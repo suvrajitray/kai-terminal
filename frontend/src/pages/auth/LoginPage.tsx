@@ -1,18 +1,10 @@
-// import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { FcGoogle } from "react-icons/fc"; // Official Google Color Icon
 
 export default function LoginPage() {
-  // const navigate = useNavigate();
-
-  // const handleLogin = () => {
-  //   // TEMP: replace with real Google OAuth
-  //   localStorage.setItem("auth", "true");
-  //   navigate("/");
-  // };
-
   const handleGoogleLogin = () => {
-    window.location.href = "http://localhost:5122/auth/google";
+    window.location.href = "https://localhost:5001/auth/google";
   };
 
   return (
@@ -28,9 +20,11 @@ export default function LoginPage() {
           </p>
 
           <Button
-            className="w-full bg-white text-black hover:bg-gray-200"
+            variant="outline" // Often used for social logins
+            className="w-full bg-white text-black hover:bg-gray-200 flex items-center justify-center gap-2"
             onClick={handleGoogleLogin}
           >
+            <FcGoogle className="h-5 w-5" /> {/* Icon added here */}
             Sign in with Google
           </Button>
         </CardContent>
