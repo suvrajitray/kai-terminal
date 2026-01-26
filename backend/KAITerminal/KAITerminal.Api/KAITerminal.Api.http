@@ -1,0 +1,6 @@
+@KAITerminal.Api_HostAddress = http://localhost:5122
+
+GET {{KAITerminal.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
