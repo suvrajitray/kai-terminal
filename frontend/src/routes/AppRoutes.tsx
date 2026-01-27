@@ -4,6 +4,7 @@ import HomePage from "@/pages/home/HomePage";
 import ConnectBrokerPage from "@/pages/broker/ConnectBrokerPage";
 import AuthCallback from "@/pages/auth/AuthCallback";
 import ProtectedRoute from "./ProtectedRoutes";
+import PositionsPage from "@/pages/positions/PositionsPage";
 
 export default function AppRoutes() {
   return (
@@ -27,6 +28,14 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <ConnectBrokerPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/positions"
+        element={
+          <ProtectedRoute>
+            <PositionsPage />
           </ProtectedRoute>
         }
       />

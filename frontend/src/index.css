@@ -123,3 +123,31 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* this if for blink animation in positions table */
+@keyframes blinkGreen {
+  0% {
+    background-color: rgba(34, 197, 94, 0.3);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+@keyframes blinkRed {
+  0% {
+    background-color: rgba(239, 68, 68, 0.3);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.animate-blink-green {
+  animation: blinkGreen 0.5s ease-out;
+}
+
+.animate-blink-red {
+  animation: blinkRed 0.5s ease-out;
+}
+/* end blink animation */
