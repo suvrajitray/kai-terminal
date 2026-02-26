@@ -1,6 +1,9 @@
+using KAITerminal.Broker.Interfaces;
+using KAITerminal.Broker.Models;
 using KAITerminal.RiskEngine.Infrastructure;
 using KAITerminal.RiskEngine.Interfaces;
 using KAITerminal.RiskEngine.Models;
+using KAITerminal.Types;
 
 namespace KAITerminal.RiskEngine.Risk;
 
@@ -26,12 +29,12 @@ public class StrikeMonitor
     _repo = repo;
   }
 
-  public async Task EvaluateTickAsync(string strategyId)
+  public async Task EvaluateTickAsync(AccessToken accessToken, string strategyId)
   {
     var state = await _repo.GetStateAsync(strategyId);
     if (state.IsSquaredOff) return;
 
-    var positions = await _positions.GetOpenPositionsAsync(strategyId);
+    var positions = await _positions.GetOpenPositionsAsync(accessToken, strategyId);
 
     foreach (var pos in positions.Where(p => p.IsOpen))
     {
@@ -39,17 +42,18 @@ public class StrikeMonitor
       if (ltp <= 0) continue;
 
       decimal threshold = pos.OptionType == "CE"
-          ? pos.AvgPrice * (1 + _config.StrikeSL.CePercent / 100)
-          : pos.AvgPrice * (1 + _config.StrikeSL.PePercent / 100);
+          ? pos.AveragePrice * (1 + _config.StrikeSL.CePercent / 100)
+          : pos.AveragePrice * (1 + _config.StrikeSL.PePercent / 100);
 
       if (ltp >= threshold)
       {
-        await HandleStrikeAsync(strategyId, pos, state);
+        await HandleStrikeAsync(accessToken, strategyId, pos, state);
       }
     }
   }
 
   private async Task HandleStrikeAsync(
+      AccessToken accessToken,
       string strategyId,
       Position pos,
       StrategyRiskState state)
@@ -59,7 +63,7 @@ public class StrikeMonitor
     if (count >= _config.StrikeSL.MaxReEntry)
       return;
 
-    await _orders.ExitPositionAsync(pos);
+    await _orders.ExitPositionAsync(accessToken, pos);
 
     count++;
     state.ReEntries[pos.Symbol] = count;
@@ -69,7 +73,7 @@ public class StrikeMonitor
 
     if (count < _config.StrikeSL.MaxReEntry)
     {
-      await _orders.TakeNextOtmAsync(pos, _config.StrikeSL.StrikeGap);
+      await _orders.TakeNextOtmAsync(accessToken, pos, _config.StrikeSL.StrikeGap);
     }
   }
 }

@@ -1,9 +1,14 @@
 using System.Security.Claims;
 using System.Text;
+using KAITerminal.Api.Models.Requests;
 using KAITerminal.Api.Services;
+using KAITerminal.Broker.Interfaces;
+using KAITerminal.Broker.Zerodha;
+using KAITerminal.Types;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -77,6 +82,18 @@ builder.Services.AddAuthorization();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
+// Kite connect settings start
+
+builder.Services.Configure<ZerodhaSettings>(
+    builder.Configuration.GetSection("Zerodha"));
+
+builder.Services.AddHttpClient<KiteConnectHttpClient>();
+
+builder.Services.AddTransient<IPositionProvider, ZerodhaPositionProvider>();
+builder.Services.AddTransient<IOrderExecutor, ZerodhaOrderExecutor>();
+builder.Services.AddTransient<ITokenGenerator, ZerodhaTokenGenerator>();
+// Kite connect settings end
+
 var app = builder.Build();
 
 app.UseCors();
@@ -142,4 +159,29 @@ app.MapGet("/debug/claims", (ClaimsPrincipal user) =>
 
 // Logout
 
+
+// Zerodha routes
+app.MapGet("/api/zerodha/positions", async ([FromHeader(Name = "X-Zerodha-AccessToken")] string accessToken, IPositionProvider positionProvider) =>
+{
+    var positions = await positionProvider.GetOpenPositionsAsync(new AccessToken(accessToken));
+    return Results.Ok(positions);
+});
+
+
+app.MapGet("/api/zerodha/mtm", async ([FromHeader(Name = "X-Zerodha-AccessToken")] string accessToken, IPositionProvider positionProvider) =>
+{
+    var mtm = await positionProvider.GetCurrentMtmAsync(new AccessToken(accessToken));
+    return Results.Ok(new { Mtm = mtm });
+});
+
+app.MapPost("/api/zerodha/access-token", async (
+    [FromBody] ZerodhaTokenRequest request,
+    ITokenGenerator tokenGenerator) =>
+{
+    var token = await tokenGenerator.GenerateAccessTokenAsync(
+        request.ApiKey,
+        request.ApiSecret,
+        request.RequestToken);
+    return Results.Ok(new { AccessToken = token.Value });
+});
 app.Run();

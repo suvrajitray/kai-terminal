@@ -1,3 +1,5 @@
+using KAITerminal.Broker.Interfaces;
+using KAITerminal.Broker.Zerodha;
 using KAITerminal.RiskEngine.Brokers.Zerodha;
 using KAITerminal.RiskEngine.Infrastructure;
 using KAITerminal.RiskEngine.Interfaces;
@@ -10,7 +12,7 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.Services.Configure<ZerodhaSettings>(
     builder.Configuration.GetSection("Zerodha"));
 
-builder.Services.AddHttpClient<KiteHttpClient>();
+builder.Services.AddHttpClient<KiteConnectHttpClient>();
 
 // ================= CONFIG =================
 
@@ -44,10 +46,9 @@ builder.Services.AddHostedService<StartupSeeder>();
 // ================= ZERODHA (STUB) =================
 
 // builder.Services.AddHttpClient();
-// builder.Services.AddSingleton<IPositionProvider, KitePositionProvider>();
+// builder.Services.AddSingleton<IPositionProvider, ZerodhaPositionProvider>();
 builder.Services.AddSingleton<IPositionProvider, DummyPositionProvider>();
-builder.Services.AddSingleton<IOrderExecutor, KiteOrderExecutor>();
-builder.Services.AddSingleton<KiteTickWebSocket>();
+builder.Services.AddSingleton<IOrderExecutor, ZerodhaOrderExecutor>();
 
 var host = builder.Build();
 host.Run();

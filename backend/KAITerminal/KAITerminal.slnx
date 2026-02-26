@@ -3,7 +3,7 @@
   <Project Path="KAITerminal.Auth/KAITerminal.Auth.csproj" />
   <Project Path="KAITerminal.Broker/KAITerminal.Broker.csproj" />
   <Project Path="KAITerminal.Console/KAITerminal.Console.csproj" />
-  <Project Path="KAITerminal.PnLWorker/KAITerminal.PnLWorker.csproj" />
   <Project Path="KAITerminal.RiskEngine/KAITerminal.RiskEngine.csproj" />
+  <Project Path="KAITerminal.Types/KAITerminal.Types.csproj" />
   <Project Path="KAITerminal.Util/KAITerminal.Util.csproj" />
 </Solution>

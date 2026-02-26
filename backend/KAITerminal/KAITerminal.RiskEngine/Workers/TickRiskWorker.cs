@@ -28,6 +28,7 @@ public class TickRiskWorker : BackgroundService
   {
     _logger.LogInformation("TickRiskWorker started");
     return; // temporarily disabled to test background worker and logging. Will re-enable after testing.
+    /*
     await foreach (var strategyId in _channel.Reader.ReadAllAsync(ct))
     {
       try
@@ -39,5 +40,6 @@ public class TickRiskWorker : BackgroundService
         _logger.LogError(ex, "Tick risk error");
       }
     }
+    */
   }
 }

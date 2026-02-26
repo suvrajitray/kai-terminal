@@ -1,63 +1,64 @@
-using KAITerminal.RiskEngine.Interfaces;
-using KAITerminal.RiskEngine.Models;
-using KAITerminal.RiskEngine.Risk;
+using KAITerminal.Broker.Interfaces;
+using KAITerminal.Broker.Models;
+using KAITerminal.Types;
+using Microsoft.Extensions.Logging;
 
-namespace KAITerminal.RiskEngine.Brokers.Zerodha;
+namespace KAITerminal.Broker.Zerodha;
 
-public class KiteOrderExecutor(
-  KiteHttpClient kite,
+public class ZerodhaOrderExecutor(
+  KiteConnectHttpClient kite,
   IPositionProvider positions,
-  ILogger<KiteOrderExecutor> logger) : IOrderExecutor
+  ILogger<ZerodhaOrderExecutor> logger) : IOrderExecutor
 {
-  public async Task ExitAllAsync(string strategyId)
+  public async Task ExitAllAsync(AccessToken accessToken, string strategyId)
   {
     logger.LogWarning("ExitAll: Attempting to exit all open positions for strategy {StrategyId}.", strategyId);
     var openPositions = (await positions
-        .GetOpenPositionsAsync(strategyId))
+        .GetOpenPositionsAsync(accessToken, strategyId))
         .Where(p => p.IsOpen)
         .OrderBy(p => p.Quantity)
         .ToList();
 
     foreach (var pos in openPositions)
     {
-      await ExitPositionAsync(pos);
+      await ExitPositionAsync(accessToken, pos);
     }
     logger.LogWarning("ExitAll: Exited {Count} open positions.", openPositions.Count);
   }
 
-  public async Task ExitPositionAsync(Position pos)
+  public async Task ExitPositionAsync(AccessToken accessToken, Position pos)
   {
     var form = new Dictionary<string, string>
     {
       ["tradingsymbol"] = pos.Symbol,
-      ["exchange"] = "NFO",
+      ["exchange"] = pos.Exchange!,
       ["transaction_type"] = pos.Quantity > 0 ? "SELL" : "BUY",
       ["order_type"] = "MARKET",
       ["quantity"] = Math.Abs(pos.Quantity).ToString(),
-      ["product"] = "NRML"
+      ["product"] = pos.Product!
     };
 
-    await kite.PostAsync("/orders/regular", form);
+    await kite.PostAsync(accessToken, "/orders/regular", form);
   }
 
-  public async Task TakeNextOtmAsync(Position pos, int strikeGap)
+  public async Task TakeNextOtmAsync(AccessToken accessToken, Position pos, int strikeGap)
   {
     var next = OtmStrikeCalculator.GetNextStrike(pos.Symbol, strikeGap);
 
     var form = new Dictionary<string, string>
     {
       ["tradingsymbol"] = next,
-      ["exchange"] = "NFO",
+      ["exchange"] = pos.Exchange!,
       ["transaction_type"] = "SELL",
       ["order_type"] = "MARKET",
       ["quantity"] = Math.Abs(pos.Quantity).ToString(),
-      ["product"] = "NRML"
+      ["product"] = pos.Product!
     };
 
-    await kite.PostAsync("/orders/regular", form);
+    await kite.PostAsync(accessToken, "/orders/regular", form);
   }
 
-  public async Task CancelAllPendingAsync(string strategyId)
+  public async Task CancelAllPendingAsync(AccessToken accessToken, string strategyId)
   {
     // Optional: implement orderbook cancel loop
     logger.LogWarning("CancelAll: Canceling all pending orders for strategy {StrategyId}.", strategyId);

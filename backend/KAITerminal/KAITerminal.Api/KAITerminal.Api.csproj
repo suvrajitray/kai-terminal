@@ -17,4 +17,8 @@
     <Folder Include="Services/" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="../KAITerminal.Broker/KAITerminal.Broker.csproj" />
+  </ItemGroup>
+
 </Project>

@@ -1,5 +1,9 @@
+using KAITerminal.Broker.Interfaces;
+using KAITerminal.Broker.Zerodha;
 using KAITerminal.RiskEngine.Interfaces;
 using KAITerminal.RiskEngine.Models;
+using KAITerminal.Types;
+using Microsoft.Extensions.Options;
 
 namespace KAITerminal.RiskEngine.Risk;
 
@@ -8,6 +12,7 @@ public class RiskEvaluator(
     IOrderExecutor orders,
     RiskConfig config,
     IRiskRepository repo,
+    IOptions<ZerodhaSettings> zerodhaSettings,
     ILogger<RiskEvaluator> logger)
 {
   public async Task EvaluateAsync(string strategyId)
@@ -15,7 +20,9 @@ public class RiskEvaluator(
     var state = await repo.GetStateAsync(strategyId);
     if (state.IsSquaredOff) return;
 
-    var mtm = await positions.GetCurrentMtmAsync(strategyId);
+    var mtm = await positions.GetCurrentMtmAsync(
+      new AccessToken(zerodhaSettings.Value.AccessToken),
+      strategyId);
 
     if (state.TrailingActivated)
     {
@@ -31,27 +38,27 @@ public class RiskEvaluator(
     if (mtm <= config.OverallStopLoss)
     {
       logger.LogInformation("Overall SL hit! MTM: {mtm}, SL: {sl}", mtm, config.OverallStopLoss);
-      await SquareOff(strategyId, "OVERALL_SL");
+      await SquareOff(new AccessToken(zerodhaSettings.Value.AccessToken), strategyId, "OVERALL_SL");
       return;
     }
 
     if (mtm >= config.OverallTarget)
     {
       logger.LogInformation("Overall Target hit! MTM: {mtm}, Target: {target}", mtm, config.OverallTarget);
-      await SquareOff(strategyId, "TARGET_HIT");
+      await SquareOff(new AccessToken(zerodhaSettings.Value.AccessToken), strategyId, "TARGET_HIT");
       return;
     }
 
     await HandleTrailing(strategyId, state, mtm);
   }
 
-  private async Task SquareOff(string strategyId, string reason)
+  private async Task SquareOff(AccessToken accessToken, string strategyId, string reason)
   {
     var marked = await repo.TryMarkSquaredOffAsync(strategyId);
     if (!marked) return;
 
-    await orders.CancelAllPendingAsync(strategyId);
-    await orders.ExitAllAsync(strategyId);
+    await orders.CancelAllPendingAsync(accessToken, strategyId);
+    await orders.ExitAllAsync(accessToken, strategyId);
 
     logger.LogInformation("[RISK] Square off: {reason}\n\n", reason);
   }
@@ -92,7 +99,7 @@ public class RiskEvaluator(
       logger.LogInformation(
         "Trailing SL hit! MTM: {mtm}, Current TSL: {tsl}",
         mtm, state.CurrentTrailingSl);
-      await SquareOff(strategyId, "TRAILING_SL");
+      await SquareOff(new AccessToken(zerodhaSettings.Value.AccessToken), strategyId, "TRAILING_SL");
     }
   }
 }

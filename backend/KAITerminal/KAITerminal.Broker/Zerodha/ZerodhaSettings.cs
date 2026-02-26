@@ -1,4 +1,4 @@
-namespace KAITerminal.RiskEngine.Brokers.Zerodha;
+namespace KAITerminal.Broker.Zerodha;
 
 public class ZerodhaSettings
 {
