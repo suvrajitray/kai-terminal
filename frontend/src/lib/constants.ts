@@ -2,7 +2,8 @@ import type { BrokerInfo } from "@/types";
 
 export const APP_NAME = "KAI Terminal";
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL ?? "https://localhost:5001";
+export const API_BASE_URL =
+  import.meta.env.VITE_API_URL ?? "https://localhost:5001";
 
 export const NAV_ITEMS = [
   { label: "Dashboard", path: "/dashboard" },
@@ -11,15 +12,6 @@ export const NAV_ITEMS = [
 
 export const BROKERS: BrokerInfo[] = [
   {
-    id: "zerodha",
-    name: "Zerodha",
-    description:
-      "India's largest retail stockbroker. Trade in equities, commodities, futures & options via Kite Connect API.",
-    color: "#387ED1",
-    features: ["Equities", "F&O", "Commodities", "WebSocket"],
-    connected: false,
-  },
-  {
     id: "upstox",
     name: "Upstox",
     description:
@@ -27,6 +19,17 @@ export const BROKERS: BrokerInfo[] = [
     color: "#7B2FF7",
     features: ["Equities", "F&O", "REST API", "WebSocket"],
     connected: false,
+    redirectPath: "/redirect/upstox",
+  },
+  {
+    id: "zerodha",
+    name: "Zerodha",
+    description:
+      "India's largest retail stockbroker. Trade in equities, commodities, futures & options via Kite Connect API.",
+    color: "#387ED1",
+    features: ["Equities", "F&O", "Commodities", "WebSocket"],
+    connected: false,
+    redirectPath: "/redirect/zerodha",
   },
   {
     id: "dhan",
@@ -36,5 +39,6 @@ export const BROKERS: BrokerInfo[] = [
     color: "#00B386",
     features: ["Equities", "F&O", "Options Chain", "WebSocket"],
     connected: false,
+    redirectPath: "/redirect/dhan",
   },
 ];

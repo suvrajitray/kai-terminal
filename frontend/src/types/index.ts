@@ -12,4 +12,11 @@ export interface BrokerInfo {
   color: string;
   features: string[];
   connected: boolean;
+  redirectPath: string;
+}
+
+export interface BrokerCredentials {
+  apiKey: string;
+  apiSecret: string;
+  redirectUrl: string;
 }
