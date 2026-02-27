@@ -1,24 +1,20 @@
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { motion } from "motion/react";
 import { Activity } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { GoogleLoginButton } from "@/components/auth/google-login-button";
 import { useAuthStore } from "@/stores/auth-store";
-import { APP_NAME, MOCK_USER } from "@/lib/constants";
+import { APP_NAME, API_BASE_URL } from "@/lib/constants";
 
 export function LoginPage() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const login = useAuthStore((s) => s.login);
-  const location = useLocation();
-
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? "/dashboard";
 
   if (isAuthenticated) {
-    return <Navigate to={from} replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   const handleLogin = () => {
-    login(MOCK_USER);
+    window.location.href = `${API_BASE_URL}/auth/google`;
   };
 
   return (
