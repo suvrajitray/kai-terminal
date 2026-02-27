@@ -1,0 +1,16 @@
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Broker/bin/Debug/net10.0/KAITerminal.Broker.deps.json
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Broker/bin/Debug/net10.0/KAITerminal.Broker.dll
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Broker/bin/Debug/net10.0/KAITerminal.Broker.pdb
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Broker/obj/Debug/net10.0/KAITerminal.Broker.GeneratedMSBuildEditorConfig.editorconfig
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Broker/obj/Debug/net10.0/KAITerminal.Broker.AssemblyInfoInputs.cache
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Broker/obj/Debug/net10.0/KAITerminal.Broker.AssemblyInfo.cs
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Broker/obj/Debug/net10.0/KAITerminal.Broker.csproj.CoreCompileInputs.cache
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Broker/obj/Debug/net10.0/KAITerminal.Broker.dll
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Broker/obj/Debug/net10.0/refint/KAITerminal.Broker.dll
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Broker/obj/Debug/net10.0/KAITerminal.Broker.pdb
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Broker/obj/Debug/net10.0/ref/KAITerminal.Broker.dll
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Broker/obj/Debug/net10.0/KAITerminal.Broker.sourcelink.json
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Broker/bin/Debug/net10.0/KAITerminal.Types.dll
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Broker/bin/Debug/net10.0/KAITerminal.Types.pdb
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Broker/obj/Debug/net10.0/KAITerminal.Broker.csproj.AssemblyReference.cache
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Broker/obj/Debug/net10.0/KAITermi.B39E6C6C.Up2Date

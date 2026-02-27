@@ -1,0 +1,12 @@
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Auth/bin/Debug/net10.0/KAITerminal.Auth.deps.json
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Auth/bin/Debug/net10.0/KAITerminal.Auth.dll
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Auth/bin/Debug/net10.0/KAITerminal.Auth.pdb
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Auth/obj/Debug/net10.0/KAITerminal.Auth.GeneratedMSBuildEditorConfig.editorconfig
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Auth/obj/Debug/net10.0/KAITerminal.Auth.AssemblyInfoInputs.cache
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Auth/obj/Debug/net10.0/KAITerminal.Auth.AssemblyInfo.cs
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Auth/obj/Debug/net10.0/KAITerminal.Auth.csproj.CoreCompileInputs.cache
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Auth/obj/Debug/net10.0/KAITerminal.Auth.dll
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Auth/obj/Debug/net10.0/refint/KAITerminal.Auth.dll
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Auth/obj/Debug/net10.0/KAITerminal.Auth.pdb
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Auth/obj/Debug/net10.0/ref/KAITerminal.Auth.dll
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Auth/obj/Debug/net10.0/KAITerminal.Auth.sourcelink.json

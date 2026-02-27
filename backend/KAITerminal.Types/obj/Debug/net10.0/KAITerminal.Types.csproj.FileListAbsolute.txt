@@ -1,0 +1,12 @@
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Types/bin/Debug/net10.0/KAITerminal.Types.deps.json
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Types/bin/Debug/net10.0/KAITerminal.Types.dll
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Types/bin/Debug/net10.0/KAITerminal.Types.pdb
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Types/obj/Debug/net10.0/KAITerminal.Types.GeneratedMSBuildEditorConfig.editorconfig
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Types/obj/Debug/net10.0/KAITerminal.Types.AssemblyInfoInputs.cache
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Types/obj/Debug/net10.0/KAITerminal.Types.AssemblyInfo.cs
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Types/obj/Debug/net10.0/KAITerminal.Types.csproj.CoreCompileInputs.cache
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Types/obj/Debug/net10.0/KAITerminal.Types.sourcelink.json
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Types/obj/Debug/net10.0/KAITerminal.Types.dll
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Types/obj/Debug/net10.0/refint/KAITerminal.Types.dll
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Types/obj/Debug/net10.0/KAITerminal.Types.pdb
+/Users/suvra/github/KAITerminal/backend/KAITerminal/KAITerminal.Types/obj/Debug/net10.0/ref/KAITerminal.Types.dll
