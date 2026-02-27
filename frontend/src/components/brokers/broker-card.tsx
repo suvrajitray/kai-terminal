@@ -63,7 +63,11 @@ export function BrokerCard({ broker }: BrokerCardProps) {
                 </Button>
               </div>
             ) : (
-              <Button className="w-full" onClick={() => setConnectOpen(true)}>
+              <Button
+                className="w-full text-white hover:opacity-90"
+                style={{ backgroundColor: broker.color }}
+                onClick={() => setConnectOpen(true)}
+              >
                 <Plug className="mr-2 size-4" />
                 Connect
               </Button>
