@@ -1,4 +1,4 @@
-namespace KAITerminal.Api.Models.Requests;
+namespace KAITerminal.Api.Models;
 
 public record struct ZerodhaTokenRequest(
     string ApiKey,
