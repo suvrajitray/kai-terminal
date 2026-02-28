@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text;
+using KAITerminal.Api.Data;
 using KAITerminal.Api.Models.Requests;
 using KAITerminal.Api.Services;
 using KAITerminal.Broker.Interfaces;
@@ -9,6 +10,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -82,6 +84,10 @@ builder.Services.AddAuthorization();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
+// SQLite via EF Core
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+
 // Kite connect settings start
 
 builder.Services.Configure<ZerodhaSettings>(
@@ -95,6 +101,13 @@ builder.Services.AddTransient<ITokenGenerator, ZerodhaTokenGenerator>();
 // Kite connect settings end
 
 var app = builder.Build();
+
+// Ensure DB and schema exist
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.EnsureCreated();
+}
 
 app.UseCors();
 app.UseAuthentication();
@@ -184,4 +197,75 @@ app.MapPost("/api/zerodha/access-token", async (
         request.RequestToken);
     return Results.Ok(new { AccessToken = token.Value });
 });
+// Broker credentials routes
+app.MapPost("/api/broker-credentials", async (
+    [FromBody] SaveBrokerCredentialRequest request,
+    ClaimsPrincipal user,
+    AppDbContext db) =>
+{
+    var username = user.FindFirstValue(ClaimTypes.Email) ?? user.FindFirst("email")?.Value;
+    if (username is null) return Results.Unauthorized();
+
+    var existing = await db.BrokerCredentials
+        .FirstOrDefaultAsync(x => x.Username == username && x.BrokerName == request.BrokerName);
+
+    if (existing is not null)
+    {
+        existing.ApiKey = request.ApiKey;
+        existing.ApiSecret = request.ApiSecret;
+        existing.UpdatedAt = DateTime.UtcNow;
+    }
+    else
+    {
+        db.BrokerCredentials.Add(new BrokerCredential
+        {
+            Username = username,
+            BrokerName = request.BrokerName,
+            ApiKey = request.ApiKey,
+            ApiSecret = request.ApiSecret,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        });
+    }
+
+    await db.SaveChangesAsync();
+    return Results.Ok();
+})
+.RequireAuthorization();
+
+app.MapGet("/api/broker-credentials", async (
+    ClaimsPrincipal user,
+    AppDbContext db) =>
+{
+    var username = user.FindFirstValue(ClaimTypes.Email) ?? user.FindFirst("email")?.Value;
+    if (username is null) return Results.Unauthorized();
+
+    var credentials = await db.BrokerCredentials
+        .Where(x => x.Username == username)
+        .Select(x => new { x.BrokerName, x.ApiKey, x.ApiSecret })
+        .ToListAsync();
+
+    return Results.Ok(credentials);
+})
+.RequireAuthorization();
+
+app.MapDelete("/api/broker-credentials/{brokerName}", async (
+    string brokerName,
+    ClaimsPrincipal user,
+    AppDbContext db) =>
+{
+    var username = user.FindFirstValue(ClaimTypes.Email) ?? user.FindFirst("email")?.Value;
+    if (username is null) return Results.Unauthorized();
+
+    var credential = await db.BrokerCredentials
+        .FirstOrDefaultAsync(x => x.Username == username && x.BrokerName == brokerName);
+
+    if (credential is null) return Results.NotFound();
+
+    db.BrokerCredentials.Remove(credential);
+    await db.SaveChangesAsync();
+    return Results.NoContent();
+})
+.RequireAuthorization();
+
 app.Run();

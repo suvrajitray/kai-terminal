@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useBrokerStore } from "@/stores/broker-store";
+import { saveBrokerCredential } from "@/services/broker-api";
 import type { BrokerInfo } from "@/types";
 
 interface ConnectBrokerDialogProps {
@@ -25,6 +26,8 @@ export function ConnectBrokerDialog({ broker, open, onOpenChange }: ConnectBroke
   const [apiKey, setApiKey] = useState("");
   const [apiSecret, setApiSecret] = useState("");
   const [copied, setCopied] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const redirectUrl = `${window.location.origin}${broker.redirectPath}`;
 
@@ -34,18 +37,27 @@ export function ConnectBrokerDialog({ broker, open, onOpenChange }: ConnectBroke
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!apiKey.trim() || !apiSecret.trim()) return;
 
-    saveCredentials(broker.id, {
-      apiKey: apiKey.trim(),
-      apiSecret: apiSecret.trim(),
-      redirectUrl,
-    });
-    setApiKey("");
-    setApiSecret("");
-    onOpenChange(false);
+    setSaving(true);
+    setError(null);
+    try {
+      await saveBrokerCredential(broker.id, apiKey.trim(), apiSecret.trim());
+      saveCredentials(broker.id, {
+        apiKey: apiKey.trim(),
+        apiSecret: apiSecret.trim(),
+        redirectUrl,
+      });
+      setApiKey("");
+      setApiSecret("");
+      onOpenChange(false);
+    } catch {
+      setError("Failed to save. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -92,12 +104,13 @@ export function ConnectBrokerDialog({ broker, open, onOpenChange }: ConnectBroke
               Copy this URL and set it as the redirect URL in your {broker.name} app settings.
             </p>
           </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!apiKey.trim() || !apiSecret.trim()}>
-              Save
+            <Button type="submit" disabled={!apiKey.trim() || !apiSecret.trim() || saving}>
+              {saving ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>
         </form>

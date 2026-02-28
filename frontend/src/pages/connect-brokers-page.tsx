@@ -1,8 +1,29 @@
+import { useEffect } from "react";
 import { motion } from "motion/react";
 import { BROKERS } from "@/lib/constants";
 import { BrokerCard } from "@/components/brokers/broker-card";
+import { useBrokerStore } from "@/stores/broker-store";
+import { fetchBrokerCredentials } from "@/services/broker-api";
 
 export function ConnectBrokersPage() {
+  const saveCredentials = useBrokerStore((s) => s.saveCredentials);
+
+  useEffect(() => {
+    fetchBrokerCredentials()
+      .then((credentials) => {
+        for (const cred of credentials) {
+          saveCredentials(cred.brokerName, {
+            apiKey: cred.apiKey,
+            apiSecret: cred.apiSecret,
+            redirectUrl: `${window.location.origin}/redirect/${cred.brokerName}`,
+          });
+        }
+      })
+      .catch(() => {
+        // silently ignore — store may already have persisted data
+      });
+  }, [saveCredentials]);
+
   return (
     <div className="space-y-6">
       <div>
