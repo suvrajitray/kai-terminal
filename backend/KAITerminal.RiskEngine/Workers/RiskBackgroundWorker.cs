@@ -39,7 +39,7 @@ public class RiskBackgroundWorker : BackgroundService
         _logger.LogError(ex, "Risk evaluation error");
       }
 
-      await Task.Delay(TimeSpan.FromSeconds(3), ct);
+      await Task.Delay(TimeSpan.FromSeconds(60), ct);
     }
   }
 }

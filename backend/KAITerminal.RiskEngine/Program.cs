@@ -1,6 +1,5 @@
 using KAITerminal.Broker.Interfaces;
 using KAITerminal.Broker.Upstox;
-using KAITerminal.RiskEngine.Brokers.Upstox;
 using KAITerminal.RiskEngine.Infrastructure;
 using KAITerminal.RiskEngine.Interfaces;
 using KAITerminal.RiskEngine.Models;
@@ -16,11 +15,8 @@ builder.Services.AddHttpClient<UpstoxHttpClient>();
 
 // ================= CONFIG =================
 
-builder.Services.AddSingleton(new RiskConfig
-{
-  OverallStopLoss = -25000,
-  OverallTarget = 25000,
-});
+var riskConfig = builder.Configuration.GetSection("RiskEngine").Get<RiskConfig>() ?? new RiskConfig();
+builder.Services.AddSingleton(riskConfig);
 
 // ================= CORE =================
 
@@ -33,21 +29,16 @@ builder.Services.AddSingleton<IStrategyProvider, InMemoryStrategyProvider>();
 builder.Services.AddSingleton<StrikeMonitor>();
 builder.Services.AddSingleton<RiskEvaluator>();
 
+// ================= UPSTOX =================
+
+builder.Services.AddSingleton<IPositionProvider, UpstoxPositionProvider>();
+builder.Services.AddSingleton<IOrderExecutor, UpstoxOrderExecutor>();
+
 // ================= WORKERS =================
 
-builder.Services.AddSingleton<TickRiskWorker>();
-builder.Services.AddHostedService(sp => sp.GetRequiredService<TickRiskWorker>());
 builder.Services.AddHostedService<RiskBackgroundWorker>();
-
-// 🔥 TODO: Following two services are for testing simulation.
-builder.Services.AddSingleton<UpstoxTickWebSocket>();
-builder.Services.AddHostedService<DummyTickGenerator>();
+builder.Services.AddHostedService<StrikeRiskWorker>();
 builder.Services.AddHostedService<StartupSeeder>();
-
-// ================= UPSTOX (STUB) =================
-
-builder.Services.AddSingleton<IPositionProvider, DummyPositionProvider>();
-builder.Services.AddSingleton<IOrderExecutor, UpstoxOrderExecutor>();
 
 var host = builder.Build();
 host.Run();
