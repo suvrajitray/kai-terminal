@@ -1,6 +1,6 @@
 using KAITerminal.Api.Services;
 using KAITerminal.Broker.Interfaces;
-using KAITerminal.Broker.Zerodha;
+using KAITerminal.Broker.Upstox;
 
 namespace KAITerminal.Api.Extensions;
 
@@ -8,13 +8,13 @@ public static class BrokerExtensions
 {
     public static IServiceCollection AddBrokerServices(this IServiceCollection services, IConfiguration config)
     {
-        services.Configure<ZerodhaSettings>(config.GetSection("Zerodha"));
+        services.Configure<UpstoxSettings>(config.GetSection("Upstox"));
 
-        services.AddHttpClient<KiteConnectHttpClient>();
+        services.AddHttpClient<UpstoxHttpClient>();
 
-        services.AddTransient<IPositionProvider, ZerodhaPositionProvider>();
-        services.AddTransient<IOrderExecutor, ZerodhaOrderExecutor>();
-        services.AddTransient<ITokenGenerator, ZerodhaTokenGenerator>();
+        services.AddTransient<IPositionProvider, UpstoxPositionProvider>();
+        services.AddTransient<IOrderExecutor, UpstoxOrderExecutor>();
+        services.AddTransient<ITokenGenerator, UpstoxTokenGenerator>();
 
         services.AddScoped<BrokerCredentialService>();
 

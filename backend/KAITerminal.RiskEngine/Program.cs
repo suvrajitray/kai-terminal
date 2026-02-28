@@ -1,6 +1,6 @@
 using KAITerminal.Broker.Interfaces;
-using KAITerminal.Broker.Zerodha;
-using KAITerminal.RiskEngine.Brokers.Zerodha;
+using KAITerminal.Broker.Upstox;
+using KAITerminal.RiskEngine.Brokers.Upstox;
 using KAITerminal.RiskEngine.Infrastructure;
 using KAITerminal.RiskEngine.Interfaces;
 using KAITerminal.RiskEngine.Models;
@@ -9,10 +9,10 @@ using KAITerminal.RiskEngine.Workers;
 
 var builder = Host.CreateApplicationBuilder(args);
 
-builder.Services.Configure<ZerodhaSettings>(
-    builder.Configuration.GetSection("Zerodha"));
+builder.Services.Configure<UpstoxSettings>(
+    builder.Configuration.GetSection("Upstox"));
 
-builder.Services.AddHttpClient<KiteConnectHttpClient>();
+builder.Services.AddHttpClient<UpstoxHttpClient>();
 
 // ================= CONFIG =================
 
@@ -40,15 +40,14 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<TickRiskWorker>())
 builder.Services.AddHostedService<RiskBackgroundWorker>();
 
 // 🔥 TODO: Following two services are for testing simulation.
+builder.Services.AddSingleton<UpstoxTickWebSocket>();
 builder.Services.AddHostedService<DummyTickGenerator>();
 builder.Services.AddHostedService<StartupSeeder>();
 
-// ================= ZERODHA (STUB) =================
+// ================= UPSTOX (STUB) =================
 
-// builder.Services.AddHttpClient();
-// builder.Services.AddSingleton<IPositionProvider, ZerodhaPositionProvider>();
 builder.Services.AddSingleton<IPositionProvider, DummyPositionProvider>();
-builder.Services.AddSingleton<IOrderExecutor, ZerodhaOrderExecutor>();
+builder.Services.AddSingleton<IOrderExecutor, UpstoxOrderExecutor>();
 
 var host = builder.Build();
 host.Run();

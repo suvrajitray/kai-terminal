@@ -1,5 +1,5 @@
 using KAITerminal.Broker.Interfaces;
-using KAITerminal.Broker.Zerodha;
+using KAITerminal.Broker.Upstox;
 using KAITerminal.RiskEngine.Interfaces;
 using KAITerminal.RiskEngine.Models;
 using KAITerminal.Types;
@@ -12,7 +12,7 @@ public class RiskEvaluator(
     IOrderExecutor orders,
     RiskConfig config,
     IRiskRepository repo,
-    IOptions<ZerodhaSettings> zerodhaSettings,
+    IOptions<UpstoxSettings> upstoxSettings,
     ILogger<RiskEvaluator> logger)
 {
   public async Task EvaluateAsync(string strategyId)
@@ -21,7 +21,7 @@ public class RiskEvaluator(
     if (state.IsSquaredOff) return;
 
     var mtm = await positions.GetCurrentMtmAsync(
-      new AccessToken(zerodhaSettings.Value.AccessToken),
+      new AccessToken(upstoxSettings.Value.AccessToken),
       strategyId);
 
     if (state.TrailingActivated)
@@ -38,14 +38,14 @@ public class RiskEvaluator(
     if (mtm <= config.OverallStopLoss)
     {
       logger.LogInformation("Overall SL hit! MTM: {mtm}, SL: {sl}", mtm, config.OverallStopLoss);
-      await SquareOff(new AccessToken(zerodhaSettings.Value.AccessToken), strategyId, "OVERALL_SL");
+      await SquareOff(new AccessToken(upstoxSettings.Value.AccessToken), strategyId, "OVERALL_SL");
       return;
     }
 
     if (mtm >= config.OverallTarget)
     {
       logger.LogInformation("Overall Target hit! MTM: {mtm}, Target: {target}", mtm, config.OverallTarget);
-      await SquareOff(new AccessToken(zerodhaSettings.Value.AccessToken), strategyId, "TARGET_HIT");
+      await SquareOff(new AccessToken(upstoxSettings.Value.AccessToken), strategyId, "TARGET_HIT");
       return;
     }
 
@@ -99,7 +99,7 @@ public class RiskEvaluator(
       logger.LogInformation(
         "Trailing SL hit! MTM: {mtm}, Current TSL: {tsl}",
         mtm, state.CurrentTrailingSl);
-      await SquareOff(new AccessToken(zerodhaSettings.Value.AccessToken), strategyId, "TRAILING_SL");
+      await SquareOff(new AccessToken(upstoxSettings.Value.AccessToken), strategyId, "TRAILING_SL");
     }
   }
 }

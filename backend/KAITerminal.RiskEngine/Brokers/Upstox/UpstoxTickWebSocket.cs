@@ -2,15 +2,15 @@ using KAITerminal.RiskEngine.Infrastructure;
 using KAITerminal.RiskEngine.Interfaces;
 using KAITerminal.RiskEngine.Workers;
 
-namespace KAITerminal.RiskEngine.Brokers.Zerodha;
+namespace KAITerminal.RiskEngine.Brokers.Upstox;
 
-public class KiteTickWebSocket
+public class UpstoxTickWebSocket
 {
   private readonly PriceCache _cache;
   private readonly TickRiskWorker _worker;
   private readonly IStrategyProvider _strategies;
 
-  public KiteTickWebSocket(
+  public UpstoxTickWebSocket(
       PriceCache cache,
       TickRiskWorker worker,
       IStrategyProvider strategies)

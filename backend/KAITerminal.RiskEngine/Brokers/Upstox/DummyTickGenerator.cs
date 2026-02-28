@@ -1,14 +1,12 @@
-using KAITerminal.RiskEngine.Brokers.Zerodha;
-
 namespace KAITerminal.RiskEngine.Workers;
 
 public class DummyTickGenerator : BackgroundService
 {
-  private readonly KiteTickWebSocket _ws;
+  private readonly KAITerminal.RiskEngine.Brokers.Upstox.UpstoxTickWebSocket _ws;
   private readonly ILogger<DummyTickGenerator> _logger;
 
   public DummyTickGenerator(
-      KiteTickWebSocket ws,
+      KAITerminal.RiskEngine.Brokers.Upstox.UpstoxTickWebSocket ws,
       ILogger<DummyTickGenerator> logger)
   {
     _ws = ws;

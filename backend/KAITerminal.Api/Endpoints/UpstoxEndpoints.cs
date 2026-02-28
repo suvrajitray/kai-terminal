@@ -5,14 +5,14 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace KAITerminal.Api.Endpoints;
 
-public static class ZerodhaEndpoints
+public static class UpstoxEndpoints
 {
-    public static void MapZerodhaEndpoints(this IEndpointRouteBuilder app)
+    public static void MapUpstoxEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/zerodha");
+        var group = app.MapGroup("/api/upstox");
 
         group.MapGet("/positions", async (
-            [FromHeader(Name = "X-Zerodha-AccessToken")] string accessToken,
+            [FromHeader(Name = "X-Upstox-AccessToken")] string accessToken,
             IPositionProvider positionProvider) =>
         {
             var positions = await positionProvider.GetOpenPositionsAsync(new AccessToken(accessToken));
@@ -20,7 +20,7 @@ public static class ZerodhaEndpoints
         });
 
         group.MapGet("/mtm", async (
-            [FromHeader(Name = "X-Zerodha-AccessToken")] string accessToken,
+            [FromHeader(Name = "X-Upstox-AccessToken")] string accessToken,
             IPositionProvider positionProvider) =>
         {
             var mtm = await positionProvider.GetCurrentMtmAsync(new AccessToken(accessToken));
@@ -28,13 +28,13 @@ public static class ZerodhaEndpoints
         });
 
         group.MapPost("/access-token", async (
-            [FromBody] ZerodhaTokenRequest request,
+            [FromBody] UpstoxTokenRequest request,
             ITokenGenerator tokenGenerator) =>
         {
             var token = await tokenGenerator.GenerateAccessTokenAsync(
                 request.ApiKey,
                 request.ApiSecret,
-                request.RequestToken);
+                request.Code);
             return Results.Ok(new { AccessToken = token.Value });
         });
     }

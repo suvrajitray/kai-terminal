@@ -24,7 +24,7 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.MapAuthEndpoints();
-app.MapZerodhaEndpoints();
+app.MapUpstoxEndpoints();
 app.MapBrokerCredentialsEndpoints();
 
 if (app.Environment.IsDevelopment())

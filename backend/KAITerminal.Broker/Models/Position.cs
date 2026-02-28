@@ -11,6 +11,5 @@ public class Position
   public bool IsOpen { get; set; }
   public decimal Pnl { get; set; }
   public string? Exchange { get; set; }
-  public string? Segment { get; set; }
-  public long InstrumentToken { get; set; } = default!;
+  public string InstrumentKey { get; set; } = string.Empty;
 }
