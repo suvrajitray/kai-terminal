@@ -1,6 +1,5 @@
 using System.Text.Json;
 using KAITerminal.Broker.Interfaces;
-using KAITerminal.Broker.Models;
 using KAITerminal.Broker.Util;
 using KAITerminal.Types;
 using Microsoft.Extensions.Logging;
