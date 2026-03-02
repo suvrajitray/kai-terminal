@@ -1,9 +1,7 @@
-using System.Text;
 using KAITerminal.RiskEngine.Abstractions;
 using KAITerminal.RiskEngine.Configuration;
 using KAITerminal.RiskEngine.Models;
 using KAITerminal.Upstox;
-using KAITerminal.Upstox.Models.Responses;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -42,29 +40,23 @@ public sealed class RiskEvaluator
             return;
         }
 
-        IReadOnlyList<Position> positions;
+        decimal mtm;
         try
         {
-            positions = await _upstox.GetAllPositionsAsync(ct);
+            mtm = await _upstox.GetTotalMtmAsync(ct);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Portfolio check: failed to fetch positions for userId={UserId}", userId);
+            _logger.LogWarning(ex, "Portfolio check: failed to fetch MTM for userId={UserId}", userId);
             return;
         }
 
-        decimal mtm = positions.Sum(p => p.Pnl);
-
-        _logger.LogInformation(
-            "Portfolio check: userId={UserId} MTM={Mtm:+0.##;-0.##}\n{Table}",
-            userId, mtm, BuildPositionsTable(positions));
+        LogStatus(userId, mtm, state);
 
         // ── 1. Hard stop loss ────────────────────────────────────────────────
         if (mtm <= _cfg.HardStopLoss)
         {
-            _logger.LogWarning(
-                "Hard stop loss triggered for userId={UserId} (MTM={Mtm}) — exiting all positions",
-                userId, mtm);
+            _logger.LogWarning("Hard SL hit for userId={UserId} — exiting all positions", userId);
             await SquareOffAsync(userId, state, ct);
             return;
         }
@@ -72,9 +64,7 @@ public sealed class RiskEvaluator
         // ── 2. Profit target ─────────────────────────────────────────────────
         if (mtm >= _cfg.ProfitTarget)
         {
-            _logger.LogInformation(
-                "Profit target reached for userId={UserId} (MTM={Mtm}) — exiting all positions",
-                userId, mtm);
+            _logger.LogInformation("Target hit for userId={UserId} — exiting all positions", userId);
             await SquareOffAsync(userId, state, ct);
             return;
         }
@@ -89,13 +79,12 @@ public sealed class RiskEvaluator
                 state.TrailingLastTrigger = mtm;
                 _repo.Update(userId, state);
                 _logger.LogInformation(
-                    "Trailing SL activated for userId={UserId}: stop={Stop}, lastTrigger={LastTrigger}",
-                    userId, state.TrailingStop, state.TrailingLastTrigger);
+                    "Trailing SL activated for userId={UserId}  stop={Stop:+0;-0}  locked-in={Lock:+0;-0}",
+                    userId, state.TrailingStop, _cfg.TrailingInitialLock);
             }
         }
         else
         {
-            // Raise the trailing stop if MTM has moved up by StepGain since last trigger
             decimal gain = mtm - state.TrailingLastTrigger;
             if (gain >= _cfg.TrailingStepGain)
             {
@@ -104,17 +93,33 @@ public sealed class RiskEvaluator
                 state.TrailingLastTrigger += steps * _cfg.TrailingStepGain;
                 _repo.Update(userId, state);
                 _logger.LogInformation(
-                    "Trailing SL raised for userId={UserId}: stop={Stop}, lastTrigger={LastTrigger}",
-                    userId, state.TrailingStop, state.TrailingLastTrigger);
+                    "Trailing SL raised for userId={UserId}  stop={Stop:+0;-0}",
+                    userId, state.TrailingStop);
             }
 
             if (mtm <= state.TrailingStop)
             {
                 _logger.LogWarning(
-                    "Trailing SL hit for userId={UserId} (MTM={Mtm} ≤ stop={Stop}) — exiting all positions",
+                    "Trailing SL hit for userId={UserId}  MTM={Mtm:+0;-0}  stop={Stop:+0;-0} — exiting all positions",
                     userId, mtm, state.TrailingStop);
                 await SquareOffAsync(userId, state, ct);
             }
+        }
+    }
+
+    private void LogStatus(string userId, decimal mtm, UserRiskState state)
+    {
+        if (state.TrailingActive)
+        {
+            _logger.LogInformation(
+                "[{UserId}]  PnL={Mtm:+0;-0}  Target={Target:+0}  TSL={Stop:+0;-0}",
+                userId, mtm, _cfg.ProfitTarget, state.TrailingStop);
+        }
+        else
+        {
+            _logger.LogInformation(
+                "[{UserId}]  PnL={Mtm:+0;-0}  SL={Sl:0}  Target={Target:+0}  TSL=inactive (activates at {Threshold:+0})",
+                userId, mtm, _cfg.HardStopLoss, _cfg.ProfitTarget, _cfg.TrailingActivationThreshold);
         }
     }
 
@@ -130,40 +135,5 @@ public sealed class RiskEvaluator
         {
             _logger.LogError(ex, "Failed to exit all positions for userId={UserId}", userId);
         }
-    }
-
-    private static string BuildPositionsTable(IReadOnlyList<Position> positions)
-    {
-        var open = positions.ToList();
-        if (open.Count == 0)
-            return "  (no positions)";
-
-        const int colSymbol = -28; // left-aligned
-        const int colQty    =   6;
-        const int colAvg    =   9;
-        const int colLtp    =   9;
-        const int colPnl    =  11;
-
-        var sb = new StringBuilder();
-
-        // Header
-        sb.AppendLine(
-            $"  {"Symbol",colSymbol} {"Qty",colQty} {"Avg",colAvg} {"LTP",colLtp} {"P&L",colPnl}");
-        sb.AppendLine("  " + new string('─', 28 + 6 + 9 + 9 + 11 + 4));
-
-        foreach (var p in open)
-        {
-            string pnlStr = p.Pnl >= 0 ? $"+{p.Pnl:F2}" : $"{p.Pnl:F2}";
-            sb.AppendLine(
-                $"  {p.TradingSymbol,colSymbol} {p.Quantity,colQty} {p.AveragePrice,colAvg:F2} {p.LastPrice,colLtp:F2} {pnlStr,colPnl}");
-        }
-
-        sb.Append("  " + new string('─', 28 + 6 + 9 + 9 + 11 + 4));
-        decimal totalPnl = open.Sum(p => p.Pnl);
-        string totalStr = totalPnl >= 0 ? $"+{totalPnl:F2}" : $"{totalPnl:F2}";
-        sb.AppendLine();
-        sb.Append($"  {"Total MTM",colSymbol} {"",colQty} {"",colAvg} {"",colLtp} {totalStr,colPnl}");
-
-        return sb.ToString();
     }
 }
