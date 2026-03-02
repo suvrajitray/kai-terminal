@@ -55,4 +55,14 @@ public class UpstoxHttpClient
         _logger.LogDebug("POST JSON to {Url}", url);
         return await _http.PostAsJsonAsync(url, body, ct);
     }
+
+    public async Task<HttpResponseMessage> DeleteAsync(
+        AccessToken token,
+        string url,
+        CancellationToken ct = default)
+    {
+        SetBearer(token);
+        _logger.LogDebug("DELETE {Url}", url);
+        return await _http.DeleteAsync(url, ct);
+    }
 }

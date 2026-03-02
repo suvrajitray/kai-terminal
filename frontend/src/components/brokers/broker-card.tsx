@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { ConnectBrokerDialog } from "./connect-broker-dialog";
 import { BrokerSettingsDialog } from "./broker-settings-dialog";
 import { useBrokerStore } from "@/stores/broker-store";
-import { API_BASE_URL } from "@/lib/constants";
 import type { BrokerInfo } from "@/types";
 
 interface BrokerCardProps {
@@ -16,11 +15,19 @@ interface BrokerCardProps {
 
 export function BrokerCard({ broker }: BrokerCardProps) {
   const isConnected = useBrokerStore((s) => s.isConnected(broker.id));
+  const getCredentials = useBrokerStore((s) => s.getCredentials);
   const [connectOpen, setConnectOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const handleAuthenticate = () => {
-    window.location.href = `${API_BASE_URL}/auth/${broker.id}`;
+    const creds = getCredentials(broker.id);
+    if (!creds) return;
+    const params = new URLSearchParams({
+      response_type: "code",
+      client_id: creds.apiKey,
+      redirect_uri: creds.redirectUrl,
+    });
+    window.location.href = `https://api.upstox.com/v2/login/authorization/dialog?${params.toString()}`;
   };
 
   return (

@@ -1,0 +1,140 @@
+syntax = "proto3";
+
+package com.upstox.marketdatafeeder.rpc.proto;
+
+option csharp_namespace = "KAITerminal.Upstox.Protos";
+
+// ─── Top-level response ───────────────────────────────────────────────────────
+
+message FeedResponse {
+  Type type = 1;
+  map<string, Feed> feeds = 2;
+  int64 currentTs = 3;
+  MarketInfo marketInfo = 4;
+
+  enum Type {
+    Initial_Feed = 0;
+    Live_Feed    = 1;
+    Market_Info  = 2;
+  }
+}
+
+// ─── Per-instrument feed (one active field via oneof) ─────────────────────────
+
+message Feed {
+  oneof FeedUnion {
+    LTPC                 ltpc                 = 1;
+    FullFeed             fullFeed             = 2;
+    FirstLevelWithGreeks firstLevelWithGreeks = 3;
+    FullD30              fullD30              = 4;
+  }
+}
+
+// ─── LTPC mode ────────────────────────────────────────────────────────────────
+
+message LTPC {
+  double ltp = 1;
+  int64  ltt = 2;
+  int64  ltq = 3;
+  double cp  = 4;
+}
+
+// ─── Full mode ────────────────────────────────────────────────────────────────
+
+message FullFeed {
+  MarketFF marketFF = 1;
+  IndexFF  indexFF  = 2;
+}
+
+message MarketFF {
+  LTPC              ltpc         = 1;
+  int64             vtt          = 2;
+  double            atp          = 3;
+  double            oi           = 4;
+  double            iv           = 5;
+  Depth             depth        = 6;
+  repeated OHLCData ohlcData     = 7;
+  OptionGreeks      optionGreeks = 8;
+}
+
+message IndexFF {
+  LTPC              ltpc     = 1;
+  repeated OHLCData ohlcData = 2;
+}
+
+// ─── OptionGreeks mode ────────────────────────────────────────────────────────
+
+message FirstLevelWithGreeks {
+  LTPC         ltpc         = 1;
+  int64        vtt          = 2;
+  double       atp          = 3;
+  double       oi           = 4;
+  double       iv           = 5;
+  OptionGreeks optionGreeks = 6;
+  Depth        depth        = 7;
+}
+
+// ─── FullD30 mode (30-level depth) ───────────────────────────────────────────
+
+message FullD30 {
+  MarketFullD30 marketFullD30 = 1;
+  IndexFullD30  indexFullD30  = 2;
+}
+
+message MarketFullD30 {
+  LTPC              ltpc         = 1;
+  int64             vtt          = 2;
+  double            atp          = 3;
+  double            oi           = 4;
+  double            iv           = 5;
+  DepthD30          depthD30     = 6;
+  repeated OHLCData ohlcData     = 7;
+  OptionGreeks      optionGreeks = 8;
+}
+
+message IndexFullD30 {
+  LTPC              ltpc     = 1;
+  repeated OHLCData ohlcData = 2;
+}
+
+// ─── Shared sub-messages ─────────────────────────────────────────────────────
+
+message Depth {
+  repeated BidAsk bid = 1;
+  repeated BidAsk ask = 2;
+}
+
+message DepthD30 {
+  repeated BidAsk bid = 1;
+  repeated BidAsk ask = 2;
+}
+
+message BidAsk {
+  int64  quantity = 1;
+  double price    = 2;
+  int32  orders   = 3;
+}
+
+message OHLCData {
+  string interval = 1;
+  double open     = 2;
+  double high     = 3;
+  double low      = 4;
+  double close    = 5;
+  int64  vol      = 6;
+  int64  ts       = 7;
+}
+
+message OptionGreeks {
+  double vega  = 1;
+  double theta = 2;
+  double gamma = 3;
+  double delta = 4;
+  double iv    = 5;
+}
+
+// ─── Market-level info ────────────────────────────────────────────────────────
+
+message MarketInfo {
+  map<string, string> segmentStatus = 1;
+}
