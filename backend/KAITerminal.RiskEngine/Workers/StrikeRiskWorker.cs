@@ -33,6 +33,12 @@ public sealed class StrikeRiskWorker : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        if (!_cfg.EnableStrikeWorker)
+        {
+            _logger.LogInformation("StrikeRiskWorker disabled via config — not running");
+            return;
+        }
+
         _logger.LogInformation("StrikeRiskWorker started (interval={Interval}s)", _cfg.StrikeCheckIntervalSeconds);
 
         while (!stoppingToken.IsCancellationRequested)

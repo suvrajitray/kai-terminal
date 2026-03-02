@@ -128,7 +128,7 @@ See [backend/KAITerminal.RiskEngine/README.md](backend/KAITerminal.RiskEngine/RE
 |---|---|---|
 | Hard Stop Loss | MTM ≤ −₹25,000 | Square off all positions |
 | Profit Target | MTM ≥ +₹25,000 | Square off all positions |
-| Trailing Stop Loss | Activates at +₹5,000 (`TSLActivateAt`) | Stop locked at ₹2,000 (`LockProfitAt`); raises ₹500 (`IncreaseTSLBy`) every ₹1,000 gain (`WhenProfitIncreasesBy`) |
+| Trailing Stop Loss | Activates at +₹5,000 (`TSLActivateAt`) | Stop locked at ₹2,000 (`LockProfitAt`); raises ₹500 (`IncreaseTSLBy`) every ₹1,000 gain (`WhenProfitIncreasesBy`). Disable with `EnableTrailingStopLoss: false` |
 
 **Per-strike risk** (5-second loop):
 
@@ -136,6 +136,8 @@ See [backend/KAITerminal.RiskEngine/README.md](backend/KAITerminal.RiskEngine/RE
 |---|---|---|
 | CE | Loss > 20% | Exit; re-enter OTM1 (max 2 re-entries) |
 | PE | Loss > 30% | Exit; re-enter OTM1 (max 2 re-entries) |
+
+Disable the strike worker entirely with `EnableStrikeWorker: false`.
 
 All thresholds live in `appsettings.json` under `RiskEngine` — no code changes needed to tune them.
 

@@ -70,6 +70,8 @@ public sealed class RiskEvaluator
         }
 
         // ── 3. Trailing stop loss ────────────────────────────────────────────
+        if (!_cfg.EnableTrailingStopLoss) return;
+
         if (!state.TrailingActive)
         {
             if (mtm >= _cfg.TSLActivateAt)

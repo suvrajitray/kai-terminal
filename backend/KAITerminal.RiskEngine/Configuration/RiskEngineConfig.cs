@@ -26,6 +26,10 @@ public sealed class RiskEngineConfig
     public int    StrikeGap         { get; set; } = 100;
     public int    MaxReentries      { get; set; } = 2;
 
+    // ── Feature flags ───────────────────────────────────────────────────────
+    public bool EnableTrailingStopLoss { get; set; } = true;
+    public bool EnableStrikeWorker     { get; set; } = true;
+
     // ── Loop intervals ──────────────────────────────────────────────────────
     public int PortfolioCheckIntervalSeconds { get; set; } = 60;
     public int StrikeCheckIntervalSeconds    { get; set; } = 5;

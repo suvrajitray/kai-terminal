@@ -173,10 +173,12 @@ All settings live under the `RiskEngine` key in `appsettings.json`. No code chan
   "RiskEngine": {
     "HardStopLoss": -25000,
     "ProfitTarget": 25000,
+    "EnableTrailingStopLoss": true,
     "TSLActivateAt": 5000,
     "LockProfitAt": 2000,
     "WhenProfitIncreasesBy": 1000,
     "IncreaseTSLBy": 500,
+    "EnableStrikeWorker": true,
     "CeStopLossPercent": 0.20,
     "PeStopLossPercent": 0.30,
     "MaxReentries": 2,
@@ -193,10 +195,12 @@ All settings live under the `RiskEngine` key in `appsettings.json`. No code chan
 |---|---|---|
 | `HardStopLoss` | −25,000 | Square off immediately if MTM hits this |
 | `ProfitTarget` | +25,000 | Square off immediately if MTM hits this |
+| `EnableTrailingStopLoss` | `true` | Set to `false` to disable trailing SL entirely; only hard SL and profit target apply |
 | `TSLActivateAt` | +5,000 | MTM level that arms the trailing SL |
 | `LockProfitAt` | +2,000 | Trailing stop value the moment TSL arms — your guaranteed floor |
 | `WhenProfitIncreasesBy` | +1,000 | MTM must gain this much from last step to raise the stop |
 | `IncreaseTSLBy` | +500 | How much the stop rises each time the profit step is crossed |
+| `EnableStrikeWorker` | `true` | Set to `false` to disable per-strike CE/PE checks entirely |
 | `CeStopLossPercent` | 0.20 (20%) | CE loss threshold relative to entry price |
 | `PeStopLossPercent` | 0.30 (30%) | PE loss threshold relative to entry price |
 | `MaxReentries` | 2 | Max OTM re-entries after a strike SL |
