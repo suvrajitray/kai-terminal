@@ -23,7 +23,7 @@ Consumer (ASP.NET Core / Worker Service)
     ↓
 UpstoxClient         (Facade — single public entry point, delegates to services)
     ↓
-Services             (IPositionService, IOrderService, IOptionService,
+Services             (IAuthService, IPositionService, IOrderService, IOptionService,
                       IMarketDataStreamer, IPortfolioStreamer)
     ↓
 UpstoxHttpClient     (Internal HTTP layer — REST calls, JSON, error handling)
@@ -35,19 +35,24 @@ Upstox REST API v2/v3 + WebSocket feeds
 
 - **`UpstoxClient.cs`** — Facade exposing all SDK features as async methods. Consumers inject this.
 - **`UpstoxTokenContext.cs`** — Public `AsyncLocal<string?>` ambient token. Set per-call to override the configured token (multi-user pattern).
-- **`Extensions/ServiceCollectionExtensions.cs`** — `AddUpstoxSdk()` registers all services and wires `UpstoxAuthHandler` into both named HttpClients.
-- **`Http/UpstoxHttpClient.cs`** — Wraps all REST calls; handles JSON, errors, and envelope unwrapping.
+- **`Extensions/ServiceCollectionExtensions.cs`** — `AddUpstoxSdk()` registers all services and wires `UpstoxAuthHandler` into the named HttpClients.
+- **`Http/UpstoxHttpClient.cs`** — Wraps all REST calls; handles JSON, errors, and envelope unwrapping. The token exchange endpoint bypasses the envelope handler (raw JSON response).
 - **`Http/UpstoxAuthHandler.cs`** — `DelegatingHandler` that injects `Authorization: Bearer` per request. Reads `UpstoxTokenContext.Current` first, falls back to `UpstoxConfig.AccessToken`.
 - **`Configuration/UpstoxConfig.cs`** — Config model. `AccessToken` is `string?` (nullable); omit it when using per-call tokens.
 - **`Exceptions/UpstoxException.cs`** — Unified exception with `HttpStatusCode`, `ErrorCode`, and `ApiErrors`.
 - **`Protos/MarketDataFeedV3.cs`** — Pre-generated protobuf C# file (do not delete; see Protobuf note below).
 
-### Two Named HttpClients
+### Three Named HttpClients
 
-- **"UpstoxApi"** → `https://api.upstox.com` — read-only REST (positions, orders, option chain)
-- **"UpstoxHft"** → `https://api-hft.upstox.com` — order writes (lower latency HFT endpoint)
+- **"UpstoxApi"** → `https://api.upstox.com` — read-only REST (positions, orders, option chain); has `UpstoxAuthHandler`
+- **"UpstoxHft"** → `https://api-hft.upstox.com` — order writes (lower latency HFT endpoint); has `UpstoxAuthHandler`
+- **"UpstoxAuth"** → `https://api.upstox.com` — OAuth token exchange only; **no** `UpstoxAuthHandler` (no Bearer header)
 
-Both clients have `UpstoxAuthHandler` registered as a message handler. The `Authorization` header is **not** set in `DefaultRequestHeaders` — it is injected per request by the handler.
+The `Authorization` header is **not** set in `DefaultRequestHeaders` on any client — it is injected per request by `UpstoxAuthHandler`.
+
+### Token Generation (OAuth 2.0)
+
+`IAuthService` / `AuthService` handles the authorization code → access token exchange. It calls `POST /v2/login/authorization/token` with `application/x-www-form-urlencoded` body via the `"UpstoxAuth"` client. The response is plain JSON (not the standard `UpstoxEnvelope<T>` wrapper), so `UpstoxHttpClient.GenerateTokenAsync` deserializes it directly. All four OAuth parameters (`clientId`, `clientSecret`, `redirectUri`, `authorizationCode`) are passed as method arguments — they are **not** stored in `UpstoxConfig`.
 
 ### WebSocket Streamers
 
@@ -68,6 +73,22 @@ protoc --csharp_out=Protos --proto_path=Protos Protos/MarketDataFeedV3.proto
 ```
 
 ## Consumer Integration Patterns
+
+### Token generation (OAuth 2.0)
+
+```csharp
+// Step 1: redirect user to Upstox login
+// https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id=...&redirect_uri=...
+
+// Step 2: exchange the code returned in the redirect callback
+TokenResponse token = await upstoxClient.GenerateTokenAsync(
+    clientId:          "api_key",
+    clientSecret:      "api_secret",
+    redirectUri:       "https://your-app/callback",
+    authorizationCode: "code_from_redirect");
+
+// Step 3: use token.AccessToken for all subsequent API calls
+```
 
 ### Single-user / Worker Service (static token in config)
 
@@ -126,3 +147,4 @@ app.Use(async (ctx, next) =>
 - Response models use `[JsonPropertyName]` with camelCase names to match Upstox JSON envelopes.
 - Internal DTOs (e.g. `PlaceOrderDto`, `UpstoxEnvelope<T>`) live inside `UpstoxHttpClient.cs` as private nested classes — they are serialisation-only and not part of the public API.
 - `UpstoxTokenContext` is the only mechanism for per-call token injection. Do not add `accessToken` parameters to service or facade methods.
+- OAuth credentials (`clientId`, `clientSecret`, `redirectUri`) are **never** stored in `UpstoxConfig` — they are passed directly as method parameters to `GenerateTokenAsync`.

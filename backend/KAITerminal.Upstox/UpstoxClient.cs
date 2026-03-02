@@ -12,6 +12,7 @@ namespace KAITerminal.Upstox;
 /// </summary>
 public sealed class UpstoxClient
 {
+    private readonly IAuthService _auth;
     private readonly IPositionService _positions;
     private readonly IOrderService _orders;
     private readonly IOptionService _options;
@@ -19,18 +20,41 @@ public sealed class UpstoxClient
     private readonly Func<IPortfolioStreamer> _portfolioStreamerFactory;
 
     public UpstoxClient(
+        IAuthService auth,
         IPositionService positions,
         IOrderService orders,
         IOptionService options,
         Func<IMarketDataStreamer> marketDataStreamerFactory,
         Func<IPortfolioStreamer> portfolioStreamerFactory)
     {
+        _auth = auth;
         _positions = positions;
         _orders = orders;
         _options = options;
         _marketDataStreamerFactory = marketDataStreamerFactory;
         _portfolioStreamerFactory = portfolioStreamerFactory;
     }
+
+    // ═══════════════════════════════════════════════════════
+    // Feature 0 — Token Generation
+    // ═══════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Exchanges an Upstox authorization code for an access token.
+    /// Obtain the code by redirecting the user to the Upstox login page and capturing
+    /// the <c>code</c> query parameter from the redirect callback.
+    /// </summary>
+    /// <param name="clientId">API key from the Upstox developer console.</param>
+    /// <param name="clientSecret">API secret from the Upstox developer console.</param>
+    /// <param name="redirectUri">Redirect URI registered in the Upstox developer console.</param>
+    /// <param name="authorizationCode">The <c>code</c> received in the OAuth callback.</param>
+    public Task<TokenResponse> GenerateTokenAsync(
+        string clientId,
+        string clientSecret,
+        string redirectUri,
+        string authorizationCode,
+        CancellationToken cancellationToken = default)
+        => _auth.GenerateTokenAsync(clientId, clientSecret, redirectUri, authorizationCode, cancellationToken);
 
     // ═══════════════════════════════════════════════════════
     // Feature 1 — Get All Positions

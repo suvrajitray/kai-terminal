@@ -10,22 +10,23 @@ A .NET 10 class library that wraps the [Upstox REST API v2/v3](https://upstox.co
 2. [Project Reference](#project-reference)
 3. [Configuration](#configuration)
 4. [Registration (DI)](#registration-di)
-5. [Multi-User Token Handling](#multi-user-token-handling)
-6. [REST Features](#rest-features)
+5. [Token Generation](#token-generation)
+6. [Multi-User Token Handling](#multi-user-token-handling)
+7. [REST Features](#rest-features)
    - [Positions](#1-positions)
    - [Orders](#2-orders)
    - [Option Chain & Contracts](#3-option-chain--contracts)
    - [Place Order by Option Price](#4-place-order-by-option-price)
    - [Place Order by Strike Type](#5-place-order-by-strike-type)
-7. [WebSocket Streaming](#websocket-streaming)
+8. [WebSocket Streaming](#websocket-streaming)
    - [Market Data Feed V3](#market-data-feed-v3)
    - [Portfolio Stream Feed V2](#portfolio-stream-feed-v2)
-8. [Error Handling](#error-handling)
-9. [Models Reference](#models-reference)
-10. [Enums Reference](#enums-reference)
-11. [Usage in ASP.NET Core Minimal API](#usage-in-aspnet-core-minimal-api)
-12. [Usage in .NET Worker Service](#usage-in-net-worker-service)
-13. [Protobuf & Apple Silicon](#protobuf--apple-silicon)
+9. [Error Handling](#error-handling)
+10. [Models Reference](#models-reference)
+11. [Enums Reference](#enums-reference)
+12. [Usage in ASP.NET Core Minimal API](#usage-in-aspnet-core-minimal-api)
+13. [Usage in .NET Worker Service](#usage-in-net-worker-service)
+14. [Protobuf & Apple Silicon](#protobuf--apple-silicon)
 
 ---
 
@@ -110,6 +111,7 @@ This registers the following services:
 | Service | Lifetime | Purpose |
 |---|---|---|
 | `UpstoxClient` | Singleton | High-level facade — the main entry point |
+| `IAuthService` | Singleton | OAuth 2.0 token generation |
 | `IPositionService` | Singleton | Position queries and exits |
 | `IOrderService` | Singleton | Order placement and cancellation |
 | `IOptionService` | Singleton | Option chain, contracts, and option-aware order placement |
@@ -117,6 +119,87 @@ This registers the following services:
 | `IPortfolioStreamer` | Transient | One WebSocket portfolio updates connection per instance |
 
 > **Inject `UpstoxClient`** for convenience. Inject individual service interfaces only when you want to keep concerns separated.
+
+---
+
+## Token Generation
+
+Upstox uses the **OAuth 2.0 authorization code flow** to issue daily access tokens. The SDK handles the token exchange (step 3) — you manage the browser redirect for step 1.
+
+### Step 1 — Redirect the user to Upstox login
+
+Build the authorization URL and open it in a browser or WebView:
+
+```
+https://api.upstox.com/v2/login/authorization/dialog
+  ?response_type=code
+  &client_id=YOUR_API_KEY
+  &redirect_uri=YOUR_REDIRECT_URI
+```
+
+> You can find your API key and secret in the [Upstox developer console](https://developer.upstox.com/).
+
+### Step 2 — Capture the authorization code
+
+After the user authenticates and grants permission, Upstox redirects to your `redirect_uri` with a `code` query parameter:
+
+```
+https://your-app/callback?code=AUTH_CODE_HERE
+```
+
+### Step 3 — Exchange the code for an access token
+
+```csharp
+using KAITerminal.Upstox.Models.Responses;
+
+TokenResponse token = await client.GenerateTokenAsync(
+    clientId:          "your_api_key",
+    clientSecret:      "your_api_secret",
+    redirectUri:       "https://your-app/callback",
+    authorizationCode: "code_from_oauth_redirect");
+
+Console.WriteLine(token.AccessToken);
+Console.WriteLine($"Logged in as: {token.UserName} ({token.Email})");
+```
+
+Store `token.AccessToken` and use it for all subsequent API calls — pass it via `UpstoxTokenContext.Use()` (multi-user) or set `UpstoxConfig.AccessToken` (single-user).
+
+### ASP.NET Core — OAuth callback endpoint
+
+```csharp
+app.MapGet("/auth/callback", async (
+    string code,
+    UpstoxClient client,
+    CancellationToken ct) =>
+{
+    var token = await client.GenerateTokenAsync(
+        clientId:          "your_api_key",
+        clientSecret:      "your_api_secret",
+        redirectUri:       "https://your-app/auth/callback",
+        authorizationCode: code,
+        cancellationToken: ct);
+
+    // Persist token.AccessToken for the user and redirect to your app
+    return Results.Ok(new { accessToken = token.AccessToken, user = token.UserName });
+});
+```
+
+### `TokenResponse` properties
+
+| Property | Type | Description |
+|---|---|---|
+| `AccessToken` | `string` | Bearer token for all API calls |
+| `ExtendedToken` | `string?` | Long-lived token (if issued by Upstox) |
+| `TokenType` | `string` | Always `"Bearer"` |
+| `Email` | `string?` | User email address |
+| `UserId` | `string?` | Upstox user ID |
+| `UserName` | `string?` | Display name |
+| `UserType` | `string?` | e.g. `"individual"` |
+| `Broker` | `string?` | Always `"UPSTOX"` |
+| `IsActive` | `bool` | Whether the account is active |
+| `Exchanges` | `IReadOnlyList<string>?` | Enabled exchanges (e.g. `["NSE", "BSE"]`) |
+| `Products` | `IReadOnlyList<string>?` | Enabled products (e.g. `["I", "D"]`) |
+| `OrderTypes` | `IReadOnlyList<string>?` | Enabled order types |
 
 ---
 
@@ -1270,4 +1353,4 @@ On Linux / Windows CI (where Grpc.Tools works), you can add the Protobuf item gr
 
 ---
 
-*SDK version 1.1.0 · .NET 10 · Upstox API v2/v3*
+*SDK version 1.2.0 · .NET 10 · Upstox API v2/v3*

@@ -53,6 +53,14 @@ public static class ServiceCollectionExtensions
         // then falls back to UpstoxConfig.AccessToken (config / worker-service default).
         services.AddTransient<UpstoxAuthHandler>();
 
+        // Plain client for the token endpoint — no Bearer injection.
+        services.AddHttpClient("UpstoxAuth", (sp, client) =>
+        {
+            var cfg = ResolveConfig(sp);
+            client.BaseAddress = new Uri(cfg.ApiBaseUrl);
+            client.Timeout = cfg.HttpTimeout;
+        });
+
         services.AddHttpClient("UpstoxApi", (sp, client) =>
         {
             var cfg = ResolveConfig(sp);
@@ -70,6 +78,7 @@ public static class ServiceCollectionExtensions
         }).AddHttpMessageHandler<UpstoxAuthHandler>();
 
         services.AddSingleton<UpstoxHttpClient>();
+        services.AddSingleton<IAuthService, AuthService>();
         services.AddSingleton<IPositionService, PositionService>();
         services.AddSingleton<IOrderService, OrderService>();
         services.AddSingleton<IOptionService, OptionService>();
