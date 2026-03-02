@@ -19,6 +19,22 @@ public sealed class SimOptionService : IOptionService
         string underlyingKey, string? expiryDate = null, CancellationToken cancellationToken = default)
         => Task.FromResult<IReadOnlyList<OptionContract>>([]);
 
+    public Task<PlaceOrderRequest> GetOrderByOptionPriceAsync(
+        PlaceOrderByOptionPriceRequest request, CancellationToken cancellationToken = default)
+        => Task.FromResult(new PlaceOrderRequest
+        {
+            InstrumentToken = $"SIM|{request.UnderlyingKey}_{request.OptionType}_{request.TargetPremium}",
+            Quantity        = request.Quantity,
+            TransactionType = request.TransactionType,
+            OrderType       = request.OrderType,
+            Product         = request.Product,
+            Validity        = request.Validity,
+            Price           = request.Price,
+            TriggerPrice    = request.TriggerPrice,
+            IsAmo           = request.IsAmo,
+            Tag             = request.Tag,
+        });
+
     public Task<PlaceOrderResult> PlaceOrderByOptionPriceAsync(
         PlaceOrderByOptionPriceRequest request, CancellationToken cancellationToken = default)
     {
@@ -32,6 +48,22 @@ public sealed class SimOptionService : IOptionService
         PlaceOrderByOptionPriceRequest request, CancellationToken cancellationToken = default)
         => PlaceOrderByOptionPriceAsync(request, cancellationToken)
             .ContinueWith(t => new PlaceOrderV3Result { OrderIds = [t.Result.OrderId], Latency = 1 }, cancellationToken);
+
+    public Task<PlaceOrderRequest> GetOrderByStrikeAsync(
+        PlaceOrderByStrikeRequest request, CancellationToken cancellationToken = default)
+        => Task.FromResult(new PlaceOrderRequest
+        {
+            InstrumentToken = $"SIM|{request.UnderlyingKey}_{request.StrikeType}_{request.OptionType}",
+            Quantity        = request.Quantity,
+            TransactionType = request.TransactionType,
+            OrderType       = request.OrderType,
+            Product         = request.Product,
+            Validity        = request.Validity,
+            Price           = request.Price,
+            TriggerPrice    = request.TriggerPrice,
+            IsAmo           = request.IsAmo,
+            Tag             = request.Tag,
+        });
 
     public Task<PlaceOrderResult> PlaceOrderByStrikeAsync(
         PlaceOrderByStrikeRequest request, CancellationToken cancellationToken = default)

@@ -138,6 +138,14 @@ public sealed class UpstoxClient
     // ═══════════════════════════════════════════════════════
 
     /// <summary>
+    /// Resolve the strike that would be selected by <see cref="PlaceOrderByOptionPriceAsync"/>
+    /// and return the order record without placing it.
+    /// </summary>
+    public Task<PlaceOrderRequest> GetOrderByOptionPriceAsync(
+        PlaceOrderByOptionPriceRequest request, CancellationToken cancellationToken = default)
+        => _options.GetOrderByOptionPriceAsync(request, cancellationToken);
+
+    /// <summary>
     /// Find the strike whose LTP is nearest to the target premium and place a v2 order.
     /// </summary>
     public Task<PlaceOrderResult> PlaceOrderByOptionPriceAsync(
@@ -154,6 +162,14 @@ public sealed class UpstoxClient
     // ═══════════════════════════════════════════════════════
     // Feature 8 — Place Order by Strike Type
     // ═══════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Resolve the strike that would be selected by <see cref="PlaceOrderByStrikeAsync"/>
+    /// and return the order record without placing it.
+    /// </summary>
+    public Task<PlaceOrderRequest> GetOrderByStrikeAsync(
+        PlaceOrderByStrikeRequest request, CancellationToken cancellationToken = default)
+        => _options.GetOrderByStrikeAsync(request, cancellationToken);
 
     /// <summary>
     /// Resolve the exact strike (ATM / OTM1-5 / ITM1-5) relative to the current spot price

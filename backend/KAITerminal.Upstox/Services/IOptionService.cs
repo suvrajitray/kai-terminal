@@ -29,6 +29,14 @@ public interface IOptionService
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Feature 7 (preview) — Resolve the strike that would be selected by
+    /// <see cref="PlaceOrderByOptionPriceAsync"/> and return the order record without placing it.
+    /// </summary>
+    Task<PlaceOrderRequest> GetOrderByOptionPriceAsync(
+        PlaceOrderByOptionPriceRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Feature 7 — Find the strike whose current LTP is nearest to the target premium
     /// and place a v2 order on it.
     /// </summary>
@@ -42,6 +50,14 @@ public interface IOptionService
     /// </summary>
     Task<PlaceOrderV3Result> PlaceOrderByOptionPriceV3Async(
         PlaceOrderByOptionPriceRequest request,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Feature 8 (preview) — Resolve the strike that would be selected by
+    /// <see cref="PlaceOrderByStrikeAsync"/> and return the order record without placing it.
+    /// </summary>
+    Task<PlaceOrderRequest> GetOrderByStrikeAsync(
+        PlaceOrderByStrikeRequest request,
         CancellationToken cancellationToken = default);
 
     /// <summary>

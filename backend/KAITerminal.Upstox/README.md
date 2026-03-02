@@ -18,6 +18,7 @@ A .NET 10 class library that wraps the [Upstox REST API v2/v3](https://upstox.co
    - [Option Chain & Contracts](#3-option-chain--contracts)
    - [Place Order by Option Price](#4-place-order-by-option-price)
    - [Place Order by Strike Type](#5-place-order-by-strike-type)
+   - [Resolve Order Without Placing](#6-resolve-order-without-placing)
 8. [WebSocket Streaming](#websocket-streaming)
    - [Market Data Feed V3](#market-data-feed-v3)
    - [Portfolio Stream Feed V2](#portfolio-stream-feed-v2)
@@ -442,33 +443,54 @@ Console.WriteLine($"Lot size: {contract.LotSize}  Freeze qty: {contract.FreezeQu
 
 ### 4. Place Order by Option Price
 
-The SDK fetches the full option chain, finds the strike whose LTP is **nearest to your target premium**, and places the order on it.
+The SDK fetches the full option chain, resolves the target strike using `PriceSearchMode`, and places the order on it.
+
+#### `PriceSearchMode`
+
+| Value | Behaviour |
+|---|---|
+| `Nearest` *(default)* | Strike with LTP **closest** to `TargetPremium` |
+| `GreaterThan` | Strike with the **smallest LTP strictly above** `TargetPremium` |
+| `LessThan` | Strike with the **largest LTP strictly below** `TargetPremium` |
 
 ```csharp
-// v2
+// Nearest (default) — v2
 var result = await client.PlaceOrderByOptionPriceAsync(new PlaceOrderByOptionPriceRequest
 {
     UnderlyingKey   = "NSE_INDEX|Nifty 50",
     ExpiryDate      = "2024-03-28",
     OptionType      = OptionType.CE,
-    TargetPremium   = 50m,          // find strike with LTP closest to ₹50
+    TargetPremium   = 50m,
     Quantity        = 50,
     TransactionType = TransactionType.Sell,
 });
-Console.WriteLine($"Sold at: {result.OrderId}");
+Console.WriteLine($"Order ID: {result.OrderId}");
 
-// v3 HFT
-var resultV3 = await client.PlaceOrderByOptionPriceV3Async(new PlaceOrderByOptionPriceRequest
+// GreaterThan — first strike priced above ₹150
+var resultGt = await client.PlaceOrderByOptionPriceAsync(new PlaceOrderByOptionPriceRequest
+{
+    UnderlyingKey   = "NSE_INDEX|Nifty 50",
+    ExpiryDate      = "2024-03-28",
+    OptionType      = OptionType.CE,
+    TargetPremium   = 150m,
+    PriceSearchMode = PriceSearchMode.GreaterThan,
+    Quantity        = 50,
+    TransactionType = TransactionType.Sell,
+});
+
+// LessThan — last strike priced below ₹150 (v3 HFT)
+var resultLt = await client.PlaceOrderByOptionPriceV3Async(new PlaceOrderByOptionPriceRequest
 {
     UnderlyingKey   = "NSE_INDEX|NIFTY BANK",
     ExpiryDate      = "2024-03-28",
     OptionType      = OptionType.PE,
-    TargetPremium   = 100m,
+    TargetPremium   = 150m,
+    PriceSearchMode = PriceSearchMode.LessThan,
     Quantity        = 15,
     TransactionType = TransactionType.Buy,
     Slice           = true,
 });
-Console.WriteLine($"Latency: {resultV3.Latency} ms");
+Console.WriteLine($"Latency: {resultLt.Latency} ms");
 ```
 
 ---
@@ -509,6 +531,45 @@ Strike resolution rules:
 | `ATM` | Closest strike to spot | Closest strike to spot |
 | `OTM1`–`OTM5` | n strikes **above** ATM | n strikes **below** ATM |
 | `ITM1`–`ITM5` | n strikes **below** ATM | n strikes **above** ATM |
+
+---
+
+### 6. Resolve Order Without Placing
+
+`GetOrderByOptionPriceAsync` and `GetOrderByStrikeAsync` run the same chain resolution logic as their `PlaceOrder*` counterparts but **return the `PlaceOrderRequest` without submitting it**. Use these to inspect, log, or confirm the resolved strike before committing.
+
+```csharp
+// Inspect what would be placed by option price
+PlaceOrderRequest order = await client.GetOrderByOptionPriceAsync(new PlaceOrderByOptionPriceRequest
+{
+    UnderlyingKey   = "NSE_INDEX|Nifty 50",
+    ExpiryDate      = "2024-03-28",
+    OptionType      = OptionType.CE,
+    TargetPremium   = 150m,
+    PriceSearchMode = PriceSearchMode.GreaterThan,
+    Quantity        = 50,
+    TransactionType = TransactionType.Sell,
+});
+
+Console.WriteLine(order.InstrumentToken); // e.g. "NSE_FO|52618"
+Console.WriteLine(order.Quantity);        // 50
+
+// Place it when ready
+var result = await client.PlaceOrderV3Async(order);
+
+// Inspect what would be placed by strike type
+PlaceOrderRequest strikeOrder = await client.GetOrderByStrikeAsync(new PlaceOrderByStrikeRequest
+{
+    UnderlyingKey   = "NSE_INDEX|Nifty 50",
+    ExpiryDate      = "2024-03-28",
+    OptionType      = OptionType.CE,
+    StrikeType      = StrikeType.OTM1,
+    Quantity        = 50,
+    TransactionType = TransactionType.Sell,
+});
+
+Console.WriteLine(strikeOrder.InstrumentToken); // resolved OTM1 CE token
+```
 
 ---
 
@@ -883,6 +944,13 @@ public sealed class PlaceOrderV3Result
 
 ### `StrikeType`
 `ATM` · `OTM1` · `OTM2` · `OTM3` · `OTM4` · `OTM5` · `ITM1` · `ITM2` · `ITM3` · `ITM4` · `ITM5`
+
+### `PriceSearchMode`
+| Value | Description |
+|---|---|
+| `Nearest` | Strike with LTP closest to `TargetPremium` (default) |
+| `GreaterThan` | Strike with the smallest LTP strictly above `TargetPremium` |
+| `LessThan` | Strike with the largest LTP strictly below `TargetPremium` |
 
 ### `FeedMode` (WebSocket)
 | Value | Description |

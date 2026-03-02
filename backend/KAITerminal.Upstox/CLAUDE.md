@@ -54,6 +54,20 @@ The `Authorization` header is **not** set in `DefaultRequestHeaders` on any clie
 
 `IAuthService` / `AuthService` handles the authorization code → access token exchange. It calls `POST /v2/login/authorization/token` with `application/x-www-form-urlencoded` body via the `"UpstoxAuth"` client. The response is plain JSON (not the standard `UpstoxEnvelope<T>` wrapper), so `UpstoxHttpClient.GenerateTokenAsync` deserializes it directly. All four OAuth parameters (`clientId`, `clientSecret`, `redirectUri`, `authorizationCode`) are passed as method arguments — they are **not** stored in `UpstoxConfig`.
 
+### Option Price Search Modes
+
+`PlaceOrderByOptionPriceRequest` has a `PriceSearchMode` property (`Nearest` / `GreaterThan` / `LessThan`) that controls how `OptionService.ResolveByPremiumAsync` picks a strike from the chain:
+
+- `Nearest` (default) — `Math.Abs(ltp - target)`, pick minimum diff.
+- `GreaterThan` — filter `ltp > target`, pick minimum `ltp`.
+- `LessThan` — filter `ltp < target`, pick maximum `ltp`.
+
+Throw `UpstoxException` when no strike satisfies the constraint (e.g. no strike priced above the target).
+
+### Resolve-Only Methods
+
+`GetOrderByOptionPriceAsync` and `GetOrderByStrikeAsync` on both `IOptionService` and `UpstoxClient` run the same chain resolution logic as the `PlaceOrder*` variants but return the built `PlaceOrderRequest` without submitting it to the broker. Use these to inspect the resolved instrument token before committing.
+
 ### WebSocket Streamers
 
 - **`MarketDataStreamer`** — Protobuf binary feed (V3). 4 feed modes: `Ltpc`, `Full`, `OptionGreeks`, `FullD30`.

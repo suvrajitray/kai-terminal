@@ -30,6 +30,14 @@ internal sealed class OptionService : IOptionService
     // ──────────────────────────────────────────────────────────
 
     /// <inheritdoc />
+    public async Task<PlaceOrderRequest> GetOrderByOptionPriceAsync(
+        PlaceOrderByOptionPriceRequest request, CancellationToken cancellationToken = default)
+    {
+        var instrumentToken = await ResolveByPremiumAsync(request, cancellationToken);
+        return BuildOrderRequest(request, instrumentToken);
+    }
+
+    /// <inheritdoc />
     public async Task<PlaceOrderResult> PlaceOrderByOptionPriceAsync(
         PlaceOrderByOptionPriceRequest request, CancellationToken cancellationToken = default)
     {
@@ -50,6 +58,14 @@ internal sealed class OptionService : IOptionService
     // ──────────────────────────────────────────────────────────
     // Feature 8: Place Order by Strike Type
     // ──────────────────────────────────────────────────────────
+
+    /// <inheritdoc />
+    public async Task<PlaceOrderRequest> GetOrderByStrikeAsync(
+        PlaceOrderByStrikeRequest request, CancellationToken cancellationToken = default)
+    {
+        var instrumentToken = await ResolveByStrikeTypeAsync(request, cancellationToken);
+        return BuildOrderRequest(request, instrumentToken);
+    }
 
     /// <inheritdoc />
     public async Task<PlaceOrderResult> PlaceOrderByStrikeAsync(
