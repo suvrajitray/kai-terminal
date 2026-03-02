@@ -72,25 +72,25 @@ public sealed class RiskEvaluator
         // ── 3. Trailing stop loss ────────────────────────────────────────────
         if (!state.TrailingActive)
         {
-            if (mtm >= _cfg.TrailingActivationThreshold)
+            if (mtm >= _cfg.TSLActivateAt)
             {
-                state.TrailingActive = true;
-                state.TrailingStop = mtm - _cfg.TrailingInitialLock;
+                state.TrailingActive      = true;
+                state.TrailingStop        = _cfg.LockProfitAt;   // fixed floor, not relative to MTM
                 state.TrailingLastTrigger = mtm;
                 _repo.Update(userId, state);
                 _logger.LogInformation(
-                    "Trailing SL activated for userId={UserId}  stop={Stop:+0;-0}  locked-in={Lock:+0;-0}",
-                    userId, state.TrailingStop, _cfg.TrailingInitialLock);
+                    "Trailing SL activated for userId={UserId}  stop locked at={Stop:+0;-0}",
+                    userId, state.TrailingStop);
             }
         }
         else
         {
             decimal gain = mtm - state.TrailingLastTrigger;
-            if (gain >= _cfg.TrailingStepGain)
+            if (gain >= _cfg.WhenProfitIncreasesBy)
             {
-                long steps = (long)(gain / _cfg.TrailingStepGain);
-                state.TrailingStop += steps * _cfg.TrailingStepLock;
-                state.TrailingLastTrigger += steps * _cfg.TrailingStepGain;
+                long steps = (long)(gain / _cfg.WhenProfitIncreasesBy);
+                state.TrailingStop        += steps * _cfg.IncreaseTSLBy;
+                state.TrailingLastTrigger += steps * _cfg.WhenProfitIncreasesBy;
                 _repo.Update(userId, state);
                 _logger.LogInformation(
                     "Trailing SL raised for userId={UserId}  stop={Stop:+0;-0}",
@@ -119,7 +119,7 @@ public sealed class RiskEvaluator
         {
             _logger.LogInformation(
                 "[{UserId}]  PnL={Mtm:+0;-0}  SL={Sl:0}  Target={Target:+0}  TSL=inactive (activates at {Threshold:+0})",
-                userId, mtm, _cfg.HardStopLoss, _cfg.ProfitTarget, _cfg.TrailingActivationThreshold);
+                userId, mtm, _cfg.HardStopLoss, _cfg.ProfitTarget, _cfg.TSLActivateAt);
         }
     }
 
