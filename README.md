@@ -172,9 +172,33 @@ Trailing SL hit  MTM=+2800  stop=+3000 — exiting all positions
 | `backend/KAITerminal.Worker/appsettings.json` | Multi-user risk engine — Upstox base URLs, thresholds, `Users[]` list |
 | `backend/KAITerminal.Console/appsettings.json` | Single-user risk engine — `Upstox:AccessToken`, thresholds |
 | `backend/KAITerminal.SimConsole/appsettings.json` | Simulation — thresholds and loop intervals only |
-| `frontend/.env` (optional) | `VITE_API_URL` — defaults to `https://localhost:5001` |
+| `frontend/.env` | `VITE_API_URL` — backend API base URL |
 
 `Frontend:Url` in the API config must match the frontend origin (`http://localhost:3000`) for CORS and OAuth redirects to work.
+
+### Frontend Environment Variables
+
+`frontend/.env` is committed with safe defaults. All variables must be prefixed `VITE_` to be accessible in browser code via `import.meta.env`.
+
+| Variable | Default | Description |
+|---|---|---|
+| `VITE_API_URL` | `https://localhost:5001` | Base URL of the running `KAITerminal.Api` |
+
+To override locally without modifying the committed file, create `frontend/.env.local` (gitignored):
+
+```bash
+# frontend/.env.local
+VITE_API_URL=https://my-staging-server.example.com
+```
+
+Vite loads env files in this order (highest precedence first):
+
+```
+.env.local          ← personal overrides, never committed
+.env.development    ← dev-only overrides (npm run dev)
+.env.production     ← production-only overrides (npm run build)
+.env                ← committed defaults
+```
 
 ---
 
