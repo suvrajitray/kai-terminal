@@ -1,6 +1,5 @@
 using KAITerminal.Api.Models;
-using KAITerminal.Broker.Interfaces;
-using KAITerminal.Types;
+using KAITerminal.Upstox;
 using Microsoft.AspNetCore.Mvc;
 
 namespace KAITerminal.Api.Endpoints;
@@ -13,29 +12,36 @@ public static class UpstoxEndpoints
 
         group.MapGet("/positions", async (
             [FromHeader(Name = "X-Upstox-AccessToken")] string accessToken,
-            IPositionProvider positionProvider) =>
+            UpstoxClient upstox) =>
         {
-            var positions = await positionProvider.GetOpenPositionsAsync(new AccessToken(accessToken));
-            return Results.Ok(positions);
+            using (UpstoxTokenContext.Use(accessToken))
+            {
+                var positions = await upstox.GetAllPositionsAsync();
+                return Results.Ok(positions);
+            }
         });
 
         group.MapGet("/mtm", async (
             [FromHeader(Name = "X-Upstox-AccessToken")] string accessToken,
-            IPositionProvider positionProvider) =>
+            UpstoxClient upstox) =>
         {
-            var mtm = await positionProvider.GetCurrentMtmAsync(new AccessToken(accessToken));
-            return Results.Ok(new { Mtm = mtm });
+            using (UpstoxTokenContext.Use(accessToken))
+            {
+                var mtm = await upstox.GetTotalMtmAsync();
+                return Results.Ok(new { Mtm = mtm });
+            }
         });
 
         group.MapPost("/access-token", async (
             [FromBody] UpstoxTokenRequest request,
-            ITokenGenerator tokenGenerator) =>
+            UpstoxClient upstox) =>
         {
-            var token = await tokenGenerator.GenerateAccessTokenAsync(
+            var token = await upstox.GenerateTokenAsync(
                 request.ApiKey,
                 request.ApiSecret,
+                request.RedirectUri,
                 request.Code);
-            return Results.Ok(new { AccessToken = token.Value });
+            return Results.Ok(new { AccessToken = token.AccessToken });
         });
     }
 }

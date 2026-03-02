@@ -15,7 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../KAITerminal.Broker/KAITerminal.Broker.csproj" />
+    <ProjectReference Include="../KAITerminal.Upstox/KAITerminal.Upstox.csproj" />
   </ItemGroup>
 
 </Project>
