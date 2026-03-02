@@ -74,8 +74,9 @@ internal sealed class OptionService : IOptionService
     // ──────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Fetches the option chain and returns the instrument key of the strike
-    /// whose LTP is closest to the target premium.
+    /// Fetches the option chain and returns the instrument key of the strike that best
+    /// matches <see cref="PlaceOrderByOptionPriceRequest.TargetPremium"/> according to
+    /// <see cref="PlaceOrderByOptionPriceRequest.PriceSearchMode"/>.
     /// </summary>
     private async Task<string> ResolveByPremiumAsync(
         PlaceOrderByOptionPriceRequest request, CancellationToken ct)
@@ -86,7 +87,26 @@ internal sealed class OptionService : IOptionService
             throw new UpstoxException(
                 $"Option chain returned no data for {request.UnderlyingKey} expiry {request.ExpiryDate}.");
 
-        OptionSide? bestSide = null;
+        OptionSide? bestSide = request.PriceSearchMode switch
+        {
+            PriceSearchMode.Nearest     => FindNearest(chain, request),
+            PriceSearchMode.GreaterThan => FindGreaterThan(chain, request),
+            PriceSearchMode.LessThan    => FindLessThan(chain, request),
+            _ => throw new ArgumentOutOfRangeException(nameof(request.PriceSearchMode))
+        };
+
+        if (bestSide is null)
+            throw new UpstoxException(
+                $"No valid {request.OptionType} option found with LTP {request.PriceSearchMode} {request.TargetPremium} in the chain.");
+
+        return bestSide.InstrumentKey;
+    }
+
+    /// <summary>Returns the side whose LTP is closest to the target premium.</summary>
+    private static OptionSide? FindNearest(
+        IReadOnlyList<OptionChainEntry> chain, PlaceOrderByOptionPriceRequest request)
+    {
+        OptionSide? best = null;
         decimal bestDiff = decimal.MaxValue;
 
         foreach (var entry in chain)
@@ -98,15 +118,57 @@ internal sealed class OptionService : IOptionService
             if (diff < bestDiff)
             {
                 bestDiff = diff;
-                bestSide = side;
+                best = side;
             }
         }
 
-        if (bestSide is null)
-            throw new UpstoxException(
-                $"No valid {request.OptionType} option found with LTP data in the chain.");
+        return best;
+    }
 
-        return bestSide.InstrumentKey;
+    /// <summary>Returns the side with the smallest LTP that is strictly above the target premium.</summary>
+    private static OptionSide? FindGreaterThan(
+        IReadOnlyList<OptionChainEntry> chain, PlaceOrderByOptionPriceRequest request)
+    {
+        OptionSide? best = null;
+        decimal bestLtp = decimal.MaxValue;
+
+        foreach (var entry in chain)
+        {
+            var side = request.OptionType == OptionType.CE ? entry.CallOptions : entry.PutOptions;
+            if (side?.MarketData is null) continue;
+
+            var ltp = side.MarketData.Ltp;
+            if (ltp > request.TargetPremium && ltp < bestLtp)
+            {
+                bestLtp = ltp;
+                best = side;
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>Returns the side with the largest LTP that is strictly below the target premium.</summary>
+    private static OptionSide? FindLessThan(
+        IReadOnlyList<OptionChainEntry> chain, PlaceOrderByOptionPriceRequest request)
+    {
+        OptionSide? best = null;
+        decimal bestLtp = decimal.MinValue;
+
+        foreach (var entry in chain)
+        {
+            var side = request.OptionType == OptionType.CE ? entry.CallOptions : entry.PutOptions;
+            if (side?.MarketData is null) continue;
+
+            var ltp = side.MarketData.Ltp;
+            if (ltp < request.TargetPremium && ltp > bestLtp)
+            {
+                bestLtp = ltp;
+                best = side;
+            }
+        }
+
+        return best;
     }
 
     /// <summary>

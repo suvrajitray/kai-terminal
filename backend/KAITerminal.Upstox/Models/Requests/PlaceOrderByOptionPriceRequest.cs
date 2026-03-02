@@ -4,8 +4,8 @@ namespace KAITerminal.Upstox.Models.Requests;
 
 /// <summary>
 /// Parameters for Feature 7: Place Order by Option Price.
-/// The SDK finds the strike whose current premium is nearest to <see cref="TargetPremium"/>
-/// and places the order on it.
+/// The SDK searches the option chain using <see cref="PriceSearchMode"/> to find a matching
+/// strike and places the order on it.
 /// </summary>
 public sealed class PlaceOrderByOptionPriceRequest
 {
@@ -22,6 +22,16 @@ public sealed class PlaceOrderByOptionPriceRequest
 
     /// <summary>Target option premium (LTP) to match.</summary>
     public required decimal TargetPremium { get; init; }
+
+    /// <summary>
+    /// How to search the option chain for a strike matching <see cref="TargetPremium"/>.
+    /// <list type="bullet">
+    ///   <item><see cref="PriceSearchMode.Nearest"/> — strike with LTP closest to target (default).</item>
+    ///   <item><see cref="PriceSearchMode.GreaterThan"/> — lowest LTP strictly above target.</item>
+    ///   <item><see cref="PriceSearchMode.LessThan"/> — highest LTP strictly below target.</item>
+    /// </list>
+    /// </summary>
+    public PriceSearchMode PriceSearchMode { get; init; } = PriceSearchMode.Nearest;
 
     public required int Quantity { get; init; }
 
