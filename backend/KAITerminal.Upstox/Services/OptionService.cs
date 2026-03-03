@@ -30,19 +30,18 @@ internal sealed class OptionService : IOptionService
     // ──────────────────────────────────────────────────────────
 
     /// <inheritdoc />
-    public async Task<PlaceOrderRequest> GetOrderByOptionPriceAsync(
-        PlaceOrderByOptionPriceRequest request, CancellationToken cancellationToken = default)
-    {
-        var instrumentToken = await ResolveByPremiumAsync(request, cancellationToken);
-        return BuildOrderRequest(request, instrumentToken);
-    }
+    public async Task<OptionChainEntry> GetOrderByOptionPriceAsync(
+        string underlyingKey, string expiryDate, OptionType optionType,
+        decimal targetPremium, PriceSearchMode priceSearchMode = PriceSearchMode.Nearest,
+        CancellationToken cancellationToken = default)
+        => await ResolveByPremiumAsync(underlyingKey, expiryDate, optionType, targetPremium, priceSearchMode, cancellationToken);
 
     /// <inheritdoc />
     public async Task<PlaceOrderResult> PlaceOrderByOptionPriceAsync(
         PlaceOrderByOptionPriceRequest request, CancellationToken cancellationToken = default)
     {
-        var instrumentToken = await ResolveByPremiumAsync(request, cancellationToken);
-        var orderReq = BuildOrderRequest(request, instrumentToken);
+        var entry = await ResolveByPremiumAsync(request.UnderlyingKey, request.ExpiryDate, request.OptionType, request.TargetPremium, request.PriceSearchMode, cancellationToken);
+        var orderReq = BuildOrderRequest(request, InstrumentKey(entry, request.OptionType));
         return await _http.PlaceOrderV2Async(orderReq, cancellationToken);
     }
 
@@ -50,8 +49,8 @@ internal sealed class OptionService : IOptionService
     public async Task<PlaceOrderV3Result> PlaceOrderByOptionPriceV3Async(
         PlaceOrderByOptionPriceRequest request, CancellationToken cancellationToken = default)
     {
-        var instrumentToken = await ResolveByPremiumAsync(request, cancellationToken);
-        var orderReq = BuildOrderRequest(request, instrumentToken, slice: request.Slice);
+        var entry = await ResolveByPremiumAsync(request.UnderlyingKey, request.ExpiryDate, request.OptionType, request.TargetPremium, request.PriceSearchMode, cancellationToken);
+        var orderReq = BuildOrderRequest(request, InstrumentKey(entry, request.OptionType), slice: request.Slice);
         return await _http.PlaceOrderV3Async(orderReq, cancellationToken);
     }
 
@@ -60,19 +59,17 @@ internal sealed class OptionService : IOptionService
     // ──────────────────────────────────────────────────────────
 
     /// <inheritdoc />
-    public async Task<PlaceOrderRequest> GetOrderByStrikeAsync(
-        PlaceOrderByStrikeRequest request, CancellationToken cancellationToken = default)
-    {
-        var instrumentToken = await ResolveByStrikeTypeAsync(request, cancellationToken);
-        return BuildOrderRequest(request, instrumentToken);
-    }
+    public async Task<OptionChainEntry> GetOrderByStrikeAsync(
+        string underlyingKey, string expiryDate, OptionType optionType, StrikeType strikeType,
+        CancellationToken cancellationToken = default)
+        => await ResolveByStrikeTypeAsync(underlyingKey, expiryDate, optionType, strikeType, cancellationToken);
 
     /// <inheritdoc />
     public async Task<PlaceOrderResult> PlaceOrderByStrikeAsync(
         PlaceOrderByStrikeRequest request, CancellationToken cancellationToken = default)
     {
-        var instrumentToken = await ResolveByStrikeTypeAsync(request, cancellationToken);
-        var orderReq = BuildOrderRequest(request, instrumentToken);
+        var entry = await ResolveByStrikeTypeAsync(request.UnderlyingKey, request.ExpiryDate, request.OptionType, request.StrikeType, cancellationToken);
+        var orderReq = BuildOrderRequest(request, InstrumentKey(entry, request.OptionType));
         return await _http.PlaceOrderV2Async(orderReq, cancellationToken);
     }
 
@@ -80,8 +77,8 @@ internal sealed class OptionService : IOptionService
     public async Task<PlaceOrderV3Result> PlaceOrderByStrikeV3Async(
         PlaceOrderByStrikeRequest request, CancellationToken cancellationToken = default)
     {
-        var instrumentToken = await ResolveByStrikeTypeAsync(request, cancellationToken);
-        var orderReq = BuildOrderRequest(request, instrumentToken, slice: request.Slice);
+        var entry = await ResolveByStrikeTypeAsync(request.UnderlyingKey, request.ExpiryDate, request.OptionType, request.StrikeType, cancellationToken);
+        var orderReq = BuildOrderRequest(request, InstrumentKey(entry, request.OptionType), slice: request.Slice);
         return await _http.PlaceOrderV3Async(orderReq, cancellationToken);
     }
 
@@ -90,97 +87,97 @@ internal sealed class OptionService : IOptionService
     // ──────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Fetches the option chain and returns the instrument key of the strike that best
-    /// matches <see cref="PlaceOrderByOptionPriceRequest.TargetPremium"/> according to
-    /// <see cref="PlaceOrderByOptionPriceRequest.PriceSearchMode"/>.
+    /// Fetches the option chain and returns the chain entry of the strike that best
+    /// matches <paramref name="targetPremium"/> according to <paramref name="priceSearchMode"/>.
     /// </summary>
-    private async Task<string> ResolveByPremiumAsync(
-        PlaceOrderByOptionPriceRequest request, CancellationToken ct)
+    private async Task<OptionChainEntry> ResolveByPremiumAsync(
+        string underlyingKey, string expiryDate, OptionType optionType,
+        decimal targetPremium, PriceSearchMode priceSearchMode, CancellationToken ct)
     {
-        var chain = await _http.GetOptionChainAsync(request.UnderlyingKey, request.ExpiryDate, ct);
+        var chain = await _http.GetOptionChainAsync(underlyingKey, expiryDate, ct);
 
         if (chain.Count == 0)
             throw new UpstoxException(
-                $"Option chain returned no data for {request.UnderlyingKey} expiry {request.ExpiryDate}.");
+                $"Option chain returned no data for {underlyingKey} expiry {expiryDate}.");
 
-        OptionSide? bestSide = request.PriceSearchMode switch
+        OptionChainEntry? best = priceSearchMode switch
         {
-            PriceSearchMode.Nearest     => FindNearest(chain, request),
-            PriceSearchMode.GreaterThan => FindGreaterThan(chain, request),
-            PriceSearchMode.LessThan    => FindLessThan(chain, request),
-            _ => throw new ArgumentOutOfRangeException(nameof(request.PriceSearchMode))
+            PriceSearchMode.Nearest     => FindNearest(chain, optionType, targetPremium),
+            PriceSearchMode.GreaterThan => FindGreaterThan(chain, optionType, targetPremium),
+            PriceSearchMode.LessThan    => FindLessThan(chain, optionType, targetPremium),
+            _ => throw new ArgumentOutOfRangeException(nameof(priceSearchMode))
         };
 
-        if (bestSide is null)
+        if (best is null)
             throw new UpstoxException(
-                $"No valid {request.OptionType} option found with LTP {request.PriceSearchMode} {request.TargetPremium} in the chain.");
+                $"No valid {optionType} option found with LTP {priceSearchMode} {targetPremium} in the chain.");
 
-        return bestSide.InstrumentKey;
+        return best;
     }
 
-    /// <summary>Returns the side whose LTP is closest to the target premium.</summary>
-    private static OptionSide? FindNearest(
-        IReadOnlyList<OptionChainEntry> chain, PlaceOrderByOptionPriceRequest request)
+    /// <summary>Returns the entry whose LTP is closest to the target premium.</summary>
+    private static OptionChainEntry? FindNearest(
+        IReadOnlyList<OptionChainEntry> chain, OptionType optionType, decimal targetPremium)
     {
-        OptionSide? best = null;
+        OptionChainEntry? best = null;
         decimal bestDiff = decimal.MaxValue;
 
         foreach (var entry in chain)
         {
-            var side = request.OptionType == OptionType.CE ? entry.CallOptions : entry.PutOptions;
+            var side = optionType == OptionType.CE ? entry.CallOptions : entry.PutOptions;
             if (side?.MarketData is null) continue;
 
-            var diff = Math.Abs(side.MarketData.Ltp - request.TargetPremium);
+            var diff = Math.Abs(side.MarketData.Ltp - targetPremium);
             if (diff < bestDiff)
             {
                 bestDiff = diff;
-                best = side;
+                best = entry;
             }
         }
 
         return best;
     }
 
-    /// <summary>Returns the side with the smallest LTP that is strictly above the target premium.</summary>
-    private static OptionSide? FindGreaterThan(
-        IReadOnlyList<OptionChainEntry> chain, PlaceOrderByOptionPriceRequest request)
+    /// <summary>Returns the entry with the smallest LTP that is strictly above the target premium.</summary>
+    private static OptionChainEntry? FindGreaterThan(
+        IReadOnlyList<OptionChainEntry> chain, OptionType optionType, decimal targetPremium)
     {
-        OptionSide? best = null;
+        OptionChainEntry? best = null;
         decimal bestLtp = decimal.MaxValue;
 
         foreach (var entry in chain)
         {
-            var side = request.OptionType == OptionType.CE ? entry.CallOptions : entry.PutOptions;
+            var side = optionType == OptionType.CE ? entry.CallOptions : entry.PutOptions;
             if (side?.MarketData is null) continue;
 
             var ltp = side.MarketData.Ltp;
-            if (ltp > request.TargetPremium && ltp < bestLtp)
+            if (ltp > targetPremium && ltp < bestLtp)
             {
                 bestLtp = ltp;
-                best = side;
+                best = entry;
             }
         }
 
         return best;
     }
 
-    /// <summary>Returns the side with the largest LTP that is strictly below the target premium.</summary>
-    private static OptionSide? FindLessThan(
-        IReadOnlyList<OptionChainEntry> chain, PlaceOrderByOptionPriceRequest request)
+    /// <summary>Returns the entry with the largest LTP that is strictly below the target premium.</summary>
+    private static OptionChainEntry? FindLessThan(
+        IReadOnlyList<OptionChainEntry> chain, OptionType optionType, decimal targetPremium)
     {
-        OptionSide? best = null;
+        OptionChainEntry? best = null;
         decimal bestLtp = decimal.MinValue;
 
         foreach (var entry in chain)
         {
-            var side = request.OptionType == OptionType.CE ? entry.CallOptions : entry.PutOptions;
+            var side = optionType == OptionType.CE ? entry.CallOptions : entry.PutOptions;
             if (side?.MarketData is null) continue;
 
             var ltp = side.MarketData.Ltp;
-            if (ltp < request.TargetPremium && ltp > bestLtp)
+            if (ltp < targetPremium && ltp > bestLtp)
             {
                 bestLtp = ltp;
-                best = side;
+                best = entry;
             }
         }
 
@@ -189,26 +186,27 @@ internal sealed class OptionService : IOptionService
 
     /// <summary>
     /// Fetches the option chain, determines the ATM strike, walks n strikes in the
-    /// correct OTM/ITM direction and returns the instrument key.
+    /// correct OTM/ITM direction and returns the matched chain entry.
     /// </summary>
-    private async Task<string> ResolveByStrikeTypeAsync(
-        PlaceOrderByStrikeRequest request, CancellationToken ct)
+    private async Task<OptionChainEntry> ResolveByStrikeTypeAsync(
+        string underlyingKey, string expiryDate, OptionType optionType, StrikeType strikeType,
+        CancellationToken ct)
     {
-        var chain = await _http.GetOptionChainAsync(request.UnderlyingKey, request.ExpiryDate, ct);
+        var chain = await _http.GetOptionChainAsync(underlyingKey, expiryDate, ct);
 
         if (chain.Count == 0)
             throw new UpstoxException(
-                $"Option chain returned no data for {request.UnderlyingKey} expiry {request.ExpiryDate}.");
+                $"Option chain returned no data for {underlyingKey} expiry {expiryDate}.");
 
         // Sort strikes ascending.
         var sorted = chain
-            .Where(e => (request.OptionType == OptionType.CE ? e.CallOptions : e.PutOptions) is not null)
+            .Where(e => (optionType == OptionType.CE ? e.CallOptions : e.PutOptions) is not null)
             .OrderBy(e => e.StrikePrice)
             .ToList();
 
         if (sorted.Count == 0)
             throw new UpstoxException(
-                $"No {request.OptionType} options found in the chain.");
+                $"No {optionType} options found in the chain.");
 
         var spotPrice = chain[0].UnderlyingSpotPrice;
 
@@ -225,26 +223,26 @@ internal sealed class OptionService : IOptionService
             }
         }
 
-        int offset = StrikeOffset(request.StrikeType);
+        int offset = StrikeOffset(strikeType);
 
         // For CE: OTM = higher strikes (positive offset), ITM = lower strikes (negative offset)
         // For PE: OTM = lower strikes (negative offset), ITM = higher strikes (positive offset)
-        int targetIndex = request.OptionType == OptionType.CE
+        int targetIndex = optionType == OptionType.CE
             ? atmIndex + offset
             : atmIndex - offset;
 
         targetIndex = Math.Clamp(targetIndex, 0, sorted.Count - 1);
 
         var targetEntry = sorted[targetIndex];
-        var targetSide = request.OptionType == OptionType.CE
+        var targetSide = optionType == OptionType.CE
             ? targetEntry.CallOptions
             : targetEntry.PutOptions;
 
         if (targetSide is null)
             throw new UpstoxException(
-                $"No {request.OptionType} contract found at strike {targetEntry.StrikePrice}.");
+                $"No {optionType} contract found at strike {targetEntry.StrikePrice}.");
 
-        return targetSide.InstrumentKey;
+        return targetEntry;
     }
 
     /// <summary>Maps a <see cref="StrikeType"/> to a signed strike offset from ATM.</summary>
@@ -263,6 +261,19 @@ internal sealed class OptionService : IOptionService
         StrikeType.ITM5 => -5,
         _ => throw new ArgumentOutOfRangeException(nameof(strikeType), strikeType, null)
     };
+
+    // ──────────────────────────────────────────────────────────
+    // Helpers
+    // ──────────────────────────────────────────────────────────
+
+    private static string InstrumentKey(OptionChainEntry entry, OptionType optionType)
+    {
+        var side = optionType == OptionType.CE ? entry.CallOptions : entry.PutOptions;
+        if (side is null)
+            throw new UpstoxException(
+                $"No {optionType} contract found at strike {entry.StrikePrice}.");
+        return side.InstrumentKey;
+    }
 
     // ──────────────────────────────────────────────────────────
     // PlaceOrderRequest builders

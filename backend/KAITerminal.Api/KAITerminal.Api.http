@@ -161,20 +161,10 @@ X-Upstox-AccessToken: {{UpstoxAccessToken}}
 
 ###
 
-# Resolve strike by option price (no order placed)
-POST {{HostAddress}}/api/upstox/orders/by-option-price/resolve
+# Resolve strike by option price (no order placed) — returns OptionChainEntry
+# PriceSearchMode: Nearest (default) | GreaterThan | LessThan
+GET {{HostAddress}}/api/upstox/orders/by-option-price/resolve?UnderlyingKey=NSE_INDEX|Nifty+50&ExpiryDate=2026-03-27&OptionType=CE&TargetPremium=150&PriceSearchMode=Nearest
 X-Upstox-AccessToken: {{UpstoxAccessToken}}
-Content-Type: application/json
-
-{
-  "UnderlyingKey": "NSE_INDEX|Nifty 50",
-  "ExpiryDate": "2026-03-27",
-  "OptionType": "CE",
-  "TargetPremium": 150,
-  "PriceSearchMode": "Nearest",
-  "Quantity": 50,
-  "TransactionType": "Sell"
-}
 
 ###
 
@@ -212,20 +202,10 @@ Content-Type: application/json
 
 ###
 
-# Resolve strike by strike type (no order placed)
+# Resolve strike by strike type (no order placed) — returns OptionChainEntry
 # StrikeType: ATM | OTM1-OTM5 | ITM1-ITM5
-POST {{HostAddress}}/api/upstox/orders/by-strike/resolve
+GET {{HostAddress}}/api/upstox/orders/by-strike/resolve?UnderlyingKey=NSE_INDEX|Nifty+50&ExpiryDate=2026-03-27&OptionType=CE&StrikeType=OTM1
 X-Upstox-AccessToken: {{UpstoxAccessToken}}
-Content-Type: application/json
-
-{
-  "UnderlyingKey": "NSE_INDEX|Nifty 50",
-  "ExpiryDate": "2026-03-27",
-  "OptionType": "CE",
-  "StrikeType": "OTM1",
-  "Quantity": 50,
-  "TransactionType": "Sell"
-}
 
 ###
 

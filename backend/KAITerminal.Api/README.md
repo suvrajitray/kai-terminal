@@ -190,10 +190,10 @@ All endpoints require `X-Upstox-AccessToken` header.
 |---|---|---|
 | `GET` | `/api/upstox/options/chain` | Full option chain for a given expiry |
 | `GET` | `/api/upstox/options/contracts` | Option contract metadata (no live prices) |
-| `POST` | `/api/upstox/orders/by-option-price/resolve` | Resolve strike by target premium — no order placed |
+| `GET` | `/api/upstox/orders/by-option-price/resolve` | Resolve strike by target premium — no order placed |
 | `POST` | `/api/upstox/orders/by-option-price` | Place order at strike nearest to target premium |
 | `POST` | `/api/upstox/orders/by-option-price/v3` | Same, HFT v3 |
-| `POST` | `/api/upstox/orders/by-strike/resolve` | Resolve strike by type (ATM/OTM/ITM) — no order placed |
+| `GET` | `/api/upstox/orders/by-strike/resolve` | Resolve strike by type (ATM/OTM/ITM) — no order placed |
 | `POST` | `/api/upstox/orders/by-strike` | Place order at a named strike type |
 | `POST` | `/api/upstox/orders/by-strike/v3` | Same, HFT v3 |
 
@@ -205,7 +205,14 @@ All endpoints require `X-Upstox-AccessToken` header.
 - `underlyingKey` — required
 - `expiryDate` — optional
 
-**Place by option price request body:**
+**`GET /orders/by-option-price/resolve` query parameters** (returns `OptionChainEntry` for the matched strike — no order placed):
+```
+UnderlyingKey=NSE_INDEX|Nifty+50&ExpiryDate=2026-03-27&OptionType=CE
+  &TargetPremium=150&PriceSearchMode=Nearest
+```
+`PriceSearchMode`: `Nearest` (default) | `GreaterThan` | `LessThan`
+
+**`POST /orders/by-option-price` request body:**
 ```json
 {
   "UnderlyingKey": "NSE_INDEX|Nifty 50",
@@ -220,7 +227,13 @@ All endpoints require `X-Upstox-AccessToken` header.
 }
 ```
 
-**Place by strike request body:**
+**`GET /orders/by-strike/resolve` query parameters** (returns `OptionChainEntry` for the matched strike — no order placed):
+```
+UnderlyingKey=NSE_INDEX|Nifty+50&ExpiryDate=2026-03-27&OptionType=CE&StrikeType=OTM1
+```
+`StrikeType`: `ATM` | `OTM1`–`OTM5` | `ITM1`–`ITM5`
+
+**`POST /orders/by-strike` request body:**
 ```json
 {
   "UnderlyingKey": "NSE_INDEX|Nifty 50",

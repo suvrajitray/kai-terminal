@@ -124,10 +124,11 @@ public static class UpstoxEndpoints
             return Results.Ok(currentMonth);
         });
 
-        group.MapPost("/orders/by-option-price/resolve", async (
-            [FromBody] PlaceOrderByOptionPriceRequest request,
+        group.MapGet("/orders/by-option-price/resolve", async (
+            [AsParameters] ResolveByOptionPriceQuery q,
             UpstoxClient upstox) =>
-            Results.Ok(await upstox.GetOrderByOptionPriceAsync(request)));
+            Results.Ok(await upstox.GetOrderByOptionPriceAsync(
+                q.UnderlyingKey, q.ExpiryDate, q.OptionType, q.TargetPremium, q.PriceSearchMode)));
 
         group.MapPost("/orders/by-option-price", async (
             [FromBody] PlaceOrderByOptionPriceRequest request,
@@ -139,10 +140,11 @@ public static class UpstoxEndpoints
             UpstoxClient upstox) =>
             Results.Ok(await upstox.PlaceOrderByOptionPriceV3Async(request)));
 
-        group.MapPost("/orders/by-strike/resolve", async (
-            [FromBody] PlaceOrderByStrikeRequest request,
+        group.MapGet("/orders/by-strike/resolve", async (
+            [AsParameters] ResolveByStrikeQuery q,
             UpstoxClient upstox) =>
-            Results.Ok(await upstox.GetOrderByStrikeAsync(request)));
+            Results.Ok(await upstox.GetOrderByStrikeAsync(
+                q.UnderlyingKey, q.ExpiryDate, q.OptionType, q.StrikeType)));
 
         group.MapPost("/orders/by-strike", async (
             [FromBody] PlaceOrderByStrikeRequest request,

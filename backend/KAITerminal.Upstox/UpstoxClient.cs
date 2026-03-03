@@ -138,12 +138,14 @@ public sealed class UpstoxClient
     // ═══════════════════════════════════════════════════════
 
     /// <summary>
-    /// Resolve the strike that would be selected by <see cref="PlaceOrderByOptionPriceAsync"/>
-    /// and return the order record without placing it.
+    /// Resolve the option chain entry whose LTP best matches <paramref name="targetPremium"/>
+    /// and return it without placing any order.
     /// </summary>
-    public Task<PlaceOrderRequest> GetOrderByOptionPriceAsync(
-        PlaceOrderByOptionPriceRequest request, CancellationToken cancellationToken = default)
-        => _options.GetOrderByOptionPriceAsync(request, cancellationToken);
+    public Task<OptionChainEntry> GetOrderByOptionPriceAsync(
+        string underlyingKey, string expiryDate, OptionType optionType,
+        decimal targetPremium, PriceSearchMode priceSearchMode = PriceSearchMode.Nearest,
+        CancellationToken cancellationToken = default)
+        => _options.GetOrderByOptionPriceAsync(underlyingKey, expiryDate, optionType, targetPremium, priceSearchMode, cancellationToken);
 
     /// <summary>
     /// Find the strike whose LTP is nearest to the target premium and place a v2 order.
@@ -164,12 +166,13 @@ public sealed class UpstoxClient
     // ═══════════════════════════════════════════════════════
 
     /// <summary>
-    /// Resolve the strike that would be selected by <see cref="PlaceOrderByStrikeAsync"/>
-    /// and return the order record without placing it.
+    /// Resolve the option chain entry for the given strike type (ATM / OTM1-5 / ITM1-5)
+    /// and return it without placing any order.
     /// </summary>
-    public Task<PlaceOrderRequest> GetOrderByStrikeAsync(
-        PlaceOrderByStrikeRequest request, CancellationToken cancellationToken = default)
-        => _options.GetOrderByStrikeAsync(request, cancellationToken);
+    public Task<OptionChainEntry> GetOrderByStrikeAsync(
+        string underlyingKey, string expiryDate, OptionType optionType, StrikeType strikeType,
+        CancellationToken cancellationToken = default)
+        => _options.GetOrderByStrikeAsync(underlyingKey, expiryDate, optionType, strikeType, cancellationToken);
 
     /// <summary>
     /// Resolve the exact strike (ATM / OTM1-5 / ITM1-5) relative to the current spot price

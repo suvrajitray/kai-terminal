@@ -1,3 +1,4 @@
+using KAITerminal.Upstox.Models.Enums;
 using KAITerminal.Upstox.Models.Requests;
 using KAITerminal.Upstox.Models.Responses;
 
@@ -29,11 +30,17 @@ public interface IOptionService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Feature 7 (preview) — Resolve the strike that would be selected by
-    /// <see cref="PlaceOrderByOptionPriceAsync"/> and return the order record without placing it.
+    /// Feature 7 (preview) — Resolve the option chain entry whose LTP best matches
+    /// <paramref name="targetPremium"/> according to <paramref name="priceSearchMode"/>.
+    /// Returns the full <see cref="OptionChainEntry"/> for the matched strike (live LTP,
+    /// greeks, OI, instrument key) without placing any order.
     /// </summary>
-    Task<PlaceOrderRequest> GetOrderByOptionPriceAsync(
-        PlaceOrderByOptionPriceRequest request,
+    Task<OptionChainEntry> GetOrderByOptionPriceAsync(
+        string underlyingKey,
+        string expiryDate,
+        OptionType optionType,
+        decimal targetPremium,
+        PriceSearchMode priceSearchMode = PriceSearchMode.Nearest,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -53,11 +60,16 @@ public interface IOptionService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Feature 8 (preview) — Resolve the strike that would be selected by
-    /// <see cref="PlaceOrderByStrikeAsync"/> and return the order record without placing it.
+    /// Feature 8 (preview) — Resolve the option chain entry for the given strike type
+    /// (ATM / OTM1-5 / ITM1-5) relative to the current spot price.
+    /// Returns the full <see cref="OptionChainEntry"/> for the matched strike (live LTP,
+    /// greeks, OI, instrument key) without placing any order.
     /// </summary>
-    Task<PlaceOrderRequest> GetOrderByStrikeAsync(
-        PlaceOrderByStrikeRequest request,
+    Task<OptionChainEntry> GetOrderByStrikeAsync(
+        string underlyingKey,
+        string expiryDate,
+        OptionType optionType,
+        StrikeType strikeType,
         CancellationToken cancellationToken = default);
 
     /// <summary>
