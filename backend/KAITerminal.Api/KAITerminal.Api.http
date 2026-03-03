@@ -1,6 +1,262 @@
-@KAITerminal.Api_HostAddress = http://localhost:5122
+@HostAddress = https://localhost:5001
+@JwtToken = <your-jwt-token>
+@UpstoxAccessToken = <your-upstox-access-token>
 
-GET {{KAITerminal.Api_HostAddress}}/weatherforecast/
-Accept: application/json
+### ── Auth ────────────────────────────────────────────────────────────────────
+
+# Initiate Google OAuth (opens browser redirect)
+GET {{HostAddress}}/auth/google
+
+###
+
+# Get authenticated user profile
+GET {{HostAddress}}/api/profile
+Authorization: Bearer {{JwtToken}}
+
+###
+
+# Debug: list all JWT claims
+GET {{HostAddress}}/debug/claims
+Authorization: Bearer {{JwtToken}}
+
+###
+
+### ── Broker Credentials ───────────────────────────────────────────────────────
+
+# Get saved broker credentials
+GET {{HostAddress}}/api/broker-credentials/
+Authorization: Bearer {{JwtToken}}
+
+###
+
+# Save / update broker credentials
+POST {{HostAddress}}/api/broker-credentials/
+Authorization: Bearer {{JwtToken}}
+Content-Type: application/json
+
+{
+  "BrokerName": "upstox",
+  "ApiKey": "<api-key>",
+  "ApiSecret": "<api-secret>"
+}
+
+###
+
+# Delete broker credentials
+DELETE {{HostAddress}}/api/broker-credentials/upstox
+Authorization: Bearer {{JwtToken}}
+
+###
+
+### ── Upstox: Auth ─────────────────────────────────────────────────────────────
+
+# Exchange auth code for Upstox access token
+POST {{HostAddress}}/api/upstox/access-token
+Content-Type: application/json
+
+{
+  "ApiKey": "<api-key>",
+  "ApiSecret": "<api-secret>",
+  "RedirectUri": "http://localhost:3000/redirect/upstox",
+  "Code": "<auth-code>"
+}
+
+###
+
+### ── Upstox: Positions ────────────────────────────────────────────────────────
+
+# Get all positions
+GET {{HostAddress}}/api/upstox/positions
+X-Upstox-AccessToken: {{UpstoxAccessToken}}
+
+###
+
+# Get total MTM
+GET {{HostAddress}}/api/upstox/mtm
+X-Upstox-AccessToken: {{UpstoxAccessToken}}
+
+###
+
+# Exit all positions (orderType: Market|Limit|SL|SLM, product: Intraday|Delivery|MTF|CoverOrder)
+POST {{HostAddress}}/api/upstox/positions/exit-all
+X-Upstox-AccessToken: {{UpstoxAccessToken}}
+
+###
+
+# Exit a single position by instrument token
+POST {{HostAddress}}/api/upstox/positions/NSE_FO|57352/exit
+X-Upstox-AccessToken: {{UpstoxAccessToken}}
+
+###
+
+### ── Upstox: Orders ───────────────────────────────────────────────────────────
+
+# Get all orders
+GET {{HostAddress}}/api/upstox/orders
+X-Upstox-AccessToken: {{UpstoxAccessToken}}
+
+###
+
+# Place order
+POST {{HostAddress}}/api/upstox/orders
+X-Upstox-AccessToken: {{UpstoxAccessToken}}
+Content-Type: application/json
+
+{
+  "InstrumentToken": "NSE_FO|57352",
+  "Quantity": 50,
+  "TransactionType": "Sell",
+  "OrderType": "Market",
+  "Product": "Intraday",
+  "Validity": "Day"
+}
+
+###
+
+# Place order (HFT v3)
+POST {{HostAddress}}/api/upstox/orders/v3
+X-Upstox-AccessToken: {{UpstoxAccessToken}}
+Content-Type: application/json
+
+{
+  "InstrumentToken": "NSE_FO|57352",
+  "Quantity": 50,
+  "TransactionType": "Sell",
+  "OrderType": "Market",
+  "Product": "Intraday",
+  "Validity": "Day"
+}
+
+###
+
+# Cancel all pending orders
+POST {{HostAddress}}/api/upstox/orders/cancel-all
+X-Upstox-AccessToken: {{UpstoxAccessToken}}
+
+###
+
+# Cancel a specific order
+DELETE {{HostAddress}}/api/upstox/orders/<order-id>
+X-Upstox-AccessToken: {{UpstoxAccessToken}}
+
+###
+
+# Cancel a specific order (HFT v3)
+DELETE {{HostAddress}}/api/upstox/orders/<order-id>/v3
+X-Upstox-AccessToken: {{UpstoxAccessToken}}
+
+###
+
+### ── Upstox: Options ──────────────────────────────────────────────────────────
+
+# Get option chain (expiryDate: YYYY-MM-DD)
+GET {{HostAddress}}/api/upstox/options/chain?underlyingKey=NSE_INDEX|Nifty+50&expiryDate=2026-03-27
+X-Upstox-AccessToken: {{UpstoxAccessToken}}
+
+###
+
+# Get option contracts (expiryDate optional)
+GET {{HostAddress}}/api/upstox/options/contracts?underlyingKey=NSE_INDEX|Nifty+50
+X-Upstox-AccessToken: {{UpstoxAccessToken}}
+
+###
+
+# Resolve strike by option price (no order placed)
+POST {{HostAddress}}/api/upstox/orders/by-option-price/resolve
+X-Upstox-AccessToken: {{UpstoxAccessToken}}
+Content-Type: application/json
+
+{
+  "UnderlyingKey": "NSE_INDEX|Nifty 50",
+  "ExpiryDate": "2026-03-27",
+  "OptionType": "CE",
+  "TargetPremium": 150,
+  "PriceSearchMode": "Nearest",
+  "Quantity": 50,
+  "TransactionType": "Sell"
+}
+
+###
+
+# Place order by option price
+POST {{HostAddress}}/api/upstox/orders/by-option-price
+X-Upstox-AccessToken: {{UpstoxAccessToken}}
+Content-Type: application/json
+
+{
+  "UnderlyingKey": "NSE_INDEX|Nifty 50",
+  "ExpiryDate": "2026-03-27",
+  "OptionType": "CE",
+  "TargetPremium": 150,
+  "PriceSearchMode": "Nearest",
+  "Quantity": 50,
+  "TransactionType": "Sell"
+}
+
+###
+
+# Place order by option price (HFT v3)
+POST {{HostAddress}}/api/upstox/orders/by-option-price/v3
+X-Upstox-AccessToken: {{UpstoxAccessToken}}
+Content-Type: application/json
+
+{
+  "UnderlyingKey": "NSE_INDEX|Nifty 50",
+  "ExpiryDate": "2026-03-27",
+  "OptionType": "CE",
+  "TargetPremium": 150,
+  "PriceSearchMode": "Nearest",
+  "Quantity": 50,
+  "TransactionType": "Sell"
+}
+
+###
+
+# Resolve strike by strike type (no order placed)
+# StrikeType: ATM | OTM1-OTM5 | ITM1-ITM5
+POST {{HostAddress}}/api/upstox/orders/by-strike/resolve
+X-Upstox-AccessToken: {{UpstoxAccessToken}}
+Content-Type: application/json
+
+{
+  "UnderlyingKey": "NSE_INDEX|Nifty 50",
+  "ExpiryDate": "2026-03-27",
+  "OptionType": "CE",
+  "StrikeType": "OTM1",
+  "Quantity": 50,
+  "TransactionType": "Sell"
+}
+
+###
+
+# Place order by strike type
+POST {{HostAddress}}/api/upstox/orders/by-strike
+X-Upstox-AccessToken: {{UpstoxAccessToken}}
+Content-Type: application/json
+
+{
+  "UnderlyingKey": "NSE_INDEX|Nifty 50",
+  "ExpiryDate": "2026-03-27",
+  "OptionType": "CE",
+  "StrikeType": "OTM1",
+  "Quantity": 50,
+  "TransactionType": "Sell"
+}
+
+###
+
+# Place order by strike type (HFT v3)
+POST {{HostAddress}}/api/upstox/orders/by-strike/v3
+X-Upstox-AccessToken: {{UpstoxAccessToken}}
+Content-Type: application/json
+
+{
+  "UnderlyingKey": "NSE_INDEX|Nifty 50",
+  "ExpiryDate": "2026-03-27",
+  "OptionType": "CE",
+  "StrikeType": "OTM1",
+  "Quantity": 50,
+  "TransactionType": "Sell"
+}
 
 ###

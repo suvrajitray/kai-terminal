@@ -972,126 +972,279 @@ public sealed class PlaceOrderV3Result
 
 ## Usage in ASP.NET Core Minimal API
 
-This example shows a **multi-user** setup where every request carries its own Upstox token (e.g. a trading terminal serving multiple accounts). See the [Multi-User Token Handling](#multi-user-token-handling) section for background.
+This example shows the **per-endpoint token** pattern used in `KAITerminal.Api`. Each endpoint reads the Upstox token directly from the `X-Upstox-AccessToken` request header and scopes it with `UpstoxTokenContext.Use(token)`. This is the recommended approach when the API itself acts as a proxy for multiple authenticated users.
+
+See the [Multi-User Token Handling](#multi-user-token-handling) section for background on `UpstoxTokenContext`.
+
+### Registration
 
 ```csharp
 // Program.cs
+builder.Services.AddUpstoxSdk(builder.Configuration); // no AccessToken in config
+```
+
+```json
+// appsettings.json
+{
+  "Upstox": { "AutoReconnect": false }
+}
+```
+
+### Full endpoint map
+
+```csharp
 using KAITerminal.Upstox;
-using KAITerminal.Upstox.Extensions;
 using KAITerminal.Upstox.Models.Enums;
 using KAITerminal.Upstox.Models.Requests;
-using KAITerminal.Upstox.Models.WebSocket;
-using KAITerminal.Upstox.Exceptions;
+using Microsoft.AspNetCore.Mvc;
 
-var builder = WebApplication.CreateBuilder(args);
+var group = app.MapGroup("/api/upstox");
 
-// No AccessToken in config — each request supplies its own token via UpstoxTokenContext.
-builder.Services.AddUpstoxSdk(builder.Configuration);
+// ─── Auth ─────────────────────────────────────────────────────────────────────
 
-var app = builder.Build();
-
-// ─── Per-request token middleware ──────────────────────────────────────────────
-// Reads the Upstox token from the Authorization header (or any user store)
-// and sets it for the duration of each HTTP request.
-
-app.Use(async (ctx, next) =>
+// POST /api/upstox/access-token
+// Exchange an Upstox OAuth authorization code for an access token.
+group.MapPost("/access-token", async (
+    [FromBody] UpstoxTokenRequest request,   // { ApiKey, ApiSecret, RedirectUri, Code }
+    UpstoxClient upstox) =>
 {
-    var token = ctx.Request.Headers["X-Upstox-Token"].FirstOrDefault();
-    using (UpstoxTokenContext.Use(token))
-        await next(ctx);
+    var token = await upstox.GenerateTokenAsync(
+        request.ApiKey, request.ApiSecret, request.RedirectUri, request.Code);
+    return Results.Ok(new { AccessToken = token.AccessToken });
 });
 
 // ─── Positions ────────────────────────────────────────────────────────────────
 
-app.MapGet("/positions", async (UpstoxClient client, CancellationToken ct) =>
+// GET /api/upstox/positions
+group.MapGet("/positions", async (
+    [FromHeader(Name = "X-Upstox-AccessToken")] string accessToken,
+    UpstoxClient upstox) =>
 {
-    var positions = await client.GetAllPositionsAsync(ct);
-    return Results.Ok(positions);
+    using (UpstoxTokenContext.Use(accessToken))
+        return Results.Ok(await upstox.GetAllPositionsAsync());
 });
 
-app.MapGet("/positions/mtm", async (UpstoxClient client, CancellationToken ct) =>
+// GET /api/upstox/mtm
+group.MapGet("/mtm", async (
+    [FromHeader(Name = "X-Upstox-AccessToken")] string accessToken,
+    UpstoxClient upstox) =>
 {
-    var mtm = await client.GetTotalMtmAsync(ct);
-    return Results.Ok(new { totalMtm = mtm });
+    using (UpstoxTokenContext.Use(accessToken))
+        return Results.Ok(new { Mtm = await upstox.GetTotalMtmAsync() });
 });
 
-app.MapDelete("/positions", async (UpstoxClient client, CancellationToken ct) =>
+// POST /api/upstox/positions/exit-all?orderType=Market&product=Intraday
+group.MapPost("/positions/exit-all", async (
+    [FromHeader(Name = "X-Upstox-AccessToken")] string accessToken,
+    UpstoxClient upstox,
+    [FromQuery] OrderType? orderType = null,
+    [FromQuery] Product? product = null) =>
 {
-    var ids = await client.ExitAllPositionsAsync(cancellationToken: ct);
-    return Results.Ok(new { exitedOrders = ids });
+    using (UpstoxTokenContext.Use(accessToken))
+    {
+        var ids = await upstox.ExitAllPositionsAsync(
+            orderType ?? OrderType.Market, product ?? Product.Intraday);
+        return Results.Ok(new { OrderIds = ids });
+    }
+});
+
+// POST /api/upstox/positions/{instrumentToken}/exit?orderType=Market&product=Intraday
+group.MapPost("/positions/{instrumentToken}/exit", async (
+    string instrumentToken,
+    [FromHeader(Name = "X-Upstox-AccessToken")] string accessToken,
+    UpstoxClient upstox,
+    [FromQuery] OrderType? orderType = null,
+    [FromQuery] Product? product = null) =>
+{
+    using (UpstoxTokenContext.Use(accessToken))
+    {
+        var id = await upstox.ExitPositionAsync(
+            instrumentToken, orderType ?? OrderType.Market, product ?? Product.Intraday);
+        return Results.Ok(new { OrderId = id });
+    }
 });
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
 
-app.MapGet("/orders", async (UpstoxClient client, CancellationToken ct) =>
-    Results.Ok(await client.GetAllOrdersAsync(ct)));
-
-app.MapDelete("/orders", async (UpstoxClient client, CancellationToken ct) =>
+// GET /api/upstox/orders
+group.MapGet("/orders", async (
+    [FromHeader(Name = "X-Upstox-AccessToken")] string accessToken,
+    UpstoxClient upstox) =>
 {
-    var ids = await client.CancelAllPendingOrdersAsync(ct);
-    return Results.Ok(new { cancelledOrders = ids });
+    using (UpstoxTokenContext.Use(accessToken))
+        return Results.Ok(await upstox.GetAllOrdersAsync());
 });
 
-app.MapPost("/orders", async (
-    PlaceOrderRequest request,
-    UpstoxClient client,
-    CancellationToken ct) =>
+// POST /api/upstox/orders
+group.MapPost("/orders", async (
+    [FromHeader(Name = "X-Upstox-AccessToken")] string accessToken,
+    [FromBody] PlaceOrderRequest request,
+    UpstoxClient upstox) =>
 {
-    try
-    {
-        var result = await client.PlaceOrderAsync(request, ct);
-        return Results.Ok(result);
-    }
-    catch (UpstoxException ex)
-    {
-        return Results.Problem(
-            title:      "Upstox API error",
-            detail:     ex.Message,
-            statusCode: ex.HttpStatusCode ?? 500);
-    }
+    using (UpstoxTokenContext.Use(accessToken))
+        return Results.Ok(await upstox.PlaceOrderAsync(request));
 });
 
-app.MapPost("/orders/v3", async (
-    PlaceOrderRequest request,
-    UpstoxClient client,
-    CancellationToken ct) =>
+// POST /api/upstox/orders/v3  (HFT endpoint — lower latency, returns latency ms)
+group.MapPost("/orders/v3", async (
+    [FromHeader(Name = "X-Upstox-AccessToken")] string accessToken,
+    [FromBody] PlaceOrderRequest request,
+    UpstoxClient upstox) =>
 {
-    var result = await client.PlaceOrderV3Async(request, ct);
-    return Results.Ok(result);
+    using (UpstoxTokenContext.Use(accessToken))
+        return Results.Ok(await upstox.PlaceOrderV3Async(request));
+});
+
+// POST /api/upstox/orders/cancel-all
+group.MapPost("/orders/cancel-all", async (
+    [FromHeader(Name = "X-Upstox-AccessToken")] string accessToken,
+    UpstoxClient upstox) =>
+{
+    using (UpstoxTokenContext.Use(accessToken))
+        return Results.Ok(new { OrderIds = await upstox.CancelAllPendingOrdersAsync() });
+});
+
+// DELETE /api/upstox/orders/{orderId}
+group.MapDelete("/orders/{orderId}", async (
+    string orderId,
+    [FromHeader(Name = "X-Upstox-AccessToken")] string accessToken,
+    UpstoxClient upstox) =>
+{
+    using (UpstoxTokenContext.Use(accessToken))
+        return Results.Ok(new { OrderId = await upstox.CancelOrderAsync(orderId) });
+});
+
+// DELETE /api/upstox/orders/{orderId}/v3  (HFT — returns orderId + latency ms)
+group.MapDelete("/orders/{orderId}/v3", async (
+    string orderId,
+    [FromHeader(Name = "X-Upstox-AccessToken")] string accessToken,
+    UpstoxClient upstox) =>
+{
+    using (UpstoxTokenContext.Use(accessToken))
+    {
+        var (id, latency) = await upstox.CancelOrderV3Async(orderId);
+        return Results.Ok(new { OrderId = id, Latency = latency });
+    }
 });
 
 // ─── Options ──────────────────────────────────────────────────────────────────
 
-app.MapGet("/options/chain", async (
-    string underlyingKey,
-    string expiryDate,
-    UpstoxClient client,
-    CancellationToken ct) =>
-    Results.Ok(await client.GetOptionChainAsync(underlyingKey, expiryDate, ct)));
-
-app.MapPost("/orders/by-premium", async (
-    PlaceOrderByOptionPriceRequest request,
-    UpstoxClient client,
-    CancellationToken ct) =>
+// GET /api/upstox/options/chain?underlyingKey=NSE_INDEX|Nifty+50&expiryDate=2026-03-27
+group.MapGet("/options/chain", async (
+    [FromQuery] string underlyingKey,
+    [FromQuery] string expiryDate,
+    [FromHeader(Name = "X-Upstox-AccessToken")] string accessToken,
+    UpstoxClient upstox) =>
 {
-    var result = await client.PlaceOrderByOptionPriceAsync(request, ct);
-    return Results.Ok(result);
+    using (UpstoxTokenContext.Use(accessToken))
+        return Results.Ok(await upstox.GetOptionChainAsync(underlyingKey, expiryDate));
 });
 
-app.MapPost("/orders/by-strike", async (
-    PlaceOrderByStrikeRequest request,
-    UpstoxClient client,
-    CancellationToken ct) =>
+// GET /api/upstox/options/contracts?underlyingKey=NSE_INDEX|Nifty+50[&expiryDate=...]
+group.MapGet("/options/contracts", async (
+    [FromQuery] string underlyingKey,
+    [FromHeader(Name = "X-Upstox-AccessToken")] string accessToken,
+    UpstoxClient upstox,
+    [FromQuery] string? expiryDate = null) =>
 {
-    var result = await client.PlaceOrderByStrikeAsync(request, ct);
-    return Results.Ok(result);
+    using (UpstoxTokenContext.Use(accessToken))
+        return Results.Ok(await upstox.GetOptionContractsAsync(underlyingKey, expiryDate));
 });
 
-// ─── SSE endpoint — stream live ticks to the browser ─────────────────────────
-// The per-request middleware has already set UpstoxTokenContext for this request,
-// so ConnectAsync picks up the correct user token automatically.
+// POST /api/upstox/orders/by-option-price/resolve  — resolve strike without placing
+group.MapPost("/orders/by-option-price/resolve", async (
+    [FromHeader(Name = "X-Upstox-AccessToken")] string accessToken,
+    [FromBody] PlaceOrderByOptionPriceRequest request,
+    UpstoxClient upstox) =>
+{
+    using (UpstoxTokenContext.Use(accessToken))
+        return Results.Ok(await upstox.GetOrderByOptionPriceAsync(request));
+});
 
+// POST /api/upstox/orders/by-option-price
+group.MapPost("/orders/by-option-price", async (
+    [FromHeader(Name = "X-Upstox-AccessToken")] string accessToken,
+    [FromBody] PlaceOrderByOptionPriceRequest request,
+    UpstoxClient upstox) =>
+{
+    using (UpstoxTokenContext.Use(accessToken))
+        return Results.Ok(await upstox.PlaceOrderByOptionPriceAsync(request));
+});
+
+// POST /api/upstox/orders/by-option-price/v3
+group.MapPost("/orders/by-option-price/v3", async (
+    [FromHeader(Name = "X-Upstox-AccessToken")] string accessToken,
+    [FromBody] PlaceOrderByOptionPriceRequest request,
+    UpstoxClient upstox) =>
+{
+    using (UpstoxTokenContext.Use(accessToken))
+        return Results.Ok(await upstox.PlaceOrderByOptionPriceV3Async(request));
+});
+
+// POST /api/upstox/orders/by-strike/resolve  — resolve strike without placing
+group.MapPost("/orders/by-strike/resolve", async (
+    [FromHeader(Name = "X-Upstox-AccessToken")] string accessToken,
+    [FromBody] PlaceOrderByStrikeRequest request,
+    UpstoxClient upstox) =>
+{
+    using (UpstoxTokenContext.Use(accessToken))
+        return Results.Ok(await upstox.GetOrderByStrikeAsync(request));
+});
+
+// POST /api/upstox/orders/by-strike
+group.MapPost("/orders/by-strike", async (
+    [FromHeader(Name = "X-Upstox-AccessToken")] string accessToken,
+    [FromBody] PlaceOrderByStrikeRequest request,
+    UpstoxClient upstox) =>
+{
+    using (UpstoxTokenContext.Use(accessToken))
+        return Results.Ok(await upstox.PlaceOrderByStrikeAsync(request));
+});
+
+// POST /api/upstox/orders/by-strike/v3
+group.MapPost("/orders/by-strike/v3", async (
+    [FromHeader(Name = "X-Upstox-AccessToken")] string accessToken,
+    [FromBody] PlaceOrderByStrikeRequest request,
+    UpstoxClient upstox) =>
+{
+    using (UpstoxTokenContext.Use(accessToken))
+        return Results.Ok(await upstox.PlaceOrderByStrikeV3Async(request));
+});
+```
+
+### Endpoint summary
+
+| Method | Path | SDK method |
+|---|---|---|
+| `POST` | `/access-token` | `GenerateTokenAsync` |
+| `GET` | `/positions` | `GetAllPositionsAsync` |
+| `GET` | `/mtm` | `GetTotalMtmAsync` |
+| `POST` | `/positions/exit-all` | `ExitAllPositionsAsync` |
+| `POST` | `/positions/{token}/exit` | `ExitPositionAsync` |
+| `GET` | `/orders` | `GetAllOrdersAsync` |
+| `POST` | `/orders` | `PlaceOrderAsync` |
+| `POST` | `/orders/v3` | `PlaceOrderV3Async` |
+| `POST` | `/orders/cancel-all` | `CancelAllPendingOrdersAsync` |
+| `DELETE` | `/orders/{orderId}` | `CancelOrderAsync` |
+| `DELETE` | `/orders/{orderId}/v3` | `CancelOrderV3Async` |
+| `GET` | `/options/chain` | `GetOptionChainAsync` |
+| `GET` | `/options/contracts` | `GetOptionContractsAsync` |
+| `POST` | `/orders/by-option-price/resolve` | `GetOrderByOptionPriceAsync` |
+| `POST` | `/orders/by-option-price` | `PlaceOrderByOptionPriceAsync` |
+| `POST` | `/orders/by-option-price/v3` | `PlaceOrderByOptionPriceV3Async` |
+| `POST` | `/orders/by-strike/resolve` | `GetOrderByStrikeAsync` |
+| `POST` | `/orders/by-strike` | `PlaceOrderByStrikeAsync` |
+| `POST` | `/orders/by-strike/v3` | `PlaceOrderByStrikeV3Async` |
+
+The `/resolve` variants (`GetOrderByOptionPriceAsync`, `GetOrderByStrikeAsync`) run the full strike resolution logic and return the resolved `PlaceOrderRequest` without submitting the order — useful for previewing before committing.
+
+### SSE endpoint — stream live ticks to the browser
+
+For WebSocket streaming in a Minimal API, scope the token at `ConnectAsync` time:
+
+```csharp
 app.MapGet("/stream/nifty", async (
+    [FromHeader(Name = "X-Upstox-AccessToken")] string accessToken,
     UpstoxClient client,
     HttpContext ctx,
     CancellationToken ct) =>
@@ -1111,31 +1264,15 @@ app.MapGet("/stream/nifty", async (
         }
     };
 
-    await streamer.ConnectAsync(ct); // token from UpstoxTokenContext captured here
+    using (UpstoxTokenContext.Use(accessToken))
+        await streamer.ConnectAsync(ct); // token captured here, reused on reconnects
+
     await streamer.SubscribeAsync(["NSE_INDEX|Nifty 50"], FeedMode.Ltpc, ct);
 
-    // Hold the response open until the client disconnects
     try { await Task.Delay(Timeout.Infinite, ct); }
     catch (OperationCanceledException) { }
 });
-
-app.Run();
 ```
-
-### `appsettings.json` (Minimal API — multi-user)
-
-```json
-{
-  "Upstox": {
-    "AutoReconnect": false
-  },
-  "Logging": {
-    "LogLevel": { "Default": "Information" }
-  }
-}
-```
-
-> For a **single-user** Minimal API, add `"AccessToken": "your_token_here"` to the `Upstox` section and remove the per-request middleware.
 
 ---
 
