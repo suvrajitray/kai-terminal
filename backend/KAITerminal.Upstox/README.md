@@ -905,6 +905,66 @@ public sealed class PlaceOrderV3Result
 }
 ```
 
+### `OptionContract`
+
+Returned by `GetOptionContractsAsync`. Contains metadata only — no live prices.
+
+| Property | Type | Notes |
+|---|---|---|
+| `InstrumentKey` | `string` | e.g. `"NSE_FO\|57352"` — use this to place orders |
+| `TradingSymbol` | `string` | Human-readable symbol |
+| `Name` | `string` | Underlying name |
+| `Exchange` | `string` | `"NSE"`, `"BSE"`, etc. |
+| `Segment` | `string` | e.g. `"NSE_FO"` |
+| `ExchangeToken` | `string` | Exchange-assigned token |
+| `Expiry` | `string` | `YYYY-MM-DD` |
+| `InstrumentType` | `string` | `"CE"` or `"PE"` |
+| `StrikePrice` | `decimal` | Strike price |
+| `TickSize` | `decimal` | Minimum price movement |
+| `LotSize` | `decimal` | Contract lot size — returned as float by Upstox |
+| `FreezeQuantity` | `decimal` | Max qty per order before auto-slice — returned as float by Upstox |
+| `MinimumLot` | `decimal` | Minimum order quantity — returned as float by Upstox |
+| `UnderlyingKey` | `string` | e.g. `"NSE_INDEX\|Nifty 50"` |
+| `UnderlyingSymbol` | `string` | Underlying ticker |
+| `UnderlyingType` | `string` | `"INDEX"`, `"EQUITY"`, etc. |
+| `Weekly` | `bool` | `true` for weekly expiries |
+
+> `LotSize`, `FreezeQuantity`, and `MinimumLot` are `decimal` because the Upstox API returns these as floating-point numbers (e.g. `25.0`, `1800.0`) even though they represent whole-number quantities.
+
+### `OptionChainEntry`
+
+Returned by `GetOptionChainAsync`. One row per strike price, with live market data.
+
+| Property | Type | Notes |
+|---|---|---|
+| `StrikePrice` | `decimal` | Strike price |
+| `Expiry` | `string` | `YYYY-MM-DD` |
+| `UnderlyingKey` | `string` | |
+| `UnderlyingSpotPrice` | `decimal` | Spot price at query time |
+| `Pcr` | `decimal` | Put/Call ratio |
+| `CallOptions` | `OptionSide?` | CE side — `null` if no CE exists for this strike |
+| `PutOptions` | `OptionSide?` | PE side — `null` if no PE exists for this strike |
+
+`OptionSide` properties:
+
+| Property | Type | Notes |
+|---|---|---|
+| `InstrumentKey` | `string` | Use this to place orders |
+| `MarketData` | `OptionMarketData?` | LTP, OI, volume, bid/ask |
+| `OptionGreeks` | `OptionGreeks?` | Delta, gamma, theta, vega, IV, PoP |
+
+`OptionMarketData` properties:
+
+| Property | Type | Notes |
+|---|---|---|
+| `Ltp` | `decimal` | Last traded price |
+| `Volume` | `decimal` | Traded volume — returned as float by Upstox |
+| `Oi` | `decimal` | Open interest — returned as float by Upstox |
+| `PrevOi` | `decimal` | Previous OI — returned as float by Upstox |
+| `ClosePrice` | `decimal` | Previous close |
+| `BidPrice` / `AskPrice` | `decimal` | Best bid/ask price |
+| `BidQty` / `AskQty` | `decimal` | Best bid/ask quantity — returned as float by Upstox |
+
 ---
 
 ## Enums Reference

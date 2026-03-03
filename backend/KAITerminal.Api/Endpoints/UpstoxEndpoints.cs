@@ -105,6 +105,25 @@ public static class UpstoxEndpoints
             return Results.Ok(await upstox.GetOptionContractsAsync(underlyingKey, expiryDate));
         });
 
+        group.MapGet("/options/contracts/current-month", async (
+            [FromQuery] string? underlyingKey,
+            UpstoxClient upstox) =>
+        {
+            if (string.IsNullOrEmpty(underlyingKey))
+                return Results.BadRequest(new { error = "underlyingKey is required." });
+
+            var today = DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(5.5));
+            var contracts = await upstox.GetOptionContractsAsync(underlyingKey);
+            var currentMonth = contracts
+                .Where(c => DateOnly.TryParse(c.Expiry, out var expiry)
+                            && expiry.Year == today.Year
+                            && expiry.Month == today.Month)
+                .OrderBy(c => c.Expiry)
+                .ToList();
+
+            return Results.Ok(currentMonth);
+        });
+
         group.MapPost("/orders/by-option-price/resolve", async (
             [FromBody] PlaceOrderByOptionPriceRequest request,
             UpstoxClient upstox) =>

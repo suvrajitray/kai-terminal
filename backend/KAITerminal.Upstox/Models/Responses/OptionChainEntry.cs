@@ -45,13 +45,13 @@ public sealed class OptionMarketData
     public decimal Ltp { get; init; }
 
     [JsonPropertyName("volume")]
-    public long Volume { get; init; }
+    public decimal Volume { get; init; }
 
     [JsonPropertyName("oi")]
-    public long Oi { get; init; }
+    public decimal Oi { get; init; }
 
     [JsonPropertyName("prev_oi")]
-    public long PrevOi { get; init; }
+    public decimal PrevOi { get; init; }
 
     [JsonPropertyName("close_price")]
     public decimal ClosePrice { get; init; }
@@ -60,13 +60,13 @@ public sealed class OptionMarketData
     public decimal BidPrice { get; init; }
 
     [JsonPropertyName("bid_qty")]
-    public int BidQty { get; init; }
+    public decimal BidQty { get; init; }
 
     [JsonPropertyName("ask_price")]
     public decimal AskPrice { get; init; }
 
     [JsonPropertyName("ask_qty")]
-    public int AskQty { get; init; }
+    public decimal AskQty { get; init; }
 }
 
 public sealed class OptionGreeks
