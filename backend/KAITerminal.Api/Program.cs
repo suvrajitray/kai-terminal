@@ -23,7 +23,8 @@ app.UseWhen(
     ctx => ctx.Request.Path.StartsWithSegments("/api/upstox"),
     upstox => upstox.Use(async (ctx, next) =>
     {
-        var token = ctx.Request.Headers["X-Upstox-AccessToken"].FirstOrDefault();
+        var token = ctx.Request.Headers["X-Upstox-Access-Token"].FirstOrDefault();
+        Console.WriteLine("token: ", token);
         using (UpstoxTokenContext.Use(token))
             await next(ctx);
     }));

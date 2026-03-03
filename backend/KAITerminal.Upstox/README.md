@@ -25,9 +25,10 @@ A .NET 10 class library that wraps the [Upstox REST API v2/v3](https://upstox.co
 9. [Error Handling](#error-handling)
 10. [Models Reference](#models-reference)
 11. [Enums Reference](#enums-reference)
-12. [Usage in ASP.NET Core Minimal API](#usage-in-aspnet-core-minimal-api)
-13. [Usage in .NET Worker Service](#usage-in-net-worker-service)
-14. [Protobuf & Apple Silicon](#protobuf--apple-silicon)
+12. [Integration Quick Start](#integration-quick-start)
+    - [ASP.NET Core Minimal API](#aspnet-core-minimal-api)
+    - [.NET Worker Service](#net-worker-service)
+13. [Protobuf & Apple Silicon](#protobuf--apple-silicon)
 
 ---
 
@@ -970,29 +971,18 @@ public sealed class PlaceOrderV3Result
 
 ---
 
-## Usage in ASP.NET Core Minimal API
+## Integration Quick Start
 
-This example shows the **middleware token** pattern used in `KAITerminal.Api`. A single `UseWhen` middleware reads `X-Upstox-AccessToken` from the request header once and sets `UpstoxTokenContext` for the entire request. Endpoints then call the SDK directly — no token handling in each handler.
+### ASP.NET Core Minimal API
 
-See the [Multi-User Token Handling](#multi-user-token-handling) section for background on `UpstoxTokenContext`.
-
-### Registration
+Register the SDK without a stored token — each request brings its own:
 
 ```csharp
 // Program.cs
 builder.Services.AddUpstoxSdk(builder.Configuration); // no AccessToken in config
 ```
 
-```json
-// appsettings.json
-{
-  "Upstox": { "AutoReconnect": false }
-}
-```
-
-### Middleware
-
-Scope the token middleware to the Upstox route prefix so it doesn't run on unrelated requests:
+Scope `UpstoxTokenContext` for a route prefix with a single middleware:
 
 ```csharp
 app.UseWhen(
@@ -1005,166 +995,33 @@ app.UseWhen(
     }));
 ```
 
-### Full endpoint map
-
-With the middleware in place, endpoints need no token plumbing at all:
+Endpoints then call the SDK directly with no token plumbing:
 
 ```csharp
-using KAITerminal.Upstox;
-using KAITerminal.Upstox.Models.Enums;
-using KAITerminal.Upstox.Models.Requests;
-using Microsoft.AspNetCore.Mvc;
-
 var group = app.MapGroup("/api/upstox");
-
-// ─── Auth ─────────────────────────────────────────────────────────────────────
-
-group.MapPost("/access-token", async (
-    [FromBody] UpstoxTokenRequest request,
-    UpstoxClient upstox) =>
-{
-    var token = await upstox.GenerateTokenAsync(
-        request.ApiKey, request.ApiSecret, request.RedirectUri, request.Code);
-    return Results.Ok(new { AccessToken = token.AccessToken });
-});
-
-// ─── Positions ────────────────────────────────────────────────────────────────
 
 group.MapGet("/positions", async (UpstoxClient upstox) =>
     Results.Ok(await upstox.GetAllPositionsAsync()));
-
-group.MapGet("/mtm", async (UpstoxClient upstox) =>
-    Results.Ok(new { Mtm = await upstox.GetTotalMtmAsync() }));
-
-// POST /positions/exit-all?orderType=Market&product=Intraday
-group.MapPost("/positions/exit-all", async (
-    UpstoxClient upstox,
-    [FromQuery] OrderType? orderType = null,
-    [FromQuery] Product? product = null) =>
-{
-    var ids = await upstox.ExitAllPositionsAsync(
-        orderType ?? OrderType.Market, product ?? Product.Intraday);
-    return Results.Ok(new { OrderIds = ids });
-});
-
-// POST /positions/{instrumentToken}/exit?orderType=Market&product=Intraday
-group.MapPost("/positions/{instrumentToken}/exit", async (
-    string instrumentToken,
-    UpstoxClient upstox,
-    [FromQuery] OrderType? orderType = null,
-    [FromQuery] Product? product = null) =>
-{
-    var id = await upstox.ExitPositionAsync(
-        instrumentToken, orderType ?? OrderType.Market, product ?? Product.Intraday);
-    return Results.Ok(new { OrderId = id });
-});
-
-// ─── Orders ───────────────────────────────────────────────────────────────────
-
-group.MapGet("/orders", async (UpstoxClient upstox) =>
-    Results.Ok(await upstox.GetAllOrdersAsync()));
 
 group.MapPost("/orders", async (
     [FromBody] PlaceOrderRequest request, UpstoxClient upstox) =>
     Results.Ok(await upstox.PlaceOrderAsync(request)));
 
-group.MapPost("/orders/v3", async (
-    [FromBody] PlaceOrderRequest request, UpstoxClient upstox) =>
-    Results.Ok(await upstox.PlaceOrderV3Async(request)));
-
-group.MapPost("/orders/cancel-all", async (UpstoxClient upstox) =>
-    Results.Ok(new { OrderIds = await upstox.CancelAllPendingOrdersAsync() }));
-
-group.MapDelete("/orders/{orderId}", async (
-    string orderId, UpstoxClient upstox) =>
-    Results.Ok(new { OrderId = await upstox.CancelOrderAsync(orderId) }));
-
-// HFT cancel — returns orderId + latency ms
-group.MapDelete("/orders/{orderId}/v3", async (
-    string orderId, UpstoxClient upstox) =>
-{
-    var (id, latency) = await upstox.CancelOrderV3Async(orderId);
-    return Results.Ok(new { OrderId = id, Latency = latency });
-});
-
-// ─── Options ──────────────────────────────────────────────────────────────────
-
-// GET /options/chain?underlyingKey=NSE_INDEX|Nifty+50&expiryDate=2026-03-27
 group.MapGet("/options/chain", async (
     [FromQuery] string underlyingKey,
     [FromQuery] string expiryDate,
     UpstoxClient upstox) =>
     Results.Ok(await upstox.GetOptionChainAsync(underlyingKey, expiryDate)));
-
-// GET /options/contracts?underlyingKey=NSE_INDEX|Nifty+50[&expiryDate=...]
-group.MapGet("/options/contracts", async (
-    [FromQuery] string underlyingKey,
-    UpstoxClient upstox,
-    [FromQuery] string? expiryDate = null) =>
-    Results.Ok(await upstox.GetOptionContractsAsync(underlyingKey, expiryDate)));
-
-// Resolve strike without placing — inspect before committing
-group.MapPost("/orders/by-option-price/resolve", async (
-    [FromBody] PlaceOrderByOptionPriceRequest request, UpstoxClient upstox) =>
-    Results.Ok(await upstox.GetOrderByOptionPriceAsync(request)));
-
-group.MapPost("/orders/by-option-price", async (
-    [FromBody] PlaceOrderByOptionPriceRequest request, UpstoxClient upstox) =>
-    Results.Ok(await upstox.PlaceOrderByOptionPriceAsync(request)));
-
-group.MapPost("/orders/by-option-price/v3", async (
-    [FromBody] PlaceOrderByOptionPriceRequest request, UpstoxClient upstox) =>
-    Results.Ok(await upstox.PlaceOrderByOptionPriceV3Async(request)));
-
-// Resolve strike without placing — inspect before committing
-group.MapPost("/orders/by-strike/resolve", async (
-    [FromBody] PlaceOrderByStrikeRequest request, UpstoxClient upstox) =>
-    Results.Ok(await upstox.GetOrderByStrikeAsync(request)));
-
-group.MapPost("/orders/by-strike", async (
-    [FromBody] PlaceOrderByStrikeRequest request, UpstoxClient upstox) =>
-    Results.Ok(await upstox.PlaceOrderByStrikeAsync(request)));
-
-group.MapPost("/orders/by-strike/v3", async (
-    [FromBody] PlaceOrderByStrikeRequest request, UpstoxClient upstox) =>
-    Results.Ok(await upstox.PlaceOrderByStrikeV3Async(request)));
 ```
 
-### Endpoint summary
+For the full REST API implementation — all endpoints, auth, broker credentials, and configuration — see [`KAITerminal.Api/README.md`](../KAITerminal.Api/README.md).
 
-| Method | Path | SDK method |
-|---|---|---|
-| `POST` | `/access-token` | `GenerateTokenAsync` |
-| `GET` | `/positions` | `GetAllPositionsAsync` |
-| `GET` | `/mtm` | `GetTotalMtmAsync` |
-| `POST` | `/positions/exit-all` | `ExitAllPositionsAsync` |
-| `POST` | `/positions/{token}/exit` | `ExitPositionAsync` |
-| `GET` | `/orders` | `GetAllOrdersAsync` |
-| `POST` | `/orders` | `PlaceOrderAsync` |
-| `POST` | `/orders/v3` | `PlaceOrderV3Async` |
-| `POST` | `/orders/cancel-all` | `CancelAllPendingOrdersAsync` |
-| `DELETE` | `/orders/{orderId}` | `CancelOrderAsync` |
-| `DELETE` | `/orders/{orderId}/v3` | `CancelOrderV3Async` |
-| `GET` | `/options/chain` | `GetOptionChainAsync` |
-| `GET` | `/options/contracts` | `GetOptionContractsAsync` |
-| `POST` | `/orders/by-option-price/resolve` | `GetOrderByOptionPriceAsync` |
-| `POST` | `/orders/by-option-price` | `PlaceOrderByOptionPriceAsync` |
-| `POST` | `/orders/by-option-price/v3` | `PlaceOrderByOptionPriceV3Async` |
-| `POST` | `/orders/by-strike/resolve` | `GetOrderByStrikeAsync` |
-| `POST` | `/orders/by-strike` | `PlaceOrderByStrikeAsync` |
-| `POST` | `/orders/by-strike/v3` | `PlaceOrderByStrikeV3Async` |
+#### SSE — stream live ticks to the browser
 
-The `/resolve` variants (`GetOrderByOptionPriceAsync`, `GetOrderByStrikeAsync`) run the full strike resolution logic and return the resolved `PlaceOrderRequest` without submitting the order — useful for previewing before committing.
-
-### SSE endpoint — stream live ticks to the browser
-
-The middleware has already set `UpstoxTokenContext` before the handler runs. `ConnectAsync` captures the ambient token automatically, so no explicit scoping is needed:
+The middleware sets `UpstoxTokenContext` before the handler runs, so `ConnectAsync` picks up the token automatically:
 
 ```csharp
-app.MapGet("/stream/nifty", async (
-    UpstoxClient client,
-    HttpContext ctx,
-    CancellationToken ct) =>
+app.MapGet("/stream/nifty", async (UpstoxClient client, HttpContext ctx, CancellationToken ct) =>
 {
     ctx.Response.Headers.ContentType  = "text/event-stream";
     ctx.Response.Headers.CacheControl = "no-cache";
@@ -1181,8 +1038,7 @@ app.MapGet("/stream/nifty", async (
         }
     };
 
-    await streamer.ConnectAsync(ct); // token already set by middleware, captured here
-
+    await streamer.ConnectAsync(ct);
     await streamer.SubscribeAsync(["NSE_INDEX|Nifty 50"], FeedMode.Ltpc, ct);
 
     try { await Task.Delay(Timeout.Infinite, ct); }
@@ -1192,33 +1048,12 @@ app.MapGet("/stream/nifty", async (
 
 ---
 
-## Usage in .NET Worker Service
+### .NET Worker Service
 
-A Worker Service is the natural host for persistent WebSocket streams that need to run for the duration of the application.
-
-### Project setup
-
-```xml
-<!-- Worker.csproj -->
-<Project Sdk="Microsoft.NET.Sdk.Worker">
-  <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-  </PropertyGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\KAITerminal.Upstox\KAITerminal.Upstox.csproj" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.0" />
-  </ItemGroup>
-</Project>
-```
-
-### Program.cs
+A Worker Service is the natural host for persistent WebSocket streams.
 
 ```csharp
-using KAITerminal.Upstox.Extensions;
-
+// Program.cs
 var host = Host.CreateDefaultBuilder(args)
     .ConfigureServices((ctx, services) =>
     {
@@ -1231,7 +1066,7 @@ var host = Host.CreateDefaultBuilder(args)
 await host.RunAsync();
 ```
 
-### Market data worker
+#### Market data worker
 
 ```csharp
 using KAITerminal.Upstox;
@@ -1242,70 +1077,44 @@ public sealed class MarketDataWorker : BackgroundService
     private readonly UpstoxClient _client;
     private readonly ILogger<MarketDataWorker> _logger;
 
-    // Instruments to subscribe — edit as needed
-    private static readonly string[] Instruments =
-    [
-        "NSE_INDEX|Nifty 50",
-        "NSE_INDEX|NIFTY BANK"
-    ];
+    private static readonly string[] Instruments = ["NSE_INDEX|Nifty 50", "NSE_INDEX|NIFTY BANK"];
 
     public MarketDataWorker(UpstoxClient client, ILogger<MarketDataWorker> logger)
-    {
-        _client = client;
-        _logger = logger;
-    }
+        => (_client, _logger) = (client, logger);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await using var streamer = _client.CreateMarketDataStreamer();
 
-        streamer.Connected    += (_, _)  => _logger.LogInformation("Market feed connected");
-        streamer.Reconnecting += (_, _)  => _logger.LogWarning("Market feed reconnecting…");
-        streamer.Disconnected += (_, ex) => _logger.LogWarning(ex, "Market feed disconnected");
-        streamer.AutoReconnectStopped += (_, _) =>
-            _logger.LogError("Market feed auto-reconnect exhausted — giving up");
+        streamer.Connected            += (_, _)  => _logger.LogInformation("Market feed connected");
+        streamer.Reconnecting         += (_, _)  => _logger.LogWarning("Market feed reconnecting…");
+        streamer.Disconnected         += (_, ex) => _logger.LogWarning(ex, "Market feed disconnected");
+        streamer.AutoReconnectStopped += (_, _)  => _logger.LogError("Auto-reconnect exhausted");
 
         streamer.FeedReceived += (_, msg) =>
         {
             foreach (var (key, feed) in msg.Instruments)
-            {
                 if (feed.Ltpc is { } ltpc)
                     _logger.LogInformation("{Key}  LTP={Ltp}", key, ltpc.Ltp);
-            }
-        };
-
-        streamer.MarketStatusReceived += (_, status) =>
-        {
-            foreach (var (segment, state) in status.Segments)
-                _logger.LogInformation("Segment {Segment}: {State}", segment, state);
         };
 
         try
         {
             await streamer.ConnectAsync(stoppingToken);
             await streamer.SubscribeAsync(Instruments, FeedMode.Ltpc, stoppingToken);
-
-            // Keep alive until the host shuts down
             await Task.Delay(Timeout.Infinite, stoppingToken);
         }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Market feed worker stopping");
-        }
-        finally
-        {
-            await streamer.DisconnectAsync();
-        }
+        catch (OperationCanceledException) { }
+        finally { await streamer.DisconnectAsync(); }
     }
 }
 ```
 
-### Portfolio update worker
+#### Portfolio update worker
 
 ```csharp
 using KAITerminal.Upstox;
 using KAITerminal.Upstox.Models.WebSocket;
-using System.Text.Json;
 
 public sealed class PortfolioWorker : BackgroundService
 {
@@ -1313,10 +1122,7 @@ public sealed class PortfolioWorker : BackgroundService
     private readonly ILogger<PortfolioWorker> _logger;
 
     public PortfolioWorker(UpstoxClient client, ILogger<PortfolioWorker> logger)
-    {
-        _client = client;
-        _logger = logger;
-    }
+        => (_client, _logger) = (client, logger);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -1329,20 +1135,11 @@ public sealed class PortfolioWorker : BackgroundService
         streamer.UpdateReceived += (_, update) =>
         {
             _logger.LogInformation("Portfolio update: {Type}", update.Type);
-
-            switch (update.Type)
+            if (update.Type == "order_update" && update.Data.HasValue)
             {
-                case "order_update" when update.Data.HasValue:
-                    var orderId = update.Data.Value.GetProperty("order_id").GetString();
-                    var status  = update.Data.Value.GetProperty("status").GetString();
-                    _logger.LogInformation("  Order {OrderId} → {Status}", orderId, status);
-                    break;
-
-                case "position_update" when update.Data.HasValue:
-                    var token = update.Data.Value.GetProperty("instrument_token").GetString();
-                    var qty   = update.Data.Value.GetProperty("quantity").GetInt32();
-                    _logger.LogInformation("  Position {Token}  qty={Qty}", token, qty);
-                    break;
+                var orderId = update.Data.Value.GetProperty("order_id").GetString();
+                var status  = update.Data.Value.GetProperty("status").GetString();
+                _logger.LogInformation("  Order {OrderId} → {Status}", orderId, status);
             }
         };
 
@@ -1351,77 +1148,15 @@ public sealed class PortfolioWorker : BackgroundService
             await streamer.ConnectAsync(
                 updateTypes: [UpdateType.Order, UpdateType.Position],
                 ct: stoppingToken);
-
             await Task.Delay(Timeout.Infinite, stoppingToken);
         }
-        catch (OperationCanceledException)
-        {
-            _logger.LogInformation("Portfolio worker stopping");
-        }
-        finally
-        {
-            await streamer.DisconnectAsync();
-        }
-    }
-}
-```
-
-### Combined worker: REST + streaming
-
-```csharp
-// Example: every 30 s print P&L; also stream live ticks for risk monitoring
-public sealed class RiskMonitorWorker : BackgroundService
-{
-    private readonly UpstoxClient _client;
-    private readonly ILogger<RiskMonitorWorker> _logger;
-
-    public RiskMonitorWorker(UpstoxClient client, ILogger<RiskMonitorWorker> logger)
-    {
-        _client = client;
-        _logger = logger;
-    }
-
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        await using var streamer = _client.CreateMarketDataStreamer();
-
-        streamer.FeedReceived += (_, msg) =>
-        {
-            // Real-time tick handler — keep fast, no I/O
-            foreach (var (key, feed) in msg.Instruments)
-                if (feed.Ltpc is { } ltpc && ltpc.Ltp < 0)
-                    _logger.LogWarning("Unexpected negative LTP for {Key}", key);
-        };
-
-        await streamer.ConnectAsync(stoppingToken);
-        await streamer.SubscribeAsync(["NSE_INDEX|Nifty 50"], FeedMode.Ltpc, stoppingToken);
-
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
-
-        try
-        {
-            while (await timer.WaitForNextTickAsync(stoppingToken))
-            {
-                var mtm = await _client.GetTotalMtmAsync(stoppingToken);
-                _logger.LogInformation("Total MTM: ₹{Mtm:F2}", mtm);
-
-                if (mtm < -50_000)
-                {
-                    _logger.LogCritical("MTM breach — exiting all positions");
-                    await _client.ExitAllPositionsAsync(cancellationToken: stoppingToken);
-                }
-            }
-        }
         catch (OperationCanceledException) { }
-        finally
-        {
-            await streamer.DisconnectAsync();
-        }
+        finally { await streamer.DisconnectAsync(); }
     }
 }
 ```
 
-### `appsettings.json` (Worker)
+#### `appsettings.json`
 
 ```json
 {
@@ -1430,15 +1165,11 @@ public sealed class RiskMonitorWorker : BackgroundService
     "AutoReconnect": true,
     "ReconnectIntervalSeconds": 3,
     "MaxReconnectAttempts": 10
-  },
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft.Hosting.Lifetime": "Information"
-    }
   }
 }
 ```
+
+For a Worker Service that also runs portfolio risk evaluation — see [`KAITerminal.RiskEngine/README.md`](../KAITerminal.RiskEngine/README.md).
 
 ---
 

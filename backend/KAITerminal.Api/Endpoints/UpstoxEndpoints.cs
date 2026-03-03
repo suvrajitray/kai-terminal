@@ -86,16 +86,24 @@ public static class UpstoxEndpoints
         // ── Options ───────────────────────────────────────────────────────────
 
         group.MapGet("/options/chain", async (
-            [FromQuery] string underlyingKey,
-            [FromQuery] string expiryDate,
+            [FromQuery] string? underlyingKey,
+            [FromQuery] string? expiryDate,
             UpstoxClient upstox) =>
-            Results.Ok(await upstox.GetOptionChainAsync(underlyingKey, expiryDate)));
+        {
+            if (string.IsNullOrEmpty(underlyingKey) || string.IsNullOrEmpty(expiryDate))
+                return Results.BadRequest(new { error = "underlyingKey and expiryDate are required." });
+            return Results.Ok(await upstox.GetOptionChainAsync(underlyingKey, expiryDate));
+        });
 
         group.MapGet("/options/contracts", async (
-            [FromQuery] string underlyingKey,
+            [FromQuery] string? underlyingKey,
             UpstoxClient upstox,
             [FromQuery] string? expiryDate = null) =>
-            Results.Ok(await upstox.GetOptionContractsAsync(underlyingKey, expiryDate)));
+        {
+            if (string.IsNullOrEmpty(underlyingKey))
+                return Results.BadRequest(new { error = "underlyingKey is required." });
+            return Results.Ok(await upstox.GetOptionContractsAsync(underlyingKey, expiryDate));
+        });
 
         group.MapPost("/orders/by-option-price/resolve", async (
             [FromBody] PlaceOrderByOptionPriceRequest request,

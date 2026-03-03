@@ -31,14 +31,14 @@ public sealed class OptionContract
     public decimal TickSize { get; init; }
 
     [JsonPropertyName("lot_size")]
-    public int LotSize { get; init; }
+    public decimal LotSize { get; init; }
 
     /// <summary>CE or PE.</summary>
     [JsonPropertyName("instrument_type")]
     public string InstrumentType { get; init; } = "";
 
     [JsonPropertyName("freeze_quantity")]
-    public int FreezeQuantity { get; init; }
+    public decimal FreezeQuantity { get; init; }
 
     [JsonPropertyName("underlying_key")]
     public string UnderlyingKey { get; init; } = "";
@@ -53,7 +53,7 @@ public sealed class OptionContract
     public decimal StrikePrice { get; init; }
 
     [JsonPropertyName("minimum_lot")]
-    public int MinimumLot { get; init; }
+    public decimal MinimumLot { get; init; }
 
     [JsonPropertyName("weekly")]
     public bool Weekly { get; init; }

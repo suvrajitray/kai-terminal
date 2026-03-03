@@ -238,3 +238,83 @@ dotnet run --project KAITerminal.SimConsole
 | Host restarts | All state lost; engine starts fresh |
 
 State is intentionally in-memory only. Persistence across restarts is not implemented — the intent is that the engine is set up fresh each trading day.
+
+---
+
+## Custom Risk Worker Pattern
+
+If you need a lightweight risk monitor without the full `KAITerminal.RiskEngine` library — for example a single-purpose worker that combines live market ticks with periodic P&L checks — you can build directly on the Upstox SDK:
+
+```csharp
+using KAITerminal.Upstox;
+using KAITerminal.Upstox.Models.WebSocket;
+
+/// <summary>
+/// Streams live market ticks and polls MTM on a timer.
+/// Exits all positions if MTM falls below a configurable hard stop.
+/// </summary>
+public sealed class RiskMonitorWorker : BackgroundService
+{
+    private readonly UpstoxClient _client;
+    private readonly ILogger<RiskMonitorWorker> _logger;
+    private readonly decimal _hardStopLoss;
+
+    public RiskMonitorWorker(
+        UpstoxClient client,
+        ILogger<RiskMonitorWorker> logger,
+        IConfiguration config)
+    {
+        _client      = client;
+        _logger      = logger;
+        _hardStopLoss = config.GetValue<decimal>("RiskMonitor:HardStopLoss", -25_000);
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        await using var streamer = _client.CreateMarketDataStreamer();
+
+        streamer.FeedReceived += (_, msg) =>
+        {
+            // Real-time tick handler — keep fast, no blocking I/O
+            foreach (var (key, feed) in msg.Instruments)
+                if (feed.Ltpc is { } ltpc)
+                    _logger.LogDebug("{Key}  LTP={Ltp}", key, ltpc.Ltp);
+        };
+
+        await streamer.ConnectAsync(stoppingToken);
+        await streamer.SubscribeAsync(["NSE_INDEX|Nifty 50"], FeedMode.Ltpc, stoppingToken);
+
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(60));
+
+        try
+        {
+            while (await timer.WaitForNextTickAsync(stoppingToken))
+            {
+                var mtm = await _client.GetTotalMtmAsync(stoppingToken);
+                _logger.LogInformation("MTM: ₹{Mtm:F2}  HardSL: ₹{HardSL}", mtm, _hardStopLoss);
+
+                if (mtm <= _hardStopLoss)
+                {
+                    _logger.LogCritical("Hard SL breached — exiting all positions");
+                    await _client.ExitAllPositionsAsync(cancellationToken: stoppingToken);
+                    break;
+                }
+            }
+        }
+        catch (OperationCanceledException) { }
+        finally { await streamer.DisconnectAsync(); }
+    }
+}
+```
+
+**When to use this vs `AddRiskEngine<T>()`:**
+
+| | `AddRiskEngine<T>()` | Custom worker |
+|---|---|---|
+| Trailing SL | Yes | Implement yourself |
+| Per-strike CE/PE checks | Yes | Implement yourself |
+| Multi-user support | Yes (`IUserTokenSource`) | Manual token scoping |
+| Re-entry logic | Yes | Implement yourself |
+| Complexity | Managed by the library | Full control |
+
+Use `AddRiskEngine<T>()` for production trading. Use a custom worker when you need a minimal, self-contained monitor (e.g. a quick stop-loss guard for a single account).
