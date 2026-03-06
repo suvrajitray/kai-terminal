@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ConnectBrokerDialog } from "./connect-broker-dialog";
 import { BrokerSettingsDialog } from "./broker-settings-dialog";
 import { useBrokerStore } from "@/stores/broker-store";
+import { UPSTOX_OAUTH_URL } from "@/lib/constants";
 import type { BrokerInfo } from "@/types";
 
 interface BrokerCardProps {
@@ -27,7 +28,7 @@ export function BrokerCard({ broker }: BrokerCardProps) {
       client_id: creds.apiKey,
       redirect_uri: creds.redirectUrl,
     });
-    window.location.href = `https://api.upstox.com/v2/login/authorization/dialog?${params.toString()}`;
+    window.location.href = `${UPSTOX_OAUTH_URL}?${params.toString()}`;
   };
 
   return (

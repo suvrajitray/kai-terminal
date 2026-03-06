@@ -1,8 +1,10 @@
 import type { BrokerInfo } from "@/types";
 
-export const APP_NAME = "KAI Terminal";
+export const APP_NAME = (import.meta.env.VITE_APP_NAME as string) || "KAI Terminal";
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL as string;
+
+export const UPSTOX_OAUTH_URL = import.meta.env.VITE_UPSTOX_OAUTH_URL as string;
 
 export const NAV_ITEMS = [
   { label: "Dashboard", path: "/dashboard" },
