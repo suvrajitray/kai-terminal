@@ -16,7 +16,7 @@ public sealed class SingleUserTokenSource : IUserTokenSource
 
     public SingleUserTokenSource(IOptions<UpstoxConfig> cfg)
     {
-        _users = [new UserConfig { UserId = "console", AccessToken = cfg.Value.AccessToken ?? "" }];
+        _users = [new UserConfig { UserId = "Console", AccessToken = cfg.Value.AccessToken ?? "" }];
     }
 
     public IReadOnlyList<UserConfig> GetUsers() => _users;
