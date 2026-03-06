@@ -7,7 +7,7 @@ import { fetchBrokerCredentials } from "@/services/broker-api";
 
 export function ConnectBrokersPage() {
   const saveCredentials = useBrokerStore((s) => s.saveCredentials);
-
+  const getCredentials  = useBrokerStore((s) => s.getCredentials);
   useEffect(() => {
     fetchBrokerCredentials()
       .then((credentials) => {
@@ -16,6 +16,7 @@ export function ConnectBrokersPage() {
             apiKey: cred.apiKey,
             apiSecret: cred.apiSecret,
             redirectUrl: `${window.location.origin}/redirect/${cred.brokerName}`,
+            accessToken: getCredentials(cred.brokerName)?.accessToken,
           });
         }
       })

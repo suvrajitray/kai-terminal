@@ -1,13 +1,52 @@
-import { useParams, Link, Navigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useParams, useSearchParams, Link, Navigate } from "react-router-dom";
 import { motion } from "motion/react";
-import { CheckCircle2, ArrowRight } from "lucide-react";
+import { CheckCircle2, ArrowRight, Loader2, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { BROKERS } from "@/lib/constants";
+import { useBrokerStore } from "@/stores/broker-store";
+import { exchangeAccessToken } from "@/services/broker-api";
 
 export function BrokerRedirectPage() {
   const { brokerId } = useParams<{ brokerId: string }>();
+  const [searchParams] = useSearchParams();
   const broker = BROKERS.find((b) => b.id === brokerId);
+
+  const getCredentials = useBrokerStore((s) => s.getCredentials);
+  const setAccessToken = useBrokerStore((s) => s.setAccessToken);
+
+  const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
+  const [error, setError] = useState<string | null>(null);
+  const calledRef = useRef(false);
+
+  useEffect(() => {
+    if (calledRef.current) return;
+    calledRef.current = true;
+    const code = searchParams.get("code");
+    if (!code || !brokerId) {
+      setStatus("error");
+      setError("Authorization code not found in redirect URL.");
+      return;
+    }
+
+    const creds = getCredentials(brokerId);
+    if (!creds) {
+      setStatus("error");
+      setError("Broker credentials not found. Please connect the broker first.");
+      return;
+    }
+
+    exchangeAccessToken(creds.apiKey, creds.apiSecret, creds.redirectUrl, code)
+      .then((accessToken) => {
+        setAccessToken(brokerId, accessToken);
+        setStatus("success");
+      })
+      .catch((err: Error) => {
+        setError(err.message);
+        setStatus("error");
+      });
+  }, [brokerId, searchParams, getCredentials, setAccessToken]);
 
   if (!broker) {
     return <Navigate to="/connect-brokers" replace />;
@@ -28,11 +67,18 @@ export function BrokerRedirectPage() {
               transition={{ duration: 0.3, delay: 0.15 }}
               className="flex items-center gap-3"
             >
-              <CheckCircle2
-                className="size-8 shrink-0"
-                style={{ color: broker.color }}
-              />
-              <CardTitle className="text-xl">Authentication Successful</CardTitle>
+              {status === "loading" && (
+                <Loader2 className="size-8 shrink-0 animate-spin text-muted-foreground" />
+              )}
+              {status === "success" && (
+                <CheckCircle2 className="size-8 shrink-0" style={{ color: broker.color }} />
+              )}
+              {status === "error" && <AlertCircle className="size-8 shrink-0 text-destructive" />}
+              <CardTitle className="text-xl">
+                {status === "loading" && "Authenticating…"}
+                {status === "success" && "Authentication Successful"}
+                {status === "error" && "Authentication Failed"}
+              </CardTitle>
             </motion.div>
             <motion.div
               initial={{ opacity: 0, y: 10 }}
@@ -40,30 +86,49 @@ export function BrokerRedirectPage() {
               transition={{ duration: 0.3, delay: 0.3 }}
             >
               <CardDescription className="pt-2 text-sm">
-                Successfully connected to{" "}
-                <span className="font-medium text-foreground">{broker.name}</span>.
-                You can now trade using your {broker.name} account.
+                {status === "loading" && `Exchanging authorization code with ${broker.name}…`}
+                {status === "success" && (
+                  <>
+                    Successfully authenticated with{" "}
+                    <span className="font-medium text-foreground">{broker.name}</span>. Your access
+                    token has been saved. You can now use the trading terminal.
+                  </>
+                )}
+                {status === "error" && (error ?? "An unexpected error occurred.")}
               </CardDescription>
             </motion.div>
           </CardHeader>
-          <CardContent>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3, delay: 0.5 }}
-              className="flex gap-3"
-            >
-              <Button asChild className="flex-1">
-                <Link to="/dashboard">
-                  Go to Dashboard
-                  <ArrowRight className="ml-2 size-4" />
-                </Link>
-              </Button>
-              <Button asChild variant="outline" className="flex-1">
-                <Link to="/connect-brokers">Back to Brokers</Link>
-              </Button>
-            </motion.div>
-          </CardContent>
+
+          {status !== "loading" && (
+            <CardContent>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3, delay: 0.5 }}
+                className="flex gap-3"
+              >
+                {status === "success" ? (
+                  <>
+                    <Button asChild className="flex-1">
+                      <Link to="/terminal">
+                        Open Terminal
+                        <ArrowRight className="ml-2 size-4" />
+                      </Link>
+                    </Button>
+                    <Button asChild variant="outline" className="flex-1">
+                      <Link to="/dashboard">Dashboard</Link>
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button asChild variant="outline" className="flex-1">
+                      <Link to="/connect-brokers">Back to Brokers</Link>
+                    </Button>
+                  </>
+                )}
+              </motion.div>
+            </CardContent>
+          )}
         </Card>
       </motion.div>
     </div>

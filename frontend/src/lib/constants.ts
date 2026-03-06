@@ -8,6 +8,7 @@ export const UPSTOX_OAUTH_URL = import.meta.env.VITE_UPSTOX_OAUTH_URL as string;
 
 export const NAV_ITEMS = [
   { label: "Dashboard", path: "/dashboard" },
+  { label: "Terminal", path: "/terminal" },
   { label: "Connect Brokers", path: "/connect-brokers" },
 ] as const;
 

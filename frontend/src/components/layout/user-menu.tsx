@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuthStore } from "@/stores/auth-store";
+import { useBrokerStore } from "@/stores/broker-store";
 
 function getInitials(name: string): string {
   return name
@@ -23,12 +24,14 @@ function getInitials(name: string): string {
 export function UserMenu() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+  const clearBrokers = useBrokerStore((s) => s.clearAll);
   const navigate = useNavigate();
 
   if (!user) return null;
 
   const handleLogout = () => {
     logout();
+    clearBrokers();
     navigate("/login");
   };
 

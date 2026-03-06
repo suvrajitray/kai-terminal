@@ -1,13 +1,4 @@
-import { API_BASE_URL } from "@/lib/constants";
-import { useAuthStore } from "@/stores/auth-store";
-
-function authHeaders(): HeadersInit {
-  const token = useAuthStore.getState().token;
-  return {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-}
+import { apiClient } from "@/lib/api-client";
 
 export interface BrokerCredentialResponse {
   brokerName: string;
@@ -16,11 +7,8 @@ export interface BrokerCredentialResponse {
 }
 
 export async function fetchBrokerCredentials(): Promise<BrokerCredentialResponse[]> {
-  const res = await fetch(`${API_BASE_URL}/api/broker-credentials`, {
-    headers: authHeaders(),
-  });
-  if (!res.ok) throw new Error("Failed to fetch broker credentials");
-  return res.json();
+  const res = await apiClient.get<BrokerCredentialResponse[]>("/api/broker-credentials");
+  return res.data;
 }
 
 export async function saveBrokerCredential(
@@ -28,18 +16,24 @@ export async function saveBrokerCredential(
   apiKey: string,
   apiSecret: string,
 ): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/api/broker-credentials`, {
-    method: "POST",
-    headers: authHeaders(),
-    body: JSON.stringify({ brokerName, apiKey, apiSecret }),
-  });
-  if (!res.ok) throw new Error("Failed to save broker credentials");
+  await apiClient.post("/api/broker-credentials", { brokerName, apiKey, apiSecret });
 }
 
 export async function deleteBrokerCredential(brokerName: string): Promise<void> {
-  const res = await fetch(`${API_BASE_URL}/api/broker-credentials/${brokerName}`, {
-    method: "DELETE",
-    headers: authHeaders(),
+  await apiClient.delete(`/api/broker-credentials/${brokerName}`);
+}
+
+export async function exchangeAccessToken(
+  apiKey: string,
+  apiSecret: string,
+  redirectUri: string,
+  code: string,
+): Promise<string> {
+  const res = await apiClient.post<{ accessToken: string }>("/api/upstox/access-token", {
+    apiKey,
+    apiSecret,
+    redirectUri,
+    code,
   });
-  if (!res.ok) throw new Error("Failed to delete broker credentials");
+  return res.data.accessToken;
 }
