@@ -1,9 +1,13 @@
 using System.Security.Claims;
-using KAITerminal.Api.Services;
+using KAITerminal.Auth.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Google;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
 
-namespace KAITerminal.Api.Endpoints;
+namespace KAITerminal.Auth.Endpoints;
 
 public static class AuthEndpoints
 {

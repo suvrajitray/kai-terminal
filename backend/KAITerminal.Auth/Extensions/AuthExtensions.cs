@@ -1,9 +1,11 @@
 using System.Text;
-using KAITerminal.Api.Services;
+using KAITerminal.Auth.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 
-namespace KAITerminal.Api.Extensions;
+namespace KAITerminal.Auth.Extensions;
 
 public static class AuthExtensions
 {

@@ -1,5 +1,7 @@
 using KAITerminal.Api.Endpoints;
 using KAITerminal.Api.Extensions;
+using KAITerminal.Auth.Endpoints;
+using KAITerminal.Auth.Extensions;
 using KAITerminal.Upstox;
 
 var builder = WebApplication.CreateBuilder(args);

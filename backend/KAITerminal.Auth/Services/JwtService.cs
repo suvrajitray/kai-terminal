@@ -2,8 +2,9 @@ using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using Microsoft.Extensions.Configuration;
 
-namespace KAITerminal.Api.Services;
+namespace KAITerminal.Auth.Services;
 
 public class JwtService(IConfiguration config)
 {
