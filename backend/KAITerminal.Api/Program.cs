@@ -21,9 +21,7 @@ app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.UseWhen(
-    ctx => ctx.Request.Path.StartsWithSegments("/api/upstox")
-            && !ctx.Request.Path.StartsWithSegments("/api/upstox/access-token"),
+app.UseWhen(ctx => ctx.Request.Path.StartsWithSegments("/api/upstox"),
     upstox => upstox.Use(async (ctx, next) =>
     {
         var token = ctx.Request.Headers["X-Upstox-Access-Token"].FirstOrDefault();
