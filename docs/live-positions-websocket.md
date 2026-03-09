@@ -29,9 +29,10 @@ Each browser connection gets its own pair of Upstox WebSocket connections. They 
 
 | File | Change |
 |------|--------|
-| `KAITerminal.Api/Hubs/PositionsHub.cs` | **New** — SignalR hub, manages per-connection streamers |
+| `KAITerminal.Api/Hubs/PositionsHub.cs` | **New** — SignalR hub, manages per-connection streamers; supports `?exchange=` filter |
 | `KAITerminal.Api/Services/PositionStreamManager.cs` | **New** — singleton `ConcurrentDictionary` of streamer pairs keyed by connection ID |
 | `KAITerminal.Api/Program.cs` | Added `AddSignalR()`, `AddSingleton<PositionStreamManager>()`, `MapHub<PositionsHub>("/hubs/positions")` |
+| `KAITerminal.Api/Endpoints/UpstoxEndpoints.cs` | Added `?exchange=` filter to `/positions` and `/mtm` endpoints |
 | `KAITerminal.Auth/Extensions/AuthExtensions.cs` | Added `.AllowCredentials()` to CORS (required for SignalR negotiate) |
 
 ### Frontend
@@ -40,6 +41,7 @@ Each browser connection gets its own pair of Upstox WebSocket connections. They 
 |------|--------|
 | `package.json` | Added `@microsoft/signalr@10.0.0` |
 | `components/panels/positions-panel.tsx` | SignalR connection on mount; `ReceivePositions` replaces state; `ReceiveLtpBatch` updates `last_price` + recalculates `unrealised`/`pnl` in real-time; live `Wifi`/`WifiOff` indicator |
+| `services/trading-api.ts` | `fetchPositions()` accepts optional `exchanges` array, serialised as `?exchange=NFO,BFO` |
 
 ---
 
@@ -48,10 +50,13 @@ Each browser connection gets its own pair of Upstox WebSocket connections. They 
 ### Connection
 
 ```
-WSS https://<host>/hubs/positions?upstoxToken=<upstox_access_token>
+WSS https://<host>/hubs/positions?upstoxToken=<upstox_access_token>[&exchange=NFO,BFO]
 ```
 
-The Upstox access token is passed as a query parameter. The hub aborts the connection if the token is missing.
+| Query param | Required | Description |
+|-------------|----------|-------------|
+| `upstoxToken` | Yes | Upstox daily access token. Hub aborts if missing. |
+| `exchange` | No | Comma-separated exchange filter (e.g. `NFO,BFO`). Omit to receive all exchanges. |
 
 ### Server → Client messages
 
@@ -78,6 +83,58 @@ const pnl = unrealised + position.realised;
 `quantity` is already in units (negative for short positions), so this formula correctly yields a gain for shorts when the price falls.
 
 Full P&L (including realised) is authoritative only after a `ReceivePositions` event from the portfolio stream (i.e. when an order is filled or a position closes).
+
+---
+
+## Exchange Filter
+
+All position and MTM APIs (REST and SignalR) support an optional exchange filter. Upstox always returns every position from their API; the filter is applied server-side after fetching.
+
+### Supported exchanges
+
+| Value | Segment |
+|-------|---------|
+| `NSE` | NSE equities |
+| `BSE` | BSE equities |
+| `NFO` | NSE F&O (futures & options) |
+| `BFO` | BSE F&O |
+| `MCX` | Multi Commodity Exchange |
+| `CDS` | Currency derivatives |
+
+The filter is **case-insensitive** and accepts any exchange string returned by Upstox.
+
+### REST endpoints
+
+```
+GET /api/upstox/positions?exchange=NFO,BFO     ← NFO + BFO positions only
+GET /api/upstox/positions?exchange=NFO          ← NFO only
+GET /api/upstox/positions                       ← all exchanges (no filter)
+
+GET /api/upstox/mtm?exchange=NFO,BFO           ← MTM summed over NFO + BFO only
+GET /api/upstox/mtm                             ← MTM across all positions
+```
+
+### SignalR hub
+
+Pass `exchange` as an additional query parameter on the connection URL. Every `ReceivePositions` push for that connection will be pre-filtered to the specified exchanges:
+
+```
+WSS /hubs/positions?upstoxToken=<token>&exchange=NFO,BFO
+```
+
+Market data subscriptions are also scoped to instruments from the filtered exchange set, so no unnecessary LTP ticks are streamed.
+
+### Frontend helper
+
+```ts
+import { fetchPositions } from "@/services/trading-api";
+
+// Filtered
+const positions = await fetchPositions(["NFO", "BFO"]);
+
+// All exchanges
+const positions = await fetchPositions();
+```
 
 ---
 

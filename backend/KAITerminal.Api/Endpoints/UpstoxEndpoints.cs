@@ -25,11 +25,22 @@ public static class UpstoxEndpoints
 
         // ── Positions ─────────────────────────────────────────────────────────
 
-        group.MapGet("/positions", async (UpstoxClient upstox) =>
-            Results.Ok(await upstox.GetAllPositionsAsync()));
+        group.MapGet("/positions", async (
+            UpstoxClient upstox,
+            [FromQuery] string? exchange = null) =>
+        {
+            var positions = await upstox.GetAllPositionsAsync();
+            return Results.Ok(FilterByExchange(positions, exchange));
+        });
 
-        group.MapGet("/mtm", async (UpstoxClient upstox) =>
-            Results.Ok(new { Mtm = await upstox.GetTotalMtmAsync() }));
+        group.MapGet("/mtm", async (
+            UpstoxClient upstox,
+            [FromQuery] string? exchange = null) =>
+        {
+            var positions = await upstox.GetAllPositionsAsync();
+            var filtered = FilterByExchange(positions, exchange);
+            return Results.Ok(new { Mtm = filtered.Sum(p => p.Pnl) });
+        });
 
         group.MapPost("/positions/exit-all", async (
             UpstoxClient upstox,
@@ -155,5 +166,27 @@ public static class UpstoxEndpoints
             [FromBody] PlaceOrderByStrikeRequest request,
             UpstoxClient upstox) =>
             Results.Ok(await upstox.PlaceOrderByStrikeV3Async(request)));
+    }
+
+    /// <summary>
+    /// Filters positions by a comma-separated exchange list (e.g. "NFO,BFO").
+    /// Returns all positions when <paramref name="exchange"/> is null or empty.
+    /// </summary>
+    private static IReadOnlyList<KAITerminal.Upstox.Models.Responses.Position> FilterByExchange(
+        IReadOnlyList<KAITerminal.Upstox.Models.Responses.Position> positions,
+        string? exchange)
+    {
+        if (string.IsNullOrWhiteSpace(exchange))
+            return positions;
+
+        var exchanges = exchange
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(e => e.ToUpperInvariant())
+            .ToHashSet();
+
+        return positions
+            .Where(p => exchanges.Contains(p.Exchange.ToUpperInvariant()))
+            .ToList()
+            .AsReadOnly();
     }
 }

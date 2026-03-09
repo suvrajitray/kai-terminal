@@ -1,8 +1,9 @@
 import { apiClient } from "@/lib/api-client";
 import type { Position, Order } from "@/types";
 
-export async function fetchPositions(): Promise<Position[]> {
-  const res = await apiClient.get<Position[]>("/api/upstox/positions");
+export async function fetchPositions(exchanges?: string[]): Promise<Position[]> {
+  const params = exchanges?.length ? { exchange: exchanges.join(",") } : undefined;
+  const res = await apiClient.get<Position[]>("/api/upstox/positions", { params });
   return res.data;
 }
 

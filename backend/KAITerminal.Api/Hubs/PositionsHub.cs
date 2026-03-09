@@ -21,12 +21,16 @@ public sealed class PositionsHub : Hub
 
     public override async Task OnConnectedAsync()
     {
-        var token = Context.GetHttpContext()?.Request.Query["upstoxToken"].ToString();
+        var qs = Context.GetHttpContext()?.Request.Query;
+        var token = qs?["upstoxToken"].ToString();
         if (string.IsNullOrWhiteSpace(token))
         {
             Context.Abort();
             return;
         }
+
+        // Optional comma-separated exchange filter, e.g. "NFO,BFO"
+        var exchangeFilter = ParseExchanges(qs?["exchange"].ToString());
 
         var connectionId = Context.ConnectionId;
         var hubContext = _hubContext;
@@ -36,6 +40,7 @@ public sealed class PositionsHub : Hub
         using (UpstoxTokenContext.Use(token))
             positions = await _upstox.GetAllPositionsAsync();
 
+        positions = Filter(positions, exchangeFilter);
         await Clients.Caller.SendAsync("ReceivePositions", positions);
 
         // Create streamers under the user's token (token is captured inside ConnectAsync)
@@ -71,6 +76,7 @@ public sealed class PositionsHub : Hub
                     using (UpstoxTokenContext.Use(token))
                         fresh = await _upstox.GetAllPositionsAsync();
 
+                    fresh = Filter(fresh, exchangeFilter);
                     await hubContext.Clients.Client(connectionId).SendAsync("ReceivePositions", fresh);
 
                     // Re-subscribe market data for any new instruments
@@ -119,5 +125,28 @@ public sealed class PositionsHub : Hub
     {
         await _manager.RemoveAsync(Context.ConnectionId);
         await base.OnDisconnectedAsync(exception);
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    private static HashSet<string>? ParseExchanges(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        var set = raw
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(e => e.ToUpperInvariant())
+            .ToHashSet();
+        return set.Count > 0 ? set : null;
+    }
+
+    private static IReadOnlyList<KAITerminal.Upstox.Models.Responses.Position> Filter(
+        IReadOnlyList<KAITerminal.Upstox.Models.Responses.Position> positions,
+        HashSet<string>? exchanges)
+    {
+        if (exchanges is null) return positions;
+        return positions
+            .Where(p => exchanges.Contains(p.Exchange.ToUpperInvariant()))
+            .ToList()
+            .AsReadOnly();
     }
 }
