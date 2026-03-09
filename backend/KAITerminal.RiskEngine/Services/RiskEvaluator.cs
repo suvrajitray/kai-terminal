@@ -30,24 +30,32 @@ public sealed class RiskEvaluator
         _logger = logger;
     }
 
+    /// <summary>Fetches MTM via REST then evaluates risk. Used by the interval-based worker.</summary>
     public async Task EvaluateAsync(string userId, CancellationToken ct = default)
+    {
+        decimal mtm;
+        try
+        {
+            var positions = await _upstox.GetAllPositionsAsync(ct);
+            mtm = _cfg.FilterPositions(positions).Sum(p => p.Pnl);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Portfolio check: failed to fetch MTM for userId={UserId}", userId);
+            return;
+        }
+
+        await EvaluateAsync(userId, mtm, ct);
+    }
+
+    /// <summary>Evaluates risk using a pre-computed MTM value. Used by the streaming worker.</summary>
+    public async Task EvaluateAsync(string userId, decimal mtm, CancellationToken ct = default)
     {
         var state = _repo.GetOrCreate(userId);
 
         if (state.IsSquaredOff)
         {
             _logger.LogDebug("Portfolio check skipped for userId={UserId}: already squared off", userId);
-            return;
-        }
-
-        decimal mtm;
-        try
-        {
-            mtm = await _upstox.GetTotalMtmAsync(ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Portfolio check: failed to fetch MTM for userId={UserId}", userId);
             return;
         }
 

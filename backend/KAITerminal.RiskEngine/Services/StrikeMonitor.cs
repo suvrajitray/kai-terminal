@@ -2,6 +2,7 @@ using System.Globalization;
 using KAITerminal.RiskEngine.Abstractions;
 using KAITerminal.RiskEngine.Configuration;
 using KAITerminal.Upstox;
+using KAITerminal.Upstox.Models.Responses;
 using KAITerminal.Upstox.Models.Enums;
 using KAITerminal.Upstox.Models.Requests;
 using Microsoft.Extensions.Logging;
@@ -42,17 +43,17 @@ public sealed class StrikeMonitor
         _logger = logger;
     }
 
+    /// <summary>Fetches positions via REST then runs strike checks. Used by the interval-based worker.</summary>
     public async Task MonitorAsync(string userId, CancellationToken ct = default)
     {
         var state = _repo.GetOrCreate(userId);
-
         if (state.IsSquaredOff)
         {
             _logger.LogDebug("Strike check skipped for userId={UserId}: already squared off", userId);
             return;
         }
 
-        IReadOnlyList<KAITerminal.Upstox.Models.Responses.Position> positions;
+        IReadOnlyList<Position> positions;
         try
         {
             positions = await _upstox.GetAllPositionsAsync(ct);
@@ -63,6 +64,33 @@ public sealed class StrikeMonitor
             return;
         }
 
+        await MonitorCoreAsync(userId, state, _cfg.FilterPositions(positions), (token, fallback) => fallback, ct);
+    }
+
+    /// <summary>
+    /// Runs strike checks using cached positions and live LTP values. Used by the streaming worker.
+    /// </summary>
+    public async Task MonitorAsync(string userId, IPositionCache cache, CancellationToken ct = default)
+    {
+        var state = _repo.GetOrCreate(userId);
+        if (state.IsSquaredOff)
+        {
+            _logger.LogDebug("Strike check skipped for userId={UserId}: already squared off", userId);
+            return;
+        }
+
+        var positions = cache.GetPositions(userId);
+        await MonitorCoreAsync(userId, state, positions,
+            (token, fallback) => cache.GetEffectiveLtp(userId, token, fallback), ct);
+    }
+
+    private async Task MonitorCoreAsync(
+        string userId,
+        Models.UserRiskState state,
+        IReadOnlyList<Position> positions,
+        Func<string, decimal, decimal> getLtp,
+        CancellationToken ct)
+    {
         foreach (var pos in positions)
         {
             if (!pos.IsOpen) continue;
@@ -79,10 +107,9 @@ public sealed class StrikeMonitor
             var optionType = suffix == "CE" ? OptionType.CE : OptionType.PE;
             double slThreshold = optionType == OptionType.CE ? _cfg.CeStopLossPercent : _cfg.PeStopLossPercent;
 
-            // For short options: loss = LTP rose above avg entry price
-            // lossPercent = (LastPrice - AveragePrice) / AveragePrice
             if (pos.AveragePrice == 0) continue;
-            double lossPercent = (double)((pos.LastPrice - pos.AveragePrice) / pos.AveragePrice);
+            var ltp = getLtp(pos.InstrumentToken, pos.LastPrice);
+            double lossPercent = (double)((ltp - pos.AveragePrice) / pos.AveragePrice);
 
             if (lossPercent <= slThreshold) continue;
 
