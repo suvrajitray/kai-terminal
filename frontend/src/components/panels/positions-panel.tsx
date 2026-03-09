@@ -168,11 +168,11 @@ export function PositionsPanel({ expanded, onToggle }: PositionsPanelProps) {
   const [isLive, setIsLive] = useState(false);
   const connectionRef = useRef<signalR.HubConnection | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (exchanges = ["NFO", "BFO"]) => {
     setLoading(true);
     setError(null);
     try {
-      setPositions(await fetchPositions());
+      setPositions(await fetchPositions(exchanges));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -184,12 +184,12 @@ export function PositionsPanel({ expanded, onToggle }: PositionsPanelProps) {
   useEffect(() => {
     const upstoxToken = useBrokerStore.getState().getCredentials("upstox")?.accessToken;
     if (!upstoxToken) {
-      load();
+      load(["NFO", "BFO"]);
       return;
     }
 
     const conn = new signalR.HubConnectionBuilder()
-      .withUrl(`${API_BASE_URL}/hubs/positions?upstoxToken=${encodeURIComponent(upstoxToken)}`)
+      .withUrl(`${API_BASE_URL}/hubs/positions?upstoxToken=${encodeURIComponent(upstoxToken)}&exchange=NFO,BFO`)
       .withAutomaticReconnect()
       .build();
 
@@ -221,7 +221,7 @@ export function PositionsPanel({ expanded, onToggle }: PositionsPanelProps) {
       .then(() => setIsLive(true))
       .catch(() => {
         setIsLive(false);
-        load();
+        load(["NFO", "BFO"]);
       });
 
     connectionRef.current = conn;
@@ -372,7 +372,7 @@ export function PositionsPanel({ expanded, onToggle }: PositionsPanelProps) {
             size="icon"
             variant="ghost"
             className="size-6"
-            onClick={load}
+            onClick={() => load()}
             disabled={loading}
             title="Refresh"
           >
