@@ -7,6 +7,8 @@ import {
   ChevronUp,
   Layers,
   Box,
+  Plus,
+  Minus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -408,45 +410,34 @@ export function PositionsPanel({ expanded, onToggle }: PositionsPanelProps) {
                             onToggleMode={toggleMode}
                           />
                           <Button
-                            size="sm"
+                            size="icon"
                             variant="ghost"
-                            className="h-6 w-6 p-0 text-green-500 hover:bg-green-500/10 hover:text-green-400"
+                            className="size-8 text-green-500 hover:bg-green-500/10 hover:text-green-400"
                             onClick={() => handleAdd(p)}
-                            disabled={
-                              !!acting ||
-                              actualQty(
-                                p.instrument_token,
-                                p.trading_symbol,
-                              ) === 0
-                            }
-                            title="Add to position"
+                            disabled={!!acting || actualQty(p.instrument_token, p.trading_symbol) === 0}
+                            title="Add"
                           >
-                            +
+                            <Plus className="size-4" />
                           </Button>
                           <Button
-                            size="sm"
+                            size="icon"
                             variant="ghost"
-                            className="h-6 w-6 p-0 text-red-500 hover:bg-red-500/10 hover:text-red-400"
+                            className="size-8 text-red-500 hover:bg-red-500/10 hover:text-red-400"
                             onClick={() => handleReduce(p)}
-                            disabled={
-                              !!acting ||
-                              actualQty(
-                                p.instrument_token,
-                                p.trading_symbol,
-                              ) === 0
-                            }
-                            title="Reduce position"
+                            disabled={!!acting || actualQty(p.instrument_token, p.trading_symbol) === 0}
+                            title="Reduce"
                           >
-                            −
+                            <Minus className="size-4" />
                           </Button>
                           <Button
-                            size="sm"
+                            size="icon"
                             variant="ghost"
-                            className="h-6 px-2 text-xs text-destructive hover:text-destructive"
+                            className="size-8 text-destructive hover:text-destructive"
                             onClick={() => handleExit(p.instrument_token)}
                             disabled={!!acting}
+                            title="Exit"
                           >
-                            Exit
+                            <LogOut className="size-4" />
                           </Button>
                         </div>
                       )}
