@@ -73,6 +73,8 @@ KAITerminal.SimConsole ─► KAITerminal.RiskEngine
 - `BrokerExtensions.AddBrokerServices()` registers `AddUpstoxSdk()`. The API uses `UpstoxTokenContext.Use(token)` per-request to inject the user's Upstox access token into broker calls (passed by frontend as `X-Upstox-AccessToken` header).
 - Credentials (`Jwt:Key`, `GoogleAuth:ClientId/Secret`) and `Frontend:Url` must be set in `appsettings.json` or `dotnet user-secrets` before the API starts.
 - `Frontend:Url` (default `http://localhost:3000`) controls CORS allowed origins and the OAuth redirect.
+- **Live positions** — `PositionsHub` (`Hubs/PositionsHub.cs`) is a SignalR hub mounted at `/hubs/positions`. On connect it fetches positions, starts per-connection `IPortfolioStreamer` + `IMarketDataStreamer`, and pushes `ReceivePositions` / `ReceiveLtpBatch` messages. `PositionStreamManager` (singleton) tracks streamer pairs by connection ID and disposes them on disconnect.
+- **Exchange filter** — `GET /api/upstox/positions?exchange=NFO,BFO` and `GET /api/upstox/mtm?exchange=NFO,BFO` accept a comma-separated exchange list; the `PositionsHub` also accepts `?exchange=` on the WebSocket URL. Filtering is applied server-side; omit the param to receive all exchanges. See `docs/live-positions-websocket.md` for full protocol details.
 
 ### Upstox SDK (`KAITerminal.Upstox`)
 
@@ -122,7 +124,8 @@ SQLite (`kai-terminal.db`) — created automatically alongside the binary. `AppD
 
 - Routing: React Router v7; routes in `App.tsx`. Non-auth pages wrapped in `ProtectedRoute`.
 - State: Zustand stores in `stores/` persisted to `localStorage` keys `kai-terminal-auth` and `kai-terminal-brokers`.
-- All backend HTTP calls go through `services/broker-api.ts`; reads `VITE_API_URL` (default `https://localhost:5001`).
+- All backend HTTP calls go through `services/broker-api.ts`; reads `VITE_API_URL` (default `https://localhost:5001`). Trading-specific calls (positions with exchange filter) go through `services/trading-api.ts`.
+- Live positions use `@microsoft/signalr` — `PositionsPanel` connects to `WSS /hubs/positions?upstoxToken=...` on mount, handles `ReceivePositions` (full refresh) and `ReceiveLtpBatch` (in-place LTP + P&L update), and shows a live `Wifi`/`WifiOff` indicator.
 - UI: shadcn/ui components; add new ones with `npx shadcn add <component>`.
 
 ---
