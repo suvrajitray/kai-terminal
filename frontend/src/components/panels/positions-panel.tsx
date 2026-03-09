@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import * as signalR from "@microsoft/signalr";
 import {
   RefreshCw,
   LogOut,
@@ -9,6 +10,8 @@ import {
   Box,
   Plus,
   Minus,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -19,6 +22,8 @@ import {
   exitPosition,
   placeMarketOrder,
 } from "@/services/trading-api";
+import { API_BASE_URL } from "@/lib/constants";
+import { useBrokerStore } from "@/stores/broker-store";
 import type { Position } from "@/types";
 
 interface PositionsPanelProps {
@@ -160,6 +165,8 @@ export function PositionsPanel({ expanded, onToggle }: PositionsPanelProps) {
   const [acting, setActing] = useState<string | null>(null);
   const [qtys, setQtys] = useState<Record<string, string>>({});
   const [qtyMode, setQtyMode] = useState<QtyMode>("qty");
+  const [isLive, setIsLive] = useState(false);
+  const connectionRef = useRef<signalR.HubConnection | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -173,9 +180,57 @@ export function PositionsPanel({ expanded, onToggle }: PositionsPanelProps) {
     }
   }, []);
 
+  // ── SignalR live feed ───────────────────────────────────────────────────
   useEffect(() => {
-    load();
-  }, [load]);
+    const upstoxToken = useBrokerStore.getState().getCredentials("upstox")?.accessToken;
+    if (!upstoxToken) {
+      load();
+      return;
+    }
+
+    const conn = new signalR.HubConnectionBuilder()
+      .withUrl(`${API_BASE_URL}/hubs/positions?upstoxToken=${encodeURIComponent(upstoxToken)}`)
+      .withAutomaticReconnect()
+      .build();
+
+    conn.on("ReceivePositions", (incoming: Position[]) => {
+      setPositions(incoming);
+      setLoading(false);
+    });
+
+    conn.on("ReceiveLtpBatch", (updates: Array<{ instrumentToken: string; ltp: number }>) => {
+      setPositions((prev) => {
+        if (prev.length === 0) return prev;
+        const map = new Map(updates.map((u) => [u.instrumentToken, u.ltp]));
+        return prev.map((p) => {
+          const ltp = map.get(p.instrument_token);
+          if (ltp === undefined) return p;
+          const unrealised = p.quantity * (ltp - p.average_price);
+          const pnl = unrealised + p.realised;
+          return { ...p, last_price: ltp, unrealised, pnl };
+        });
+      });
+    });
+
+    conn.onreconnecting(() => setIsLive(false));
+    conn.onreconnected(() => setIsLive(true));
+    conn.onclose(() => setIsLive(false));
+
+    setLoading(true);
+    conn.start()
+      .then(() => setIsLive(true))
+      .catch(() => {
+        setIsLive(false);
+        load();
+      });
+
+    connectionRef.current = conn;
+    return () => {
+      conn.stop();
+      connectionRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Toggle mode globally, converting all existing values ───────────────
   const toggleMode = () => {
@@ -307,6 +362,12 @@ export function PositionsPanel({ expanded, onToggle }: PositionsPanelProps) {
               Exit All
             </Button>
           )}
+          <span
+            title={isLive ? "Live" : "Polling"}
+            className={cn("flex items-center", isLive ? "text-green-500" : "text-muted-foreground")}
+          >
+            {isLive ? <Wifi className="size-3" /> : <WifiOff className="size-3" />}
+          </span>
           <Button
             size="icon"
             variant="ghost"

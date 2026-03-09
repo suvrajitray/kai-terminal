@@ -1,5 +1,7 @@
 using KAITerminal.Api.Endpoints;
 using KAITerminal.Api.Extensions;
+using KAITerminal.Api.Hubs;
+using KAITerminal.Api.Services;
 using KAITerminal.Auth.Endpoints;
 using KAITerminal.Auth.Extensions;
 using KAITerminal.Upstox;
@@ -11,7 +13,10 @@ builder.Services
     .AddAuthorization()
     .AddOpenApi()
     .AddDatabase(builder.Configuration)
-    .AddBrokerServices(builder.Configuration);
+    .AddBrokerServices(builder.Configuration)
+    .AddSignalR();
+
+builder.Services.AddSingleton<PositionStreamManager>();
 
 var app = builder.Build();
 
@@ -38,6 +43,7 @@ app.UseHttpsRedirection();
 app.MapAuthEndpoints();
 app.MapUpstoxEndpoints();
 app.MapBrokerCredentialsEndpoints();
+app.MapHub<PositionsHub>("/hubs/positions");
 
 if (app.Environment.IsDevelopment())
     app.MapDiagnosticsEndpoints();

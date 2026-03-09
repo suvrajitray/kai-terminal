@@ -18,7 +18,8 @@ public static class AuthExtensions
                 policy
                     .WithOrigins(config["Frontend:Url"]!)
                     .AllowAnyHeader()
-                    .AllowAnyMethod();
+                    .AllowAnyMethod()
+                    .AllowCredentials();
             });
         });
 
