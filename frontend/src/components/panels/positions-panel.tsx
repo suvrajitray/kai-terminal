@@ -1,14 +1,17 @@
 import { useEffect, useState, useCallback } from "react";
-import { RefreshCw, LogOut, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { RefreshCw, LogOut, AlertCircle, ChevronDown, ChevronUp, Layers, Box } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { fetchPositions, exitAllPositions, exitPosition } from "@/services/trading-api";
+import { getLotSize } from "@/lib/lot-sizes";
+import { fetchPositions, exitAllPositions, exitPosition, placeMarketOrder } from "@/services/trading-api";
 import type { Position } from "@/types";
 
 interface PositionsPanelProps {
   expanded: boolean;
   onToggle: () => void;
 }
+
+type QtyMode = "qty" | "lot";
 
 const INR = new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 });
 
@@ -25,11 +28,69 @@ function PnlCell({ value }: { value: number }) {
   );
 }
 
+interface QtyInputProps {
+  value: string;
+  mode: QtyMode;
+  multiplier: number;
+  onChange: (v: string) => void;
+  onToggleMode: () => void;
+}
+
+function QtyInput({ value, mode, multiplier, onChange, onToggleMode }: QtyInputProps) {
+  const lot = Math.max(multiplier, 1);
+  const num = parseInt(value, 10) || 1;
+
+  // In qty mode, snap down to the nearest whole-lot multiple on blur
+  const handleBlur = () => {
+    if (mode === "qty" && lot > 1) {
+      const raw     = parseInt(value, 10) || lot;
+      const snapped = Math.max(lot, Math.floor(raw / lot) * lot);
+      if (snapped !== raw) onChange(String(snapped));
+    }
+  };
+
+  // Hint always rendered (non-breaking space) so row height never shifts
+  const hintText = mode === "lot"
+    ? `${num * lot} qty.`
+    : lot > 1 ? `${Math.floor(num / lot)} lot` : "\u00a0";
+
+  return (
+    <div className="flex flex-col items-start gap-0.5">
+      <span className="text-[10px] leading-none text-muted-foreground">
+        {mode === "qty" ? "Qty." : "Lots"}
+      </span>
+      <div className="flex items-stretch overflow-hidden rounded border border-border bg-background focus-within:ring-1 focus-within:ring-ring">
+        {/* Toggle button on the LEFT */}
+        <button
+          type="button"
+          onClick={onToggleMode}
+          title={mode === "qty" ? "Switch to lots" : "Switch to qty"}
+          className="flex items-center border-r border-border px-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          {mode === "qty" ? <Layers className="size-3" /> : <Box className="size-3" />}
+        </button>
+        <input
+          type="number"
+          min="1"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={handleBlur}
+          className="w-14 bg-transparent py-1 pl-1.5 pr-1.5 text-right text-xs tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none focus:outline-none"
+        />
+      </div>
+      {/* Fixed-height hint row — prevents row flicker */}
+      <span className="text-[10px] leading-none text-muted-foreground">{hintText}</span>
+    </div>
+  );
+}
+
 export function PositionsPanel({ expanded, onToggle }: PositionsPanelProps) {
   const [positions, setPositions] = useState<Position[]>([]);
   const [loading,   setLoading]   = useState(false);
   const [error,     setError]     = useState<string | null>(null);
-  const [exiting,   setExiting]   = useState<string | null>(null);
+  const [acting,    setActing]    = useState<string | null>(null);
+  const [qtys,      setQtys]      = useState<Record<string, string>>({});
+  const [qtyMode,   setQtyMode]   = useState<QtyMode>("qty");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -45,18 +106,68 @@ export function PositionsPanel({ expanded, onToggle }: PositionsPanelProps) {
 
   useEffect(() => { load(); }, [load]);
 
+  // ── Toggle mode globally, converting all existing values ───────────────
+  const toggleMode = () => {
+    const newMode: QtyMode = qtyMode === "qty" ? "lot" : "qty";
+    setQtys(prev => {
+      const next: Record<string, string> = {};
+      for (const p of positions) {
+        const lot = getLotSize(p.trading_symbol);
+        const raw = parseInt(prev[p.instrument_token] ?? "1", 10) || 1;
+        next[p.instrument_token] = newMode === "lot"
+          ? String(Math.max(1, Math.round(raw / lot)))
+          : String(raw * lot);
+      }
+      return next;
+    });
+    setQtyMode(newMode);
+  };
+
+  // ── Resolve actual qty to send to the broker ───────────────────────────
+  const actualQty = (token: string, tradingSymbol: string): number => {
+    const lot = getLotSize(tradingSymbol);
+    const val = parseInt(qtys[token] ?? "1", 10) || 1;
+    return qtyMode === "lot" ? val * lot : val;
+  };
+
+  const setQty = (token: string, val: string) =>
+    setQtys(prev => ({ ...prev, [token]: val }));
+
+  // ── Handlers ───────────────────────────────────────────────────────────
   const handleExitAll = async () => {
-    setExiting("all");
+    setActing("all");
+    setError(null);
     try { await exitAllPositions(); await load(); }
     catch (e) { setError((e as Error).message); }
-    finally { setExiting(null); }
+    finally { setActing(null); }
   };
 
   const handleExit = async (token: string) => {
-    setExiting(token);
+    setActing(token + ":exit");
+    setError(null);
     try { await exitPosition(token); await load(); }
     catch (e) { setError((e as Error).message); }
-    finally { setExiting(null); }
+    finally { setActing(null); }
+  };
+
+  const handleAdd = async (p: Position) => {
+    const qty = actualQty(p.instrument_token, p.trading_symbol);
+    const txn = p.quantity >= 0 ? "Buy" : "Sell";
+    setActing(p.instrument_token + ":add");
+    setError(null);
+    try { await placeMarketOrder(p.instrument_token, qty, txn); await load(); }
+    catch (e) { setError((e as Error).message); }
+    finally { setActing(null); }
+  };
+
+  const handleReduce = async (p: Position) => {
+    const qty = actualQty(p.instrument_token, p.trading_symbol);
+    const txn = p.quantity >= 0 ? "Sell" : "Buy";
+    setActing(p.instrument_token + ":reduce");
+    setError(null);
+    try { await placeMarketOrder(p.instrument_token, qty, txn); await load(); }
+    catch (e) { setError((e as Error).message); }
+    finally { setActing(null); }
   };
 
   const openPositions = positions.filter((p) => p.quantity !== 0);
@@ -93,7 +204,7 @@ export function PositionsPanel({ expanded, onToggle }: PositionsPanelProps) {
               variant="destructive"
               className="h-6 px-2 text-xs"
               onClick={handleExitAll}
-              disabled={exiting === "all"}
+              disabled={acting === "all"}
             >
               <LogOut className="mr-1 size-3" />
               Exit All
@@ -147,7 +258,7 @@ export function PositionsPanel({ expanded, onToggle }: PositionsPanelProps) {
                   <tr
                     key={p.instrument_token}
                     className={cn(
-                      "border-b border-border/40 transition-colors hover:bg-muted/30",
+                      "border-b border-border/40 transition-colors hover:bg-muted/30 align-middle",
                       p.quantity === 0 && "opacity-50",
                     )}
                   >
@@ -176,17 +287,46 @@ export function PositionsPanel({ expanded, onToggle }: PositionsPanelProps) {
                     <td className="px-3 py-1.5 text-right">
                       <PnlCell value={p.realised} />
                     </td>
-                    <td className="px-3 py-1.5 text-right">
+                    <td className="px-3 py-2.5 text-right">
                       {p.quantity !== 0 && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-6 px-2 text-xs text-destructive hover:text-destructive"
-                          onClick={() => handleExit(p.instrument_token)}
-                          disabled={exiting === p.instrument_token}
-                        >
-                          Exit
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <QtyInput
+                            value={qtys[p.instrument_token] ?? "1"}
+                            mode={qtyMode}
+                            multiplier={getLotSize(p.trading_symbol)}
+                            onChange={(v) => setQty(p.instrument_token, v)}
+                            onToggleMode={toggleMode}
+                          />
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 w-6 p-0 text-green-500 hover:bg-green-500/10 hover:text-green-400"
+                            onClick={() => handleAdd(p)}
+                            disabled={!!acting}
+                            title="Add to position"
+                          >
+                            +
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 w-6 p-0 text-red-500 hover:bg-red-500/10 hover:text-red-400"
+                            onClick={() => handleReduce(p)}
+                            disabled={!!acting}
+                            title="Reduce position"
+                          >
+                            −
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-6 px-2 text-xs text-destructive hover:text-destructive"
+                            onClick={() => handleExit(p.instrument_token)}
+                            disabled={!!acting}
+                          >
+                            Exit
+                          </Button>
+                        </div>
                       )}
                     </td>
                   </tr>

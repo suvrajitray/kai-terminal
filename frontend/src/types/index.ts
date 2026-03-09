@@ -29,6 +29,7 @@ export interface Position {
   trading_symbol: string;
   product: string;
   quantity: number;
+  multiplier: number;
   average_price: number;
   last_price: number;
   pnl: number;
