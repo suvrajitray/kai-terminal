@@ -50,7 +50,7 @@ public sealed class PositionsHub : Hub
         {
             portfolioStreamer = _upstox.CreatePortfolioStreamer();
             marketDataStreamer = _upstox.CreateMarketDataStreamer();
-            await portfolioStreamer.ConnectAsync([UpdateType.Order, UpdateType.Position]);
+            await portfolioStreamer.ConnectAsync();
             await marketDataStreamer.ConnectAsync();
         }
 

@@ -112,9 +112,9 @@ internal sealed class UpstoxHttpClient
 
         if (updateTypes is not null)
         {
-            var types = string.Join(",", updateTypes.Select(ToUpdateTypeString));
-            if (!string.IsNullOrEmpty(types))
-                path += $"?update_types={Uri.EscapeDataString(types)}";
+            var parts = updateTypes.Select(t => $"update_types={ToUpdateTypeString(t)}").ToList();
+            if (parts.Count > 0)
+                path += "?" + string.Join("&", parts);
         }
 
         var client = _factory.CreateClient("UpstoxApi");
