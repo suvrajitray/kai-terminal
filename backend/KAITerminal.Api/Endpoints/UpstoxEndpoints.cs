@@ -41,9 +41,16 @@ public static class UpstoxEndpoints
             return Results.Ok(new { Mtm = filtered.Sum(p => p.Pnl) });
         });
 
-        group.MapPost("/positions/exit-all", async (UpstoxClient upstox) =>
+        group.MapPost("/positions/exit-all", async (
+            UpstoxClient upstox,
+            [FromQuery] string? exchange = null) =>
         {
-            var ids = await upstox.ExitAllPositionsAsync();
+            var exchanges = string.IsNullOrWhiteSpace(exchange)
+                ? null
+                : exchange.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                          .ToList()
+                          .AsReadOnly();
+            var ids = await upstox.ExitAllPositionsAsync(exchanges);
             return Results.Ok(new { OrderIds = ids });
         });
 

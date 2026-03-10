@@ -79,6 +79,7 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
   const cols = (
     <tr className="border-b border-border text-muted-foreground">
       <th className="px-3 py-1.5 text-left font-medium">Symbol</th>
+      <th className="px-3 py-1.5 text-left font-medium">Product</th>
       <th className="px-3 py-1.5 text-right font-medium">Qty</th>
       <th className="px-3 py-1.5 text-right font-medium">Avg</th>
       <th className="px-3 py-1.5 text-right font-medium">LTP</th>

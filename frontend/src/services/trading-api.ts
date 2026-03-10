@@ -7,8 +7,10 @@ export async function fetchPositions(exchanges?: string[]): Promise<Position[]> 
   return res.data;
 }
 
-export async function exitAllPositions(): Promise<void> {
-  await apiClient.post("/api/upstox/positions/exit-all");
+export async function exitAllPositions(exchanges = ["NFO", "BFO"]): Promise<void> {
+  await apiClient.post("/api/upstox/positions/exit-all", null, {
+    params: { exchange: exchanges.join(",") },
+  });
 }
 
 export async function exitPosition(instrumentToken: string, product: string): Promise<void> {

@@ -19,9 +19,11 @@ public interface IPositionService
     /// <summary>
     /// Feature 3 — Square off every open position immediately.
     /// Places an opposing order (SELL for long, BUY for short) for each position with non-zero quantity.
+    /// When <paramref name="exchanges"/> is provided, only positions on those exchanges are exited.
     /// </summary>
     /// <returns>List of order IDs created for the exits.</returns>
     Task<IReadOnlyList<string>> ExitAllPositionsAsync(
+        IReadOnlyCollection<string>? exchanges = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>

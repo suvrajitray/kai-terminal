@@ -2,10 +2,20 @@ import { LogOut, Plus, Minus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { getLotSize } from "@/lib/lot-sizes";
+import { parseTradingSymbol } from "@/lib/parse-trading-symbol";
 import { QtyInput, type QtyMode } from "./qty-input";
 import type { Position } from "@/types";
 
 const INR = new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 });
+
+const PRODUCT_LABEL: Record<string, string> = {
+  I: "Intraday",
+  D: "Delivery",
+  NRML: "Delivery",
+  MIS: "Intraday",
+  MTF: "MTF",
+  CO: "Cover",
+};
 
 export function PnlCell({ value }: { value: number }) {
   return (
@@ -46,6 +56,7 @@ export function PositionRow({
   const lot = getLotSize(p.trading_symbol);
   const num = parseInt(qtyValue, 10);
   const actualQty = isNaN(num) || num <= 0 ? 0 : qtyMode === "lot" ? num * lot : num;
+  const parsed = parseTradingSymbol(p.trading_symbol);
 
   return (
     <tr
@@ -55,10 +66,22 @@ export function PositionRow({
       )}
     >
       <td className="px-3 py-1.5">
-        <span className="font-medium">{p.trading_symbol}</span>
-        <span className="ml-1.5 text-muted-foreground">
-          {p.exchange} · {p.product}
-        </span>
+        {parsed ? (
+          <>
+            <div className="font-medium">{parsed.label}</div>
+            <div className="text-[11px] text-muted-foreground">
+              {p.exchange} {parsed.expiryLabel}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="font-medium">{p.trading_symbol}</div>
+            <div className="text-[11px] text-muted-foreground">{p.exchange}</div>
+          </>
+        )}
+      </td>
+      <td className="px-3 py-1.5 text-sm text-muted-foreground">
+        {PRODUCT_LABEL[p.product.toUpperCase()] ?? p.product}
       </td>
       <td
         className={cn(

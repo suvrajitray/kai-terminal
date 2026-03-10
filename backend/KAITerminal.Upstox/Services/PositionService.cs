@@ -28,10 +28,18 @@ internal sealed class PositionService : IPositionService
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<string>> ExitAllPositionsAsync(
+        IReadOnlyCollection<string>? exchanges = null,
         CancellationToken cancellationToken = default)
     {
         var positions = await GetAllPositionsAsync(cancellationToken);
-        var openPositions = positions.Where(p => p.IsOpen).ToList();
+        var filter = (exchanges is null || exchanges.Count == 0)
+            ? ["NFO", "BFO"]
+            : exchanges;
+
+        var openPositions = positions
+            .Where(p => p.IsOpen)
+            .Where(p => filter.Contains(p.Exchange, StringComparer.OrdinalIgnoreCase))
+            .ToList();
 
         if (openPositions.Count == 0)
             return [];

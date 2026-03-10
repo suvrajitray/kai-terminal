@@ -86,8 +86,9 @@ public sealed class UpstoxClient
     /// </summary>
     /// <returns>List of exit order IDs.</returns>
     public Task<IReadOnlyList<string>> ExitAllPositionsAsync(
+        IReadOnlyCollection<string>? exchanges = null,
         CancellationToken cancellationToken = default)
-        => _positions.ExitAllPositionsAsync(cancellationToken);
+        => _positions.ExitAllPositionsAsync(exchanges, cancellationToken);
 
     // ═══════════════════════════════════════════════════════
     // Feature 4 — Exit Single Position
