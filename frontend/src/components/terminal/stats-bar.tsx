@@ -1,7 +1,8 @@
-import { RefreshCw, LogOut, AlertCircle, Wifi, WifiOff } from "lucide-react";
+import { RefreshCw, LogOut, AlertCircle, Wifi, WifiOff, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { PnlCell } from "@/components/panels/positions-panel/position-row";
+import { useProfitProtectionStore } from "@/stores/profit-protection-store";
 import type { Position } from "@/types";
 
 interface StatsBarProps {
@@ -12,6 +13,10 @@ interface StatsBarProps {
   acting: string | null;
   onRefresh: () => void;
   onExitAll: () => void;
+  onOpenProfitProtection: () => void;
+  ppTarget: number | null;
+  ppCurrentSl: number | null;
+  ppTrailing: boolean;
 }
 
 export function StatsBar({
@@ -22,7 +27,13 @@ export function StatsBar({
   acting,
   onRefresh,
   onExitAll,
+  onOpenProfitProtection,
+  ppTarget,
+  ppCurrentSl,
+  ppTrailing,
 }: StatsBarProps) {
+  const { enabled, setEnabled } = useProfitProtectionStore();
+
   const openCount = positions.filter((p) => p.quantity !== 0).length;
   const closedCount = positions.filter((p) => p.quantity === 0).length;
   const totalPnl = positions.reduce((s, p) => s + p.pnl, 0);
@@ -48,6 +59,22 @@ export function StatsBar({
         </>
       )}
 
+      {ppTarget !== null && ppCurrentSl !== null && (
+        <>
+          <div className="h-4 w-px bg-border" />
+          <span className="flex items-center gap-2 text-xs">
+            <span className="text-muted-foreground">Target</span>
+            <span className="font-medium tabular-nums text-green-500">
+              ₹{ppTarget.toLocaleString("en-IN")}
+            </span>
+            <span className="text-muted-foreground">{ppTrailing ? "Trail SL" : "SL"}</span>
+            <span className="font-medium tabular-nums text-red-500">
+              ₹{ppCurrentSl.toLocaleString("en-IN")}
+            </span>
+          </span>
+        </>
+      )}
+
       {error && (
         <span className="flex items-center gap-1 text-xs text-destructive">
           <AlertCircle className="size-3" />
@@ -55,7 +82,39 @@ export function StatsBar({
         </span>
       )}
 
-      <div className="ml-auto flex items-center gap-1">
+      <div className="ml-auto flex items-center gap-2">
+        {/* Profit Protection */}
+        <button
+          onClick={onOpenProfitProtection}
+          className={cn(
+            "flex items-center gap-1.5 rounded px-2 py-1 text-xs font-medium transition-colors",
+            enabled
+              ? "text-green-500 hover:bg-green-500/10"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground",
+          )}
+          title={enabled ? "Profit Protection ON — click to configure" : "Click to configure Profit Protection"}
+        >
+          <ShieldCheck className="size-3.5" />
+          Profit Protection
+          {/* inline toggle dot */}
+          <span
+            onClick={(e) => { e.stopPropagation(); setEnabled(!enabled); }}
+            className={cn(
+              "ml-0.5 inline-flex h-4 w-7 items-center rounded-full border border-transparent transition-colors",
+              enabled ? "bg-green-500" : "bg-muted-foreground/30",
+            )}
+          >
+            <span
+              className={cn(
+                "mx-0.5 h-3 w-3 rounded-full bg-white transition-transform",
+                enabled ? "translate-x-3" : "translate-x-0",
+              )}
+            />
+          </span>
+        </button>
+
+        <div className="h-4 w-px bg-border" />
+
         {openCount > 0 && (
           <Button
             size="sm"
