@@ -3,14 +3,26 @@ import { PositionsPanel } from "@/components/panels/positions-panel";
 import { OrdersPanel } from "@/components/panels/orders-panel";
 import { StatsBar } from "@/components/terminal/stats-bar";
 import { ProfitProtectionPanel } from "@/components/terminal/profit-protection-panel";
+import { BrokerAuthRequired } from "@/components/terminal/broker-auth-required";
 import { usePositionsFeed } from "@/components/panels/positions-panel/use-positions-feed";
 import { exitAllPositions } from "@/services/trading-api";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
+import { useBrokerStore } from "@/stores/broker-store";
+import { isTokenExpired } from "@/lib/token-utils";
 
 const DEFAULT_ORDERS_HEIGHT = 180;
 const MIN_HEIGHT = 32;
 
 export function TerminalPage() {
+  const token = useBrokerStore((s) => s.getCredentials("upstox")?.accessToken);
+  if (!token || isTokenExpired(token)) {
+    return <BrokerAuthRequired expired={!!token} />;
+  }
+
+  return <TerminalPageInner />;
+}
+
+function TerminalPageInner() {
   const { positions, setPositions, loading, isLive, load } = usePositionsFeed();
   const [error, setError] = useState<string | null>(null);
   const [acting, setActing] = useState<string | null>(null);

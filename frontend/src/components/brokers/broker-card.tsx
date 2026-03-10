@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion } from "motion/react";
-import { LogIn, Settings, Plug } from "lucide-react";
+import { KeyRound, Settings, Plug } from "lucide-react";
+import { CopyTokenButton } from "@/components/layout/copy-token-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -63,9 +64,10 @@ export function BrokerCard({ broker }: BrokerCardProps) {
             {isConnected ? (
               <div className="flex gap-2">
                 <Button className="flex-1" variant="default" onClick={handleAuthenticate}>
-                  <LogIn className="mr-2 size-4" />
+                  <KeyRound className="mr-2 size-4" />
                   Authenticate
                 </Button>
+                <CopyTokenButton brokerId={broker.id} />
                 <Button variant="outline" size="icon" onClick={() => setSettingsOpen(true)}>
                   <Settings className="size-4" />
                 </Button>
