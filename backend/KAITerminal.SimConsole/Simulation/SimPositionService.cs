@@ -1,5 +1,4 @@
 using KAITerminal.RiskEngine.Abstractions;
-using KAITerminal.Upstox.Models.Enums;
 using KAITerminal.Upstox.Models.Responses;
 using KAITerminal.Upstox.Services;
 using Microsoft.Extensions.Logging;
@@ -42,8 +41,6 @@ public sealed class SimPositionService : IPositionService
     }
 
     public Task<IReadOnlyList<string>> ExitAllPositionsAsync(
-        OrderType orderType = OrderType.Market,
-        Product product = Product.Intraday,
         CancellationToken cancellationToken = default)
     {
         _squaredOff = true;
@@ -58,8 +55,6 @@ public sealed class SimPositionService : IPositionService
 
     public Task<string> ExitPositionAsync(
         string instrumentToken,
-        OrderType orderType = OrderType.Market,
-        Product product = Product.Intraday,
         CancellationToken cancellationToken = default)
         => Task.FromResult($"SIM-EXIT-{instrumentToken}");
 

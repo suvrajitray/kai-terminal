@@ -28,8 +28,6 @@ internal sealed class PositionService : IPositionService
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<string>> ExitAllPositionsAsync(
-        OrderType orderType = OrderType.Market,
-        Product product = Product.Intraday,
         CancellationToken cancellationToken = default)
     {
         var positions = await GetAllPositionsAsync(cancellationToken);
@@ -38,21 +36,14 @@ internal sealed class PositionService : IPositionService
         if (openPositions.Count == 0)
             return [];
 
-        var orderIds = new List<string>(openPositions.Count);
-
-        // Place exit orders concurrently for all open positions.
-        var tasks = openPositions.Select(p => ExitSingleAsync(p, orderType, product, cancellationToken));
+        var tasks = openPositions.Select(p => ExitSingleAsync(p, cancellationToken));
         var results = await Task.WhenAll(tasks);
-
-        orderIds.AddRange(results);
-        return orderIds.AsReadOnly();
+        return results.ToList().AsReadOnly();
     }
 
     /// <inheritdoc />
     public async Task<string> ExitPositionAsync(
         string instrumentToken,
-        OrderType orderType = OrderType.Market,
-        Product product = Product.Intraday,
         CancellationToken cancellationToken = default)
     {
         var positions = await GetAllPositionsAsync(cancellationToken);
@@ -65,15 +56,14 @@ internal sealed class PositionService : IPositionService
         if (!position.IsOpen)
             throw new UpstoxException($"Position for {instrumentToken} is already closed (quantity = 0).");
 
-        return await ExitSingleAsync(position, orderType, product, cancellationToken);
+        return await ExitSingleAsync(position, cancellationToken);
     }
 
     // ──────────────────────────────────────────────────
     // Helpers
     // ──────────────────────────────────────────────────
 
-    private async Task<string> ExitSingleAsync(
-        Position position, OrderType orderType, Product product, CancellationToken ct)
+    private async Task<string> ExitSingleAsync(Position position, CancellationToken ct)
     {
         // Positive quantity → long position → exit with SELL
         // Negative quantity → short position → exit with BUY
@@ -86,12 +76,20 @@ internal sealed class PositionService : IPositionService
             InstrumentToken = position.InstrumentToken,
             Quantity = Math.Abs(position.Quantity),
             TransactionType = transactionType,
-            OrderType = orderType,
-            Product = product,
+            OrderType = OrderType.Market,
+            Product = ParseProduct(position.Product),
             Tag = "EXIT"
         };
 
         var result = await _http.PlaceOrderV2Async(request, ct);
         return result.OrderId;
     }
+
+    private static Product ParseProduct(string product) => product.ToUpperInvariant() switch
+    {
+        "D" => Product.Delivery,
+        "MTF" => Product.MTF,
+        "CO" => Product.CoverOrder,
+        _ => Product.Intraday
+    };
 }

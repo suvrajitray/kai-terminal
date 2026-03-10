@@ -1,6 +1,5 @@
 using KAITerminal.Api.Models;
 using KAITerminal.Upstox;
-using KAITerminal.Upstox.Models.Enums;
 using KAITerminal.Upstox.Models.Requests;
 using Microsoft.AspNetCore.Mvc;
 
@@ -42,24 +41,17 @@ public static class UpstoxEndpoints
             return Results.Ok(new { Mtm = filtered.Sum(p => p.Pnl) });
         });
 
-        group.MapPost("/positions/exit-all", async (
-            UpstoxClient upstox,
-            [FromQuery] OrderType? orderType = null,
-            [FromQuery] Product? product = null) =>
+        group.MapPost("/positions/exit-all", async (UpstoxClient upstox) =>
         {
-            var ids = await upstox.ExitAllPositionsAsync(
-                orderType ?? OrderType.Market, product ?? Product.Intraday);
+            var ids = await upstox.ExitAllPositionsAsync();
             return Results.Ok(new { OrderIds = ids });
         });
 
         group.MapPost("/positions/{instrumentToken}/exit", async (
             string instrumentToken,
-            UpstoxClient upstox,
-            [FromQuery] OrderType? orderType = null,
-            [FromQuery] Product? product = null) =>
+            UpstoxClient upstox) =>
         {
-            var id = await upstox.ExitPositionAsync(
-                instrumentToken, orderType ?? OrderType.Market, product ?? Product.Intraday);
+            var id = await upstox.ExitPositionAsync(instrumentToken);
             return Results.Ok(new { OrderId = id });
         });
 

@@ -86,10 +86,8 @@ public sealed class UpstoxClient
     /// </summary>
     /// <returns>List of exit order IDs.</returns>
     public Task<IReadOnlyList<string>> ExitAllPositionsAsync(
-        OrderType orderType = OrderType.Market,
-        Product product = Product.Intraday,
         CancellationToken cancellationToken = default)
-        => _positions.ExitAllPositionsAsync(orderType, product, cancellationToken);
+        => _positions.ExitAllPositionsAsync(cancellationToken);
 
     // ═══════════════════════════════════════════════════════
     // Feature 4 — Exit Single Position
@@ -101,10 +99,8 @@ public sealed class UpstoxClient
     /// <param name="instrumentToken">e.g. "NSE_FO|52618"</param>
     public Task<string> ExitPositionAsync(
         string instrumentToken,
-        OrderType orderType = OrderType.Market,
-        Product product = Product.Intraday,
         CancellationToken cancellationToken = default)
-        => _positions.ExitPositionAsync(instrumentToken, orderType, product, cancellationToken);
+        => _positions.ExitPositionAsync(instrumentToken, cancellationToken);
 
     // ═══════════════════════════════════════════════════════
     // Feature 5 — Cancel All Pending Orders

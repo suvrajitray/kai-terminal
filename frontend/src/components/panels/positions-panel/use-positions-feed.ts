@@ -44,7 +44,8 @@ export function usePositionsFeed() {
         return prev.map((p) => {
           const ltp = map.get(p.instrument_token);
           if (ltp === undefined) return p;
-          const unrealised = p.quantity * (ltp - p.average_price);
+          const avgPrice = p.average_price !== 0 ? p.average_price : p.quantity < 0 ? p.sell_price : p.buy_price;
+          const unrealised = p.quantity * (ltp - avgPrice);
           return { ...p, last_price: ltp, unrealised, pnl: unrealised + p.realised };
         });
       });

@@ -1,4 +1,3 @@
-using KAITerminal.Upstox.Models.Enums;
 using KAITerminal.Upstox.Models.Responses;
 
 namespace KAITerminal.Upstox.Services;
@@ -23,18 +22,15 @@ public interface IPositionService
     /// </summary>
     /// <returns>List of order IDs created for the exits.</returns>
     Task<IReadOnlyList<string>> ExitAllPositionsAsync(
-        OrderType orderType = OrderType.Market,
-        Product product = Product.Intraday,
         CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Feature 4 — Square off a single specified position.
+    /// Product type is derived from the position itself.
     /// </summary>
     /// <param name="instrumentToken">Instrument key of the position to exit, e.g. "NSE_FO|52618".</param>
     /// <returns>The order ID created for the exit.</returns>
     Task<string> ExitPositionAsync(
         string instrumentToken,
-        OrderType orderType = OrderType.Market,
-        Product product = Product.Intraday,
         CancellationToken cancellationToken = default);
 }
