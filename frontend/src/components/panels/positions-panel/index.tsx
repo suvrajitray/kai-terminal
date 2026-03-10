@@ -57,22 +57,22 @@ export function PositionsPanel({ expanded, onToggle }: PositionsPanelProps) {
   const handleExit = (token: string, product: string) =>
     withActing(token + ":exit", () => exitPosition(token, product));
 
-  const handleAdd = (token: string, tradingSymbol: string) => {
+  const handleAdd = (token: string, tradingSymbol: string, product: string) => {
     const lot = getLotSize(tradingSymbol);
     const num = parseInt(qtys[token] ?? "", 10);
     const qty = isNaN(num) || num <= 0 ? 0 : qtyMode === "lot" ? num * lot : num;
-    const position = positions.find((p) => p.instrument_token === token)!;
+    const position = positions.find((p) => p.instrument_token === token && p.product === product)!;
     const txn = position.quantity >= 0 ? "Buy" : "Sell";
-    return withActing(token + ":add", () => placeMarketOrder(token, qty, txn));
+    return withActing(token + ":add", () => placeMarketOrder(token, qty, txn, product));
   };
 
-  const handleReduce = (token: string, tradingSymbol: string) => {
+  const handleReduce = (token: string, tradingSymbol: string, product: string) => {
     const lot = getLotSize(tradingSymbol);
     const num = parseInt(qtys[token] ?? "", 10);
     const qty = isNaN(num) || num <= 0 ? 0 : qtyMode === "lot" ? num * lot : num;
-    const position = positions.find((p) => p.instrument_token === token)!;
+    const position = positions.find((p) => p.instrument_token === token && p.product === product)!;
     const txn = position.quantity >= 0 ? "Sell" : "Buy";
-    return withActing(token + ":reduce", () => placeMarketOrder(token, qty, txn));
+    return withActing(token + ":reduce", () => placeMarketOrder(token, qty, txn, product));
   };
 
   const openPositions = positions.filter((p) => p.quantity !== 0);
@@ -124,8 +124,8 @@ export function PositionsPanel({ expanded, onToggle }: PositionsPanelProps) {
                     acting={acting}
                     onQtyChange={(v) => setQty(p.instrument_token, v)}
                     onToggleMode={toggleMode}
-                    onAdd={() => handleAdd(p.instrument_token, p.trading_symbol)}
-                    onReduce={() => handleReduce(p.instrument_token, p.trading_symbol)}
+                    onAdd={() => handleAdd(p.instrument_token, p.trading_symbol, p.product)}
+                    onReduce={() => handleReduce(p.instrument_token, p.trading_symbol, p.product)}
                     onExit={() => handleExit(p.instrument_token, p.product)}
                   />
                 ))}

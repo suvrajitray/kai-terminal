@@ -31,16 +31,27 @@ export async function cancelOrder(orderId: string): Promise<void> {
 }
 
 // TransactionType: Buy = 0, Sell = 1  (matches backend enum order)
+// Product: I=0, D=1, MTF=2, CO=3
+function productToEnum(product: string): number {
+  switch (product.toUpperCase()) {
+    case "D": return 1;
+    case "MTF": return 2;
+    case "CO": return 3;
+    default: return 0;
+  }
+}
+
 export async function placeMarketOrder(
   instrumentToken: string,
   quantity: number,
   transactionType: "Buy" | "Sell",
+  product: string,
 ): Promise<void> {
   await apiClient.post("/api/upstox/orders", {
     instrumentToken,
     quantity,
     transactionType: transactionType === "Buy" ? 0 : 1,
     orderType: 0,  // Market
-    product: 0,    // Intraday
+    product: productToEnum(product),
   });
 }
