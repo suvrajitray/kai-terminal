@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { RefreshCw, XCircle, AlertCircle } from "lucide-react";
+import { RefreshCw, XCircle, AlertCircle, ChevronUp, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -30,7 +30,12 @@ function fmt(n: number) {
 
 type Tab = "open" | "executed";
 
-export function OrdersPanel() {
+interface OrdersPanelProps {
+  expanded: boolean;
+  onToggle: () => void;
+}
+
+export function OrdersPanel({ expanded, onToggle }: OrdersPanelProps) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -126,7 +131,7 @@ export function OrdersPanel() {
               {error}
             </span>
           )}
-          {tab === "open" && openOrders.length > 0 && (
+          {expanded && tab === "open" && openOrders.length > 0 && (
             <Button
               size="sm"
               variant="destructive"
@@ -138,21 +143,32 @@ export function OrdersPanel() {
               Cancel All
             </Button>
           )}
+          {expanded && (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-6"
+              onClick={load}
+              disabled={loading}
+              title="Refresh"
+            >
+              <RefreshCw className={cn("size-3", loading && "animate-spin")} />
+            </Button>
+          )}
           <Button
             size="icon"
             variant="ghost"
-            className="size-6"
-            onClick={load}
-            disabled={loading}
-            title="Refresh"
+            className="size-8"
+            onClick={onToggle}
+            title={expanded ? "Collapse" : "Expand"}
           >
-            <RefreshCw className={cn("size-3", loading && "animate-spin")} />
+            {expanded ? <ChevronDown className="size-5" /> : <ChevronUp className="size-5" />}
           </Button>
         </div>
       </div>
 
       {/* Body */}
-      <div className="flex-1 overflow-auto">
+      <div className={cn("flex-1 overflow-auto", !expanded && "hidden")}>
         {visibleOrders.length === 0 && !loading ? (
           <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
             {tab === "open" ? "No open orders" : "No executed orders"}

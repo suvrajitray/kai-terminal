@@ -14,10 +14,23 @@ export function TerminalPage() {
   const { positions, setPositions, loading, isLive, load } = usePositionsFeed();
   const [error, setError] = useState<string | null>(null);
   const [acting, setActing] = useState<string | null>(null);
-  const [ordersHeight, setOrdersHeight] = useState(DEFAULT_ORDERS_HEIGHT);
+  const [ordersHeight, setOrdersHeight] = useState(MIN_HEIGHT);
+  const [ordersExpanded, setOrdersExpanded] = useState(false);
   const [ppOpen, setPpOpen] = useState(false);
   const dragStartY = useRef<number | null>(null);
   const dragStartHeight = useRef<number>(DEFAULT_ORDERS_HEIGHT);
+  const lastExpandedHeight = useRef<number>(DEFAULT_ORDERS_HEIGHT);
+
+  const handleOrdersToggle = () => {
+    if (ordersExpanded) {
+      lastExpandedHeight.current = ordersHeight;
+      setOrdersHeight(MIN_HEIGHT);
+      setOrdersExpanded(false);
+    } else {
+      setOrdersHeight(lastExpandedHeight.current);
+      setOrdersExpanded(true);
+    }
+  };
 
   // Profit protection monitoring state
   const pp = useProfitProtectionStore();
@@ -87,7 +100,9 @@ export function TerminalPage() {
     const onMouseMove = (ev: MouseEvent) => {
       if (dragStartY.current === null) return;
       const delta = dragStartY.current - ev.clientY;
-      setOrdersHeight(Math.max(MIN_HEIGHT, dragStartHeight.current + delta));
+      const next = Math.max(MIN_HEIGHT, dragStartHeight.current + delta);
+      setOrdersHeight(next);
+      setOrdersExpanded(next > MIN_HEIGHT);
     };
 
     const onMouseUp = () => {
@@ -140,7 +155,7 @@ export function TerminalPage() {
           onMouseDown={onDragStart}
           title="Drag to resize"
         />
-        <OrdersPanel />
+        <OrdersPanel expanded={ordersExpanded} onToggle={handleOrdersToggle} />
       </div>
 
       {/* Profit Protection config dialog */}
