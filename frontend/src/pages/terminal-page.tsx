@@ -1,27 +1,43 @@
 import { useState, useRef, useCallback } from "react";
 import { PositionsPanel } from "@/components/panels/positions-panel";
+import { OrdersPanel } from "@/components/panels/orders-panel";
+import { StatsBar } from "@/components/terminal/stats-bar";
+import { usePositionsFeed } from "@/components/panels/positions-panel/use-positions-feed";
+import { exitAllPositions } from "@/services/trading-api";
 
-const DEFAULT_HEIGHT = 220;
+const DEFAULT_ORDERS_HEIGHT = 180;
 const MIN_HEIGHT = 32;
-const COLLAPSED_HEIGHT = 32;
 
 export function TerminalPage() {
-  const [positionsExpanded, setPositionsExpanded] = useState(true);
-  const [panelHeight, setPanelHeight] = useState(DEFAULT_HEIGHT);
+  const { positions, setPositions, loading, isLive, load } = usePositionsFeed();
+  const [error, setError] = useState<string | null>(null);
+  const [acting, setActing] = useState<string | null>(null);
+  const [ordersHeight, setOrdersHeight] = useState(DEFAULT_ORDERS_HEIGHT);
   const dragStartY = useRef<number | null>(null);
-  const dragStartHeight = useRef<number>(DEFAULT_HEIGHT);
+  const dragStartHeight = useRef<number>(DEFAULT_ORDERS_HEIGHT);
+
+  const handleExitAll = async () => {
+    setActing("all");
+    setError(null);
+    try {
+      await exitAllPositions();
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setActing(null);
+    }
+  };
 
   const onDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     dragStartY.current = e.clientY;
-    dragStartHeight.current = panelHeight;
+    dragStartHeight.current = ordersHeight;
 
     const onMouseMove = (ev: MouseEvent) => {
       if (dragStartY.current === null) return;
       const delta = dragStartY.current - ev.clientY;
-      const next = Math.max(MIN_HEIGHT + 1, dragStartHeight.current + delta);
-      setPanelHeight(next);
-      if (next > COLLAPSED_HEIGHT) setPositionsExpanded(true);
+      setOrdersHeight(Math.max(MIN_HEIGHT, dragStartHeight.current + delta));
     };
 
     const onMouseUp = () => {
@@ -32,30 +48,36 @@ export function TerminalPage() {
 
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
-  }, [panelHeight]);
-
-  const handleToggle = () => {
-    setPositionsExpanded((v) => {
-      if (!v) setPanelHeight(DEFAULT_HEIGHT);
-      return !v;
-    });
-  };
-
-  const height = positionsExpanded ? panelHeight : COLLAPSED_HEIGHT;
+  }, [ordersHeight]);
 
   return (
     <div className="relative flex h-[calc(100svh-3.5rem)] flex-col overflow-hidden">
-
-      {/* ── Main workspace — empty for now ───────────────────────────────── */}
-      <div
-        className="flex-1 overflow-hidden"
-        style={{ paddingBottom: height }}
+      {/* Stats bar */}
+      <StatsBar
+        positions={positions}
+        isLive={isLive}
+        loading={loading}
+        error={error}
+        acting={acting}
+        onRefresh={load}
+        onExitAll={handleExitAll}
       />
 
-      {/* ── Positions — pinned to bottom ─────────────────────────────────── */}
+      {/* Positions — flex-1, scrollable */}
+      <div className="flex-1 overflow-hidden" style={{ paddingBottom: ordersHeight }}>
+        <PositionsPanel
+          positions={positions}
+          setPositions={setPositions}
+          loading={loading}
+          isLive={isLive}
+          load={load}
+        />
+      </div>
+
+      {/* Orders — pinned bottom, resizable */}
       <div
         className="absolute bottom-0 left-0 right-0 border-t border-border bg-background"
-        style={{ height }}
+        style={{ height: ordersHeight }}
       >
         {/* Drag handle */}
         <div
@@ -63,10 +85,7 @@ export function TerminalPage() {
           onMouseDown={onDragStart}
           title="Drag to resize"
         />
-        <PositionsPanel
-          expanded={positionsExpanded}
-          onToggle={handleToggle}
-        />
+        <OrdersPanel />
       </div>
     </div>
   );
