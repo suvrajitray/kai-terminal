@@ -99,8 +99,9 @@ public sealed class UpstoxClient
     /// <param name="instrumentToken">e.g. "NSE_FO|52618"</param>
     public Task<string> ExitPositionAsync(
         string instrumentToken,
+        string product,
         CancellationToken cancellationToken = default)
-        => _positions.ExitPositionAsync(instrumentToken, cancellationToken);
+        => _positions.ExitPositionAsync(instrumentToken, product, cancellationToken);
 
     // ═══════════════════════════════════════════════════════
     // Feature 5 — Cancel All Pending Orders

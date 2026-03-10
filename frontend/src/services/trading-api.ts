@@ -11,8 +11,10 @@ export async function exitAllPositions(): Promise<void> {
   await apiClient.post("/api/upstox/positions/exit-all");
 }
 
-export async function exitPosition(instrumentToken: string): Promise<void> {
-  await apiClient.post(`/api/upstox/positions/${encodeURIComponent(instrumentToken)}/exit`);
+export async function exitPosition(instrumentToken: string, product: string): Promise<void> {
+  await apiClient.post(`/api/upstox/positions/${encodeURIComponent(instrumentToken)}/exit`, null, {
+    params: { product },
+  });
 }
 
 export async function fetchOrders(): Promise<Order[]> {

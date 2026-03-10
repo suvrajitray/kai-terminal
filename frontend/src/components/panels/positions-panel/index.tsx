@@ -54,8 +54,8 @@ export function PositionsPanel({ expanded, onToggle }: PositionsPanelProps) {
 
   const handleExitAll = () => withActing("all", exitAllPositions);
 
-  const handleExit = (token: string) =>
-    withActing(token + ":exit", () => exitPosition(token));
+  const handleExit = (token: string, product: string) =>
+    withActing(token + ":exit", () => exitPosition(token, product));
 
   const handleAdd = (token: string, tradingSymbol: string) => {
     const lot = getLotSize(tradingSymbol);
@@ -126,7 +126,7 @@ export function PositionsPanel({ expanded, onToggle }: PositionsPanelProps) {
                     onToggleMode={toggleMode}
                     onAdd={() => handleAdd(p.instrument_token, p.trading_symbol)}
                     onReduce={() => handleReduce(p.instrument_token, p.trading_symbol)}
-                    onExit={() => handleExit(p.instrument_token)}
+                    onExit={() => handleExit(p.instrument_token, p.product)}
                   />
                 ))}
               </tbody>

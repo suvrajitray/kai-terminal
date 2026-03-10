@@ -55,6 +55,7 @@ public sealed class SimPositionService : IPositionService
 
     public Task<string> ExitPositionAsync(
         string instrumentToken,
+        string product,
         CancellationToken cancellationToken = default)
         => Task.FromResult($"SIM-EXIT-{instrumentToken}");
 

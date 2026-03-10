@@ -121,7 +121,7 @@ public sealed class StrikeMonitor
             // ── Exit position ────────────────────────────────────────────────
             try
             {
-                await _upstox.ExitPositionAsync(pos.InstrumentToken, cancellationToken: ct);
+                await _upstox.ExitPositionAsync(pos.InstrumentToken, pos.Product, cancellationToken: ct);
             }
             catch (Exception ex)
             {

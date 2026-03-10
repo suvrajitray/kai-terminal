@@ -49,9 +49,10 @@ public static class UpstoxEndpoints
 
         group.MapPost("/positions/{instrumentToken}/exit", async (
             string instrumentToken,
-            UpstoxClient upstox) =>
+            UpstoxClient upstox,
+            [FromQuery] string product = "I") =>
         {
-            var id = await upstox.ExitPositionAsync(instrumentToken);
+            var id = await upstox.ExitPositionAsync(instrumentToken, product);
             return Results.Ok(new { OrderId = id });
         });
 

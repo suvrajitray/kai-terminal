@@ -44,17 +44,19 @@ internal sealed class PositionService : IPositionService
     /// <inheritdoc />
     public async Task<string> ExitPositionAsync(
         string instrumentToken,
+        string product,
         CancellationToken cancellationToken = default)
     {
         var positions = await GetAllPositionsAsync(cancellationToken);
         var position = positions.FirstOrDefault(p =>
-            string.Equals(p.InstrumentToken, instrumentToken, StringComparison.OrdinalIgnoreCase));
+            string.Equals(p.InstrumentToken, instrumentToken, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(p.Product, product, StringComparison.OrdinalIgnoreCase));
 
         if (position is null)
-            throw new UpstoxException($"Position not found for instrument token: {instrumentToken}");
+            throw new UpstoxException($"Position not found for instrument token: {instrumentToken}, product: {product}");
 
         if (!position.IsOpen)
-            throw new UpstoxException($"Position for {instrumentToken} is already closed (quantity = 0).");
+            throw new UpstoxException($"Position for {instrumentToken}/{product} is already closed (quantity = 0).");
 
         return await ExitSingleAsync(position, cancellationToken);
     }
@@ -81,8 +83,8 @@ internal sealed class PositionService : IPositionService
             Tag = "EXIT"
         };
 
-        var result = await _http.PlaceOrderV2Async(request, ct);
-        return result.OrderId;
+        var result = await _http.PlaceOrderV3Async(request, ct);
+        return result.OrderIds.FirstOrDefault()!;
     }
 
     private static Product ParseProduct(string product) => product.ToUpperInvariant() switch

@@ -26,11 +26,13 @@ public interface IPositionService
 
     /// <summary>
     /// Feature 4 — Square off a single specified position.
-    /// Product type is derived from the position itself.
+    /// Both <paramref name="instrumentToken"/> and <paramref name="product"/> are required
+    /// because the same instrument can have separate intraday and delivery positions.
     /// </summary>
-    /// <param name="instrumentToken">Instrument key of the position to exit, e.g. "NSE_FO|52618".</param>
-    /// <returns>The order ID created for the exit.</returns>
+    /// <param name="instrumentToken">Instrument key, e.g. "NSE_FO|52618".</param>
+    /// <param name="product">Upstox product string: "I", "D", "MTF", "CO".</param>
     Task<string> ExitPositionAsync(
         string instrumentToken,
+        string product,
         CancellationToken cancellationToken = default);
 }
