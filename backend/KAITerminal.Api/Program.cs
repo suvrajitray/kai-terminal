@@ -1,9 +1,9 @@
 using System.Text.Json.Serialization;
 using KAITerminal.Api.Endpoints;
 using KAITerminal.Api.Extensions;
-using KAITerminal.Infrastructure.Extensions;
 using KAITerminal.Api.Hubs;
 using KAITerminal.Api.Services;
+using KAITerminal.Infrastructure.Extensions;
 using KAITerminal.Auth.Endpoints;
 using KAITerminal.Auth.Extensions;
 using KAITerminal.Upstox;
@@ -22,6 +22,7 @@ builder.Services
     .AddSignalR();
 
 builder.Services.AddSingleton<PositionStreamManager>();
+builder.Services.AddScoped<UserTradingSettingsService>();
 
 var app = builder.Build();
 
@@ -48,6 +49,7 @@ app.UseHttpsRedirection();
 app.MapAuthEndpoints();
 app.MapUpstoxEndpoints();
 app.MapBrokerCredentialsEndpoints();
+app.MapUserSettingsEndpoints();
 app.MapHub<PositionsHub>("/hubs/positions");
 
 if (app.Environment.IsDevelopment())
