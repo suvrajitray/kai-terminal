@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
 using KAITerminal.Api.Endpoints;
 using KAITerminal.Api.Extensions;
+using KAITerminal.Infrastructure.Extensions;
 using KAITerminal.Api.Hubs;
 using KAITerminal.Api.Services;
 using KAITerminal.Auth.Endpoints;

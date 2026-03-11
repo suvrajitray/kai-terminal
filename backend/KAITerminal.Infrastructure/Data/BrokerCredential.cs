@@ -1,4 +1,4 @@
-namespace KAITerminal.Api.Data;
+namespace KAITerminal.Infrastructure.Data;
 
 public class BrokerCredential
 {

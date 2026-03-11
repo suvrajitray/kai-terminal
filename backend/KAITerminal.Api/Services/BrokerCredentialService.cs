@@ -1,4 +1,4 @@
-using KAITerminal.Api.Data;
+using KAITerminal.Infrastructure.Data;
 using KAITerminal.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
