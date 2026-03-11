@@ -44,13 +44,6 @@ internal sealed class UpstoxHttpClient
     public Task<IReadOnlyList<Order>> GetAllOrdersAsync(CancellationToken ct = default)
         => GetListAsync<Order>("UpstoxApi", "/v2/order/retrieve-all", ct);
 
-    public async Task<PlaceOrderResult> PlaceOrderV2Async(PlaceOrderRequest req, CancellationToken ct = default)
-    {
-        var dto = BuildOrderDto(req);
-        var raw = await PostAsync<PlaceOrderRawV2>("UpstoxHft", "/v2/order/place", dto, ct);
-        return new PlaceOrderResult { OrderId = raw.OrderId ?? "" };
-    }
-
     public async Task<PlaceOrderV3Result> PlaceOrderV3Async(PlaceOrderRequest req, CancellationToken ct = default)
     {
         var dto = new PlaceOrderDtoV3
@@ -74,14 +67,6 @@ internal sealed class UpstoxHttpClient
             OrderIds = raw.OrderIds ?? [],
             Latency = latency
         };
-    }
-
-    public async Task<string> CancelOrderV2Async(string orderId, CancellationToken ct = default)
-    {
-        var client = _factory.CreateClient("UpstoxHft");
-        var response = await client.DeleteAsync($"/v2/order/cancel?order_id={Uri.EscapeDataString(orderId)}", ct);
-        var raw = await HandleResponseAsync<OrderIdRaw>(response, ct);
-        return raw.OrderId ?? orderId;
     }
 
     public async Task<(string OrderId, int Latency)> CancelOrderV3Async(string orderId, CancellationToken ct = default)
@@ -291,21 +276,6 @@ internal sealed class UpstoxHttpClient
         _ => throw new ArgumentOutOfRangeException(nameof(t), t, null)
     };
 
-    private static PlaceOrderDto BuildOrderDto(PlaceOrderRequest req) => new()
-    {
-        Quantity = req.Quantity,
-        Product = ToProductString(req.Product),
-        Validity = ToValidityString(req.Validity),
-        Price = req.Price,
-        Tag = req.Tag,
-        InstrumentToken = req.InstrumentToken,
-        OrderType = ToOrderTypeString(req.OrderType),
-        TransactionType = ToTransactionTypeString(req.TransactionType),
-        DisclosedQuantity = req.DisclosedQuantity,
-        TriggerPrice = req.TriggerPrice,
-        IsAmo = req.IsAmo
-    };
-
     internal PlaceOrderRequest BuildOrderRequest(
         string instrumentToken, int quantity, TransactionType transactionType,
         OrderType orderType, Product product, Validity validity,
@@ -329,7 +299,7 @@ internal sealed class UpstoxHttpClient
     // Internal DTOs (serialisation only)
     // ──────────────────────────────────────────────────
 
-    private class PlaceOrderDto
+    private sealed class PlaceOrderDtoV3
     {
         [JsonPropertyName("quantity")] public int Quantity { get; init; }
         [JsonPropertyName("product")] public string Product { get; init; } = "";
@@ -342,16 +312,7 @@ internal sealed class UpstoxHttpClient
         [JsonPropertyName("disclosed_quantity")] public int DisclosedQuantity { get; init; }
         [JsonPropertyName("trigger_price")] public decimal TriggerPrice { get; init; }
         [JsonPropertyName("is_amo")] public bool IsAmo { get; init; }
-    }
-
-    private sealed class PlaceOrderDtoV3 : PlaceOrderDto
-    {
         [JsonPropertyName("slice")] public bool Slice { get; init; }
-    }
-
-    private sealed class PlaceOrderRawV2
-    {
-        [JsonPropertyName("order_id")] public string? OrderId { get; init; }
     }
 
     private sealed class PlaceOrderRawV3

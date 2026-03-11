@@ -118,12 +118,6 @@ public sealed class UpstoxClient
     // Feature 6 — Place Order
     // ═══════════════════════════════════════════════════════
 
-    /// <summary>Place a standard order (v2 endpoint). Returns a single order ID.</summary>
-    [Obsolete("Use PlaceOrderV3Async instead.")]
-    public Task<PlaceOrderResult> PlaceOrderAsync(
-        PlaceOrderRequest request, CancellationToken cancellationToken = default)
-        => _orders.PlaceOrderAsync(request, cancellationToken);
-
     /// <summary>
     /// Place a standard order (v3 HFT endpoint).
     /// Returns one or more order IDs (multiple when auto-sliced) and API latency in ms.
@@ -147,14 +141,6 @@ public sealed class UpstoxClient
         => _options.GetOrderByOptionPriceAsync(underlyingKey, expiryDate, optionType, targetPremium, priceSearchMode, cancellationToken);
 
     /// <summary>
-    /// Find the strike whose LTP is nearest to the target premium and place a v2 order.
-    /// </summary>
-    [Obsolete("Use PlaceOrderByOptionPriceV3Async instead.")]
-    public Task<PlaceOrderResult> PlaceOrderByOptionPriceAsync(
-        PlaceOrderByOptionPriceRequest request, CancellationToken cancellationToken = default)
-        => _options.PlaceOrderByOptionPriceAsync(request, cancellationToken);
-
-    /// <summary>
     /// Find the strike whose LTP is nearest to the target premium and place a v3 HFT order.
     /// </summary>
     public Task<PlaceOrderV3Result> PlaceOrderByOptionPriceV3Async(
@@ -176,15 +162,6 @@ public sealed class UpstoxClient
 
     /// <summary>
     /// Resolve the exact strike (ATM / OTM1-5 / ITM1-5) relative to the current spot price
-    /// and place a v2 order.
-    /// </summary>
-    [Obsolete("Use PlaceOrderByStrikeV3Async instead.")]
-    public Task<PlaceOrderResult> PlaceOrderByStrikeAsync(
-        PlaceOrderByStrikeRequest request, CancellationToken cancellationToken = default)
-        => _options.PlaceOrderByStrikeAsync(request, cancellationToken);
-
-    /// <summary>
-    /// Resolve the exact strike (ATM / OTM1-5 / ITM1-5) relative to the current spot price
     /// and place a v3 HFT order.
     /// </summary>
     public Task<PlaceOrderV3Result> PlaceOrderByStrikeV3Async(
@@ -199,12 +176,6 @@ public sealed class UpstoxClient
     public Task<IReadOnlyList<Order>> GetAllOrdersAsync(
         CancellationToken cancellationToken = default)
         => _orders.GetAllOrdersAsync(cancellationToken);
-
-    /// <summary>Cancel a single order by ID (v2).</summary>
-    [Obsolete("Use CancelOrderV3Async instead.")]
-    public Task<string> CancelOrderAsync(
-        string orderId, CancellationToken cancellationToken = default)
-        => _orders.CancelOrderAsync(orderId, cancellationToken);
 
     /// <summary>Cancel a single order by ID (v3 HFT). Returns order ID and latency in ms.</summary>
     public Task<(string OrderId, int Latency)> CancelOrderV3Async(

@@ -27,25 +27,15 @@ internal sealed class OrderService : IOrderService
         if (cancellable.Count == 0)
             return [];
 
-        // Cancel concurrently using v2 endpoint.
-        var tasks = cancellable.Select(o => _http.CancelOrderV2Async(o.OrderId, cancellationToken));
+        var tasks = cancellable.Select(o => _http.CancelOrderV3Async(o.OrderId, cancellationToken).ContinueWith(t => t.Result.OrderId));
         var results = await Task.WhenAll(tasks);
         return results.AsReadOnly();
     }
 
     /// <inheritdoc />
-    public Task<string> CancelOrderAsync(string orderId, CancellationToken cancellationToken = default)
-        => _http.CancelOrderV2Async(orderId, cancellationToken);
-
-    /// <inheritdoc />
     public Task<(string OrderId, int Latency)> CancelOrderV3Async(
         string orderId, CancellationToken cancellationToken = default)
         => _http.CancelOrderV3Async(orderId, cancellationToken);
-
-    /// <inheritdoc />
-    public Task<PlaceOrderResult> PlaceOrderAsync(
-        PlaceOrderRequest request, CancellationToken cancellationToken = default)
-        => _http.PlaceOrderV2Async(request, cancellationToken);
 
     /// <inheritdoc />
     public Task<PlaceOrderV3Result> PlaceOrderV3Async(

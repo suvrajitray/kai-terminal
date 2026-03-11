@@ -37,15 +37,6 @@ internal sealed class OptionService : IOptionService
         => await ResolveByPremiumAsync(underlyingKey, expiryDate, optionType, targetPremium, priceSearchMode, cancellationToken);
 
     /// <inheritdoc />
-    public async Task<PlaceOrderResult> PlaceOrderByOptionPriceAsync(
-        PlaceOrderByOptionPriceRequest request, CancellationToken cancellationToken = default)
-    {
-        var entry = await ResolveByPremiumAsync(request.UnderlyingKey, request.ExpiryDate, request.OptionType, request.TargetPremium, request.PriceSearchMode, cancellationToken);
-        var orderReq = BuildOrderRequest(request, InstrumentKey(entry, request.OptionType));
-        return await _http.PlaceOrderV2Async(orderReq, cancellationToken);
-    }
-
-    /// <inheritdoc />
     public async Task<PlaceOrderV3Result> PlaceOrderByOptionPriceV3Async(
         PlaceOrderByOptionPriceRequest request, CancellationToken cancellationToken = default)
     {
@@ -63,15 +54,6 @@ internal sealed class OptionService : IOptionService
         string underlyingKey, string expiryDate, OptionType optionType, StrikeType strikeType,
         CancellationToken cancellationToken = default)
         => await ResolveByStrikeTypeAsync(underlyingKey, expiryDate, optionType, strikeType, cancellationToken);
-
-    /// <inheritdoc />
-    public async Task<PlaceOrderResult> PlaceOrderByStrikeAsync(
-        PlaceOrderByStrikeRequest request, CancellationToken cancellationToken = default)
-    {
-        var entry = await ResolveByStrikeTypeAsync(request.UnderlyingKey, request.ExpiryDate, request.OptionType, request.StrikeType, cancellationToken);
-        var orderReq = BuildOrderRequest(request, InstrumentKey(entry, request.OptionType));
-        return await _http.PlaceOrderV2Async(orderReq, cancellationToken);
-    }
 
     /// <inheritdoc />
     public async Task<PlaceOrderV3Result> PlaceOrderByStrikeV3Async(
