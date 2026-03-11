@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using KAITerminal.Api.Endpoints;
 using KAITerminal.Api.Extensions;
 using KAITerminal.Api.Hubs;
@@ -7,6 +8,9 @@ using KAITerminal.Auth.Extensions;
 using KAITerminal.Upstox;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.ConfigureHttpJsonOptions(o =>
+    o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 builder.Services
     .AddAuthServices(builder.Configuration)

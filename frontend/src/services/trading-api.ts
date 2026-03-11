@@ -43,6 +43,31 @@ function productToEnum(product: string): number {
   }
 }
 
+export type PriceSearchMode = "Nearest" | "GreaterThan" | "LessThan";
+
+export async function placeOrderByOptionPrice(params: {
+  underlyingKey: string;
+  expiryDate: string;
+  optionType: "CE" | "PE";
+  targetPremium: number;
+  priceSearchMode: PriceSearchMode;
+  quantity: number;
+  transactionType: "Buy" | "Sell";
+  product: string;
+}): Promise<void> {
+  await apiClient.post("/api/upstox/orders/by-option-price/v3", {
+    underlyingKey: params.underlyingKey,
+    expiryDate: params.expiryDate,
+    optionType: params.optionType,
+    targetPremium: params.targetPremium,
+    priceSearchMode: params.priceSearchMode,
+    quantity: params.quantity,
+    transactionType: params.transactionType,
+    product: productToEnum(params.product),
+    slice: true,
+  });
+}
+
 export async function placeMarketOrder(
   instrumentToken: string,
   quantity: number,

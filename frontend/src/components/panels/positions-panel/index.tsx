@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { getLotSize } from "@/lib/lot-sizes";
-import { exitPosition, placeMarketOrder } from "@/services/trading-api";
+import { exitPosition, placeMarketOrder, placeOrderByOptionPrice } from "@/services/trading-api";
+import { parseTradingSymbol, parseExpiryToDate } from "@/lib/parse-trading-symbol";
+import { getShiftOffset, getUnderlyingKey } from "@/lib/shift-config";
 import { PositionRow } from "./position-row";
 import type { QtyMode } from "./qty-input";
 import type { Position } from "@/types";
@@ -63,6 +65,48 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
     return withActing(token + ":add", () => placeMarketOrder(token, qty, txn, product));
   };
 
+  const handleShift = (
+    token: string,
+    tradingSymbol: string,
+    product: string,
+    direction: "up" | "down",
+  ) => {
+    const parsed = parseTradingSymbol(tradingSymbol);
+    if (!parsed) return;
+
+    const underlyingKey = getUnderlyingKey(parsed.underlying);
+    if (!underlyingKey) return;
+
+    const expiryDate = parseExpiryToDate(parsed.expiry);
+    if (!expiryDate) return;
+
+    const lot = getLotSize(tradingSymbol);
+    const num = parseInt(qtys[token] ?? "", 10);
+    const qty = isNaN(num) || num <= 0 ? 0 : qtyMode === "lot" ? num * lot : num;
+    if (qty === 0) return;
+
+    const position = positions.find((p) => p.instrument_token === token && p.product === product)!;
+    const closeTxn = position.quantity < 0 ? "Buy" : "Sell";
+    const openTxn  = position.quantity < 0 ? "Sell" : "Buy";
+    const offset = getShiftOffset(parsed.underlying);
+    const targetPremium = position.last_price + (direction === "up" ? offset : -offset);
+    const priceSearchMode = direction === "up" ? "GreaterThan" : "LessThan";
+
+    return withActing(token + ":shift-" + direction, async () => {
+      await placeMarketOrder(token, qty, closeTxn, product);
+      await placeOrderByOptionPrice({
+        underlyingKey,
+        expiryDate,
+        optionType: parsed.optionType,
+        targetPremium,
+        priceSearchMode,
+        quantity: qty,
+        transactionType: openTxn,
+        product,
+      });
+    });
+  };
+
   const handleReduce = (token: string, tradingSymbol: string, product: string) => {
     const lot = getLotSize(tradingSymbol);
     const num = parseInt(qtys[token] ?? "", 10);
@@ -102,8 +146,8 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
       onAdd={() => handleAdd(p.instrument_token, p.trading_symbol, p.product)}
       onReduce={() => handleReduce(p.instrument_token, p.trading_symbol, p.product)}
       onExit={() => handleExit(p.instrument_token, p.product)}
-      onShiftUp={() => {}}
-      onShiftDown={() => {}}
+      onShiftUp={() => handleShift(p.instrument_token, p.trading_symbol, p.product, "up")}
+      onShiftDown={() => handleShift(p.instrument_token, p.trading_symbol, p.product, "down")}
     />
   );
 
