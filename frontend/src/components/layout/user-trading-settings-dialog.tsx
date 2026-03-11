@@ -5,12 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import {
-  fetchUserTradingSettings,
-  saveUserTradingSettings,
-  DEFAULT_TRADING_SETTINGS,
-  type UserTradingSettings,
-} from "@/services/user-settings-api";
+import { useUserTradingSettingsStore } from "@/stores/user-trading-settings-store";
+import { saveUserTradingSettings, type UserTradingSettings } from "@/services/user-settings-api";
 
 interface Props {
   open: boolean;
@@ -27,18 +23,31 @@ const SHIFT_FIELDS: { key: keyof UserTradingSettings; label: string }[] = [
 ];
 
 export function UserTradingSettingsDialog({ open, onClose }: Props) {
-  const [draft, setDraft] = useState<UserTradingSettings>(DEFAULT_TRADING_SETTINGS);
-  const [loading, setLoading] = useState(false);
+  const store = useUserTradingSettingsStore();
+  const [draft, setDraft] = useState<UserTradingSettings>(() => ({
+    defaultStoplossPercentage: store.defaultStoplossPercentage,
+    niftyShiftOffset: store.niftyShiftOffset,
+    bankniftyShiftOffset: store.bankniftyShiftOffset,
+    midcpniftyShiftOffset: store.midcpniftyShiftOffset,
+    finniftyShiftOffset: store.finniftyShiftOffset,
+    sensexShiftOffset: store.sensexShiftOffset,
+    bankexShiftOffset: store.bankexShiftOffset,
+  }));
   const [saving, setSaving] = useState(false);
 
+  // Sync draft from store each time dialog opens
   useEffect(() => {
     if (!open) return;
-    setLoading(true);
-    fetchUserTradingSettings()
-      .then(setDraft)
-      .catch(() => setDraft(DEFAULT_TRADING_SETTINGS))
-      .finally(() => setLoading(false));
-  }, [open]);
+    setDraft({
+      defaultStoplossPercentage: store.defaultStoplossPercentage,
+      niftyShiftOffset: store.niftyShiftOffset,
+      bankniftyShiftOffset: store.bankniftyShiftOffset,
+      midcpniftyShiftOffset: store.midcpniftyShiftOffset,
+      finniftyShiftOffset: store.finniftyShiftOffset,
+      sensexShiftOffset: store.sensexShiftOffset,
+      bankexShiftOffset: store.bankexShiftOffset,
+    });
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const set = (key: keyof UserTradingSettings, value: number) =>
     setDraft((d) => ({ ...d, [key]: value }));
@@ -47,6 +56,7 @@ export function UserTradingSettingsDialog({ open, onClose }: Props) {
     setSaving(true);
     try {
       await saveUserTradingSettings(draft);
+      store.setSettings(draft);
       onClose();
     } finally {
       setSaving(false);
@@ -63,59 +73,55 @@ export function UserTradingSettingsDialog({ open, onClose }: Props) {
           </DialogTitle>
         </DialogHeader>
 
-        {loading ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">Loading…</div>
-        ) : (
-          <div className="space-y-6 py-1">
-            {/* Default Stoploss */}
-            <div className="space-y-1.5">
-              <Label htmlFor="sl-pct">Default Stoploss Percentage (%)</Label>
-              <Input
-                id="sl-pct"
-                type="number"
-                min={0}
-                max={100}
-                value={draft.defaultStoplossPercentage}
-                onChange={(e) => set("defaultStoplossPercentage", Number(e.target.value))}
-              />
+        <div className="space-y-6 py-1">
+          {/* Default Stoploss */}
+          <div className="space-y-1.5">
+            <Label htmlFor="sl-pct">Default Stoploss Percentage (%)</Label>
+            <Input
+              id="sl-pct"
+              type="number"
+              min={0}
+              max={100}
+              value={draft.defaultStoplossPercentage}
+              onChange={(e) => set("defaultStoplossPercentage", Number(e.target.value))}
+            />
+            <p className="text-[11px] text-muted-foreground">
+              Applied as the default stop loss when placing option orders.
+            </p>
+          </div>
+
+          <Separator />
+
+          {/* Shift Offsets */}
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-medium">Shift Offsets</p>
               <p className="text-[11px] text-muted-foreground">
-                Applied as the default stop loss when placing option orders.
+                Premium offset (₹) used for Shift Up / Shift Down per index.
               </p>
             </div>
-
-            <Separator />
-
-            {/* Shift Offsets */}
-            <div className="space-y-3">
-              <div>
-                <p className="text-sm font-medium">Shift Offsets</p>
-                <p className="text-[11px] text-muted-foreground">
-                  Premium offset (₹) used for Shift Up / Shift Down per index.
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-                {SHIFT_FIELDS.map(({ key, label }) => (
-                  <div key={key} className="space-y-1.5">
-                    <Label htmlFor={key}>{label}</Label>
-                    <Input
-                      id={key}
-                      type="number"
-                      min={0}
-                      value={draft[key] as number}
-                      onChange={(e) => set(key, Number(e.target.value))}
-                    />
-                  </div>
-                ))}
-              </div>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+              {SHIFT_FIELDS.map(({ key, label }) => (
+                <div key={key} className="space-y-1.5">
+                  <Label htmlFor={key}>{label}</Label>
+                  <Input
+                    id={key}
+                    type="number"
+                    min={0}
+                    value={draft[key] as number}
+                    onChange={(e) => set(key, Number(e.target.value))}
+                  />
+                </div>
+              ))}
             </div>
           </div>
-        )}
+        </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={loading || saving}>
+          <Button onClick={handleSave} disabled={saving}>
             {saving ? "Saving…" : "Save"}
           </Button>
         </DialogFooter>

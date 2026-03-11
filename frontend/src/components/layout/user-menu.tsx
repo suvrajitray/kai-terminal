@@ -13,6 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuthStore } from "@/stores/auth-store";
 import { useBrokerStore } from "@/stores/broker-store";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
+import { useUserTradingSettingsStore } from "@/stores/user-trading-settings-store";
 import { UserTradingSettingsDialog } from "@/components/layout/user-trading-settings-dialog";
 
 function getInitials(name: string): string {
@@ -29,6 +30,7 @@ export function UserMenu() {
   const logout = useAuthStore((s) => s.logout);
   const clearBrokers = useBrokerStore((s) => s.clearAll);
   const resetProfitProtection = useProfitProtectionStore((s) => s.reset);
+  const resetTradingSettings = useUserTradingSettingsStore((s) => s.reset);
   const navigate = useNavigate();
 
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -39,6 +41,7 @@ export function UserMenu() {
     logout();
     clearBrokers();
     resetProfitProtection();
+    resetTradingSettings();
     localStorage.clear();
     navigate("/login");
   };
