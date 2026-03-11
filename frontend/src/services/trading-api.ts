@@ -29,7 +29,7 @@ export async function cancelAllOrders(): Promise<void> {
 }
 
 export async function cancelOrder(orderId: string): Promise<void> {
-  await apiClient.delete(`/api/upstox/orders/${encodeURIComponent(orderId)}`);
+  await apiClient.delete(`/api/upstox/orders/${encodeURIComponent(orderId)}/v3`);
 }
 
 // TransactionType: Buy = 0, Sell = 1  (matches backend enum order)
@@ -74,11 +74,12 @@ export async function placeMarketOrder(
   transactionType: "Buy" | "Sell",
   product: string,
 ): Promise<void> {
-  await apiClient.post("/api/upstox/orders", {
+  await apiClient.post("/api/upstox/orders/v3", {
     instrumentToken,
     quantity,
     transactionType: transactionType === "Buy" ? 0 : 1,
     orderType: 0,  // Market
     product: productToEnum(product),
+    slice: true,
   });
 }

@@ -18,6 +18,7 @@ public interface IOrderService
     Task<IReadOnlyList<string>> CancelAllPendingOrdersAsync(CancellationToken cancellationToken = default);
 
     /// <summary>Cancel a single order by ID (v2 endpoint).</summary>
+    [Obsolete("Use CancelOrderV3Async instead.")]
     Task<string> CancelOrderAsync(string orderId, CancellationToken cancellationToken = default);
 
     /// <summary>Cancel a single order by ID (v3 HFT endpoint). Returns order ID and API latency in ms.</summary>
@@ -26,6 +27,7 @@ public interface IOrderService
     /// <summary>
     /// Feature 6 — Place a standard order (v2 endpoint).
     /// </summary>
+    [Obsolete("Use PlaceOrderV3Async instead.")]
     Task<PlaceOrderResult> PlaceOrderAsync(PlaceOrderRequest request, CancellationToken cancellationToken = default);
 
     /// <summary>

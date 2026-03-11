@@ -119,6 +119,7 @@ public sealed class UpstoxClient
     // ═══════════════════════════════════════════════════════
 
     /// <summary>Place a standard order (v2 endpoint). Returns a single order ID.</summary>
+    [Obsolete("Use PlaceOrderV3Async instead.")]
     public Task<PlaceOrderResult> PlaceOrderAsync(
         PlaceOrderRequest request, CancellationToken cancellationToken = default)
         => _orders.PlaceOrderAsync(request, cancellationToken);
@@ -148,6 +149,7 @@ public sealed class UpstoxClient
     /// <summary>
     /// Find the strike whose LTP is nearest to the target premium and place a v2 order.
     /// </summary>
+    [Obsolete("Use PlaceOrderByOptionPriceV3Async instead.")]
     public Task<PlaceOrderResult> PlaceOrderByOptionPriceAsync(
         PlaceOrderByOptionPriceRequest request, CancellationToken cancellationToken = default)
         => _options.PlaceOrderByOptionPriceAsync(request, cancellationToken);
@@ -176,6 +178,7 @@ public sealed class UpstoxClient
     /// Resolve the exact strike (ATM / OTM1-5 / ITM1-5) relative to the current spot price
     /// and place a v2 order.
     /// </summary>
+    [Obsolete("Use PlaceOrderByStrikeV3Async instead.")]
     public Task<PlaceOrderResult> PlaceOrderByStrikeAsync(
         PlaceOrderByStrikeRequest request, CancellationToken cancellationToken = default)
         => _options.PlaceOrderByStrikeAsync(request, cancellationToken);
@@ -198,6 +201,7 @@ public sealed class UpstoxClient
         => _orders.GetAllOrdersAsync(cancellationToken);
 
     /// <summary>Cancel a single order by ID (v2).</summary>
+    [Obsolete("Use CancelOrderV3Async instead.")]
     public Task<string> CancelOrderAsync(
         string orderId, CancellationToken cancellationToken = default)
         => _orders.CancelOrderAsync(orderId, cancellationToken);

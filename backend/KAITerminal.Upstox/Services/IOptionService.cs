@@ -47,6 +47,7 @@ public interface IOptionService
     /// Feature 7 — Find the strike whose current LTP is nearest to the target premium
     /// and place a v2 order on it.
     /// </summary>
+    [Obsolete("Use PlaceOrderByOptionPriceV3Async instead.")]
     Task<PlaceOrderResult> PlaceOrderByOptionPriceAsync(
         PlaceOrderByOptionPriceRequest request,
         CancellationToken cancellationToken = default);
@@ -76,6 +77,7 @@ public interface IOptionService
     /// Feature 8 — Resolve the exact strike by relative type (ATM / OTMn / ITMn)
     /// and place a v2 order on it.
     /// </summary>
+    [Obsolete("Use PlaceOrderByStrikeV3Async instead.")]
     Task<PlaceOrderResult> PlaceOrderByStrikeAsync(
         PlaceOrderByStrikeRequest request,
         CancellationToken cancellationToken = default);

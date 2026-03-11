@@ -71,7 +71,10 @@ public static class UpstoxEndpoints
         group.MapPost("/orders", async (
             [FromBody] PlaceOrderRequest request,
             UpstoxClient upstox) =>
-            Results.Ok(await upstox.PlaceOrderAsync(request)));
+#pragma warning disable CS0618
+            Results.Ok(await upstox.PlaceOrderAsync(request)))
+#pragma warning restore CS0618
+            .WithOpenApi(op => { op.Deprecated = true; return op; });
 
         group.MapPost("/orders/v3", async (
             [FromBody] PlaceOrderRequest request,
@@ -84,7 +87,10 @@ public static class UpstoxEndpoints
         group.MapDelete("/orders/{orderId}", async (
             string orderId,
             UpstoxClient upstox) =>
-            Results.Ok(new { OrderId = await upstox.CancelOrderAsync(orderId) }));
+#pragma warning disable CS0618
+            Results.Ok(new { OrderId = await upstox.CancelOrderAsync(orderId) }))
+#pragma warning restore CS0618
+            .WithOpenApi(op => { op.Deprecated = true; return op; });
 
         group.MapDelete("/orders/{orderId}/v3", async (
             string orderId,
@@ -144,7 +150,10 @@ public static class UpstoxEndpoints
         group.MapPost("/orders/by-option-price", async (
             [FromBody] PlaceOrderByOptionPriceRequest request,
             UpstoxClient upstox) =>
-            Results.Ok(await upstox.PlaceOrderByOptionPriceAsync(request)));
+#pragma warning disable CS0618
+            Results.Ok(await upstox.PlaceOrderByOptionPriceAsync(request)))
+#pragma warning restore CS0618
+            .WithOpenApi(op => { op.Deprecated = true; return op; });
 
         group.MapPost("/orders/by-option-price/v3", async (
             [FromBody] PlaceOrderByOptionPriceRequest request,
@@ -160,7 +169,10 @@ public static class UpstoxEndpoints
         group.MapPost("/orders/by-strike", async (
             [FromBody] PlaceOrderByStrikeRequest request,
             UpstoxClient upstox) =>
-            Results.Ok(await upstox.PlaceOrderByStrikeAsync(request)));
+#pragma warning disable CS0618
+            Results.Ok(await upstox.PlaceOrderByStrikeAsync(request)))
+#pragma warning restore CS0618
+            .WithOpenApi(op => { op.Deprecated = true; return op; });
 
         group.MapPost("/orders/by-strike/v3", async (
             [FromBody] PlaceOrderByStrikeRequest request,
