@@ -31,6 +31,19 @@ public static class BrokerCredentialsEndpoints
             return Results.Ok();
         });
 
+        group.MapPut("/{brokerName}/access-token", async (
+            string brokerName,
+            UpdateAccessTokenRequest request,
+            ClaimsPrincipal user,
+            BrokerCredentialService svc) =>
+        {
+            var username = GetEmail(user);
+            if (username is null) return Results.Unauthorized();
+
+            await svc.UpdateAccessTokenAsync(username, brokerName, request.AccessToken);
+            return Results.NoContent();
+        });
+
         group.MapDelete("/{brokerName}", async (
             string brokerName,
             ClaimsPrincipal user,

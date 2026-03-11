@@ -8,6 +8,8 @@ public record struct UpstoxTokenRequest(
     string RedirectUri,
     string Code);
 
+public record struct UpdateAccessTokenRequest(string AccessToken);
+
 public record struct SaveBrokerCredentialRequest(
     string BrokerName,
     string ApiKey,

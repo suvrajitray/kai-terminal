@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { BROKERS } from "@/lib/constants";
 import { useBrokerStore } from "@/stores/broker-store";
-import { exchangeAccessToken } from "@/services/broker-api";
+import { exchangeAccessToken, updateBrokerAccessToken } from "@/services/broker-api";
 
 export function BrokerRedirectPage() {
   const { brokerId } = useParams<{ brokerId: string }>();
@@ -38,8 +38,9 @@ export function BrokerRedirectPage() {
     }
 
     exchangeAccessToken(creds.apiKey, creds.apiSecret, creds.redirectUrl, code)
-      .then((accessToken) => {
+      .then(async (accessToken) => {
         setAccessToken(brokerId, accessToken);
+        await updateBrokerAccessToken(brokerId, accessToken);
         setStatus("success");
       })
       .catch((err: Error) => {

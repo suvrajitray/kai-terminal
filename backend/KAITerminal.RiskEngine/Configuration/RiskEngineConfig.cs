@@ -7,7 +7,7 @@ public sealed class RiskEngineConfig
     public const string SectionName = "RiskEngine";
 
     // ── Portfolio-level thresholds ──────────────────────────────────────────
-    public decimal HardStopLoss  { get; set; } = -25_000m;
+    public decimal OverallStopLoss  { get; set; } = -25_000m;
     public decimal ProfitTarget  { get; set; } =  25_000m;
 
     // Trailing SL

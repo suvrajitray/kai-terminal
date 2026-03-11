@@ -9,7 +9,7 @@ public static class UpstoxEndpoints
 {
     public static void MapUpstoxEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/upstox");
+        var group = app.MapGroup("/api/upstox").RequireAuthorization();
 
         // ── Auth ──────────────────────────────────────────────────────────────
 
@@ -152,8 +152,8 @@ public static class UpstoxEndpoints
     /// Filters positions by a comma-separated exchange list (e.g. "NFO,BFO").
     /// Returns all positions when <paramref name="exchange"/> is null or empty.
     /// </summary>
-    private static IReadOnlyList<KAITerminal.Upstox.Models.Responses.Position> FilterByExchange(
-        IReadOnlyList<KAITerminal.Upstox.Models.Responses.Position> positions,
+    private static IReadOnlyList<Upstox.Models.Responses.Position> FilterByExchange(
+        IReadOnlyList<Upstox.Models.Responses.Position> positions,
         string? exchange)
     {
         if (string.IsNullOrWhiteSpace(exchange))

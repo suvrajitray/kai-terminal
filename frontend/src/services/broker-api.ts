@@ -23,6 +23,10 @@ export async function deleteBrokerCredential(brokerName: string): Promise<void> 
   await apiClient.delete(`/api/broker-credentials/${brokerName}`);
 }
 
+export async function updateBrokerAccessToken(brokerName: string, accessToken: string): Promise<void> {
+  await apiClient.put(`/api/broker-credentials/${brokerName}/access-token`, { accessToken });
+}
+
 export async function exchangeAccessToken(
   apiKey: string,
   apiSecret: string,
