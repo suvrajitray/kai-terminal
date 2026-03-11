@@ -11,7 +11,8 @@ public record struct UpstoxTokenRequest(
 public record struct SaveBrokerCredentialRequest(
     string BrokerName,
     string ApiKey,
-    string ApiSecret);
+    string ApiSecret,
+    string AccessToken = "");
 
 public record ResolveByOptionPriceQuery(
     string UnderlyingKey,

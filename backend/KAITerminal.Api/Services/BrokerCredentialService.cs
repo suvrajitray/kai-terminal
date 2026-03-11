@@ -9,7 +9,7 @@ public class BrokerCredentialService(AppDbContext db)
     public async Task<List<BrokerCredentialResponse>> GetAsync(string username) =>
         await db.BrokerCredentials
             .Where(x => x.Username == username)
-            .Select(x => new BrokerCredentialResponse(x.BrokerName, x.ApiKey, x.ApiSecret))
+            .Select(x => new BrokerCredentialResponse(x.BrokerName, x.ApiKey, x.ApiSecret, string.IsNullOrEmpty(x.AccessToken) ? "NA" : x.AccessToken))
             .ToListAsync();
 
     public async Task UpsertAsync(string username, SaveBrokerCredentialRequest request)
@@ -17,10 +17,13 @@ public class BrokerCredentialService(AppDbContext db)
         var existing = await db.BrokerCredentials
             .FirstOrDefaultAsync(x => x.Username == username && x.BrokerName == request.BrokerName);
 
+        var accessToken = string.IsNullOrEmpty(request.AccessToken) ? "NA" : request.AccessToken;
+
         if (existing is not null)
         {
             existing.ApiKey = request.ApiKey;
             existing.ApiSecret = request.ApiSecret;
+            existing.AccessToken = accessToken;
             existing.UpdatedAt = DateTime.UtcNow;
         }
         else
@@ -31,6 +34,7 @@ public class BrokerCredentialService(AppDbContext db)
                 BrokerName = request.BrokerName,
                 ApiKey = request.ApiKey,
                 ApiSecret = request.ApiSecret,
+                AccessToken = accessToken,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
             });

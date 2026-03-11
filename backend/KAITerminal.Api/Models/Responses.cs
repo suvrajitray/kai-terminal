@@ -1,3 +1,3 @@
 namespace KAITerminal.Api.Models;
 
-public record BrokerCredentialResponse(string BrokerName, string ApiKey, string ApiSecret);
+public record BrokerCredentialResponse(string BrokerName, string ApiKey, string ApiSecret, string AccessToken);
