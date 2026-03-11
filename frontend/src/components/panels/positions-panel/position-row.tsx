@@ -1,9 +1,8 @@
-import { LogOut, Plus, Minus } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { getLotSize } from "@/lib/lot-sizes";
 import { parseTradingSymbol } from "@/lib/parse-trading-symbol";
-import { QtyInput, type QtyMode } from "./qty-input";
+import { type QtyMode } from "./qty-input";
+import { PositionActions } from "./position-actions";
 import type { Position } from "@/types";
 
 const INR = new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 });
@@ -40,6 +39,8 @@ interface PositionRowProps {
   onAdd: () => void;
   onReduce: () => void;
   onExit: () => void;
+  onShiftUp: () => void;
+  onShiftDown: () => void;
 }
 
 export function PositionRow({
@@ -52,6 +53,8 @@ export function PositionRow({
   onAdd,
   onReduce,
   onExit,
+  onShiftUp,
+  onShiftDown,
 }: PositionRowProps) {
   const lot = getLotSize(p.trading_symbol);
   const num = parseInt(qtyValue, 10);
@@ -106,49 +109,21 @@ export function PositionRow({
         <PnlCell value={p.realised} />
       </td>
       <td className="px-3 py-2.5 text-right">
-        <div className="flex items-center justify-end gap-1">
-            <QtyInput
-              value={qtyValue}
-              mode={qtyMode}
-              multiplier={lot}
-              onChange={onQtyChange}
-              onToggleMode={onToggleMode}
-            />
-            <Button
-              size="icon"
-              variant="ghost"
-              className="size-8 text-green-500 hover:bg-green-500/10 hover:text-green-400"
-              onClick={onAdd}
-              disabled={!!acting || actualQty === 0}
-              title="Add"
-            >
-              <Plus className="size-4" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="size-8 text-red-500 hover:bg-red-500/10 hover:text-red-400"
-              onClick={onReduce}
-              disabled={!!acting || actualQty === 0}
-              title="Reduce"
-            >
-              <Minus className="size-4" />
-            </Button>
-            {p.quantity !== 0 ? (
-              <Button
-                size="icon"
-                variant="ghost"
-                className="size-8 text-destructive hover:text-destructive"
-                onClick={onExit}
-                disabled={!!acting}
-                title="Exit"
-              >
-                <LogOut className="size-4" />
-              </Button>
-            ) : (
-              <span className="size-8 inline-block" />
-            )}
-          </div>
+        <PositionActions
+          qtyValue={qtyValue}
+          qtyMode={qtyMode}
+          multiplier={lot}
+          actualQty={actualQty}
+          acting={acting}
+          hasOpenQty={p.quantity !== 0}
+          onQtyChange={onQtyChange}
+          onToggleMode={onToggleMode}
+          onAdd={onAdd}
+          onReduce={onReduce}
+          onShiftUp={onShiftUp}
+          onShiftDown={onShiftDown}
+          onExit={onExit}
+        />
       </td>
     </tr>
   );

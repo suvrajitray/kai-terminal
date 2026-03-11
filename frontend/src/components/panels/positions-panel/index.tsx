@@ -102,6 +102,8 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
       onAdd={() => handleAdd(p.instrument_token, p.trading_symbol, p.product)}
       onReduce={() => handleReduce(p.instrument_token, p.trading_symbol, p.product)}
       onExit={() => handleExit(p.instrument_token, p.product)}
+      onShiftUp={() => {}}
+      onShiftDown={() => {}}
     />
   );
 
@@ -119,7 +121,7 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
               {openPositions.map(renderRow)}
               {closedPositions.length > 0 && openPositions.length > 0 && (
                 <tr>
-                  <td colSpan={8} className="px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60 bg-muted/20">
+                  <td colSpan={9} className="px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60 bg-muted/20">
                     Closed
                   </td>
                 </tr>
