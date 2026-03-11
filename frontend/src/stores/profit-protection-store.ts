@@ -13,6 +13,7 @@ export interface ProfitProtectionConfig {
 interface ProfitProtectionState extends ProfitProtectionConfig {
   setEnabled: (enabled: boolean) => void;
   setConfig: (config: Partial<ProfitProtectionConfig>) => void;
+  reset: () => void;
 }
 
 export const useProfitProtectionStore = create<ProfitProtectionState>()(
@@ -26,6 +27,7 @@ export const useProfitProtectionStore = create<ProfitProtectionState>()(
       trailBy: 500,
       setEnabled: (enabled) => set({ enabled }),
       setConfig: (config) => set((s) => ({ ...s, ...config })),
+      reset: () => set({ enabled: false, mtmTarget: 25000, mtmSl: -25000, trailingEnabled: true, increaseBy: 1000, trailBy: 500 }),
     }),
     { name: "kai-terminal-profit-protection" },
   ),

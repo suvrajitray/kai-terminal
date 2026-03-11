@@ -11,6 +11,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuthStore } from "@/stores/auth-store";
 import { useBrokerStore } from "@/stores/broker-store";
+import { useProfitProtectionStore } from "@/stores/profit-protection-store";
 
 function getInitials(name: string): string {
   return name
@@ -25,6 +26,7 @@ export function UserMenu() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const clearBrokers = useBrokerStore((s) => s.clearAll);
+  const resetProfitProtection = useProfitProtectionStore((s) => s.reset);
   const navigate = useNavigate();
 
   if (!user) return null;
@@ -32,6 +34,8 @@ export function UserMenu() {
   const handleLogout = () => {
     logout();
     clearBrokers();
+    resetProfitProtection();
+    localStorage.clear();
     navigate("/login");
   };
 
