@@ -12,13 +12,13 @@ public sealed class RiskEngineConfig
 
     // Trailing SL
     /// <summary>MTM level at which trailing SL activates.</summary>
-    public decimal TSLActivateAt         { get; set; } = 5_000m;
+    public decimal TrailingActivateAt         { get; set; } = 5_000m;
     /// <summary>The trailing stop is locked at this fixed profit when TSL first activates.</summary>
     public decimal LockProfitAt          { get; set; } = 2_000m;
     /// <summary>How much MTM must gain from the last step before the stop is raised.</summary>
     public decimal WhenProfitIncreasesBy { get; set; } = 1_000m;
     /// <summary>How much the trailing stop rises each time the profit step is crossed.</summary>
-    public decimal IncreaseTSLBy         { get; set; } =   500m;
+    public decimal IncreaseTrailingBy         { get; set; } =   500m;
 
     // ── Strike-level thresholds ─────────────────────────────────────────────
     public double CeStopLossPercent { get; set; } = 0.20;

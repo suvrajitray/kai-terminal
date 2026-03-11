@@ -62,7 +62,7 @@ public sealed class RiskEvaluator
         LogStatus(userId, mtm, state);
 
         // ── 1. Hard stop loss ────────────────────────────────────────────────
-        if (mtm <= _cfg.HardStopLoss)
+        if (mtm <= _cfg.OverallStopLoss)
         {
             _logger.LogWarning("Hard SL hit for userId={UserId} — exiting all positions", userId);
             await SquareOffAsync(userId, state, ct);
@@ -82,7 +82,7 @@ public sealed class RiskEvaluator
 
         if (!state.TrailingActive)
         {
-            if (mtm >= _cfg.TSLActivateAt)
+            if (mtm >= _cfg.TrailingActivateAt)
             {
                 state.TrailingActive      = true;
                 state.TrailingStop        = _cfg.LockProfitAt;   // fixed floor, not relative to MTM
@@ -99,7 +99,7 @@ public sealed class RiskEvaluator
             if (gain >= _cfg.WhenProfitIncreasesBy)
             {
                 long steps = (long)(gain / _cfg.WhenProfitIncreasesBy);
-                state.TrailingStop        += steps * _cfg.IncreaseTSLBy;
+                state.TrailingStop        += steps * _cfg.IncreaseTrailingBy;
                 state.TrailingLastTrigger += steps * _cfg.WhenProfitIncreasesBy;
                 _repo.Update(userId, state);
                 _logger.LogInformation(
@@ -129,7 +129,7 @@ public sealed class RiskEvaluator
         {
             _logger.LogInformation(
                 "[{UserId}]  PnL={Mtm:+0;-0}  SL={Sl:0}  Target={Target:+0}  TSL=inactive (activates at {Threshold:+0})",
-                userId, mtm, _cfg.HardStopLoss, _cfg.ProfitTarget, _cfg.TSLActivateAt);
+                userId, mtm, _cfg.OverallStopLoss, _cfg.ProfitTarget, _cfg.TrailingActivateAt);
         }
     }
 
