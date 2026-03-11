@@ -15,7 +15,6 @@ dotnet build                              # Build entire solution
 dotnet run --project KAITerminal.Api      # REST API on HTTPS :5001
 dotnet run --project KAITerminal.Worker   # Risk engine — multi-user
 dotnet run --project KAITerminal.Console  # Risk engine — single user (your own token)
-dotnet run --project KAITerminal.SimConsole  # Risk engine — no broker, random PnL walk
 
 dotnet watch --project KAITerminal.Api    # Hot-reload dev server
 ```
@@ -42,10 +41,9 @@ The frontend `@` alias resolves to `frontend/src/`.
 | `KAITerminal.Api` | `Sdk.Web` | ASP.NET Core REST API — auth, credentials, Upstox proxy |
 | `KAITerminal.Worker` | `Sdk.Worker` | Multi-user risk engine host — reads `RiskEngine:Users[]` from config |
 | `KAITerminal.Console` | `Sdk` | Single-user risk engine host — reads `Upstox:AccessToken` from config |
-| `KAITerminal.SimConsole` | `Sdk` | Simulation host — overrides broker services with no-op simulators |
 | `KAITerminal.RiskEngine` | Library | Risk engine library — all risk logic, workers, state |
 | `KAITerminal.Upstox` | Library | Upstox SDK — HTTP client, WebSocket streamers, order/option services |
-| `KAITerminal.Infrastructure` | Library | EF Core `AppDbContext`, DB initialisation |
+| `KAITerminal.Infrastructure` | Library | EF Core `AppDbContext`, DB initialisation, PostgreSQL integration |
 | `KAITerminal.Auth` | Library | OAuth/JWT service registration helpers |
 | `KAITerminal.Types` | Library | Cross-project shared types |
 | `KAITerminal.Util` | Library | Shared utilities |
@@ -58,7 +56,6 @@ KAITerminal.Api      ──► KAITerminal.Upstox
 
 KAITerminal.Worker   ──► KAITerminal.RiskEngine ──► KAITerminal.Upstox
 KAITerminal.Console  ──► KAITerminal.RiskEngine
-KAITerminal.SimConsole ─► KAITerminal.RiskEngine
 ```
 
 ---
@@ -71,7 +68,7 @@ KAITerminal.SimConsole ─► KAITerminal.RiskEngine
 - Minimal-API style — no controllers.
 - Auth flow: `GET /auth/google` → Google OAuth → `GET /auth/google/callback` issues a JWT → frontend redirected to `/auth/callback?token=<jwt>`. All subsequent API calls use `Authorization: Bearer <token>`.
 - `BrokerExtensions.AddBrokerServices()` registers `AddUpstoxSdk()`. The API uses `UpstoxTokenContext.Use(token)` per-request to inject the user's Upstox access token into broker calls (passed by frontend as `X-Upstox-AccessToken` header).
-- Credentials (`Jwt:Key`, `GoogleAuth:ClientId/Secret`) and `Frontend:Url` must be set in `appsettings.json` or `dotnet user-secrets` before the API starts.
+- Credentials (`Jwt:Key`, `GoogleAuth:ClientId/Secret`, `ConnectionStrings:DefaultConnection`) and `Frontend:Url` must be set in `appsettings.json` or `dotnet user-secrets` before the API starts.
 - `Frontend:Url` (default `http://localhost:3000`) controls CORS allowed origins and the OAuth redirect.
 - **Live positions** — `PositionsHub` (`Hubs/PositionsHub.cs`) is a SignalR hub mounted at `/hubs/positions`. On connect it fetches positions, starts per-connection `IPortfolioStreamer` + `IMarketDataStreamer`, and pushes `ReceivePositions` / `ReceiveLtpBatch` messages. `PositionStreamManager` (singleton) tracks streamer pairs by connection ID and disposes them on disconnect.
 - **Exchange filter** — `GET /api/upstox/positions?exchange=NFO,BFO` and `GET /api/upstox/mtm?exchange=NFO,BFO` accept a comma-separated exchange list; the `PositionsHub` also accepts `?exchange=` on the WebSocket URL. Filtering is applied server-side; omit the param to receive all exchanges. See `docs/live-positions-websocket.md` for full protocol details.
@@ -88,19 +85,19 @@ Layered: `UpstoxClient` (facade) → `IPositionService` / `IOrderService` / `IOp
 
 ### Risk Engine (`KAITerminal.RiskEngine`)
 
-A library; consumed by Worker, Console, and SimConsole via `services.AddRiskEngine<TTokenSource>(configuration)`.
+A library; consumed by Worker and Console via `services.AddRiskEngine<TTokenSource>(configuration)`.
 
 **Two background workers:**
 - `PortfolioRiskWorker` (interval: `PortfolioCheckIntervalSeconds`, default 60 s) — calls `RiskEvaluator.EvaluateAsync` per user inside a `UpstoxTokenContext.Use(token)` scope.
 - `StrikeRiskWorker` (interval: `StrikeCheckIntervalSeconds`, default 5 s) — calls `StrikeMonitor` per user, same token pattern. Disabled entirely when `EnableStrikeWorker: false`.
 
 **`RiskEvaluator` checks (in order):**
-1. Hard stop loss (`HardStopLoss`, default −₹25k) → exit all
+1. Overall stop loss (`OverallStopLoss`, default −₹25k) → exit all
 2. Profit target (`ProfitTarget`, default +₹25k) → exit all
 3. Trailing SL (`EnableTrailingStopLoss: true`):
-   - Activates when MTM ≥ `TSLActivateAt` (default +₹5k)
+   - Activates when MTM ≥ `TrailingActivateAt` (default +₹5k)
    - Stop locks at `LockProfitAt` (default +₹2k) — a fixed floor, not relative to MTM at activation
-   - Raised by `IncreaseTSLBy` (default ₹500) every time MTM gains `WhenProfitIncreasesBy` (default ₹1k) from last step
+   - Raised by `IncreaseTrailingBy` (default ₹500) every time MTM gains `WhenProfitIncreasesBy` (default ₹1k) from last step
    - Fires (exit all) when MTM falls to or below the trailing stop
 
 **`StrikeMonitor`** checks per-position % loss: CE > `CeStopLossPercent` (20%), PE > `PeStopLossPercent` (30%). On trigger: exit position, then if `reentryCount < MaxReentries` (2) place a new OTM1 SELL via `PlaceOrderByStrikeV3Async`.
@@ -110,20 +107,15 @@ A library; consumed by Worker, Console, and SimConsole via `services.AddRiskEngi
 **`IUserTokenSource`** decouples token supply from the engine:
 - `ConfigTokenSource` (Worker) — reads `RiskEngine:Users[]` from config
 - `SingleUserTokenSource` (Console) — reads `Upstox:AccessToken` from config
-- `SimTokenSource` (SimConsole) — returns a single hardcoded sim user
-
-### SimConsole
-
-Overrides `IPositionService`, `IOrderService`, and `IOptionService` with no-op simulators **after** `AddUpstoxSdk()` — Microsoft DI resolves the last-registered implementation. `SimPositionService` maintains a `_pnl` decimal with a ±₹1500 random walk per tick; after a square-off it auto-resets after 12 s via `IRiskRepository.Reset()`.
 
 ### API Data Storage
 
-SQLite (`kai-terminal.db`) — created automatically alongside the binary. `AppDbContext` has a single `BrokerCredentials` table for per-user Upstox API key/secret. `BrokerCredentialService` is scoped (per-request).
+PostgreSQL via Neon — connection string set in `ConnectionStrings:DefaultConnection`. `AppDbContext` (in `KAITerminal.Infrastructure`) has a single `BrokerCredentials` table for per-user broker API key, secret, and access token. Table is created automatically on first startup via `EnsureCreatedAsync()`. `BrokerCredentialService` is scoped (per-request).
 
 ### Frontend (`frontend/src`)
 
 - Routing: React Router v7; routes in `App.tsx`. Non-auth pages wrapped in `ProtectedRoute`.
-- State: Zustand stores in `stores/` persisted to `localStorage` keys `kai-terminal-auth` and `kai-terminal-brokers`.
+- State: Zustand stores in `stores/` persisted to `localStorage` (`kai-terminal-auth`, `kai-terminal-brokers`, `kai-terminal-profit-protection`). Logout clears all stores and calls `localStorage.clear()`.
 - All backend HTTP calls go through `services/broker-api.ts`; reads `VITE_API_URL` (default `https://localhost:5001`). Trading-specific calls (positions with exchange filter) go through `services/trading-api.ts`.
 - Live positions use `@microsoft/signalr` — `PositionsPanel` connects to `WSS /hubs/positions?upstoxToken=...` on mount, handles `ReceivePositions` (full refresh) and `ReceiveLtpBatch` (in-place LTP + P&L update), and shows a live `Wifi`/`WifiOff` indicator.
 - UI: shadcn/ui components; add new ones with `npx shadcn add <component>`.
@@ -134,10 +126,9 @@ SQLite (`kai-terminal.db`) — created automatically alongside the binary. `AppD
 
 | File | Purpose |
 |---|---|
-| `backend/KAITerminal.Api/appsettings.json` | `Jwt:*`, `GoogleAuth:*`, `Frontend:Url`, `Upstox:ApiBaseUrl/HftBaseUrl` |
+| `backend/KAITerminal.Api/appsettings.json` | `Jwt:*`, `GoogleAuth:*`, `Frontend:Url`, `Upstox:ApiBaseUrl/HftBaseUrl`, `ConnectionStrings:DefaultConnection` |
 | `backend/KAITerminal.Worker/appsettings.json` | `Upstox:*`, `RiskEngine:*` with `Users[]` list |
 | `backend/KAITerminal.Console/appsettings.json` | `Upstox:AccessToken`, `RiskEngine:*` (no `Users[]`) |
-| `backend/KAITerminal.SimConsole/appsettings.json` | `RiskEngine:*` thresholds only (fast intervals for testing) |
 | `frontend/.env` | `VITE_API_URL` (optional) |
 
 Store real tokens with `dotnet user-secrets` instead of committing them to `appsettings.json`:
@@ -147,6 +138,7 @@ cd backend/KAITerminal.Api
 dotnet user-secrets set "Jwt:Key" "<secret>"
 dotnet user-secrets set "GoogleAuth:ClientId" "<id>"
 dotnet user-secrets set "GoogleAuth:ClientSecret" "<secret>"
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=...;Database=...;Username=...;Password=...;SSL Mode=Require"
 
 cd ../KAITerminal.Console
 dotnet user-secrets set "Upstox:AccessToken" "<daily_token>"

@@ -1,0 +1,6 @@
+# Custom Dictionary Words
+BANKEX
+BANKNIFTY
+FINNIFTY
+MIDCPNIFTY
+SENSEX

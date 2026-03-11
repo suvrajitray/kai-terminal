@@ -1,6 +1,6 @@
 # KAITerminal.Api
 
-ASP.NET Core Minimal API that serves as the backend for the KAI Terminal trading frontend. It handles Google OAuth authentication, issues JWTs, proxies all Upstox broker calls, and stores per-user broker credentials in SQLite.
+ASP.NET Core Minimal API that serves as the backend for the KAI Terminal trading frontend. It handles Google OAuth authentication, issues JWTs, proxies all Upstox broker calls, and stores per-user broker credentials in PostgreSQL (Neon).
 
 ---
 
@@ -39,12 +39,16 @@ Required keys — set via `appsettings.json` or `dotnet user-secrets`:
 dotnet user-secrets set "Jwt:Key" "<min-32-char-secret>"
 dotnet user-secrets set "GoogleAuth:ClientId" "<google-client-id>"
 dotnet user-secrets set "GoogleAuth:ClientSecret" "<google-client-secret>"
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=...;Database=...;Username=...;Password=...;SSL Mode=Require"
 ```
 
 Full `appsettings.json` reference:
 
 ```json
 {
+  "ConnectionStrings": {
+    "DefaultConnection": ""
+  },
   "Jwt": {
     "Key": "",
     "Issuer": "KAITerminal",
@@ -80,7 +84,7 @@ Browser → GET /auth/google
         → GET {Frontend:Url}/auth/callback?token=<jwt>  (API redirects to frontend)
 ```
 
-All endpoints except `/auth/google`, `/auth/google/callback`, and `/api/upstox/access-token` require `Authorization: Bearer <jwt>` — except the Upstox proxy group which uses `X-Upstox-AccessToken` instead (see below).
+All endpoints except `/auth/google` and `/auth/google/callback` require `Authorization: Bearer <jwt>`.
 
 ---
 
@@ -117,7 +121,7 @@ app.UseWhen(
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `POST` | `/api/upstox/access-token` | — | Exchange OAuth code for Upstox access token |
+| `POST` | `/api/upstox/access-token` | JWT | Exchange OAuth code for Upstox access token |
 
 **Request body:**
 ```json
@@ -135,7 +139,7 @@ app.UseWhen(
 
 ### Upstox — Positions
 
-All endpoints require `X-Upstox-AccessToken` header.
+All endpoints require `Authorization: Bearer <jwt>` and `X-Upstox-AccessToken` header.
 
 | Method | Path | Description |
 |---|---|---|
@@ -152,7 +156,7 @@ All endpoints require `X-Upstox-AccessToken` header.
 
 ### Upstox — Orders
 
-All endpoints require `X-Upstox-AccessToken` header.
+All endpoints require `Authorization: Bearer <jwt>` and `X-Upstox-AccessToken` header.
 
 | Method | Path | Description |
 |---|---|---|
@@ -184,7 +188,7 @@ All endpoints require `X-Upstox-AccessToken` header.
 
 ### Upstox — Options
 
-All endpoints require `X-Upstox-AccessToken` header.
+All endpoints require `Authorization: Bearer <jwt>` and `X-Upstox-AccessToken` header.
 
 | Method | Path | Description |
 |---|---|---|
@@ -259,6 +263,7 @@ All endpoints require `Authorization: Bearer <jwt>`.
 |---|---|---|
 | `GET` | `/api/broker-credentials/` | List saved credentials for the authenticated user |
 | `POST` | `/api/broker-credentials/` | Save or update credentials for a broker |
+| `PUT` | `/api/broker-credentials/{brokerName}/access-token` | Update the access token for a broker |
 | `DELETE` | `/api/broker-credentials/{brokerName}` | Delete credentials for a broker |
 
 **Save request body:**
@@ -266,11 +271,20 @@ All endpoints require `Authorization: Bearer <jwt>`.
 {
   "BrokerName": "upstox",
   "ApiKey": "string",
-  "ApiSecret": "string"
+  "ApiSecret": "string",
+  "AccessToken": "string"
+}
+```
+`AccessToken` is optional — omit or pass empty string and it will be stored as `"NA"`.
+
+**Update access token request body:**
+```json
+{
+  "AccessToken": "string"
 }
 ```
 
-Credentials are stored in SQLite (`kai-terminal.db`) and scoped to the authenticated user's email.
+Credentials are stored in PostgreSQL (Neon) and scoped to the authenticated user's email.
 
 ---
 
