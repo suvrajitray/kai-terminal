@@ -289,10 +289,10 @@ internal sealed class UpstoxHttpClient
 
     internal static string ToUpdateTypeString(UpdateType t) => t switch
     {
-        UpdateType.Order    => "order_update",
-        UpdateType.Position => "position_update",
-        UpdateType.Holding  => "holding_update",
-        UpdateType.GttOrder => "gtt_order_update",
+        UpdateType.Order    => "order",
+        UpdateType.Position => "position",
+        UpdateType.Holding  => "holding",
+        UpdateType.GttOrder => "gtt_order",
         _ => throw new ArgumentOutOfRangeException(nameof(t), t, null)
     };
 

@@ -29,6 +29,23 @@ var app = builder.Build();
 
 await app.InitializeDatabaseAsync();
 
+app.UseExceptionHandler(errApp => errApp.Run(async ctx =>
+{
+    var feature = ctx.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+    if (feature?.Error is KAITerminal.Upstox.Exceptions.UpstoxException ex)
+    {
+        ctx.Response.StatusCode = ex.HttpStatusCode ?? 422;
+        ctx.Response.ContentType = "application/json";
+        await ctx.Response.WriteAsJsonAsync(new { message = ex.Message });
+    }
+    else
+    {
+        ctx.Response.StatusCode = 500;
+        ctx.Response.ContentType = "application/json";
+        await ctx.Response.WriteAsJsonAsync(new { message = "An unexpected error occurred." });
+    }
+}));
+
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();

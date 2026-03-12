@@ -33,9 +33,10 @@ type Tab = "open" | "executed";
 interface OrdersPanelProps {
   expanded: boolean;
   onToggle: () => void;
+  onRegisterRefresh?: (fn: () => void) => void;
 }
 
-export function OrdersPanel({ expanded, onToggle }: OrdersPanelProps) {
+export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPanelProps) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +59,10 @@ export function OrdersPanel({ expanded, onToggle }: OrdersPanelProps) {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    onRegisterRefresh?.(load);
+  }, [load, onRegisterRefresh]);
 
   const handleCancelAll = async () => {
     setCancelling("all");

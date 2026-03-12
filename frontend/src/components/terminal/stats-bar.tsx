@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { RefreshCw, LogOut, AlertCircle, Wifi, WifiOff, ShieldCheck } from "lucide-react";
+import { RefreshCw, LogOut, Wifi, WifiOff, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { PnlCell } from "@/components/panels/positions-panel/position-row";
@@ -10,7 +10,6 @@ interface StatsBarProps {
   positions: Position[];
   isLive: boolean;
   loading: boolean;
-  error: string | null;
   acting: string | null;
   onRefresh: () => void;
   onExitAll: () => void;
@@ -24,7 +23,6 @@ export function StatsBar({
   positions,
   isLive,
   loading,
-  error,
   acting,
   onRefresh,
   onExitAll,
@@ -121,13 +119,6 @@ export function StatsBar({
             </span>
           </span>
         </>
-      )}
-
-      {error && (
-        <span className="flex items-center gap-1 text-xs text-destructive">
-          <AlertCircle className="size-3" />
-          {error}
-        </span>
       )}
 
       <div className="ml-auto flex items-center gap-2">

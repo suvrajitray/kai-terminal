@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as signalR from "@microsoft/signalr";
+import { toast } from "sonner";
 import { fetchPositions } from "@/services/trading-api";
 import { API_BASE_URL } from "@/lib/constants";
 import { useBrokerStore } from "@/stores/broker-store";
 import type { Position } from "@/types";
 
-export function usePositionsFeed() {
+export function usePositionsFeed(onOrderUpdate?: () => void) {
   const [positions, setPositions] = useState<Position[]>([]);
   const [loading, setLoading] = useState(false);
   const [isLive, setIsLive] = useState(false);
@@ -49,6 +50,25 @@ export function usePositionsFeed() {
           return { ...p, last_price: ltp, unrealised, pnl: unrealised + p.realised };
         });
       });
+    });
+
+    conn.on("ReceiveOrderUpdate", (update: {
+      orderId: string;
+      status: string;
+      statusMessage: string;
+      tradingSymbol: string;
+    }) => {
+      const s = update.status.toLowerCase();
+      if (s === "rejected") {
+        toast.error(
+          update.statusMessage
+            ? `Order rejected: ${update.tradingSymbol} — ${update.statusMessage}`
+            : `Order rejected: ${update.tradingSymbol}`
+        );
+      } else if (s === "complete") {
+        toast.success(`Order filled: ${update.tradingSymbol}`);
+      }
+      onOrderUpdate?.();
     });
 
     conn.onreconnecting(() => setIsLive(false));

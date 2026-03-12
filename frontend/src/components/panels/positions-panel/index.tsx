@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import { getLotSize } from "@/lib/lot-sizes";
 import { exitPosition, placeMarketOrder, placeOrderByOptionPrice } from "@/services/trading-api";
 import { parseTradingSymbol, parseExpiryToDate } from "@/lib/parse-trading-symbol";
@@ -46,8 +47,8 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
     try {
       await fn();
       await load();
-    } catch {
-      // errors surface in stats bar via terminal-page
+    } catch (e) {
+      toast.error((e as Error).message);
     } finally {
       setActing(null);
     }

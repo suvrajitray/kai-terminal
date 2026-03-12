@@ -11,12 +11,14 @@ public sealed class PositionsHub : Hub
     private readonly UpstoxClient _upstox;
     private readonly PositionStreamManager _manager;
     private readonly IHubContext<PositionsHub> _hubContext;
+    private readonly ILogger<PositionsHub> _logger;
 
-    public PositionsHub(UpstoxClient upstox, PositionStreamManager manager, IHubContext<PositionsHub> hubContext)
+    public PositionsHub(UpstoxClient upstox, PositionStreamManager manager, IHubContext<PositionsHub> hubContext, ILogger<PositionsHub> logger)
     {
         _upstox = upstox;
         _manager = manager;
         _hubContext = hubContext;
+        _logger = logger;
     }
 
     public override async Task OnConnectedAsync()
@@ -50,7 +52,7 @@ public sealed class PositionsHub : Hub
         {
             portfolioStreamer = _upstox.CreatePortfolioStreamer();
             marketDataStreamer = _upstox.CreateMarketDataStreamer();
-            await portfolioStreamer.ConnectAsync();
+            await portfolioStreamer.ConnectAsync([UpdateType.Order, UpdateType.Position]);
             await marketDataStreamer.ConnectAsync();
         }
 
@@ -68,7 +70,8 @@ public sealed class PositionsHub : Hub
         // Portfolio update → re-fetch positions and push to client
         portfolioStreamer.UpdateReceived += (_, update) =>
         {
-            if (update.Type is not ("order_update" or "position_update")) return;
+            if (update.Type is not ("order" or "position")) return;
+            var logger = _logger;
             _ = Task.Run(async () =>
             {
                 try
@@ -79,6 +82,19 @@ public sealed class PositionsHub : Hub
 
                     fresh = Filter(fresh, exchangeFilter);
                     await hubContext.Clients.Client(connectionId).SendAsync("ReceivePositions", fresh);
+
+                    if (update.Type == "order")
+                    {
+                        logger.LogInformation("Sending ReceiveOrderUpdate: orderId={OrderId} status={Status} symbol={Symbol}",
+                            update.OrderId, update.Status, update.TradingSymbol);
+                        await hubContext.Clients.Client(connectionId).SendAsync("ReceiveOrderUpdate", new
+                        {
+                            orderId       = update.OrderId,
+                            status        = update.Status,
+                            statusMessage = update.StatusMessage,
+                            tradingSymbol = update.TradingSymbol,
+                        });
+                    }
 
                     // Re-subscribe market data for all instruments (open + closed)
                     var freshTokens = fresh
@@ -91,7 +107,7 @@ public sealed class PositionsHub : Hub
                         using (UpstoxTokenContext.Use(token))
                             await marketDataStreamer.SubscribeAsync(freshTokens, FeedMode.Ltpc);
                 }
-                catch { /* connection closed or Upstox error */ }
+                catch (Exception ex) { logger.LogError(ex, "Error processing portfolio update"); }
             });
         };
 

@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { toast } from "sonner";
 import { PositionsPanel } from "@/components/panels/positions-panel";
 import { OrdersPanel } from "@/components/panels/orders-panel";
 import { StatsBar } from "@/components/terminal/stats-bar";
@@ -23,8 +24,10 @@ export function TerminalPage() {
 }
 
 function TerminalPageInner() {
-  const { positions, setPositions, loading, isLive, load } = usePositionsFeed();
-  const [error, setError] = useState<string | null>(null);
+  const loadOrdersRef = useRef<(() => void) | null>(null);
+  const { positions, setPositions, loading, isLive, load } = usePositionsFeed(
+    () => loadOrdersRef.current?.()
+  );
   const [acting, setActing] = useState<string | null>(null);
   const [ordersHeight, setOrdersHeight] = useState(MIN_HEIGHT);
   const [ordersExpanded, setOrdersExpanded] = useState(false);
@@ -93,12 +96,11 @@ function TerminalPageInner() {
 
   const handleExitAll = async () => {
     setActing("all");
-    setError(null);
     try {
       await exitAllPositions();
       await load();
     } catch (e) {
-      setError((e as Error).message);
+      toast.error((e as Error).message);
     } finally {
       setActing(null);
     }
@@ -136,7 +138,6 @@ function TerminalPageInner() {
         positions={positions}
         isLive={isLive}
         loading={loading}
-        error={error}
         acting={acting}
         onRefresh={load}
         onExitAll={handleExitAll}
@@ -167,7 +168,11 @@ function TerminalPageInner() {
           onMouseDown={onDragStart}
           title="Drag to resize"
         />
-        <OrdersPanel expanded={ordersExpanded} onToggle={handleOrdersToggle} />
+        <OrdersPanel
+          expanded={ordersExpanded}
+          onToggle={handleOrdersToggle}
+          onRegisterRefresh={(fn) => { loadOrdersRef.current = fn; }}
+        />
       </div>
 
       {/* Profit Protection config dialog */}
