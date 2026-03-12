@@ -47,14 +47,13 @@ export function useIndicesFeed(): IndexPrices {
       });
     });
 
-    conn.on("ReceiveIndexBatch", (updates: Array<{ instrumentToken: string; ltp: number }>) => {
+    conn.on("ReceiveIndexBatch", (updates: Array<{ instrumentToken: string; ltp: number; open?: number; high?: number }>) => {
       setPrices((prev) => {
         const next = { ...prev };
-        for (const { instrumentToken, ltp } of updates) {
+        for (const { instrumentToken, ltp, open, high } of updates) {
           const key = TOKEN_MAP[instrumentToken];
           if (!key) continue;
-          const high = prev[key].high === null || ltp > prev[key].high! ? ltp : prev[key].high;
-          next[key] = { ...prev[key], ltp, high };
+          next[key] = { ltp, open: open ?? prev[key].open, high: high ?? prev[key].high };
         }
         return next;
       });

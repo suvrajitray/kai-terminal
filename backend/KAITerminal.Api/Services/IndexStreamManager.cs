@@ -1,18 +1,24 @@
 using System.Collections.Concurrent;
-using KAITerminal.Upstox.Services;
 
 namespace KAITerminal.Api.Services;
 
 public sealed class IndexStreamManager
 {
-    private readonly ConcurrentDictionary<string, IMarketDataStreamer> _connections = new();
+    private readonly ConcurrentDictionary<string, CancellationTokenSource> _connections = new();
 
-    public void Add(string connectionId, IMarketDataStreamer marketData)
-        => _connections[connectionId] = marketData;
-
-    public async Task RemoveAsync(string connectionId)
+    public CancellationToken Add(string connectionId)
     {
-        if (_connections.TryRemove(connectionId, out var streamer))
-            await streamer.DisposeAsync();
+        var cts = new CancellationTokenSource();
+        _connections[connectionId] = cts;
+        return cts.Token;
+    }
+
+    public void Remove(string connectionId)
+    {
+        if (_connections.TryRemove(connectionId, out var cts))
+        {
+            cts.Cancel();
+            cts.Dispose();
+        }
     }
 }

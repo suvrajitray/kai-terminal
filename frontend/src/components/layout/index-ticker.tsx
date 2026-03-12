@@ -5,12 +5,15 @@ const fmt = (v: number | null) => (v !== null ? FMT.format(v) : "—");
 
 function IndexCard({ label, quote }: { label: string; quote: IndexQuote }) {
   return (
-    <div className="flex items-center gap-2 text-xs">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="tabular-nums font-medium">{fmt(quote.ltp)}</span>
-      <span className="text-muted-foreground/60 tabular-nums">
-        O {fmt(quote.open)} · H {fmt(quote.high)}
-      </span>
+    <div className="flex flex-col items-center gap-0.5">
+      <div className="flex items-baseline gap-1.5">
+        <span className="text-[11px] text-muted-foreground">{label}</span>
+        <span className="text-sm font-semibold tabular-nums">{fmt(quote.ltp)}</span>
+      </div>
+      <div className="flex items-center gap-2 text-[10px] tabular-nums text-muted-foreground/50">
+        <span>O {fmt(quote.open)}</span>
+        <span>H {fmt(quote.high)}</span>
+      </div>
     </div>
   );
 }
@@ -19,9 +22,11 @@ export function IndexTicker() {
   const { nifty, bankNifty, sensex } = useIndicesFeed();
 
   return (
-    <div className="hidden items-center gap-5 lg:flex">
+    <div className="hidden items-center gap-1 lg:flex">
       <IndexCard label="Nifty" quote={nifty} />
+      <span className="mx-2 text-border select-none">|</span>
       <IndexCard label="Bank Nifty" quote={bankNifty} />
+      <span className="mx-2 text-border select-none">|</span>
       <IndexCard label="Sensex" quote={sensex} />
     </div>
   );
