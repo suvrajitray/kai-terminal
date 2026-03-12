@@ -6,11 +6,12 @@ interface QtyInputProps {
   value: string;
   mode: QtyMode;
   multiplier: number;
+  positionQty: number;
   onChange: (v: string) => void;
   onToggleMode: () => void;
 }
 
-export function QtyInput({ value, mode, multiplier, onChange, onToggleMode }: QtyInputProps) {
+export function QtyInput({ value, mode, multiplier, positionQty, onChange, onToggleMode }: QtyInputProps) {
   const lot = Math.max(multiplier, 1);
   const step = mode === "qty" ? lot : 1;
   const num = parseInt(value, 10);
@@ -55,6 +56,26 @@ export function QtyInput({ value, mode, multiplier, onChange, onToggleMode }: Qt
           className="flex items-center border-r border-border px-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           {mode === "qty" ? <Layers className="size-3" /> : <Box className="size-3" />}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const lot = Math.max(multiplier, 1);
+            const filled = mode === "lot" ? String(Math.round(positionQty / lot)) : String(positionQty);
+            onChange(filled);
+          }}
+          title="Fill all qty"
+          className="flex items-center border-r border-border px-1.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          All
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange("")}
+          title="Clear"
+          className="flex items-center border-r border-border px-1.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          Clr
         </button>
         <input
           type="number"

@@ -7,6 +7,7 @@ interface PositionActionsProps {
   qtyMode: QtyMode;
   multiplier: number;
   actualQty: number;
+  positionQty: number;
   acting: string | null;
   hasOpenQty: boolean;
   onQtyChange: (v: string) => void;
@@ -23,6 +24,7 @@ export function PositionActions({
   qtyMode,
   multiplier,
   actualQty,
+  positionQty,
   acting,
   hasOpenQty,
   onQtyChange,
@@ -42,6 +44,7 @@ export function PositionActions({
         value={qtyValue}
         mode={qtyMode}
         multiplier={multiplier}
+        positionQty={positionQty}
         onChange={onQtyChange}
         onToggleMode={onToggleMode}
       />

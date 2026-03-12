@@ -114,6 +114,7 @@ export function PositionRow({
           qtyMode={qtyMode}
           multiplier={lot}
           actualQty={actualQty}
+          positionQty={Math.abs(p.quantity)}
           acting={acting}
           hasOpenQty={p.quantity !== 0}
           onQtyChange={onQtyChange}
