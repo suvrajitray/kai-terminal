@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { RefreshCw, LogOut, AlertCircle, Wifi, WifiOff, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,29 @@ export function StatsBar({
   const closedCount = positions.filter((p) => p.quantity === 0).length;
   const totalPnl = positions.reduce((s, p) => s + p.pnl, 0);
 
+  const STORAGE_KEY = "kai-terminal-mtm-extremes";
+
+  const readStored = (): { maxProfit: number | null; maxLoss: number | null } => {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null") ?? { maxProfit: null, maxLoss: null }; }
+    catch { return { maxProfit: null, maxLoss: null }; }
+  };
+
+  const [maxProfit, setMaxProfit] = useState<number | null>(() => readStored().maxProfit);
+  const [maxLoss, setMaxLoss] = useState<number | null>(() => readStored().maxLoss);
+
+  useEffect(() => {
+    if (positions.length === 0) return;
+    setMaxProfit((prevMax) => {
+      const nextMax = prevMax === null || totalPnl > prevMax ? totalPnl : prevMax;
+      setMaxLoss((prevMin) => {
+        const nextMin = prevMin === null || totalPnl < prevMin ? totalPnl : prevMin;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ maxProfit: nextMax, maxLoss: nextMin }));
+        return nextMin;
+      });
+      return nextMax;
+    });
+  }, [totalPnl, positions.length]);
+
   return (
     <div className="flex h-9 shrink-0 items-center gap-4 border-b border-border bg-muted/40 px-3">
       <span
@@ -56,6 +80,30 @@ export function StatsBar({
           <span className="text-xs text-muted-foreground">
             {openCount} open · {closedCount} closed
           </span>
+
+          {(maxProfit !== null || maxLoss !== null) && (
+            <>
+              <div className="h-4 w-px bg-border" />
+              <span className="flex items-center gap-3 text-xs">
+                {maxProfit !== null && (
+                  <span className="flex items-center gap-1">
+                    <span className="text-muted-foreground">Peak</span>
+                    <span className={cn("tabular-nums font-medium", maxProfit >= 0 ? "text-green-500" : "text-red-500")}>
+                      {maxProfit >= 0 ? "+" : ""}₹{Math.abs(maxProfit).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </span>
+                  </span>
+                )}
+                {maxLoss !== null && maxLoss !== maxProfit && (
+                  <span className="flex items-center gap-1">
+                    <span className="text-muted-foreground">Trough</span>
+                    <span className={cn("tabular-nums font-medium", maxLoss >= 0 ? "text-green-500" : "text-red-500")}>
+                      {maxLoss >= 0 ? "+" : ""}₹{Math.abs(maxLoss).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </span>
+                  </span>
+                )}
+              </span>
+            </>
+          )}
         </>
       )}
 
