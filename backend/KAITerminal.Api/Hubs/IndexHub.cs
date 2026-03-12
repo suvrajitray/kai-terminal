@@ -74,6 +74,7 @@ public sealed class IndexHub : Hub
                         ltp  = normalised[t].LastPrice,
                         open = normalised[t].Ohlc?.Open,
                         high = normalised[t].Ohlc?.High,
+                        low  = normalised[t].Ohlc?.Low,
                     })
                     .ToList();
 

@@ -7,6 +7,7 @@ export interface IndexQuote {
   ltp: number | null;
   open: number | null;
   high: number | null;
+  low: number | null;
 }
 
 export interface IndexPrices {
@@ -15,7 +16,7 @@ export interface IndexPrices {
   sensex: IndexQuote;
 }
 
-const EMPTY_QUOTE: IndexQuote = { ltp: null, open: null, high: null };
+const EMPTY_QUOTE: IndexQuote = { ltp: null, open: null, high: null, low: null };
 const INITIAL: IndexPrices = { nifty: EMPTY_QUOTE, bankNifty: EMPTY_QUOTE, sensex: EMPTY_QUOTE };
 
 const TOKEN_MAP: Record<string, keyof IndexPrices> = {
@@ -23,6 +24,8 @@ const TOKEN_MAP: Record<string, keyof IndexPrices> = {
   "NSE_INDEX|Nifty Bank": "bankNifty",
   "BSE_INDEX|SENSEX": "sensex",
 };
+
+type IndexUpdate = { instrumentToken: string; ltp: number; open?: number; high?: number; low?: number };
 
 export function useIndicesFeed(): IndexPrices {
   const [prices, setPrices] = useState<IndexPrices>(INITIAL);
@@ -36,28 +39,26 @@ export function useIndicesFeed(): IndexPrices {
       .withAutomaticReconnect()
       .build();
 
-    conn.on("ReceiveIndexSnapshot", (snapshot: Array<{ instrumentToken: string; ltp: number; open?: number; high?: number }>) => {
-      setPrices((prev) => {
-        const next = { ...prev };
-        for (const { instrumentToken, ltp, open, high } of snapshot) {
-          const key = TOKEN_MAP[instrumentToken];
-          if (key) next[key] = { ltp, open: open ?? null, high: high ?? null };
-        }
-        return next;
-      });
-    });
+    const applyUpdates = (updates: IndexUpdate[], prev: IndexPrices): IndexPrices => {
+      const next = { ...prev };
+      for (const { instrumentToken, ltp, open, high, low } of updates) {
+        const key = TOKEN_MAP[instrumentToken];
+        if (!key) continue;
+        next[key] = {
+          ltp,
+          open: open ?? prev[key].open,
+          high: high ?? prev[key].high,
+          low:  low  ?? prev[key].low,
+        };
+      }
+      return next;
+    };
 
-    conn.on("ReceiveIndexBatch", (updates: Array<{ instrumentToken: string; ltp: number; open?: number; high?: number }>) => {
-      setPrices((prev) => {
-        const next = { ...prev };
-        for (const { instrumentToken, ltp, open, high } of updates) {
-          const key = TOKEN_MAP[instrumentToken];
-          if (!key) continue;
-          next[key] = { ltp, open: open ?? prev[key].open, high: high ?? prev[key].high };
-        }
-        return next;
-      });
-    });
+    conn.on("ReceiveIndexSnapshot", (data: IndexUpdate[]) =>
+      setPrices((prev) => applyUpdates(data, prev)));
+
+    conn.on("ReceiveIndexBatch", (data: IndexUpdate[]) =>
+      setPrices((prev) => applyUpdates(data, prev)));
 
     conn.start().catch(() => {});
 
