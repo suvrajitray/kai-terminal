@@ -54,15 +54,16 @@ public sealed class PositionsHub : Hub
             await marketDataStreamer.ConnectAsync();
         }
 
-        // Subscribe market data for open positions
-        var openTokens = positions
-            .Where(p => p.Quantity != 0 && !string.IsNullOrEmpty(p.InstrumentToken))
+        // Subscribe market data for all positions (open + closed)
+        var allTokens = positions
+            .Where(p => !string.IsNullOrEmpty(p.InstrumentToken))
             .Select(p => p.InstrumentToken)
+            .Distinct()
             .ToList();
 
-        if (openTokens.Count > 0)
+        if (allTokens.Count > 0)
             using (UpstoxTokenContext.Use(token))
-                await marketDataStreamer.SubscribeAsync(openTokens, FeedMode.Ltpc);
+                await marketDataStreamer.SubscribeAsync(allTokens, FeedMode.Ltpc);
 
         // Portfolio update → re-fetch positions and push to client
         portfolioStreamer.UpdateReceived += (_, update) =>
@@ -79,10 +80,11 @@ public sealed class PositionsHub : Hub
                     fresh = Filter(fresh, exchangeFilter);
                     await hubContext.Clients.Client(connectionId).SendAsync("ReceivePositions", fresh);
 
-                    // Re-subscribe market data for any new instruments
+                    // Re-subscribe market data for all instruments (open + closed)
                     var freshTokens = fresh
-                        .Where(p => p.Quantity != 0 && !string.IsNullOrEmpty(p.InstrumentToken))
+                        .Where(p => !string.IsNullOrEmpty(p.InstrumentToken))
                         .Select(p => p.InstrumentToken)
+                        .Distinct()
                         .ToList();
 
                     if (freshTokens.Count > 0)

@@ -1,4 +1,4 @@
-import { LogOut, Plus, Minus, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Minus, ArrowUp, ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { QtyInput, type QtyMode } from "./qty-input";
 
@@ -87,14 +87,13 @@ export function PositionActions({
       </Button>
       {hasOpenQty ? (
         <Button
-          size="icon"
+          size="sm"
           variant="ghost"
-          className="size-8 text-destructive hover:text-destructive"
+          className="h-8 px-2 text-destructive hover:text-destructive"
           onClick={onExit}
           disabled={disabled}
-          title="Exit"
         >
-          <LogOut className="size-4" />
+          Exit
         </Button>
       ) : (
         <span className="size-8 inline-block" />
