@@ -113,6 +113,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 - **Per-user Credentials** — API Key, Secret, and Access Token stored per user in PostgreSQL.
 - **OAuth Token Exchange** — One-click flow to exchange an Upstox auth code for an access token; token is automatically persisted to the database.
 - **Multi-user Token Scoping** — `UpstoxTokenContext.Use(token)` scopes API calls per user without thread contention.
+- **Real-time Order Notifications** — Rejection and fill toasts delivered via the Upstox Portfolio Stream WebSocket; Orders panel auto-refreshes on every order event.
 
 ### Risk Engine
 

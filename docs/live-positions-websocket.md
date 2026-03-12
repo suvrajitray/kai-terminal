@@ -14,12 +14,16 @@ Frontend (React)
 PositionsHub  (ASP.NET Core SignalR)
   ├── UpstoxClient.GetAllPositionsAsync()   ← initial load + re-fetch on portfolio events
   ├── IPortfolioStreamer                     ← Upstox Portfolio Stream Feed V2 (JSON/WS)
-  │     order_update / position_update  →  re-fetch positions → push ReceivePositions
+  │     update_type=order     →  re-fetch positions → push ReceivePositions
+  │                            →  push ReceiveOrderUpdate (status, message, symbol)
+  │     update_type=position  →  re-fetch positions → push ReceivePositions
   └── IMarketDataStreamer                    ← Upstox Market Data Feed V3 (protobuf/WS)
         LTP ticks  →  push ReceiveLtpBatch
 ```
 
 Each browser connection gets its own pair of Upstox WebSocket connections. They are created in `OnConnectedAsync` and disposed in `OnDisconnectedAsync` via `PositionStreamManager`.
+
+> **Portfolio stream subscription** — `ConnectAsync` is called with `[UpdateType.Order, UpdateType.Position]`. Upstox requires explicit `update_types` query params on the authorize endpoint; omitting them results in no events being delivered.
 
 ---
 
@@ -62,8 +66,20 @@ WSS https://<host>/hubs/positions?upstoxToken=<upstox_access_token>[&exchange=NF
 
 | Message | Payload | When sent |
 |---------|---------|-----------|
-| `ReceivePositions` | `Position[]` | On connect (initial load) and after every `order_update` or `position_update` from the Upstox portfolio stream |
+| `ReceivePositions` | `Position[]` | On connect (initial load) and after every `order` or `position` event from the Upstox portfolio stream |
 | `ReceiveLtpBatch` | `Array<{ instrumentToken: string, ltp: number }>` | On every market data tick for subscribed instruments |
+| `ReceiveOrderUpdate` | `{ orderId, status, statusMessage, tradingSymbol }` | On every `order` event from the portfolio stream |
+
+#### `ReceiveOrderUpdate` payload
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `orderId` | `string` | Upstox order ID |
+| `status` | `string` | Order status (e.g. `"rejected"`, `"complete"`, `"put order req received"`) |
+| `statusMessage` | `string` | Human-readable reason (populated on rejections) |
+| `tradingSymbol` | `string` | Trading symbol of the instrument |
+
+The frontend shows a `toast.error` for `rejected` status and `toast.success` for `complete`. The Orders panel auto-refreshes on every `ReceiveOrderUpdate` regardless of status.
 
 ### Market data subscription
 

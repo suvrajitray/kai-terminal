@@ -44,9 +44,16 @@
 ### Real-time Position Feed (SignalR)
 - `PositionsPanel` connects to `WSS /hubs/positions` on mount using `@microsoft/signalr`.
 - On connect, the hub fetches current positions and starts a per-connection `IPortfolioStreamer` + `IMarketDataStreamer`.
-- **`ReceivePositions`** — full position list refresh (initial load + after order fills).
+- **`ReceivePositions`** — full position list refresh (initial load + after every order or position event from the portfolio stream).
 - **`ReceiveLtpBatch`** — in-place LTP and unrealised P&L updates for each instrument without a full refresh.
+- **`ReceiveOrderUpdate`** — fired on every order event; triggers toast notifications and auto-refreshes the Orders panel.
 - Disconnects and cleans up streamers when the component unmounts.
+- Portfolio stream subscribes explicitly to `order` and `position` update types — Upstox requires explicit `update_types` params or no events are delivered.
+
+### Order Update Notifications
+- **Rejection toast** — `toast.error("Order rejected: <symbol> — <reason>")` shown immediately when Upstox rejects an order.
+- **Fill toast** — `toast.success("Order filled: <symbol>")` shown when an order reaches `complete` status.
+- **Orders panel auto-refresh** — the Orders panel reloads after every order event, keeping the status display current without manual refresh.
 
 ### Connection Status
 - Live `Wifi` / `WifiOff` indicator shows WebSocket connection state.
@@ -169,7 +176,8 @@ All pages except `/login` and `/auth/callback` are protected — unauthenticated
 
 ### Terminal
 - Live positions panel with real-time LTP and P&L updates.
-- Orders panel showing today's orders.
+- Orders panel showing today's orders — auto-refreshes on every order event.
+- Toast notifications for order rejections (with rejection reason) and fills.
 - Stats bar showing portfolio-level MTM.
 - Profit Protection panel for configuring risk thresholds.
 - Broker auth required guard — prompts user to connect a broker if not yet authenticated.
