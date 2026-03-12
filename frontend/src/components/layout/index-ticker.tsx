@@ -14,11 +14,26 @@ function OhlcBadge({ label, value, className }: { label: string; value: number |
 }
 
 function IndexCard({ label, quote }: { label: string; quote: IndexQuote }) {
+  const change = quote.ltp !== null && quote.open !== null ? quote.ltp - quote.open : null;
+  const changePct = change !== null && quote.open ? (change / quote.open) * 100 : null;
+  const isUp = change !== null && change >= 0;
+
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-baseline gap-1.5">
         <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
         <span className="text-sm font-bold tabular-nums tracking-tight">{fmt(quote.ltp)}</span>
+        {change !== null && changePct !== null && (
+          <span className={cn(
+            "text-[10px] tabular-nums font-medium",
+            isUp ? "text-green-400" : "text-red-400"
+          )}>
+            {isUp ? "+" : ""}{FMT.format(change)}
+            <span className="ml-0.5 text-[9px] opacity-80">
+              ({isUp ? "+" : ""}{changePct.toFixed(2)}%)
+            </span>
+          </span>
+        )}
       </div>
       <div className="flex items-center gap-2 rounded-sm bg-muted/30 px-1.5 py-0.5">
         <OhlcBadge label="O" value={quote.open}  className="text-sky-400/70" />
