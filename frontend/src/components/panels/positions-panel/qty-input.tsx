@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, Layers, Box } from "lucide-react";
+import { ChevronDown, ChevronUp, Layers, Box, ArrowUpToLine, X } from "lucide-react";
 
 export type QtyMode = "qty" | "lot";
 
@@ -65,17 +65,17 @@ export function QtyInput({ value, mode, multiplier, positionQty, onChange, onTog
             onChange(filled);
           }}
           title="Fill all qty"
-          className="flex items-center border-r border-border px-1.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="flex items-center border-r border-border px-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
-          All
+          <ArrowUpToLine className="size-3" />
         </button>
         <button
           type="button"
           onClick={() => onChange("")}
           title="Clear"
-          className="flex items-center border-r border-border px-1.5 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="flex items-center border-r border-border px-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
-          Clr
+          <X className="size-3" />
         </button>
         <input
           type="number"

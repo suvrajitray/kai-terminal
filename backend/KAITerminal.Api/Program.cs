@@ -22,6 +22,7 @@ builder.Services
     .AddSignalR();
 
 builder.Services.AddSingleton<PositionStreamManager>();
+builder.Services.AddSingleton<IndexStreamManager>();
 builder.Services.AddScoped<UserTradingSettingsService>();
 
 var app = builder.Build();
@@ -51,6 +52,7 @@ app.MapUpstoxEndpoints();
 app.MapBrokerCredentialsEndpoints();
 app.MapUserSettingsEndpoints();
 app.MapHub<PositionsHub>("/hubs/positions");
+app.MapHub<IndexHub>("/hubs/indices");
 
 if (app.Environment.IsDevelopment())
     app.MapDiagnosticsEndpoints();

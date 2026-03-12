@@ -82,6 +82,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IPositionService, PositionService>();
         services.AddSingleton<IOrderService, OrderService>();
         services.AddSingleton<IOptionService, OptionService>();
+        services.AddSingleton<IMarketQuoteService, MarketQuoteService>();
 
         // Streamers are stateful (own a WebSocket connection) — Transient gives each caller
         // its own independent instance.  The Func<T> factory delegates let UpstoxClient create

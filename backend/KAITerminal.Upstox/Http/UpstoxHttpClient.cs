@@ -140,6 +140,19 @@ internal sealed class UpstoxHttpClient
     }
 
     // ──────────────────────────────────────────────────
+    // Market quotes
+    // ──────────────────────────────────────────────────
+
+    public async Task<IReadOnlyDictionary<string, MarketQuote>> GetMarketQuotesAsync(
+        IEnumerable<string> instrumentKeys, CancellationToken ct = default)
+    {
+        var keys = string.Join(",", instrumentKeys.Select(Uri.EscapeDataString));
+        var dict = await GetObjectAsync<Dictionary<string, MarketQuote>>(
+            "UpstoxApi", $"/v2/market-quote/quotes?instrument_key={keys}", ct);
+        return dict;
+    }
+
+    // ──────────────────────────────────────────────────
     // Option chain
     // ──────────────────────────────────────────────────
 
@@ -172,6 +185,13 @@ internal sealed class UpstoxHttpClient
         var response = await client.GetAsync(path, ct);
         var data = await HandleResponseAsync<List<T>>(response, ct);
         return data.AsReadOnly();
+    }
+
+    private async Task<T> GetObjectAsync<T>(string clientName, string path, CancellationToken ct)
+    {
+        var client = _factory.CreateClient(clientName);
+        var response = await client.GetAsync(path, ct);
+        return await HandleResponseAsync<T>(response, ct);
     }
 
     private async Task<T> PostAsync<T>(

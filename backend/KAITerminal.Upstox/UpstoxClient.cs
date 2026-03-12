@@ -16,6 +16,7 @@ public sealed class UpstoxClient
     private readonly IPositionService _positions;
     private readonly IOrderService _orders;
     private readonly IOptionService _options;
+    private readonly IMarketQuoteService _quotes;
     private readonly Func<IMarketDataStreamer> _marketDataStreamerFactory;
     private readonly Func<IPortfolioStreamer> _portfolioStreamerFactory;
 
@@ -24,6 +25,7 @@ public sealed class UpstoxClient
         IPositionService positions,
         IOrderService orders,
         IOptionService options,
+        IMarketQuoteService quotes,
         Func<IMarketDataStreamer> marketDataStreamerFactory,
         Func<IPortfolioStreamer> portfolioStreamerFactory)
     {
@@ -31,6 +33,7 @@ public sealed class UpstoxClient
         _positions = positions;
         _orders = orders;
         _options = options;
+        _quotes = quotes;
         _marketDataStreamerFactory = marketDataStreamerFactory;
         _portfolioStreamerFactory = portfolioStreamerFactory;
     }
@@ -181,6 +184,11 @@ public sealed class UpstoxClient
     public Task<(string OrderId, int Latency)> CancelOrderV3Async(
         string orderId, CancellationToken cancellationToken = default)
         => _orders.CancelOrderV3Async(orderId, cancellationToken);
+
+    /// <summary>Fetch full market quotes (LTP + OHLC) for a list of instruments.</summary>
+    public Task<IReadOnlyDictionary<string, MarketQuote>> GetMarketQuotesAsync(
+        IEnumerable<string> instrumentKeys, CancellationToken cancellationToken = default)
+        => _quotes.GetMarketQuotesAsync(instrumentKeys, cancellationToken);
 
     /// <summary>Fetch the put/call option chain for an underlying at a given expiry.</summary>
     public Task<IReadOnlyList<OptionChainEntry>> GetOptionChainAsync(

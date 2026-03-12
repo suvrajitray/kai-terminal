@@ -4,9 +4,12 @@ import { Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { APP_NAME, NAV_ITEMS } from "@/lib/constants";
 import { UserMenu } from "./user-menu";
+import { IndexTicker } from "./index-ticker";
+import { useBrokerStore } from "@/stores/broker-store";
 
 export function Header() {
   const { pathname } = useLocation();
+  const brokerAuthenticated = useBrokerStore((s) => s.isAuthenticated("upstox"));
 
   return (
     <motion.header
@@ -38,7 +41,10 @@ export function Header() {
             ))}
           </nav>
         </div>
-        <UserMenu />
+        <div className="flex items-center gap-4">
+          {brokerAuthenticated && <IndexTicker />}
+          <UserMenu />
+        </div>
       </div>
     </motion.header>
   );
