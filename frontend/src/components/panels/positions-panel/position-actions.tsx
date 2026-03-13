@@ -76,7 +76,7 @@ export function PositionActions({
       />
 
       {/* Grouped action toolbar */}
-      <div className="flex items-stretch overflow-hidden rounded border border-border/50 bg-muted/20">
+      <div className="flex h-8 items-stretch overflow-hidden rounded border border-border/50 bg-muted/20">
 
         {/* Add / Reduce */}
         <ActionBtn onClick={onAdd} disabled={qtyDisabled} title="Add" className="text-green-500 hover:text-green-400 hover:bg-green-500/10">

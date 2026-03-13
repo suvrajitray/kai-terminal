@@ -45,12 +45,12 @@ export function QtyInput({ value, mode, multiplier, positionQty, onChange, onTog
       <span className="w-14 text-right text-[10px] tabular-nums text-muted-foreground/60">
         {hint ?? ""}
       </span>
-      <div className="flex items-stretch overflow-hidden rounded border border-border bg-background focus-within:ring-1 focus-within:ring-ring">
+      <div className="flex h-8 items-stretch overflow-hidden rounded border border-border bg-background focus-within:ring-1 focus-within:ring-ring">
         <button
           type="button"
           onClick={onToggleMode}
           title={mode === "qty" ? "Switch to lots" : "Switch to qty"}
-          className="flex items-center border-r border-border px-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="flex h-8 w-7 shrink-0 items-center justify-center border-r border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           {mode === "qty" ? <Layers className="size-3" /> : <Box className="size-3" />}
         </button>
@@ -61,17 +61,9 @@ export function QtyInput({ value, mode, multiplier, positionQty, onChange, onTog
             onChange(filled);
           }}
           title="Fill all qty"
-          className="flex items-center border-r border-border px-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="flex h-8 w-7 shrink-0 items-center justify-center border-r border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           <ArrowUpAZ className="size-3" />
-        </button>
-        <button
-          type="button"
-          onClick={() => onChange("")}
-          title="Clear"
-          className="flex items-center border-r border-border px-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <X className="size-3" />
         </button>
         <input
           type="number"
@@ -82,6 +74,14 @@ export function QtyInput({ value, mode, multiplier, positionQty, onChange, onTog
           onBlur={handleBlur}
           className="w-16 bg-transparent py-1 pl-1.5 pr-0.5 text-right text-xs tabular-nums placeholder:text-muted-foreground/40 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none focus:outline-none"
         />
+        <button
+          type="button"
+          onClick={() => onChange("")}
+          title="Clear"
+          className="flex h-8 w-7 shrink-0 items-center justify-center text-muted-foreground/40 transition-colors hover:text-muted-foreground"
+        >
+          <X className="size-3" />
+        </button>
         <div className="flex flex-col border-l border-border">
           <button
             type="button"
