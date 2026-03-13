@@ -6,6 +6,7 @@ import { APP_NAME, NAV_ITEMS } from "@/lib/constants";
 import { UserMenu } from "./user-menu";
 import { IndexTicker } from "./index-ticker";
 import { QuickTradeButton } from "./quick-trade-button";
+import { MarketStatus } from "./market-status";
 import { useBrokerStore } from "@/stores/broker-store";
 
 export function Header() {
@@ -43,6 +44,7 @@ export function Header() {
           </nav>
         </div>
         <div className="flex items-center gap-4">
+          <MarketStatus />
           {brokerAuthenticated && <IndexTicker />}
           {brokerAuthenticated && <QuickTradeButton />}
           <UserMenu />
