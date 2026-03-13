@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Zap, TrendingUp, Layers } from "lucide-react";
+import { Zap, TrendingUp, TrendingDown, ArrowUpDown, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -256,28 +256,34 @@ export function QuickTradeDialog() {
 
         {/* Action buttons */}
         <div className="grid grid-cols-3 gap-2">
-          {(["CE", "PE", "BOTH"] as ActionType[]).map((action) => (
-            <Button
-              key={action}
-              disabled={acting !== null}
-              onClick={() => execute(action)}
-              className={cn(
-                "h-11 font-semibold text-sm transition-all",
-                isBuy
-                  ? "bg-green-600 hover:bg-green-700 text-white"
-                  : "bg-red-600 hover:bg-red-700 text-white",
-              )}
-            >
-              {acting === action ? (
-                <span className="flex items-center gap-1.5">
-                  <Zap className="size-3.5 animate-pulse" />
-                  Placing…
-                </span>
-              ) : (
-                action === "BOTH" ? "Both" : action
-              )}
-            </Button>
-          ))}
+          {(["CE", "PE", "BOTH"] as ActionType[]).map((action) => {
+            const Icon =
+              action === "BOTH"
+                ? ArrowUpDown
+                : action === "CE"
+                  ? isBuy ? TrendingUp : TrendingDown
+                  : isBuy ? TrendingDown : TrendingUp;
+
+            return (
+              <Button
+                key={action}
+                disabled={acting !== null}
+                onClick={() => execute(action)}
+                className={cn(
+                  "h-11 font-semibold text-sm transition-all gap-1.5",
+                  isBuy
+                    ? "bg-green-600 hover:bg-green-700 text-white"
+                    : "bg-red-600 hover:bg-red-700 text-white",
+                )}
+              >
+                {acting === action ? (
+                  <><Zap className="size-3.5 animate-pulse" />Placing…</>
+                ) : (
+                  <><Icon className="size-4" />{action === "BOTH" ? "Both" : action}</>
+                )}
+              </Button>
+            );
+          })}
         </div>
 
       </TabsContent>

@@ -13,7 +13,7 @@ export function QuickTradeButton() {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button size="sm" className="gap-1.5 font-semibold">
+        <Button size="sm" className="gap-1.5 font-semibold bg-amber-500 hover:bg-amber-600 text-black">
           <Zap className="size-3.5" />
           Quick Trade
         </Button>
