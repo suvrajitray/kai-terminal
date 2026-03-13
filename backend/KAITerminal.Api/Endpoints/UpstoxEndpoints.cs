@@ -125,6 +125,23 @@ public static class UpstoxEndpoints
             return Results.Ok(currentMonth);
         });
 
+        group.MapGet("/options/contracts/current-year", async (
+            [FromQuery] string? underlyingKey,
+            UpstoxClient upstox) =>
+        {
+            if (string.IsNullOrEmpty(underlyingKey))
+                return Results.BadRequest(new { error = "underlyingKey is required." });
+
+            var today = DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(5.5));
+            var contracts = await upstox.GetOptionContractsAsync(underlyingKey);
+            var currentYear = contracts
+                .Where(c => DateOnly.TryParse(c.Expiry, out var expiry) && expiry.Year == today.Year)
+                .OrderBy(c => c.Expiry)
+                .ToList();
+
+            return Results.Ok(currentYear);
+        });
+
         group.MapGet("/orders/by-option-price/resolve", async (
             [AsParameters] ResolveByOptionPriceQuery q,
             UpstoxClient upstox) =>

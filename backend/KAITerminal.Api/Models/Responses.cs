@@ -5,9 +5,6 @@ public record BrokerCredentialResponse(string BrokerName, string ApiKey, string 
 public record UserTradingSettingsResponse(
     decimal DefaultStoplossPercentage,
     int NiftyShiftOffset,
-    int BankniftyShiftOffset,
-    int MidcpniftyShiftOffset,
-    int FinniftyShiftOffset,
     int SensexShiftOffset,
-    int BankexShiftOffset,
+    int BankniftyShiftOffset,
     string IndexChangeMode = "prevClose");

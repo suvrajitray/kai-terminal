@@ -68,6 +68,14 @@ export async function placeOrderByOptionPrice(params: {
   });
 }
 
+export async function fetchOptionExpiries(underlyingKey: string): Promise<string[]> {
+  const res = await apiClient.get<{ expiry: string }[]>("/api/upstox/options/contracts/current-year", {
+    params: { underlyingKey },
+  });
+  const unique = [...new Set(res.data.map((c) => c.expiry))].sort();
+  return unique;
+}
+
 export async function placeMarketOrder(
   instrumentToken: string,
   quantity: number,

@@ -18,12 +18,9 @@ public sealed class StrikeMonitor
 {
     private static readonly Dictionary<string, string> UnderlyingKeyMap = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["NIFTY"]      = "NSE_INDEX|Nifty 50",
-        ["BANKNIFTY"]  = "NSE_INDEX|Nifty Bank",
-        ["FINNIFTY"]   = "NSE_INDEX|Nifty Fin Service",
-        ["MIDCPNIFTY"] = "NSE_INDEX|NIFTY MID SELECT",
-        ["SENSEX"]     = "BSE_INDEX|SENSEX",
-        ["BANKEX"]     = "BSE_INDEX|BANKEX",
+        ["NIFTY"]     = "NSE_INDEX|Nifty 50",
+        ["SENSEX"]    = "BSE_INDEX|SENSEX",
+        ["BANKNIFTY"] = "NSE_INDEX|Nifty Bank",
     };
 
     private readonly UpstoxClient _upstox;

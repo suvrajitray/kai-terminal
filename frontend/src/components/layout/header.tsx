@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { APP_NAME, NAV_ITEMS } from "@/lib/constants";
 import { UserMenu } from "./user-menu";
 import { IndexTicker } from "./index-ticker";
+import { QuickTradeButton } from "./quick-trade-button";
 import { useBrokerStore } from "@/stores/broker-store";
 
 export function Header() {
@@ -43,6 +44,7 @@ export function Header() {
         </div>
         <div className="flex items-center gap-4">
           {brokerAuthenticated && <IndexTicker />}
+          {brokerAuthenticated && <QuickTradeButton />}
           <UserMenu />
         </div>
       </div>

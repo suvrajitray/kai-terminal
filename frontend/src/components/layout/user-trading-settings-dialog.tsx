@@ -15,11 +15,8 @@ interface Props {
 
 const SHIFT_FIELDS: { key: keyof UserTradingSettings; label: string }[] = [
   { key: "niftyShiftOffset", label: "NIFTY" },
-  { key: "bankniftyShiftOffset", label: "BANKNIFTY" },
-  { key: "midcpniftyShiftOffset", label: "MIDCPNIFTY" },
-  { key: "finniftyShiftOffset", label: "FINNIFTY" },
   { key: "sensexShiftOffset", label: "SENSEX" },
-  { key: "bankexShiftOffset", label: "BANKEX" },
+  { key: "bankniftyShiftOffset", label: "BANKNIFTY" },
 ];
 
 export function UserTradingSettingsDialog({ open, onClose }: Props) {
@@ -27,11 +24,8 @@ export function UserTradingSettingsDialog({ open, onClose }: Props) {
   const [draft, setDraft] = useState<UserTradingSettings>(() => ({
     defaultStoplossPercentage: store.defaultStoplossPercentage,
     niftyShiftOffset: store.niftyShiftOffset,
-    bankniftyShiftOffset: store.bankniftyShiftOffset,
-    midcpniftyShiftOffset: store.midcpniftyShiftOffset,
-    finniftyShiftOffset: store.finniftyShiftOffset,
     sensexShiftOffset: store.sensexShiftOffset,
-    bankexShiftOffset: store.bankexShiftOffset,
+    bankniftyShiftOffset: store.bankniftyShiftOffset,
     indexChangeMode: store.indexChangeMode,
   }));
   const [saving, setSaving] = useState(false);
@@ -42,11 +36,8 @@ export function UserTradingSettingsDialog({ open, onClose }: Props) {
     setDraft({
       defaultStoplossPercentage: store.defaultStoplossPercentage,
       niftyShiftOffset: store.niftyShiftOffset,
-      bankniftyShiftOffset: store.bankniftyShiftOffset,
-      midcpniftyShiftOffset: store.midcpniftyShiftOffset,
-      finniftyShiftOffset: store.finniftyShiftOffset,
       sensexShiftOffset: store.sensexShiftOffset,
-      bankexShiftOffset: store.bankexShiftOffset,
+      bankniftyShiftOffset: store.bankniftyShiftOffset,
       indexChangeMode: store.indexChangeMode,
     });
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps

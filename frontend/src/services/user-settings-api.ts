@@ -3,22 +3,16 @@ import { apiClient } from "@/lib/api-client";
 export interface UserTradingSettings {
   defaultStoplossPercentage: number;
   niftyShiftOffset: number;
-  bankniftyShiftOffset: number;
-  midcpniftyShiftOffset: number;
-  finniftyShiftOffset: number;
   sensexShiftOffset: number;
-  bankexShiftOffset: number;
+  bankniftyShiftOffset: number;
   indexChangeMode: "open" | "prevClose";
 }
 
 export const DEFAULT_TRADING_SETTINGS: UserTradingSettings = {
   defaultStoplossPercentage: 30,
   niftyShiftOffset: 5,
-  bankniftyShiftOffset: 10,
-  midcpniftyShiftOffset: 10,
-  finniftyShiftOffset: 10,
   sensexShiftOffset: 10,
-  bankexShiftOffset: 10,
+  bankniftyShiftOffset: 10,
   indexChangeMode: "prevClose",
 };
 

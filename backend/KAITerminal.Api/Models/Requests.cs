@@ -13,11 +13,8 @@ public record struct UpdateAccessTokenRequest(string AccessToken);
 public record struct SaveUserTradingSettingsRequest(
     decimal DefaultStoplossPercentage,
     int NiftyShiftOffset,
-    int BankniftyShiftOffset,
-    int MidcpniftyShiftOffset,
-    int FinniftyShiftOffset,
     int SensexShiftOffset,
-    int BankexShiftOffset,
+    int BankniftyShiftOffset,
     string IndexChangeMode = "prevClose");
 
 public record struct SaveBrokerCredentialRequest(

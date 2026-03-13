@@ -9,11 +9,8 @@ public class UserTradingSettingsService(AppDbContext db)
     private static readonly UserTradingSettingsResponse Defaults = new(
         DefaultStoplossPercentage: 30m,
         NiftyShiftOffset: 5,
-        BankniftyShiftOffset: 10,
-        MidcpniftyShiftOffset: 10,
-        FinniftyShiftOffset: 10,
         SensexShiftOffset: 10,
-        BankexShiftOffset: 10,
+        BankniftyShiftOffset: 10,
         IndexChangeMode: "prevClose");
 
     public async Task<UserTradingSettingsResponse> GetAsync(string username)
@@ -26,11 +23,8 @@ public class UserTradingSettingsService(AppDbContext db)
         return new UserTradingSettingsResponse(
             settings.DefaultStoplossPercentage,
             settings.NiftyShiftOffset,
-            settings.BankniftyShiftOffset,
-            settings.MidcpniftyShiftOffset,
-            settings.FinniftyShiftOffset,
             settings.SensexShiftOffset,
-            settings.BankexShiftOffset,
+            settings.BankniftyShiftOffset,
             settings.IndexChangeMode);
     }
 
@@ -43,11 +37,8 @@ public class UserTradingSettingsService(AppDbContext db)
         {
             existing.DefaultStoplossPercentage = request.DefaultStoplossPercentage;
             existing.NiftyShiftOffset = request.NiftyShiftOffset;
-            existing.BankniftyShiftOffset = request.BankniftyShiftOffset;
-            existing.MidcpniftyShiftOffset = request.MidcpniftyShiftOffset;
-            existing.FinniftyShiftOffset = request.FinniftyShiftOffset;
             existing.SensexShiftOffset = request.SensexShiftOffset;
-            existing.BankexShiftOffset = request.BankexShiftOffset;
+            existing.BankniftyShiftOffset = request.BankniftyShiftOffset;
             existing.IndexChangeMode = request.IndexChangeMode;
             existing.UpdatedAt = DateTime.UtcNow;
         }
@@ -58,11 +49,8 @@ public class UserTradingSettingsService(AppDbContext db)
                 Username = username,
                 DefaultStoplossPercentage = request.DefaultStoplossPercentage,
                 NiftyShiftOffset = request.NiftyShiftOffset,
-                BankniftyShiftOffset = request.BankniftyShiftOffset,
-                MidcpniftyShiftOffset = request.MidcpniftyShiftOffset,
-                FinniftyShiftOffset = request.FinniftyShiftOffset,
                 SensexShiftOffset = request.SensexShiftOffset,
-                BankexShiftOffset = request.BankexShiftOffset,
+                BankniftyShiftOffset = request.BankniftyShiftOffset,
                 IndexChangeMode = request.IndexChangeMode,
                 UpdatedAt = DateTime.UtcNow,
             });
