@@ -37,7 +37,7 @@ export function QuickTradeDialog() {
   const [expiry, setExpiry]           = useState("");
   const [expiries, setExpiries]       = useState<string[]>([]);
   const [price, setPrice]             = useState("");
-  const [qtyValue, setQtyValue]       = useState("1");
+  const [qtyValue, setQtyValue]       = useState("");
   const [qtyMode, setQtyMode]         = useState<QtyMode>("qty");
   const [product, setProduct]         = useState<"I" | "D">("I");
   const [direction, setDirection]     = useState<Direction>("Sell");
@@ -267,7 +267,7 @@ export function QuickTradeDialog() {
             return (
               <Button
                 key={action}
-                disabled={acting !== null}
+                disabled={acting !== null || !qtyValue || !price || parseFloat(price) <= 0}
                 onClick={() => execute(action)}
                 className={cn(
                   "h-11 font-semibold text-sm transition-all gap-1.5",
