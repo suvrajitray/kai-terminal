@@ -6,6 +6,21 @@ export const API_BASE_URL = import.meta.env.VITE_API_URL as string;
 
 export const UPSTOX_OAUTH_URL = import.meta.env.VITE_UPSTOX_OAUTH_URL as string;
 
+const REQUIRED_ENV_VARS: Record<string, string | undefined> = {
+  VITE_API_URL: import.meta.env.VITE_API_URL,
+};
+
+const missing = Object.entries(REQUIRED_ENV_VARS)
+  .filter(([, v]) => !v)
+  .map(([k]) => k);
+
+if (missing.length > 0) {
+  console.error(
+    `[KAI Terminal] Missing required environment variables: ${missing.join(", ")}.\n` +
+    `Create a .env file in the frontend/ directory. See CLAUDE.md for details.`
+  );
+}
+
 export const NAV_ITEMS = [
   { label: "Dashboard", path: "/dashboard" },
   { label: "Terminal", path: "/terminal" },

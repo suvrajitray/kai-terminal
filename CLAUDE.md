@@ -122,6 +122,16 @@ PostgreSQL via Neon — connection string set in `ConnectionStrings:DefaultConne
 - Live positions use `@microsoft/signalr` — `PositionsPanel` connects to `WSS /hubs/positions?upstoxToken=...` on mount, handles `ReceivePositions` (full refresh), `ReceiveLtpBatch` (in-place LTP + P&L update), and `ReceiveOrderUpdate` (toast notification + Orders panel refresh). Shows a live `Wifi`/`WifiOff` indicator.
 - UI: shadcn/ui components; add new ones with `npx shadcn add <component>`.
 - **Always use shadcn components over native HTML equivalents** — e.g. `Checkbox` instead of `<input type="checkbox">`. shadcn `Checkbox` supports `checked="indeterminate"` natively (no `ref` hack). `onCheckedChange` receives `CheckedState` (`boolean | "indeterminate"`).
+- **Auth / session management:**
+  - `lib/logout.ts` — `performLogout()` is the single source of truth for logout. Clears all Zustand stores, `localStorage`, and redirects to `/login`. Use this everywhere instead of duplicating store-clearing logic.
+  - `ProtectedRoute` checks JWT expiry on every render — if expired, calls `performLogout()` immediately before any API call fires.
+  - `api-client.ts` request interceptor calls `isTokenExpired` before attaching the `Authorization` header — aborts the request if expired.
+  - `api-client.ts` response interceptor catches `401` responses mid-session and calls `performLogout()` automatically.
+- **Error boundary** — `components/error-boundary.tsx` wraps the entire app in `main.tsx`. Catches unexpected React crashes and renders a recovery screen with reload + recover options.
+- **Env validation** — `lib/constants.ts` checks `VITE_API_URL` on module load and logs a clear error to the console if missing.
+- **Supported indices** — only NIFTY, SENSEX, BANKNIFTY (in that order) are supported throughout the app. This is enforced in `UNDERLYING_KEYS` (`lib/shift-config.ts`), `StrikeMonitor.cs` (backend), and `UserTradingSettings` (backend + frontend). Do not add other indices without explicit instruction.
+- **Quick Trade** — amber (`bg-amber-500`) button in the header (visible when broker authenticated). Opens a dialog with "By Price" tab (By Chain is disabled/coming soon). Expiry dates fetched from `GET /api/upstox/options/contracts/current-year` and formatted as `TUE, 17th MAR 2026`. Buy/Sell toggle drives CE/PUT/Both action buttons with context-aware icons (`TrendingUp`/`TrendingDown`/`ArrowUpDown`).
+- **Option contracts** — `GET /api/upstox/options/contracts/current-year` returns only contracts expiring in the current calendar year, sorted by expiry. Use this for expiry dropdowns instead of the full contracts endpoint.
 
 ---
 

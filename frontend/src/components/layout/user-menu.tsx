@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { LogOut, Settings2, User } from "lucide-react";
 import {
   DropdownMenu,
@@ -11,9 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuthStore } from "@/stores/auth-store";
-import { useBrokerStore } from "@/stores/broker-store";
-import { useProfitProtectionStore } from "@/stores/profit-protection-store";
-import { useUserTradingSettingsStore } from "@/stores/user-trading-settings-store";
+import { performLogout } from "@/lib/logout";
 import { UserTradingSettingsDialog } from "@/components/layout/user-trading-settings-dialog";
 
 function getInitials(name: string): string {
@@ -27,24 +24,9 @@ function getInitials(name: string): string {
 
 export function UserMenu() {
   const user = useAuthStore((s) => s.user);
-  const logout = useAuthStore((s) => s.logout);
-  const clearBrokers = useBrokerStore((s) => s.clearAll);
-  const resetProfitProtection = useProfitProtectionStore((s) => s.reset);
-  const resetTradingSettings = useUserTradingSettingsStore((s) => s.reset);
-  const navigate = useNavigate();
-
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   if (!user) return null;
-
-  const handleLogout = () => {
-    logout();
-    clearBrokers();
-    resetProfitProtection();
-    resetTradingSettings();
-    localStorage.clear();
-    navigate("/login");
-  };
 
   return (
     <>
@@ -72,7 +54,7 @@ export function UserMenu() {
             User Trading Settings
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={handleLogout}>
+          <DropdownMenuItem onClick={performLogout}>
             <LogOut className="mr-2 size-4" />
             Log out
           </DropdownMenuItem>
