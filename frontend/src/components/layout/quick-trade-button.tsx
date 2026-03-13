@@ -21,7 +21,7 @@ export function QuickTradeButton() {
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Zap className="size-4 text-primary" />
+            <Zap className="size-4 text-amber-500" />
             Quick Trade
           </DialogTitle>
         </DialogHeader>
