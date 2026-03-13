@@ -121,6 +121,7 @@ PostgreSQL via Neon — connection string set in `ConnectionStrings:DefaultConne
 - All backend HTTP calls go through `services/broker-api.ts`; reads `VITE_API_URL` (default `https://localhost:5001`). Trading-specific calls (positions with exchange filter) go through `services/trading-api.ts`.
 - Live positions use `@microsoft/signalr` — `PositionsPanel` connects to `WSS /hubs/positions?upstoxToken=...` on mount, handles `ReceivePositions` (full refresh), `ReceiveLtpBatch` (in-place LTP + P&L update), and `ReceiveOrderUpdate` (toast notification + Orders panel refresh). Shows a live `Wifi`/`WifiOff` indicator.
 - UI: shadcn/ui components; add new ones with `npx shadcn add <component>`.
+- **Always use shadcn components over native HTML equivalents** — e.g. `Checkbox` instead of `<input type="checkbox">`. shadcn `Checkbox` supports `checked="indeterminate"` natively (no `ref` hack). `onCheckedChange` receives `CheckedState` (`boolean | "indeterminate"`).
 
 ---
 
@@ -148,3 +149,18 @@ dotnet user-secrets set "Upstox:AccessToken" "<daily_token>"
 cd ../KAITerminal.Worker
 dotnet user-secrets set "RiskEngine:Users:0:AccessToken" "<daily_token>"
 ```
+
+---
+
+## UI Design Standard
+
+All frontend UI must be **modern, classy, and beautiful**. This is a non-negotiable requirement for every component, panel, and page. When building or modifying UI:
+
+- Prefer polished shadcn/ui components over native HTML elements
+- Use refined spacing, subtle borders (`border-border/40`), and layered backgrounds (`bg-muted/20`, `bg-muted/30`)
+- Favour elegant typography: clear hierarchy, muted secondary text, tabular numerals for data
+- Use purposeful colour — green/red for P&L, muted for inactive/secondary, primary for interactive focus
+- Avoid visual clutter; every element should earn its place
+- Animations and transitions should feel smooth and intentional, not jarring
+- The overall aesthetic should feel like a premium financial terminal
+- **Keep the default shadcn rounded corners** — do not switch to sharp/square corners
