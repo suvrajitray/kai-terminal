@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { LogOut, Settings2, User } from "lucide-react";
+import { Link } from "react-router-dom";
+import { LogOut, Settings2, User, Cable } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,6 +11,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuthStore } from "@/stores/auth-store";
+import { useBrokerStore } from "@/stores/broker-store";
+import { BROKERS } from "@/lib/constants";
 import { performLogout } from "@/lib/logout";
 import { UserTradingSettingsDialog } from "@/components/layout/user-trading-settings-dialog";
 
@@ -24,7 +27,10 @@ function getInitials(name: string): string {
 
 export function UserMenu() {
   const user = useAuthStore((s) => s.user);
+  const isAuthenticated = useBrokerStore((s) => s.isAuthenticated);
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const anyBrokerActive = BROKERS.some((b) => isAuthenticated(b.id));
 
   if (!user) return null;
 
@@ -51,7 +57,14 @@ export function UserMenu() {
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setSettingsOpen(true)}>
             <Settings2 className="mr-2 size-4" />
-            User Trading Settings
+            Trading Settings
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to="/connect-brokers" className="flex items-center">
+              <Cable className="mr-2 size-4" />
+              <span className="flex-1">Brokers</span>
+              <span className={`size-2 rounded-full ${anyBrokerActive ? "bg-green-500" : "bg-amber-500"}`} />
+            </Link>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={performLogout}>
