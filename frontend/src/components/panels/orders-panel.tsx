@@ -8,11 +8,22 @@ import type { Order } from "@/types";
 
 const TERMINAL_STATUSES = new Set(["complete", "rejected", "cancelled"]);
 
-function statusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
+function StatusBadge({ status }: { status: string }) {
   const s = status.toLowerCase();
-  if (s === "complete") return "default";
-  if (s === "rejected" || s === "cancelled") return "destructive";
-  return "secondary";
+  const styles =
+    s === "complete"
+      ? "bg-green-500/15 text-green-500"
+      : s === "rejected" || s.includes("cancel")
+        ? "bg-red-500/15 text-red-500"
+        : s === "open" || s === "pending" || s === "trigger pending"
+          ? "bg-amber-500/15 text-amber-500"
+          : "bg-muted text-muted-foreground";
+
+  return (
+    <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold capitalize ${styles}`}>
+      {status}
+    </span>
+  );
 }
 
 function formatTime(ts: string | null) {
@@ -222,9 +233,7 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
                       {o.average_price > 0 ? `₹${fmt(o.average_price)}` : o.price > 0 ? `₹${fmt(o.price)}` : "MKT"}
                     </td>
                     <td className="px-3 py-1.5">
-                      <Badge variant={statusVariant(o.status)} className="h-5 px-1.5 text-[10px] capitalize">
-                        {o.status}
-                      </Badge>
+                      <StatusBadge status={o.status} />
                     </td>
                     <td className="px-3 py-1.5 text-right">
                       {isCancellable && (

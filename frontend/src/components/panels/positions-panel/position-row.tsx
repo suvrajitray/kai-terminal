@@ -3,6 +3,7 @@ import { getLotSize } from "@/lib/lot-sizes";
 import { useOptionContractsStore, formatExpiryLabel } from "@/stores/option-contracts-store";
 import { type QtyMode } from "./qty-input";
 import { PositionActions } from "./position-actions";
+import { OptionTypeBadge } from "./option-type-badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Position } from "@/types";
 
@@ -83,8 +84,9 @@ export function PositionRow({
       <td className="px-3 py-1.5">
         {contract ? (
           <>
-            <div className="font-medium">
-              {contract.underlying_symbol} {contract.strike_price} {contract.instrument_type}
+            <div className="flex items-center gap-1.5 font-medium">
+              {contract.underlying_symbol} {contract.strike_price}
+              <OptionTypeBadge type={contract.instrument_type} />
             </div>
             <div className="text-[11px] text-muted-foreground">
               {p.exchange} {formatExpiryLabel(contract.expiry)}
