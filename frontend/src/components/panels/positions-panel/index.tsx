@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { toast } from "sonner";
+import { LogOut } from "lucide-react";
 import { getLotSize } from "@/lib/lot-sizes";
 import { exitPosition, placeMarketOrder, placeOrderByOptionPrice } from "@/services/trading-api";
 import { parseTradingSymbol, parseExpiryToDate } from "@/lib/parse-trading-symbol";
 import { getShiftOffset, getUnderlyingKey } from "@/lib/shift-config";
 import { PositionRow } from "./position-row";
+import { Button } from "@/components/ui/button";
 import type { QtyMode } from "./qty-input";
 import type { Position } from "@/types";
 
@@ -16,10 +18,13 @@ interface PositionsPanelProps {
   load: () => void;
 }
 
+const selKey = (p: Position) => `${p.instrument_token}|${p.product}`;
+
 export function PositionsPanel({ positions, loading, load }: PositionsPanelProps) {
   const [acting, setActing] = useState<string | null>(null);
   const [qtys, setQtys] = useState<Record<string, string>>({});
   const [qtyMode, setQtyMode] = useState<QtyMode>("qty");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const setQty = (token: string, val: string) =>
     setQtys((prev) => ({ ...prev, [token]: val }));
@@ -121,8 +126,56 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
   const closedPositions = positions.filter((p) => p.quantity === 0);
   const sorted = [...openPositions, ...closedPositions];
 
+  // Selection helpers
+  const allOpenKeys = openPositions.map(selKey);
+  const allSelected = allOpenKeys.length > 0 && allOpenKeys.every((k) => selected.has(k));
+  const someSelected = allOpenKeys.some((k) => selected.has(k));
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(allOpenKeys));
+    }
+  };
+
+  const toggleSelect = (p: Position) => {
+    if (p.quantity === 0) return;
+    const k = selKey(p);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(k) ? next.delete(k) : next.add(k);
+      return next;
+    });
+  };
+
+  const handleExitSelected = async () => {
+    const toExit = openPositions.filter((p) => selected.has(selKey(p)));
+    setActing("selected");
+    try {
+      await Promise.all(toExit.map((p) => exitPosition(p.instrument_token, p.product)));
+      setSelected(new Set());
+      await load();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setActing(null);
+    }
+  };
+
+  const selectedCount = allOpenKeys.filter((k) => selected.has(k)).length;
+
   const cols = (
-    <tr className="border-b border-border text-muted-foreground">
+    <tr className="border-b border-border text-muted-foreground h-9">
+      <th className="pl-3 py-1.5 w-7">
+        <input
+          type="checkbox"
+          className="size-3.5 cursor-pointer accent-primary"
+          checked={allSelected}
+          ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected; }}
+          onChange={toggleSelectAll}
+        />
+      </th>
       <th className="px-3 py-1.5 text-left font-medium">Symbol</th>
       <th className="px-3 py-1.5 text-left font-medium">Product</th>
       <th className="px-3 py-1.5 text-right font-medium">Qty</th>
@@ -131,7 +184,23 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
       <th className="px-3 py-1.5 text-right font-medium">P&amp;L</th>
       <th className="px-3 py-1.5 text-right font-medium">Unrealised</th>
       <th className="px-3 py-1.5 text-right font-medium">Realised</th>
-      <th className="px-3 py-1.5 text-right font-medium"></th>
+      <th className="px-3 py-1.5 text-right">
+        {selectedCount > 0 && (
+          <div className="flex items-center justify-end gap-2">
+            <span className="text-[10px] text-muted-foreground">{selectedCount} selected</span>
+            <Button
+              size="sm"
+              variant="destructive"
+              className="h-5 px-2 text-[10px]"
+              disabled={acting === "selected"}
+              onClick={handleExitSelected}
+            >
+              <LogOut className="mr-1 size-2.5" />
+              {acting === "selected" ? "Exiting…" : `Exit ${selectedCount}`}
+            </Button>
+          </div>
+        )}
+      </th>
     </tr>
   );
 
@@ -142,6 +211,8 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
       qtyValue={qtys[p.instrument_token] ?? ""}
       qtyMode={qtyMode}
       acting={acting}
+      selected={selected.has(selKey(p))}
+      onToggleSelect={() => toggleSelect(p)}
       onQtyChange={(v) => setQty(p.instrument_token, v)}
       onToggleMode={toggleMode}
       onAdd={() => handleAdd(p.instrument_token, p.trading_symbol, p.product)}
@@ -166,7 +237,7 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
               {openPositions.map(renderRow)}
               {closedPositions.length > 0 && openPositions.length > 0 && (
                 <tr>
-                  <td colSpan={9} className="px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60 bg-muted/20">
+                  <td colSpan={10} className="px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60 bg-muted/20">
                     Closed
                   </td>
                 </tr>

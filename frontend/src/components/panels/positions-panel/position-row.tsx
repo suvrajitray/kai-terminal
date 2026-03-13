@@ -34,6 +34,8 @@ interface PositionRowProps {
   qtyValue: string;
   qtyMode: QtyMode;
   acting: string | null;
+  selected: boolean;
+  onToggleSelect: () => void;
   onQtyChange: (v: string) => void;
   onToggleMode: () => void;
   onAdd: () => void;
@@ -48,6 +50,8 @@ export function PositionRow({
   qtyValue,
   qtyMode,
   acting,
+  selected,
+  onToggleSelect,
   onQtyChange,
   onToggleMode,
   onAdd,
@@ -66,8 +70,19 @@ export function PositionRow({
       className={cn(
         "border-b border-border/40 transition-colors hover:bg-muted/30 align-middle",
         p.quantity === 0 && "opacity-50",
+        selected && "bg-primary/5",
       )}
     >
+      <td className="pl-3 py-1.5 w-7">
+        {p.quantity !== 0 && (
+          <input
+            type="checkbox"
+            className="size-3.5 cursor-pointer accent-primary"
+            checked={selected}
+            onChange={onToggleSelect}
+          />
+        )}
+      </td>
       <td className="px-3 py-1.5">
         {parsed ? (
           <>
