@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { RefreshCw, LogOut, Wifi, WifiOff, ShieldCheck } from "lucide-react";
+import { SessionTimer } from "./session-timer";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { PnlCell } from "@/components/panels/positions-panel/position-row";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
 import type { Position } from "@/types";
+
 
 interface StatsBarProps {
   positions: Position[];
@@ -69,6 +71,8 @@ export function StatsBar({
         {isLive ? <Wifi className="size-3.5" /> : <WifiOff className="size-3.5" />}
         {isLive ? "Live" : "Offline"}
       </span>
+
+      <SessionTimer />
 
       {positions.length > 0 && (
         <>

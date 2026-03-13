@@ -162,6 +162,17 @@ dotnet user-secrets set "RiskEngine:Users:0:AccessToken" "<daily_token>"
 
 ---
 
+## React Component Philosophy
+
+- **Small, focused components** — every component should do one thing. If a component is growing large, extract logical pieces into their own files.
+- **One component per file** — each file exports a single primary component. Helper sub-components used only within that file are the only exception.
+- **Readable over clever** — code should be immediately understandable. A new developer (or Claude in a future session) should grasp what a component does in under 10 seconds.
+- **Co-locate by feature** — related components live together (e.g. `panels/positions-panel/position-row.tsx`, `terminal/session-timer.tsx`). Don't dump everything in one folder.
+- **Custom hooks for logic** — extract `useEffect`-heavy or reusable logic into a `use*.ts` hook file alongside the component.
+- **No inline logic in JSX** — complex expressions belong in a variable or helper function above the return statement, not inside JSX.
+
+---
+
 ## UI Design Standard
 
 All frontend UI must be **modern, classy, and beautiful**. This is a non-negotiable requirement for every component, panel, and page. When building or modifying UI:
