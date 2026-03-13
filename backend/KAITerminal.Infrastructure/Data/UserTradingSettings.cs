@@ -11,5 +11,6 @@ public class UserTradingSettings
     public int FinniftyShiftOffset { get; set; } = 10;
     public int SensexShiftOffset { get; set; } = 10;
     public int BankexShiftOffset { get; set; } = 10;
+    public string IndexChangeMode { get; set; } = "open";
     public DateTime UpdatedAt { get; set; }
 }

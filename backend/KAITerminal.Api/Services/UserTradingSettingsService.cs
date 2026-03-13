@@ -13,7 +13,8 @@ public class UserTradingSettingsService(AppDbContext db)
         MidcpniftyShiftOffset: 10,
         FinniftyShiftOffset: 10,
         SensexShiftOffset: 10,
-        BankexShiftOffset: 10);
+        BankexShiftOffset: 10,
+        IndexChangeMode: "open");
 
     public async Task<UserTradingSettingsResponse> GetAsync(string username)
     {
@@ -29,7 +30,8 @@ public class UserTradingSettingsService(AppDbContext db)
             settings.MidcpniftyShiftOffset,
             settings.FinniftyShiftOffset,
             settings.SensexShiftOffset,
-            settings.BankexShiftOffset);
+            settings.BankexShiftOffset,
+            settings.IndexChangeMode);
     }
 
     public async Task SaveAsync(string username, SaveUserTradingSettingsRequest request)
@@ -46,6 +48,7 @@ public class UserTradingSettingsService(AppDbContext db)
             existing.FinniftyShiftOffset = request.FinniftyShiftOffset;
             existing.SensexShiftOffset = request.SensexShiftOffset;
             existing.BankexShiftOffset = request.BankexShiftOffset;
+            existing.IndexChangeMode = request.IndexChangeMode;
             existing.UpdatedAt = DateTime.UtcNow;
         }
         else
@@ -60,6 +63,7 @@ public class UserTradingSettingsService(AppDbContext db)
                 FinniftyShiftOffset = request.FinniftyShiftOffset,
                 SensexShiftOffset = request.SensexShiftOffset,
                 BankexShiftOffset = request.BankexShiftOffset,
+                IndexChangeMode = request.IndexChangeMode,
                 UpdatedAt = DateTime.UtcNow,
             });
         }

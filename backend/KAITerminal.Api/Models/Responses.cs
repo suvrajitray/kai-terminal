@@ -9,4 +9,5 @@ public record UserTradingSettingsResponse(
     int MidcpniftyShiftOffset,
     int FinniftyShiftOffset,
     int SensexShiftOffset,
-    int BankexShiftOffset);
+    int BankexShiftOffset,
+    string IndexChangeMode = "open");

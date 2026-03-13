@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { useUserTradingSettingsStore, type IndexChangeMode } from "@/stores/user-trading-settings-store";
+import { useUserTradingSettingsStore } from "@/stores/user-trading-settings-store";
 import { saveUserTradingSettings, type UserTradingSettings } from "@/services/user-settings-api";
 
 interface Props {
@@ -32,8 +32,8 @@ export function UserTradingSettingsDialog({ open, onClose }: Props) {
     finniftyShiftOffset: store.finniftyShiftOffset,
     sensexShiftOffset: store.sensexShiftOffset,
     bankexShiftOffset: store.bankexShiftOffset,
+    indexChangeMode: store.indexChangeMode,
   }));
-  const [indexChangeMode, setIndexChangeMode] = useState<IndexChangeMode>(store.indexChangeMode);
   const [saving, setSaving] = useState(false);
 
   // Sync draft from store each time dialog opens
@@ -47,8 +47,8 @@ export function UserTradingSettingsDialog({ open, onClose }: Props) {
       finniftyShiftOffset: store.finniftyShiftOffset,
       sensexShiftOffset: store.sensexShiftOffset,
       bankexShiftOffset: store.bankexShiftOffset,
+      indexChangeMode: store.indexChangeMode,
     });
-    setIndexChangeMode(store.indexChangeMode);
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const set = (key: keyof UserTradingSettings, value: number) =>
@@ -59,7 +59,6 @@ export function UserTradingSettingsDialog({ open, onClose }: Props) {
     try {
       await saveUserTradingSettings(draft);
       store.setSettings(draft);
-      store.setIndexChangeMode(indexChangeMode);
       onClose();
     } finally {
       setSaving(false);
@@ -102,16 +101,16 @@ export function UserTradingSettingsDialog({ open, onClose }: Props) {
               <Button
                 type="button"
                 size="sm"
-                variant={indexChangeMode === "open" ? "default" : "outline"}
-                onClick={() => setIndexChangeMode("open")}
+                variant={draft.indexChangeMode === "open" ? "default" : "outline"}
+                onClick={() => setDraft((d) => ({ ...d, indexChangeMode: "open" }))}
               >
                 From Open
               </Button>
               <Button
                 type="button"
                 size="sm"
-                variant={indexChangeMode === "prevClose" ? "default" : "outline"}
-                onClick={() => setIndexChangeMode("prevClose")}
+                variant={draft.indexChangeMode === "prevClose" ? "default" : "outline"}
+                onClick={() => setDraft((d) => ({ ...d, indexChangeMode: "prevClose" }))}
               >
                 From Prev Close
               </Button>

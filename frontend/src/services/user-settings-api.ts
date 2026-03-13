@@ -8,6 +8,7 @@ export interface UserTradingSettings {
   finniftyShiftOffset: number;
   sensexShiftOffset: number;
   bankexShiftOffset: number;
+  indexChangeMode: "open" | "prevClose";
 }
 
 export const DEFAULT_TRADING_SETTINGS: UserTradingSettings = {
@@ -18,6 +19,7 @@ export const DEFAULT_TRADING_SETTINGS: UserTradingSettings = {
   finniftyShiftOffset: 10,
   sensexShiftOffset: 10,
   bankexShiftOffset: 10,
+  indexChangeMode: "open",
 };
 
 export async function fetchUserTradingSettings(): Promise<UserTradingSettings> {
