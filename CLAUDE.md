@@ -162,6 +162,16 @@ dotnet user-secrets set "RiskEngine:Users:0:AccessToken" "<daily_token>"
 
 ---
 
+## User Trading Profile
+
+This terminal is built **primarily for options sellers** (short options traders). All UI decisions must reflect a seller's perspective:
+
+- **PE = green** — seller profits if market stays above strike (bullish for seller)
+- **CE = red** — seller profits if market stays below strike (bearish for seller)
+- Colour coding, icons, labels, and feature suggestions should always be from the **seller's point of view**, not the buyer's
+
+---
+
 ## React Component Philosophy
 
 - **Small, focused components** — every component should do one thing. If a component is growing large, extract logical pieces into their own files.

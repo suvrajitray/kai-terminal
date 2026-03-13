@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { RefreshCw, LogOut, Wifi, WifiOff, ShieldCheck } from "lucide-react";
 import { SessionTimer } from "./session-timer";
 import { MtmDisplay } from "./mtm-display";
+import { PositionCountBadges } from "./position-count-badges";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
@@ -77,9 +78,7 @@ export function StatsBar({
       {positions.length > 0 && (
         <>
           <MtmDisplay value={totalPnl} />
-          <span className="text-xs text-muted-foreground">
-            {openCount} open · {closedCount} closed
-          </span>
+          <PositionCountBadges openCount={openCount} closedCount={closedCount} />
 
           {(maxProfit !== null || maxLoss !== null) && (
             <>

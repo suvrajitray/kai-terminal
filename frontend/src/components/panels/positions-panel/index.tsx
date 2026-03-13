@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { LogOut } from "lucide-react";
+import { LogOut, LayoutList } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { getLotSize } from "@/lib/lot-sizes";
 import { exitPosition, placeMarketOrder, placeOrderByOptionPrice } from "@/services/trading-api";
 import { getShiftOffset, UNDERLYING_KEYS } from "@/lib/shift-config";
@@ -222,9 +223,7 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
     <div className="flex h-full flex-col">
       <div className="flex-1 overflow-auto">
         {sorted.length === 0 && !loading ? (
-          <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-            No positions
-          </div>
+          <EmptyState icon={LayoutList} message="No positions" />
         ) : (
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-background z-10">{cols}</thead>

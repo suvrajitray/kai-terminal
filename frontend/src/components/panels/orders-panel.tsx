@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
-import { RefreshCw, XCircle, AlertCircle, ChevronUp, ChevronDown } from "lucide-react";
+import { RefreshCw, XCircle, AlertCircle, ChevronUp, ChevronDown, Inbox, CheckCircle2 } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -186,9 +187,10 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
       {/* Body */}
       <div className={cn("flex-1 overflow-auto", !expanded && "hidden")}>
         {visibleOrders.length === 0 && !loading ? (
-          <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-            {tab === "open" ? "No open orders" : "No executed orders"}
-          </div>
+          <EmptyState
+            icon={tab === "open" ? Inbox : CheckCircle2}
+            message={tab === "open" ? "No open orders" : "No executed orders"}
+          />
         ) : (
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-background">
