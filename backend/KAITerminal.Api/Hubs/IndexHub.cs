@@ -71,10 +71,11 @@ public sealed class IndexHub : Hub
                     .Select(t => new
                     {
                         instrumentToken = t,
-                        ltp  = normalised[t].LastPrice,
-                        open = normalised[t].Ohlc?.Open,
-                        high = normalised[t].Ohlc?.High,
-                        low  = normalised[t].Ohlc?.Low,
+                        ltp       = normalised[t].LastPrice,
+                        open      = normalised[t].Ohlc?.Open,
+                        high      = normalised[t].Ohlc?.High,
+                        low       = normalised[t].Ohlc?.Low,
+                        netChange = normalised[t].NetChange,
                     })
                     .ToList();
 

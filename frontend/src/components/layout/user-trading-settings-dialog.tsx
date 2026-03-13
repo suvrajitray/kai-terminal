@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { useUserTradingSettingsStore } from "@/stores/user-trading-settings-store";
+import { useUserTradingSettingsStore, type IndexChangeMode } from "@/stores/user-trading-settings-store";
 import { saveUserTradingSettings, type UserTradingSettings } from "@/services/user-settings-api";
 
 interface Props {
@@ -33,6 +33,7 @@ export function UserTradingSettingsDialog({ open, onClose }: Props) {
     sensexShiftOffset: store.sensexShiftOffset,
     bankexShiftOffset: store.bankexShiftOffset,
   }));
+  const [indexChangeMode, setIndexChangeMode] = useState<IndexChangeMode>(store.indexChangeMode);
   const [saving, setSaving] = useState(false);
 
   // Sync draft from store each time dialog opens
@@ -47,6 +48,7 @@ export function UserTradingSettingsDialog({ open, onClose }: Props) {
       sensexShiftOffset: store.sensexShiftOffset,
       bankexShiftOffset: store.bankexShiftOffset,
     });
+    setIndexChangeMode(store.indexChangeMode);
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const set = (key: keyof UserTradingSettings, value: number) =>
@@ -57,6 +59,7 @@ export function UserTradingSettingsDialog({ open, onClose }: Props) {
     try {
       await saveUserTradingSettings(draft);
       store.setSettings(draft);
+      store.setIndexChangeMode(indexChangeMode);
       onClose();
     } finally {
       setSaving(false);
@@ -87,6 +90,34 @@ export function UserTradingSettingsDialog({ open, onClose }: Props) {
             />
             <p className="text-[11px] text-muted-foreground">
               Applied as the default stop loss when placing option orders.
+            </p>
+          </div>
+
+          <Separator />
+
+          {/* Index Change Mode */}
+          <div className="space-y-1.5">
+            <Label>Index Change Display</Label>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={indexChangeMode === "open" ? "default" : "outline"}
+                onClick={() => setIndexChangeMode("open")}
+              >
+                From Open
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={indexChangeMode === "prevClose" ? "default" : "outline"}
+                onClick={() => setIndexChangeMode("prevClose")}
+              >
+                From Prev Close
+              </Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Controls whether index +/− is calculated from today's open or previous day's close.
             </p>
           </div>
 

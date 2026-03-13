@@ -8,6 +8,7 @@ export interface IndexQuote {
   open: number | null;
   high: number | null;
   low: number | null;
+  netChange: number | null;
 }
 
 export interface IndexPrices {
@@ -16,7 +17,7 @@ export interface IndexPrices {
   sensex: IndexQuote;
 }
 
-const EMPTY_QUOTE: IndexQuote = { ltp: null, open: null, high: null, low: null };
+const EMPTY_QUOTE: IndexQuote = { ltp: null, open: null, high: null, low: null, netChange: null };
 const INITIAL: IndexPrices = { nifty: EMPTY_QUOTE, bankNifty: EMPTY_QUOTE, sensex: EMPTY_QUOTE };
 
 const TOKEN_MAP: Record<string, keyof IndexPrices> = {
@@ -25,7 +26,7 @@ const TOKEN_MAP: Record<string, keyof IndexPrices> = {
   "BSE_INDEX|SENSEX": "sensex",
 };
 
-type IndexUpdate = { instrumentToken: string; ltp: number; open?: number; high?: number; low?: number };
+type IndexUpdate = { instrumentToken: string; ltp: number; open?: number; high?: number; low?: number; netChange?: number };
 
 export function useIndicesFeed(): IndexPrices {
   const [prices, setPrices] = useState<IndexPrices>(INITIAL);
@@ -41,14 +42,15 @@ export function useIndicesFeed(): IndexPrices {
 
     const applyUpdates = (updates: IndexUpdate[], prev: IndexPrices): IndexPrices => {
       const next = { ...prev };
-      for (const { instrumentToken, ltp, open, high, low } of updates) {
+      for (const { instrumentToken, ltp, open, high, low, netChange } of updates) {
         const key = TOKEN_MAP[instrumentToken];
         if (!key) continue;
         next[key] = {
           ltp,
-          open: open ?? prev[key].open,
-          high: high ?? prev[key].high,
-          low:  low  ?? prev[key].low,
+          open:      open      ?? prev[key].open,
+          high:      high      ?? prev[key].high,
+          low:       low       ?? prev[key].low,
+          netChange: netChange ?? prev[key].netChange,
         };
       }
       return next;

@@ -4,8 +4,9 @@ namespace KAITerminal.Upstox.Models.Responses;
 
 public sealed record MarketQuote
 {
-    [JsonPropertyName("last_price")] public decimal LastPrice { get; init; }
-    [JsonPropertyName("ohlc")] public OhlcValues? Ohlc { get; init; }
+    [JsonPropertyName("last_price")]  public decimal     LastPrice  { get; init; }
+    [JsonPropertyName("net_change")]  public decimal     NetChange  { get; init; }
+    [JsonPropertyName("ohlc")]        public OhlcValues? Ohlc       { get; init; }
 }
 
 public sealed record OhlcValues

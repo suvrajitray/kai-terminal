@@ -1,4 +1,5 @@
 import { useIndicesFeed, type IndexQuote } from "@/hooks/use-indices-feed";
+import { useUserTradingSettingsStore } from "@/stores/user-trading-settings-store";
 import { cn } from "@/lib/utils";
 
 const FMT = new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -14,8 +15,20 @@ function OhlcBadge({ label, value, className }: { label: string; value: number |
 }
 
 function IndexCard({ label, quote }: { label: string; quote: IndexQuote }) {
-  const change = quote.ltp !== null && quote.open !== null ? quote.ltp - quote.open : null;
-  const changePct = change !== null && quote.open ? (change / quote.open) * 100 : null;
+  const indexChangeMode = useUserTradingSettingsStore((s) => s.indexChangeMode);
+
+  let change: number | null;
+  let changePct: number | null;
+
+  if (indexChangeMode === "prevClose") {
+    change = quote.netChange;
+    const prevClose = quote.ltp !== null && quote.netChange !== null ? quote.ltp - quote.netChange : null;
+    changePct = change !== null && prevClose ? (change / prevClose) * 100 : null;
+  } else {
+    change = quote.ltp !== null && quote.open !== null ? quote.ltp - quote.open : null;
+    changePct = change !== null && quote.open ? (change / quote.open) * 100 : null;
+  }
+
   const isUp = change !== null && change >= 0;
 
   return (
