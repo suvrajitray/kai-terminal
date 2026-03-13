@@ -1,6 +1,6 @@
-import { Plus, Minus, ArrowUp, ArrowDown, SquareArrowRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Plus, Minus, ArrowUp, ArrowDown, LogOut } from "lucide-react";
 import { QtyInput, type QtyMode } from "./qty-input";
+import { cn } from "@/lib/utils";
 
 interface PositionActionsProps {
   qtyValue: string;
@@ -19,6 +19,32 @@ interface PositionActionsProps {
   onExit: () => void;
 }
 
+interface ActionBtnProps {
+  onClick: () => void;
+  disabled: boolean;
+  title: string;
+  className?: string;
+  children: React.ReactNode;
+}
+
+function ActionBtn({ onClick, disabled, title, className, children }: ActionBtnProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={cn(
+        "flex items-center justify-center px-2 py-1.5 text-muted-foreground transition-colors",
+        "hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30",
+        className,
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
 export function PositionActions({
   qtyValue,
   qtyMode,
@@ -35,11 +61,11 @@ export function PositionActions({
   onShiftDown,
   onExit,
 }: PositionActionsProps) {
-  const disabled = !!acting;
+  const disabled    = !!acting;
   const qtyDisabled = disabled || actualQty === 0;
 
   return (
-    <div className="flex items-center justify-end gap-1">
+    <div className="flex items-center justify-end gap-2">
       <QtyInput
         value={qtyValue}
         mode={qtyMode}
@@ -48,60 +74,41 @@ export function PositionActions({
         onChange={onQtyChange}
         onToggleMode={onToggleMode}
       />
-      <Button
-        size="icon"
-        variant="ghost"
-        className="size-8 text-green-500 hover:bg-green-500/10 hover:text-green-400"
-        onClick={onAdd}
-        disabled={qtyDisabled}
-        title="Add"
-      >
-        <Plus className="size-4" />
-      </Button>
-      <Button
-        size="icon"
-        variant="ghost"
-        className="size-8 text-red-500 hover:bg-red-500/10 hover:text-red-400"
-        onClick={onReduce}
-        disabled={qtyDisabled}
-        title="Reduce"
-      >
-        <Minus className="size-4" />
-      </Button>
-      <Button
-        size="icon"
-        variant="ghost"
-        className="size-8 text-blue-400 hover:bg-blue-500/10 hover:text-blue-300"
-        onClick={onShiftUp}
-        disabled={qtyDisabled}
-        title="Shift Up"
-      >
-        <ArrowUp className="size-4" />
-      </Button>
-      <Button
-        size="icon"
-        variant="ghost"
-        className="size-8 text-blue-400 hover:bg-blue-500/10 hover:text-blue-300"
-        onClick={onShiftDown}
-        disabled={qtyDisabled}
-        title="Shift Down"
-      >
-        <ArrowDown className="size-4" />
-      </Button>
-      {hasOpenQty ? (
-        <Button
-          size="icon"
-          variant="ghost"
-          className="size-8 text-red-500 hover:bg-red-500/10 hover:text-red-400"
-          onClick={onExit}
-          disabled={disabled}
-          title="Exit"
-        >
-          <SquareArrowRight className="size-4" />
-        </Button>
-      ) : (
-        <span className="size-8 inline-block" />
-      )}
+
+      {/* Grouped action toolbar */}
+      <div className="flex items-stretch overflow-hidden rounded border border-border/50 bg-muted/20">
+
+        {/* Add / Reduce */}
+        <ActionBtn onClick={onAdd} disabled={qtyDisabled} title="Add" className="text-green-500 hover:text-green-400 hover:bg-green-500/10">
+          <Plus className="size-3.5" />
+        </ActionBtn>
+        <div className="w-px bg-border/50" />
+        <ActionBtn onClick={onReduce} disabled={qtyDisabled} title="Reduce" className="text-red-500 hover:text-red-400 hover:bg-red-500/10">
+          <Minus className="size-3.5" />
+        </ActionBtn>
+
+        {/* Divider */}
+        <div className="w-px bg-border/50 mx-0.5" />
+
+        {/* Shift Up / Down */}
+        <ActionBtn onClick={onShiftUp} disabled={qtyDisabled} title="Shift Up" className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10">
+          <ArrowUp className="size-3.5" />
+        </ActionBtn>
+        <div className="w-px bg-border/50" />
+        <ActionBtn onClick={onShiftDown} disabled={qtyDisabled} title="Shift Down" className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10">
+          <ArrowDown className="size-3.5" />
+        </ActionBtn>
+
+        {/* Divider */}
+        {hasOpenQty && <div className="w-px bg-border/50 mx-0.5" />}
+
+        {/* Exit */}
+        {hasOpenQty && (
+          <ActionBtn onClick={onExit} disabled={disabled} title="Exit" className="text-red-500 hover:text-red-400 hover:bg-red-500/10">
+            <LogOut className="size-3.5" />
+          </ActionBtn>
+        )}
+      </div>
     </div>
   );
 }

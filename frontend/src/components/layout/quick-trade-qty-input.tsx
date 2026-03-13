@@ -35,7 +35,7 @@ export function QuickTradeQtyInput({ value, mode, lotSize, onChange, onToggleMod
             const snapped = Math.max(lotSize, Math.floor(raw / lotSize) * lotSize);
             if (snapped !== raw) onChange(String(snapped));
           }}
-          placeholder="0"
+          placeholder={mode === "qty" ? "Qty" : "Lot"}
           className="flex-1 min-w-0 bg-transparent px-3 text-sm tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none focus:outline-none"
         />
         <button

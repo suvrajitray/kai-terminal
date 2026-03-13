@@ -34,19 +34,16 @@ export function QtyInput({ value, mode, multiplier, positionQty, onChange, onTog
     onChange(String(cur + step));
   };
 
-  const hintText =
-    value === ""
-      ? "\u00a0"
-      : mode === "lot"
-        ? `${num * lot} qty.`
-        : lot > 1
-          ? `${Math.floor(num / lot)} lot`
-          : "\u00a0";
+  const hint =
+    value === "" || isNaN(num) ? null
+    : mode === "lot" ? `Qty: ${num * lot}`
+    : lot > 1 ? `Lot: ${Math.floor(num / lot)}`
+    : null;
 
   return (
-    <div className="flex flex-col items-start gap-0.5">
-      <span className="text-[10px] leading-none text-muted-foreground">
-        {mode === "qty" ? "Qty." : "Lots"}
+    <div className="flex items-center gap-1.5">
+      <span className="w-14 text-right text-[10px] tabular-nums text-muted-foreground/60">
+        {hint ?? ""}
       </span>
       <div className="flex items-stretch overflow-hidden rounded border border-border bg-background focus-within:ring-1 focus-within:ring-ring">
         <button
@@ -60,7 +57,6 @@ export function QtyInput({ value, mode, multiplier, positionQty, onChange, onTog
         <button
           type="button"
           onClick={() => {
-            const lot = Math.max(multiplier, 1);
             const filled = mode === "lot" ? String(Math.round(positionQty / lot)) : String(positionQty);
             onChange(filled);
           }}
@@ -81,10 +77,10 @@ export function QtyInput({ value, mode, multiplier, positionQty, onChange, onTog
           type="number"
           min="0"
           value={value}
-          placeholder=""
+          placeholder={mode === "qty" ? "Qty" : "Lot"}
           onChange={(e) => onChange(e.target.value)}
           onBlur={handleBlur}
-          className="w-12 bg-transparent py-1 pl-1.5 pr-0.5 text-right text-xs tabular-nums [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none focus:outline-none"
+          className="w-16 bg-transparent py-1 pl-1.5 pr-0.5 text-right text-xs tabular-nums placeholder:text-muted-foreground/40 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none focus:outline-none"
         />
         <div className="flex flex-col border-l border-border">
           <button
@@ -105,7 +101,6 @@ export function QtyInput({ value, mode, multiplier, positionQty, onChange, onTog
           </button>
         </div>
       </div>
-      <span className="text-[10px] leading-none text-muted-foreground">{hintText}</span>
     </div>
   );
 }
