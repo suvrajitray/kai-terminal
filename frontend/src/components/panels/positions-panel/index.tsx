@@ -3,8 +3,8 @@ import { toast } from "sonner";
 import { LogOut } from "lucide-react";
 import { getLotSize } from "@/lib/lot-sizes";
 import { exitPosition, placeMarketOrder, placeOrderByOptionPrice } from "@/services/trading-api";
-import { parseTradingSymbol, parseExpiryToDate } from "@/lib/parse-trading-symbol";
-import { getShiftOffset, getUnderlyingKey } from "@/lib/shift-config";
+import { getShiftOffset, UNDERLYING_KEYS } from "@/lib/shift-config";
+import { useOptionContractsStore } from "@/stores/option-contracts-store";
 import { PositionRow } from "./position-row";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -26,6 +26,8 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
   const [qtys, setQtys] = useState<Record<string, string>>({});
   const [qtyMode, setQtyMode] = useState<QtyMode>("qty");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const getByInstrumentKey = useOptionContractsStore((s) => s.getByInstrumentKey);
 
   const setQty = (token: string, val: string) =>
     setQtys((prev) => ({ ...prev, [token]: val }));
@@ -78,14 +80,8 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
     product: string,
     direction: "up" | "down",
   ) => {
-    const parsed = parseTradingSymbol(tradingSymbol);
-    if (!parsed) return;
-
-    const underlyingKey = getUnderlyingKey(parsed.underlying);
-    if (!underlyingKey) return;
-
-    const expiryDate = parseExpiryToDate(parsed.expiry);
-    if (!expiryDate) return;
+    const contract = getByInstrumentKey(token);
+    if (!contract) return;
 
     const lot = getLotSize(tradingSymbol);
     const num = parseInt(qtys[token] ?? "", 10);
@@ -95,16 +91,17 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
     const position = positions.find((p) => p.instrument_token === token && p.product === product)!;
     const closeTxn = position.quantity < 0 ? "Buy" : "Sell";
     const openTxn  = position.quantity < 0 ? "Sell" : "Buy";
-    const offset = getShiftOffset(parsed.underlying);
+    const underlying = Object.keys(UNDERLYING_KEYS).find((k) => UNDERLYING_KEYS[k] === contract.underlying_key) ?? contract.underlying_symbol;
+    const offset = getShiftOffset(underlying);
     const targetPremium = position.last_price + (direction === "up" ? offset : -offset);
     const priceSearchMode = direction === "up" ? "GreaterThan" : "LessThan";
 
     return withActing(token + ":shift-" + direction, async () => {
       await placeMarketOrder(token, qty, closeTxn, product);
       await placeOrderByOptionPrice({
-        underlyingKey,
-        expiryDate,
-        optionType: parsed.optionType,
+        underlyingKey: contract.underlying_key,
+        expiryDate: contract.expiry,
+        optionType: contract.instrument_type,
         targetPremium,
         priceSearchMode,
         quantity: qty,

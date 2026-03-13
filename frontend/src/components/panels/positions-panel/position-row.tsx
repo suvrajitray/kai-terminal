@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { getLotSize } from "@/lib/lot-sizes";
-import { parseTradingSymbol } from "@/lib/parse-trading-symbol";
+import { useOptionContractsStore, formatExpiryLabel } from "@/stores/option-contracts-store";
 import { type QtyMode } from "./qty-input";
 import { PositionActions } from "./position-actions";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -64,7 +64,8 @@ export function PositionRow({
   const lot = getLotSize(p.trading_symbol);
   const num = parseInt(qtyValue, 10);
   const actualQty = isNaN(num) || num <= 0 ? 0 : qtyMode === "lot" ? num * lot : num;
-  const parsed = parseTradingSymbol(p.trading_symbol);
+  const getByInstrumentKey = useOptionContractsStore((s) => s.getByInstrumentKey);
+  const contract = getByInstrumentKey(p.instrument_token);
 
   return (
     <tr
@@ -80,11 +81,13 @@ export function PositionRow({
         )}
       </td>
       <td className="px-3 py-1.5">
-        {parsed ? (
+        {contract ? (
           <>
-            <div className="font-medium">{parsed.label}</div>
+            <div className="font-medium">
+              {contract.underlying_symbol} {contract.strike_price} {contract.instrument_type}
+            </div>
             <div className="text-[11px] text-muted-foreground">
-              {p.exchange} {parsed.expiryLabel}
+              {p.exchange} {formatExpiryLabel(contract.expiry)}
             </div>
           </>
         ) : (

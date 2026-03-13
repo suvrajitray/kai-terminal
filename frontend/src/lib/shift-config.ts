@@ -17,7 +17,3 @@ export function getShiftOffset(underlying: string): number {
   };
   return map[key] ?? 10;
 }
-
-export function getUnderlyingKey(underlying: string): string | null {
-  return UNDERLYING_KEYS[underlying.toUpperCase()] ?? null;
-}
