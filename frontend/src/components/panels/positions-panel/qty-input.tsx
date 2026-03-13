@@ -50,7 +50,7 @@ export function QtyInput({ value, mode, multiplier, positionQty, onChange, onTog
           type="button"
           onClick={onToggleMode}
           title={mode === "qty" ? "Switch to lots" : "Switch to qty"}
-          className="flex h-8 w-7 shrink-0 items-center justify-center border-r border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="flex h-8 w-7 shrink-0 items-center justify-center border-r border-border text-muted-foreground transition-colors cursor-pointer hover:bg-muted hover:text-foreground"
         >
           {mode === "qty" ? <Layers className="size-3" /> : <Box className="size-3" />}
         </button>
@@ -61,7 +61,7 @@ export function QtyInput({ value, mode, multiplier, positionQty, onChange, onTog
             onChange(filled);
           }}
           title="Fill all qty"
-          className="flex h-8 w-7 shrink-0 items-center justify-center border-r border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="flex h-8 w-7 shrink-0 items-center justify-center border-r border-border text-muted-foreground transition-colors cursor-pointer hover:bg-muted hover:text-foreground"
         >
           <ArrowUpAZ className="size-3" />
         </button>
@@ -78,7 +78,7 @@ export function QtyInput({ value, mode, multiplier, positionQty, onChange, onTog
           type="button"
           onClick={() => onChange("")}
           title="Clear"
-          className="flex h-8 w-7 shrink-0 items-center justify-center text-muted-foreground/40 transition-colors hover:text-muted-foreground"
+          className="flex h-8 w-7 shrink-0 cursor-pointer items-center justify-center text-muted-foreground/40 transition-colors hover:text-muted-foreground"
         >
           <X className="size-3" />
         </button>
@@ -86,7 +86,7 @@ export function QtyInput({ value, mode, multiplier, positionQty, onChange, onTog
           <button
             type="button"
             onClick={handleIncrement}
-            className="flex flex-1 items-center justify-center border-b border-border px-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="flex flex-1 items-center justify-center border-b border-border px-1 text-muted-foreground transition-colors cursor-pointer hover:bg-muted hover:text-foreground"
             title={`+${step}`}
           >
             <ChevronUp className="size-2.5" />
@@ -94,7 +94,7 @@ export function QtyInput({ value, mode, multiplier, positionQty, onChange, onTog
           <button
             type="button"
             onClick={handleDecrement}
-            className="flex flex-1 items-center justify-center px-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="flex flex-1 items-center justify-center px-1 text-muted-foreground transition-colors cursor-pointer hover:bg-muted hover:text-foreground"
             title={`-${step}`}
           >
             <ChevronDown className="size-2.5" />

@@ -35,7 +35,7 @@ function ActionBtn({ onClick, disabled, title, className, children }: ActionBtnP
       disabled={disabled}
       title={title}
       className={cn(
-        "flex items-center justify-center px-2 py-1.5 text-muted-foreground transition-colors",
+        "flex cursor-pointer items-center justify-center px-2 py-1.5 text-muted-foreground transition-colors",
         "hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30",
         className,
       )}
