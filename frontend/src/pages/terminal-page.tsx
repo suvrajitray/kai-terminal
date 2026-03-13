@@ -65,9 +65,11 @@ function TerminalPageInner() {
   // Monitor MTM on every positions update
   useEffect(() => {
     if (!pp.enabled || firedRef.current) return;
-    if (positions.length === 0) return;
 
-    const mtm = positions.reduce((s, p) => s + p.pnl, 0);
+    const openPositions = positions.filter((p) => p.quantity !== 0);
+    if (openPositions.length === 0) return;
+
+    const mtm = openPositions.reduce((s, p) => s + p.pnl, 0);
 
     // Target hit → exit all
     if (mtm >= pp.mtmTarget) {
