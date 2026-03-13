@@ -87,7 +87,7 @@ export function StatsBar({
                   <span className="flex items-center gap-1">
                     <span className="text-muted-foreground">Peak</span>
                     <span className={cn("tabular-nums font-medium", maxProfit >= 0 ? "text-green-500" : "text-red-500")}>
-                      {maxProfit >= 0 ? "+" : ""}₹{Math.abs(maxProfit).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      {maxProfit >= 0 ? "+" : "-"}₹{Math.abs(maxProfit).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                     </span>
                   </span>
                 )}
@@ -95,7 +95,7 @@ export function StatsBar({
                   <span className="flex items-center gap-1">
                     <span className="text-muted-foreground">Trough</span>
                     <span className={cn("tabular-nums font-medium", maxLoss >= 0 ? "text-green-500" : "text-red-500")}>
-                      {maxLoss >= 0 ? "+" : ""}₹{Math.abs(maxLoss).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      {maxLoss >= 0 ? "+" : "-"}₹{Math.abs(maxLoss).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                     </span>
                   </span>
                 )}

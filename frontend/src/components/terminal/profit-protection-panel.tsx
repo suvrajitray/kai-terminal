@@ -17,8 +17,7 @@ interface ProfitProtectionPanelProps {
 export function ProfitProtectionPanel({ open, onClose, currentMtm }: ProfitProtectionPanelProps) {
   const store = useProfitProtectionStore();
 
-  const [draft, setDraft] = useState<ProfitProtectionConfig>({
-    enabled: store.enabled,
+  const [draft, setDraft] = useState({
     mtmTarget: store.mtmTarget,
     mtmSl: store.mtmSl,
     trailingEnabled: store.trailingEnabled,
@@ -33,7 +32,6 @@ export function ProfitProtectionPanel({ open, onClose, currentMtm }: ProfitProte
     if (isOpen) {
       // Reset draft to current store values when dialog opens
       setDraft({
-        enabled: store.enabled,
         mtmTarget: store.mtmTarget,
         mtmSl: store.mtmSl,
         trailingEnabled: store.trailingEnabled,
@@ -46,7 +44,7 @@ export function ProfitProtectionPanel({ open, onClose, currentMtm }: ProfitProte
   };
 
   const handleSave = () => {
-    store.setConfig(draft);
+    store.setConfig({ ...draft, enabled: store.enabled });
     onClose();
   };
 
