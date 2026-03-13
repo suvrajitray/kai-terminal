@@ -10,6 +10,16 @@ import { exitAllPositions } from "@/services/trading-api";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
 import { useBrokerStore } from "@/stores/broker-store";
 import { isTokenExpired } from "@/lib/token-utils";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const DEFAULT_ORDERS_HEIGHT = 180;
 const MIN_HEIGHT = 32;
@@ -32,6 +42,7 @@ function TerminalPageInner() {
   const [ordersHeight, setOrdersHeight] = useState(MIN_HEIGHT);
   const [ordersExpanded, setOrdersExpanded] = useState(false);
   const [ppOpen, setPpOpen] = useState(false);
+  const [exitAllConfirmOpen, setExitAllConfirmOpen] = useState(false);
   const dragStartY = useRef<number | null>(null);
   const dragStartHeight = useRef<number>(DEFAULT_ORDERS_HEIGHT);
   const lastExpandedHeight = useRef<number>(DEFAULT_ORDERS_HEIGHT);
@@ -96,6 +107,21 @@ function TerminalPageInner() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [positions]);
 
+  // Keyboard shortcuts: R = refresh, E = exit all (with confirm)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (e.key === "r" || e.key === "R") { e.preventDefault(); load(); }
+      if (e.key === "e" || e.key === "E") {
+        const openCount = positions.filter((p) => p.quantity !== 0).length;
+        if (openCount > 0) { e.preventDefault(); setExitAllConfirmOpen(true); }
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [load, positions]);
+
   const handleExitAll = async () => {
     setActing("all");
     try {
@@ -142,7 +168,7 @@ function TerminalPageInner() {
         loading={loading}
         acting={acting}
         onRefresh={load}
-        onExitAll={handleExitAll}
+        onExitAll={() => setExitAllConfirmOpen(true)}
         onOpenProfitProtection={() => setPpOpen(true)}
         ppTarget={pp.enabled ? pp.mtmTarget : null}
         ppCurrentSl={pp.enabled ? currentSl : null}
@@ -183,6 +209,27 @@ function TerminalPageInner() {
         onClose={() => setPpOpen(false)}
         currentMtm={totalPnl}
       />
+
+      {/* Exit All confirmation (triggered by E key or button) */}
+      <AlertDialog open={exitAllConfirmOpen} onOpenChange={setExitAllConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Exit all positions?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will place market exit orders for all open positions. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => { setExitAllConfirmOpen(false); handleExitAll(); }}
+            >
+              Exit All
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
