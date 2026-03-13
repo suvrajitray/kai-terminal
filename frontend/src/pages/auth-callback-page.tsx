@@ -2,6 +2,8 @@ import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
+import { useBrokerStore } from "@/stores/broker-store";
+import { BROKERS } from "@/lib/constants";
 
 function parseJwtPayload(token: string): { sub: string; name: string; email: string } | null {
   try {
@@ -41,7 +43,11 @@ export function AuthCallbackPage() {
     }
 
     login({ id: claims.sub, name: claims.name, email: claims.email }, token);
-    navigate("/dashboard", { replace: true });
+
+    // If any broker already has a valid access token, go straight to terminal.
+    // Otherwise send to connect-brokers so they can authenticate.
+    const anyAuthenticated = BROKERS.some((b) => useBrokerStore.getState().isAuthenticated(b.id));
+    navigate(anyAuthenticated ? "/terminal" : "/connect-brokers", { replace: true });
   }, [searchParams, login, navigate]);
 
   return (

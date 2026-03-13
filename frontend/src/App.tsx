@@ -22,7 +22,7 @@ function App() {
           <Route path="/redirect/:brokerId" element={<BrokerRedirectPage />} />
         </Route>
       </Route>
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/" element={<Navigate to="/connect-brokers" replace />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
