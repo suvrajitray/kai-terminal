@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { LogOut, Settings2, User, Cable } from "lucide-react";
 import {
   DropdownMenu,
@@ -27,10 +27,12 @@ function getInitials(name: string): string {
 
 export function UserMenu() {
   const user = useAuthStore((s) => s.user);
-  const isAuthenticated = useBrokerStore((s) => s.isAuthenticated);
   const [settingsOpen, setSettingsOpen] = useState(false);
-
-  const anyBrokerActive = BROKERS.some((b) => isAuthenticated(b.id));
+  const navigate = useNavigate();
+  const isAuthenticated = useBrokerStore((s) => s.isAuthenticated);
+  const isConnected = useBrokerStore((s) => s.isConnected);
+  const anyAuthenticated = BROKERS.some((b) => isAuthenticated(b.id));
+  const anyConnected = BROKERS.some((b) => isConnected(b.id));
 
   if (!user) return null;
 
@@ -57,14 +59,15 @@ export function UserMenu() {
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setSettingsOpen(true)}>
             <Settings2 className="mr-2 size-4" />
-            Trading Settings
+            User Trading Settings
           </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link to="/connect-brokers" className="flex items-center">
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => navigate("/connect-brokers")} className="flex items-center justify-between">
+            <div className="flex items-center">
               <Cable className="mr-2 size-4" />
-              <span className="flex-1">Brokers</span>
-              <span className={`size-2 rounded-full ${anyBrokerActive ? "bg-green-500" : "bg-amber-500"}`} />
-            </Link>
+              Broker
+            </div>
+            <span className={`size-2 rounded-full ${anyAuthenticated ? "bg-green-500" : anyConnected ? "bg-amber-500" : "bg-muted-foreground/40"}`} />
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={performLogout}>
