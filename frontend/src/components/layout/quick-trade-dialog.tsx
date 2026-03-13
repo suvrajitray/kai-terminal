@@ -16,7 +16,8 @@ import {
 } from "@/components/ui/select";
 import { UNDERLYING_KEYS } from "@/lib/shift-config";
 import { getLotSize } from "@/lib/lot-sizes";
-import { fetchOptionExpiries, placeOrderByOptionPrice } from "@/services/trading-api";
+import { placeOrderByOptionPrice } from "@/services/trading-api";
+import { useOptionContractsStore } from "@/stores/option-contracts-store";
 
 const UNDERLYINGS = Object.keys(UNDERLYING_KEYS);
 
@@ -35,27 +36,19 @@ type ActionType = "CE" | "PE" | "BOTH";
 export function QuickTradeDialog() {
   const [underlying, setUnderlying]   = useState("NIFTY");
   const [expiry, setExpiry]           = useState("");
-  const [expiries, setExpiries]       = useState<string[]>([]);
   const [price, setPrice]             = useState("");
   const [qtyValue, setQtyValue]       = useState("");
   const [qtyMode, setQtyMode]         = useState<QtyMode>("qty");
   const [product, setProduct]         = useState<"I" | "D">("I");
   const [direction, setDirection]     = useState<Direction>("Sell");
   const [acting, setActing]           = useState<ActionType | null>(null);
-  const [loadingExpiries, setLoadingExpiries] = useState(false);
+
+  const getExpiries = useOptionContractsStore((s) => s.getExpiries);
+  const expiries = getExpiries(underlying);
 
   useEffect(() => {
-    setExpiry("");
-    setExpiries([]);
-    setLoadingExpiries(true);
-    fetchOptionExpiries(UNDERLYING_KEYS[underlying])
-      .then((list) => {
-        setExpiries(list);
-        setExpiry(list[0] ?? "");
-      })
-      .catch(() => toast.error("Failed to load expiries"))
-      .finally(() => setLoadingExpiries(false));
-  }, [underlying]);
+    setExpiry(expiries[0] ?? "");
+  }, [underlying, expiries.length]);
 
   const lotSize  = getLotSize(underlying);
   const num      = parseInt(qtyValue, 10);
@@ -159,9 +152,9 @@ export function QuickTradeDialog() {
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label className="text-xs text-muted-foreground uppercase tracking-wider">Expiry</Label>
-            <Select value={expiry} onValueChange={setExpiry} disabled={loadingExpiries}>
+            <Select value={expiry} onValueChange={setExpiry} disabled={expiries.length === 0}>
               <SelectTrigger className="h-9 text-sm">
-                <SelectValue placeholder={loadingExpiries ? "Loading…" : "Select expiry"}>
+                <SelectValue placeholder={expiries.length === 0 ? "No contracts" : "Select expiry"}>
                   {expiry ? formatExpiry(expiry) : undefined}
                 </SelectValue>
               </SelectTrigger>

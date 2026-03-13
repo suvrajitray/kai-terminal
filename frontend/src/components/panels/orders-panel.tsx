@@ -194,7 +194,8 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
             </thead>
             <tbody>
               {visibleOrders.map((o) => {
-                const isCancellable = !TERMINAL_STATUSES.has(o.status.toLowerCase());
+                const s = o.status.toLowerCase();
+                const isCancellable = !TERMINAL_STATUSES.has(s) && !s.includes("cancel") && !s.includes("rejected");
                 return (
                   <tr
                     key={o.order_id}

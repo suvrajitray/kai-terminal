@@ -41,6 +41,19 @@ export interface Position {
   day_sell_quantity: number;
 }
 
+export interface OptionContract {
+  instrument_key: string;
+  trading_symbol: string;
+  expiry: string;
+  strike_price: number;
+  instrument_type: "CE" | "PE";
+  lot_size: number;
+  underlying_key: string;
+  underlying_symbol: string;
+  exchange: string;
+  weekly: boolean;
+}
+
 export interface Order {
   order_id: string;
   exchange_order_id: string;

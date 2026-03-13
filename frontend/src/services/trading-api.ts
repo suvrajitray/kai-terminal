@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api-client";
-import type { Position, Order } from "@/types";
+import type { Position, Order, OptionContract } from "@/types";
 
 export async function fetchPositions(exchanges?: string[]): Promise<Position[]> {
   const params = exchanges?.length ? { exchange: exchanges.join(",") } : undefined;
@@ -68,12 +68,15 @@ export async function placeOrderByOptionPrice(params: {
   });
 }
 
-export async function fetchOptionExpiries(underlyingKey: string): Promise<string[]> {
-  const res = await apiClient.get<{ expiry: string }[]>("/api/upstox/options/contracts/current-year", {
+export async function fetchOptionContracts(underlyingKey: string): Promise<OptionContract[]> {
+  const res = await apiClient.get<OptionContract[]>("/api/upstox/options/contracts/current-year", {
     params: { underlyingKey },
   });
-  const unique = [...new Set(res.data.map((c) => c.expiry))].sort();
-  return unique;
+  return res.data;
+}
+
+export function extractExpiries(contracts: OptionContract[]): string[] {
+  return [...new Set(contracts.map((c) => c.expiry))].sort();
 }
 
 export async function placeMarketOrder(
