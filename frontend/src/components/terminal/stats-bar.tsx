@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { RefreshCw, LogOut, Wifi, WifiOff, ShieldCheck } from "lucide-react";
 import { SessionTimer } from "./session-timer";
+import { MtmDisplay } from "./mtm-display";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { PnlCell } from "@/components/panels/positions-panel/position-row";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
 import type { Position } from "@/types";
 
@@ -76,9 +76,7 @@ export function StatsBar({
 
       {positions.length > 0 && (
         <>
-          <span className="text-sm font-semibold">
-            MTM <PnlCell value={totalPnl} />
-          </span>
+          <MtmDisplay value={totalPnl} />
           <span className="text-xs text-muted-foreground">
             {openCount} open · {closedCount} closed
           </span>
