@@ -1,16 +1,4 @@
-/**
- * Configurable price offsets for Shift Up / Shift Down per underlying.
- * Shift Up  → targetPremium = LTP + offset  (GreaterThan search)
- * Shift Down → targetPremium = LTP - offset  (LessThan search)
- */
-export const SHIFT_OFFSETS: Record<string, number> = {
-  NIFTY: 5,
-  BANKNIFTY: 10,
-  MIDCPNIFTY: 10,
-  FINNIFTY: 10,
-  SENSEX: 10,
-  BANKEX: 10,
-};
+import { useUserTradingSettingsStore } from "@/stores/user-trading-settings-store";
 
 /** Maps underlying symbol name → Upstox instrument key */
 export const UNDERLYING_KEYS: Record<string, string> = {
@@ -23,7 +11,17 @@ export const UNDERLYING_KEYS: Record<string, string> = {
 };
 
 export function getShiftOffset(underlying: string): number {
-  return SHIFT_OFFSETS[underlying.toUpperCase()] ?? 10;
+  const s = useUserTradingSettingsStore.getState();
+  const key = underlying.toUpperCase();
+  const map: Record<string, number> = {
+    NIFTY: s.niftyShiftOffset,
+    BANKNIFTY: s.bankniftyShiftOffset,
+    MIDCPNIFTY: s.midcpniftyShiftOffset,
+    FINNIFTY: s.finniftyShiftOffset,
+    SENSEX: s.sensexShiftOffset,
+    BANKEX: s.bankexShiftOffset,
+  };
+  return map[key] ?? 10;
 }
 
 export function getUnderlyingKey(underlying: string): string | null {
