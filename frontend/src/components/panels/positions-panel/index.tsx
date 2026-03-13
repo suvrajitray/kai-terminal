@@ -7,6 +7,7 @@ import { parseTradingSymbol, parseExpiryToDate } from "@/lib/parse-trading-symbo
 import { getShiftOffset, getUnderlyingKey } from "@/lib/shift-config";
 import { PositionRow } from "./position-row";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { QtyMode } from "./qty-input";
 import type { Position } from "@/types";
 
@@ -168,12 +169,9 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
   const cols = (
     <tr className="border-b border-border text-muted-foreground h-9">
       <th className="pl-3 py-1.5 w-7">
-        <input
-          type="checkbox"
-          className="size-3.5 cursor-pointer accent-primary"
-          checked={allSelected}
-          ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected; }}
-          onChange={toggleSelectAll}
+        <Checkbox
+          checked={allSelected ? true : someSelected ? "indeterminate" : false}
+          onCheckedChange={toggleSelectAll}
         />
       </th>
       <th className="px-3 py-1.5 text-left font-medium">Symbol</th>

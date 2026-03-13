@@ -3,6 +3,7 @@ import { getLotSize } from "@/lib/lot-sizes";
 import { parseTradingSymbol } from "@/lib/parse-trading-symbol";
 import { type QtyMode } from "./qty-input";
 import { PositionActions } from "./position-actions";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { Position } from "@/types";
 
 const INR = new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 });
@@ -75,12 +76,7 @@ export function PositionRow({
     >
       <td className="pl-3 py-1.5 w-7">
         {p.quantity !== 0 && (
-          <input
-            type="checkbox"
-            className="size-3.5 cursor-pointer accent-primary"
-            checked={selected}
-            onChange={onToggleSelect}
-          />
+          <Checkbox checked={selected} onCheckedChange={onToggleSelect} />
         )}
       </td>
       <td className="px-3 py-1.5">
