@@ -14,7 +14,7 @@ public class UserTradingSettingsService(AppDbContext db)
         FinniftyShiftOffset: 10,
         SensexShiftOffset: 10,
         BankexShiftOffset: 10,
-        IndexChangeMode: "open");
+        IndexChangeMode: "prevClose");
 
     public async Task<UserTradingSettingsResponse> GetAsync(string username)
     {
