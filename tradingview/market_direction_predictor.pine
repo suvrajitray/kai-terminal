@@ -162,6 +162,35 @@ isNoTrade     = isNeutral and isHighVol
 
 sellerAction = strongBull ? "SELL PE" : strongBear ? "SELL CE" : weakBull ? "SELL PE (weak)" : weakBear ? "SELL CE (weak)" : isSellBoth and isSqueeze ? "SELL BOTH (squeeze)" : isSellBoth ? "SELL BOTH" : "NO TRADE"
 
+// ── Trade State Machine (entry / exit tracking) ──
+// Regime: 1 = sell PE active, -1 = sell CE active, 2 = sell both active, 0 = flat
+regime = isBullish ? 1 : isBearish ? -1 : isSellBoth ? 2 : 0
+prevRegime = nz(regime[1], 0)
+
+// Entry signals — regime changes from flat or opposite direction
+entrySellPE   = (regime == 1) and (prevRegime != 1)
+entrySellCE   = (regime == -1) and (prevRegime != -1)
+entrySellBoth = (regime == 2) and (prevRegime != 2)
+
+// Exit signals — leaving a position (regime was active, now changed)
+exitPE   = (prevRegime == 1) and (regime != 1)
+exitCE   = (prevRegime == -1) and (regime != -1)
+exitBoth = (prevRegime == 2) and (regime != 2)
+
+// ─────────────────────────────────────────────
+// ENTRY / EXIT MARKERS ON MAIN CHART
+// ─────────────────────────────────────────────
+
+// Entries — arrows below/above bars
+plotshape(entrySellPE, title="Entry: PE", text="PE", style=shape.labelup, location=location.belowbar, color=color.new(color.green, 0), textcolor=color.white, size=size.small, force_overlay=true)
+plotshape(entrySellCE, title="Entry: CE", text="CE", style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0), textcolor=color.white, size=size.small, force_overlay=true)
+plotshape(entrySellBoth, title="Entry: Both", text="Both", style=shape.labelup, location=location.belowbar, color=color.new(color.orange, 0), textcolor=color.white, size=size.small, force_overlay=true)
+
+// Exits — X marks
+plotshape(exitPE, title="Exit: PE", text="PE", style=shape.xcross, location=location.belowbar, color=color.new(color.green, 40), size=size.tiny, force_overlay=true)
+plotshape(exitCE, title="Exit: CE", text="CE", style=shape.xcross, location=location.abovebar, color=color.new(color.red, 40), size=size.tiny, force_overlay=true)
+plotshape(exitBoth, title="Exit: Both", text="Both", style=shape.xcross, location=location.belowbar, color=color.new(color.orange, 40), size=size.tiny, force_overlay=true)
+
 // ─────────────────────────────────────────────
 // HELPER FUNCTIONS
 // ─────────────────────────────────────────────
@@ -220,12 +249,6 @@ hline(-50,  "Bear Threshold", color=color.new(color.red, 60),    linestyle=hline
 // Squeeze background highlight
 bgcolor(isSqueeze ? color.new(color.orange, 90) : na, title="Squeeze Zone")
 
-// ─────────────────────────────────────────────
-// MAIN CHART BAR COLOUR
-// ─────────────────────────────────────────────
-
-_barCol = strongBull ? color.new(color.green, 30) : strongBear ? color.new(color.red, 30) : weakBull ? color.new(color.green, 70) : weakBear ? color.new(color.red, 70) : isSellBoth ? color.new(color.orange, 50) : color.new(color.gray, 70)
-barcolor(_barCol, title="Bar Colour")
 
 // ─────────────────────────────────────────────
 // LABEL ON LAST BAR

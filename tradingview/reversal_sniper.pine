@@ -1,0 +1,322 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0
+// © kai-terminal
+
+//@version=5
+indicator("Reversal Sniper", shorttitle="RS", overlay=true, max_labels_count=500, max_lines_count=500)
+
+// ─────────────────────────────────────────────
+// INPUTS
+// ─────────────────────────────────────────────
+
+// Filters
+maxSL        = input.float(40.0, "Max Stoploss (points)",     group="Filters", minval=5)
+minTarget    = input.float(20.0, "Min Target (points)",        group="Filters", minval=5)
+rrRatio      = input.float(2.0,  "Risk:Reward Ratio",          group="Filters", minval=1.0, step=0.5)
+minScore     = input.int(3,      "Min Confluence Score (1-7)",  group="Filters", minval=1, maxval=7)
+
+// Structure
+swingLen     = input.int(5,  "Swing Lookback",                  group="Structure", minval=2, maxval=20)
+srLookback   = input.int(20, "S/R Pivot Lookback",              group="Structure", minval=10, maxval=50)
+srZone       = input.float(0.15, "S/R Zone Width (%)",          group="Structure", minval=0.05, step=0.05)
+
+// Volume
+volLen       = input.int(20, "Volume MA Length",                group="Volume")
+volSpike     = input.float(1.5, "Volume Spike (x avg)",         group="Volume")
+
+// Visual
+showSLTP     = input.bool(true, "Show SL/TP Lines",            group="Visual")
+lineLen      = input.int(10, "SL/TP Line Length (bars)",        group="Visual", minval=3, maxval=30)
+showSR       = input.bool(true, "Show S/R Levels",              group="Visual")
+
+// ─────────────────────────────────────────────
+// CORE PRICE ACTION DATA
+// ─────────────────────────────────────────────
+
+bodySize    = math.abs(close - open)
+upperWick   = high - math.max(close, open)
+lowerWick   = math.min(close, open) - low
+candleRange = high - low
+midBody     = (open + close) / 2
+
+prevBodySize  = math.abs(close[1] - open[1])
+prevRange     = high[1] - low[1]
+
+isBullBar   = close > open
+isBearBar   = close < open
+
+volMA       = ta.sma(volume, volLen)
+isVolSpike  = volume >= volMA * volSpike
+
+// Swing high/low
+swingLo     = ta.lowest(low, swingLen)
+swingHi     = ta.highest(high, swingLen)
+
+// ─────────────────────────────────────────────
+// 1. CANDLESTICK REVERSAL PATTERNS
+// ─────────────────────────────────────────────
+
+// Bullish engulfing
+bullEngulf = isBearBar[1] and isBullBar and open <= close[1] and close >= open[1] and bodySize > prevBodySize
+
+// Bearish engulfing
+bearEngulf = isBullBar[1] and isBearBar and open >= close[1] and close <= open[1] and bodySize > prevBodySize
+
+// Hammer — long lower wick, small upper wick, small body at top
+isHammer = candleRange > 0 and lowerWick > bodySize * 2 and upperWick < bodySize * 0.5 and isBullBar
+
+// Shooting star — long upper wick, small lower wick, small body at bottom
+isShootingStar = candleRange > 0 and upperWick > bodySize * 2 and lowerWick < bodySize * 0.5 and isBearBar
+
+// Morning star (3-candle)
+morningStar = isBearBar[2] and bodySize[1] < bodySize[2] * 0.3 and isBullBar and close > (open[2] + close[2]) / 2
+
+// Evening star (3-candle)
+eveningStar = isBullBar[2] and bodySize[1] < bodySize[2] * 0.3 and isBearBar and close < (open[2] + close[2]) / 2
+
+// Piercing line — bearish candle followed by bullish candle opening below prev low, closing above prev midpoint
+piercingLine = isBearBar[1] and isBullBar and open < low[1] and close > midBody[1] and close < open[1]
+
+// Dark cloud cover — bullish candle followed by bearish candle opening above prev high, closing below prev midpoint
+darkCloud = isBullBar[1] and isBearBar and open > high[1] and close < midBody[1] and close > close[1]
+
+bullCandle = bullEngulf or isHammer or morningStar or piercingLine
+bearCandle = bearEngulf or isShootingStar or eveningStar or darkCloud
+
+// ─────────────────────────────────────────────
+// 2. SUPPORT / RESISTANCE (pivot-based)
+// ─────────────────────────────────────────────
+
+pivotHi = ta.pivothigh(high, srLookback, srLookback)
+pivotLo = ta.pivotlow(low, srLookback, srLookback)
+
+var float resistanceLevel = na
+var float supportLevel    = na
+
+if not na(pivotHi)
+    resistanceLevel := pivotHi
+if not na(pivotLo)
+    supportLevel := pivotLo
+
+srZonePts    = close * srZone / 100
+nearSupport  = not na(supportLevel) and math.abs(low - supportLevel) <= srZonePts
+nearResist   = not na(resistanceLevel) and math.abs(high - resistanceLevel) <= srZonePts
+
+// ─────────────────────────────────────────────
+// 3. PRICE STRUCTURE — Higher Low / Lower High
+// ─────────────────────────────────────────────
+
+prevSwingLo = ta.lowest(low, swingLen)[swingLen]
+prevSwingHi = ta.highest(high, swingLen)[swingLen]
+
+higherLow  = swingLo > prevSwingLo
+lowerHigh  = swingHi < prevSwingHi
+
+// ─────────────────────────────────────────────
+// 4. FAILED BREAKOUT (bull/bear trap)
+// ─────────────────────────────────────────────
+
+// Bull trap: broke above previous swing high but closed back below = bearish reversal
+bullTrap = high > prevSwingHi and close < prevSwingHi and isBearBar
+
+// Bear trap: broke below previous swing low but closed back above = bullish reversal
+bearTrap = low < prevSwingLo and close > prevSwingLo and isBullBar
+
+// ─────────────────────────────────────────────
+// 5. INSIDE BAR BREAKOUT
+// ─────────────────────────────────────────────
+
+// Inside bar: current bar's range is within previous bar's range
+isInsideBar = high[1] <= high[2] and low[1] >= low[2]
+
+// Inside bar followed by breakout in reversal direction
+insideBarBullBreak = isInsideBar and isBullBar and close > high[1] and low[2] <= swingLo[2] + srZonePts
+insideBarBearBreak = isInsideBar and isBearBar and close < low[1] and high[2] >= swingHi[2] - srZonePts
+
+// ─────────────────────────────────────────────
+// 6. STRONG REJECTION WICK
+// ─────────────────────────────────────────────
+
+// Long wick relative to recent ATR = strong rejection
+atrRef = ta.atr(14)
+
+// Bullish rejection: very long lower wick (> 1.5× ATR), showing buyers stepped in hard
+bullRejection = lowerWick > atrRef * 1.5 and upperWick < lowerWick * 0.3
+
+// Bearish rejection: very long upper wick (> 1.5× ATR), showing sellers slammed it down
+bearRejection = upperWick > atrRef * 1.5 and lowerWick < upperWick * 0.3
+
+// ─────────────────────────────────────────────
+// 7. VOLUME CLIMAX AT REVERSAL
+// ─────────────────────────────────────────────
+
+// Volume spike + reversal candle = climax selling/buying exhaustion
+bullVolClimax = isVolSpike and (isBullBar or lowerWick > bodySize)
+bearVolClimax = isVolSpike and (isBearBar or upperWick > bodySize)
+
+// ─────────────────────────────────────────────
+// CONFLUENCE SCORING (pure price action)
+// ─────────────────────────────────────────────
+
+bullScore = 0
+bullScore += bullCandle ? 1 : 0                             // reversal candle pattern
+bullScore += nearSupport ? 1 : 0                            // at support level
+bullScore += higherLow ? 1 : 0                              // higher low structure
+bullScore += bearTrap or insideBarBullBreak ? 1 : 0         // failed breakdown or inside bar breakout
+bullScore += bullRejection ? 1 : 0                          // strong rejection wick
+bullScore += bullVolClimax ? 1 : 0                          // volume climax
+bullScore += low <= swingLo[1] and close > open ? 1 : 0    // sweep of prior low + reclaim (liquidity grab)
+
+bearScore = 0
+bearScore += bearCandle ? 1 : 0
+bearScore += nearResist ? 1 : 0
+bearScore += lowerHigh ? 1 : 0
+bearScore += bullTrap or insideBarBearBreak ? 1 : 0
+bearScore += bearRejection ? 1 : 0
+bearScore += bearVolClimax ? 1 : 0
+bearScore += high >= swingHi[1] and close < open ? 1 : 0   // sweep of prior high + rejection (liquidity grab)
+
+// Must have minimum confluence
+rawBullRev = bullScore >= minScore
+rawBearRev = bearScore >= minScore
+
+// ─────────────────────────────────────────────
+// STOPLOSS & TARGET
+// ─────────────────────────────────────────────
+
+bullSL     = swingLo - 2
+bullEntry  = close
+bullSLdist = bullEntry - bullSL
+bullTP     = bullEntry + bullSLdist * rrRatio
+
+bearSL     = swingHi + 2
+bearEntry  = close
+bearSLdist = bearSL - bearEntry
+bearTP     = bearEntry - bearSLdist * rrRatio
+
+bullValid = rawBullRev and bullSLdist > 0 and bullSLdist <= maxSL and (bullTP - bullEntry) >= minTarget
+bearValid = rawBearRev and bearSLdist > 0 and bearSLdist <= maxSL and (bearEntry - bearTP) >= minTarget
+
+// Cooldown
+var int lastBullBar = 0
+var int lastBearBar = 0
+cooldown = swingLen * 2
+
+bullSignal = bullValid and (bar_index - lastBullBar) > cooldown
+bearSignal = bearValid and (bar_index - lastBearBar) > cooldown
+
+if bullSignal
+    lastBullBar := bar_index
+if bearSignal
+    lastBearBar := bar_index
+
+// ─────────────────────────────────────────────
+// PLOT S/R LEVELS
+// ─────────────────────────────────────────────
+
+plot(showSR and not na(supportLevel) ? supportLevel : na, "Support", color=color.new(color.green, 60), style=plot.style_circles, linewidth=1)
+plot(showSR and not na(resistanceLevel) ? resistanceLevel : na, "Resistance", color=color.new(color.red, 60), style=plot.style_circles, linewidth=1)
+
+// ─────────────────────────────────────────────
+// PLOT ENTRY / SL / TP
+// ─────────────────────────────────────────────
+
+plotshape(bullSignal, title="Bullish Reversal", text="PE", style=shape.labelup, location=location.belowbar, color=color.new(color.green, 0), textcolor=color.white, size=size.small)
+plotshape(bearSignal, title="Bearish Reversal", text="CE", style=shape.labeldown, location=location.abovebar, color=color.new(color.red, 0), textcolor=color.white, size=size.small)
+
+if showSLTP and bullSignal
+    line.new(bar_index, bullEntry, bar_index + lineLen, bullEntry, color=color.new(color.green, 0), style=line.style_solid, width=1)
+    line.new(bar_index, bullSL, bar_index + lineLen, bullSL, color=color.new(color.red, 0), style=line.style_dashed, width=1)
+    line.new(bar_index, bullTP, bar_index + lineLen, bullTP, color=color.new(color.blue, 0), style=line.style_dashed, width=1)
+    label.new(bar_index + lineLen, bullSL, "SL " + str.tostring(math.round(bullSLdist, 1)), style=label.style_none, textcolor=color.new(color.red, 0), size=size.tiny)
+    label.new(bar_index + lineLen, bullTP, "TP " + str.tostring(math.round(bullTP - bullEntry, 1)), style=label.style_none, textcolor=color.new(color.blue, 0), size=size.tiny)
+    label.new(bar_index, bullEntry, str.tostring(bullScore) + "/7", style=label.style_none, textcolor=color.new(color.green, 0), size=size.tiny)
+
+if showSLTP and bearSignal
+    line.new(bar_index, bearEntry, bar_index + lineLen, bearEntry, color=color.new(color.red, 0), style=line.style_solid, width=1)
+    line.new(bar_index, bearSL, bar_index + lineLen, bearSL, color=color.new(color.red, 0), style=line.style_dashed, width=1)
+    line.new(bar_index, bearTP, bar_index + lineLen, bearTP, color=color.new(color.blue, 0), style=line.style_dashed, width=1)
+    label.new(bar_index + lineLen, bearSL, "SL " + str.tostring(math.round(bearSLdist, 1)), style=label.style_none, textcolor=color.new(color.red, 0), size=size.tiny)
+    label.new(bar_index + lineLen, bearTP, "TP " + str.tostring(math.round(bearEntry - bearTP, 1)), style=label.style_none, textcolor=color.new(color.blue, 0), size=size.tiny)
+    label.new(bar_index, bearEntry, str.tostring(bearScore) + "/7", style=label.style_none, textcolor=color.new(color.red, 0), size=size.tiny)
+
+// ─────────────────────────────────────────────
+// INFO TABLE (top-right)
+// ─────────────────────────────────────────────
+
+var table infoTable = na
+if barstate.islast
+    table.delete(infoTable)
+    infoTable := table.new(position.top_right, 3, 11, bgcolor=color.new(color.black, 75), border_color=color.new(color.white, 60), border_width=1, frame_color=color.new(color.white, 40), frame_width=1)
+
+    table.cell(infoTable, 0, 0, "Reversal Sniper", text_color=color.white, text_size=size.small, bgcolor=color.new(color.black, 50))
+    table.cell(infoTable, 1, 0, "Bull", text_color=color.new(color.green, 20), text_size=size.small, bgcolor=color.new(color.black, 50))
+    table.cell(infoTable, 2, 0, "Bear", text_color=color.new(color.red, 20), text_size=size.small, bgcolor=color.new(color.black, 50))
+
+    // 1 — Candle Pattern
+    bCandleName = bullEngulf ? "Engulf" : isHammer ? "Hammer" : morningStar ? "MornStar" : piercingLine ? "Pierce" : "—"
+    sCandleName = bearEngulf ? "Engulf" : isShootingStar ? "ShootStar" : eveningStar ? "EveStar" : darkCloud ? "DarkCloud" : "—"
+    table.cell(infoTable, 0, 1, "Candle", text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 1, 1, bCandleName, text_color=bullCandle ? color.new(color.green, 0) : color.new(color.gray, 50), text_size=size.small)
+    table.cell(infoTable, 2, 1, sCandleName, text_color=bearCandle ? color.new(color.red, 0) : color.new(color.gray, 50), text_size=size.small)
+
+    // 2 — S/R
+    table.cell(infoTable, 0, 2, "S/R Level", text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 1, 2, nearSupport ? "Support ✓" : "—", text_color=nearSupport ? color.new(color.green, 0) : color.new(color.gray, 50), text_size=size.small)
+    table.cell(infoTable, 2, 2, nearResist ? "Resist ✓" : "—", text_color=nearResist ? color.new(color.red, 0) : color.new(color.gray, 50), text_size=size.small)
+
+    // 3 — Structure
+    table.cell(infoTable, 0, 3, "Structure", text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 1, 3, higherLow ? "Higher Low" : "—", text_color=higherLow ? color.new(color.green, 0) : color.new(color.gray, 50), text_size=size.small)
+    table.cell(infoTable, 2, 3, lowerHigh ? "Lower High" : "—", text_color=lowerHigh ? color.new(color.red, 0) : color.new(color.gray, 50), text_size=size.small)
+
+    // 4 — Trap / Inside Bar
+    bTrap = bearTrap or insideBarBullBreak
+    sTrap = bullTrap or insideBarBearBreak
+    bTrapText = bearTrap ? "Bear Trap" : insideBarBullBreak ? "IB Break ▲" : "—"
+    sTrapText = bullTrap ? "Bull Trap" : insideBarBearBreak ? "IB Break ▼" : "—"
+    table.cell(infoTable, 0, 4, "Trap / IB", text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 1, 4, bTrapText, text_color=bTrap ? color.new(color.green, 0) : color.new(color.gray, 50), text_size=size.small)
+    table.cell(infoTable, 2, 4, sTrapText, text_color=sTrap ? color.new(color.red, 0) : color.new(color.gray, 50), text_size=size.small)
+
+    // 5 — Rejection Wick
+    table.cell(infoTable, 0, 5, "Rejection", text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 1, 5, bullRejection ? "Wick ✓" : "—", text_color=bullRejection ? color.new(color.green, 0) : color.new(color.gray, 50), text_size=size.small)
+    table.cell(infoTable, 2, 5, bearRejection ? "Wick ✓" : "—", text_color=bearRejection ? color.new(color.red, 0) : color.new(color.gray, 50), text_size=size.small)
+
+    // 6 — Volume
+    table.cell(infoTable, 0, 6, "Volume", text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 1, 6, bullVolClimax ? "Climax ✓" : "—", text_color=bullVolClimax ? color.new(color.green, 0) : color.new(color.gray, 50), text_size=size.small)
+    table.cell(infoTable, 2, 6, bearVolClimax ? "Climax ✓" : "—", text_color=bearVolClimax ? color.new(color.red, 0) : color.new(color.gray, 50), text_size=size.small)
+
+    // 7 — Liquidity Grab
+    bLiqGrab = low <= swingLo[1] and close > open
+    sLiqGrab = high >= swingHi[1] and close < open
+    table.cell(infoTable, 0, 7, "Liq Grab", text_color=color.white, text_size=size.small)
+    table.cell(infoTable, 1, 7, bLiqGrab ? "Sweep ✓" : "—", text_color=bLiqGrab ? color.new(color.green, 0) : color.new(color.gray, 50), text_size=size.small)
+    table.cell(infoTable, 2, 7, sLiqGrab ? "Sweep ✓" : "—", text_color=sLiqGrab ? color.new(color.red, 0) : color.new(color.gray, 50), text_size=size.small)
+
+    // Separator
+    table.cell(infoTable, 0, 8, "", text_size=size.small, bgcolor=color.new(color.black, 50))
+    table.cell(infoTable, 1, 8, "", text_size=size.small, bgcolor=color.new(color.black, 50))
+    table.cell(infoTable, 2, 8, "", text_size=size.small, bgcolor=color.new(color.black, 50))
+
+    // Confluence Score
+    bScoreColor = bullScore >= minScore ? color.new(color.green, 0) : color.new(color.gray, 40)
+    sScoreColor = bearScore >= minScore ? color.new(color.red, 0) : color.new(color.gray, 40)
+    table.cell(infoTable, 0, 9, "Confluence", text_color=color.white, text_size=size.small, bgcolor=color.new(color.black, 40))
+    table.cell(infoTable, 1, 9, str.tostring(bullScore) + "/7", text_color=bScoreColor, text_size=size.normal, bgcolor=color.new(color.black, 40))
+    table.cell(infoTable, 2, 9, str.tostring(bearScore) + "/7", text_color=sScoreColor, text_size=size.normal, bgcolor=color.new(color.black, 40))
+
+    // Signal
+    bSigText = bullScore >= minScore ? "PE ✓" : "—"
+    sSigText = bearScore >= minScore ? "CE ✓" : "—"
+    table.cell(infoTable, 0, 10, "Signal", text_color=color.white, text_size=size.small, bgcolor=color.new(color.black, 40))
+    table.cell(infoTable, 1, 10, bSigText, text_color=bullScore >= minScore ? color.new(color.green, 0) : color.new(color.gray, 50), text_size=size.normal, bgcolor=color.new(color.black, 40))
+    table.cell(infoTable, 2, 10, sSigText, text_color=bearScore >= minScore ? color.new(color.red, 0) : color.new(color.gray, 50), text_size=size.normal, bgcolor=color.new(color.black, 40))
+
+// ─────────────────────────────────────────────
+// ALERTS
+// ─────────────────────────────────────────────
+
+alertcondition(bullSignal, "Bullish Reversal — Sell PE", "Reversal Sniper → Bullish reversal, sell PE")
+alertcondition(bearSignal, "Bearish Reversal — Sell CE", "Reversal Sniper → Bearish reversal, sell CE")

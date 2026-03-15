@@ -1,6 +1,6 @@
 # Market Direction Predictor (MDP)
 
-A TradingView Pine Script indicator built for **intraday option sellers**. It combines 7 weighted indicators, volume confirmation, and volatility analysis to produce a single directional score with explicit seller actions (SELL PE / SELL CE / SELL BOTH / NO TRADE).
+A TradingView Pine Script indicator built for **intraday option sellers**. It combines 7 weighted indicators, volume confirmation, and volatility analysis to produce a single directional score with explicit seller actions (SELL PE / SELL CE / SELL BOTH / NO TRADE). Entry and exit markers are plotted directly on the main chart.
 
 ---
 
@@ -56,6 +56,26 @@ When the score is neutral (between -50% and +50%), the action depends on **volat
 
 ---
 
+## Entry & Exit Markers (Main Chart)
+
+A regime state machine tracks the current position: Sell PE (1), Sell CE (-1), Sell Both (2), or Flat (0). Markers appear on the main price chart via `force_overlay`.
+
+### Entry (label arrows)
+| Marker | Position | Colour | Trigger |
+|--------|----------|--------|---------|
+| **PE** | Below bar, arrow up | Green | Regime shifts to bullish |
+| **CE** | Above bar, arrow down | Red | Regime shifts to bearish |
+| **Both** | Below bar, arrow up | Orange | Regime shifts to range-bound |
+
+### Exit (X cross)
+| Marker | Position | Colour | Trigger |
+|--------|----------|--------|---------|
+| **PE** | Below bar | Faded green | Leaving bullish regime |
+| **CE** | Above bar | Faded red | Leaving bearish regime |
+| **Both** | Below bar | Faded orange | Leaving range-bound regime |
+
+---
+
 ## Volatility Analysis
 
 The indicator uses **Bollinger Band width** relative to **Keltner Channels** to assess volatility:
@@ -75,8 +95,8 @@ The table shows:
 
 Signals are gated by volume relative to the 20-period moving average:
 
-- **Strong signal** — score beyond threshold AND volume ≥ 1× average → full-colour bars, confident action
-- **Weak signal** — score beyond threshold but volume is thin → faded bars, "(weak)" label, reduce position size
+- **Strong signal** — score beyond threshold AND volume ≥ 1× average → confident action
+- **Weak signal** — score beyond threshold but volume is thin → "(weak)" label, reduce position size
 
 ---
 
@@ -85,7 +105,7 @@ Signals are gated by volume relative to the 20-period moving average:
 | Element | Description |
 |---------|-------------|
 | **Histogram** | Score % as coloured columns — green (bull), red (bear), orange (sell both), faded red (no trade), gray (neutral) |
-| **Bar colouring** | Chart bars tinted by signal — bright for strong, faded for weak, orange for sell both |
+| **Entry/Exit markers** | Labels + X crosses on main chart (PE/CE/Both) |
 | **Score table** (main chart, top-right) | Breakdown of every indicator's vote, weight, volatility state, volume, and the final seller action |
 | **Label** (last bar) | Current signal + seller action + score % |
 | **Dotted lines** | ±50% thresholds |
