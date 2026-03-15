@@ -1,0 +1,343 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0
+// © kai-terminal
+
+//@version=5
+indicator("Market Direction Predictor", shorttitle="MDP", overlay=false, max_labels_count=1)
+
+// ─────────────────────────────────────────────
+// INPUTS
+// ─────────────────────────────────────────────
+
+// EMA
+emaFastLen   = input.int(9,   "EMA Fast Length",   group="EMA Alignment")
+emaMidLen    = input.int(21,  "EMA Mid Length",    group="EMA Alignment")
+emaSlowLen   = input.int(50,  "EMA Slow Length",   group="EMA Alignment")
+
+// VWAP
+useVwap      = input.bool(true, "Use VWAP",        group="VWAP")
+
+// RSI
+rsiLen       = input.int(14,  "RSI Length",        group="RSI")
+rsiBull      = input.float(55, "RSI Bullish Threshold", group="RSI")
+rsiBear      = input.float(45, "RSI Bearish Threshold", group="RSI")
+
+// MACD
+macdFast     = input.int(12, "MACD Fast",          group="MACD")
+macdSlow     = input.int(26, "MACD Slow",          group="MACD")
+macdSignal   = input.int(9,  "MACD Signal",        group="MACD")
+
+// Supertrend
+stFactor     = input.float(2.0, "Supertrend Factor",     group="Supertrend")
+stAtrLen     = input.int(10,    "Supertrend ATR Length",  group="Supertrend")
+stFactor2    = input.float(3.0, "Supertrend Factor (Slow)", group="Supertrend")
+stAtrLen2    = input.int(14,    "Supertrend ATR (Slow)",    group="Supertrend")
+
+// ADX / DMI
+adxLen       = input.int(14, "DMI Length",          group="ADX / DMI")
+adxSmooth    = input.int(14, "ADX Smoothing",       group="ADX / DMI")
+adxMinStr    = input.float(20.0, "ADX Min Strength", group="ADX / DMI")
+
+// Bollinger Band Squeeze (volatility)
+bbLen        = input.int(20,    "BB Length",             group="Volatility Squeeze")
+bbMult       = input.float(2.0, "BB Multiplier",         group="Volatility Squeeze")
+kcLen        = input.int(20,    "KC Length",             group="Volatility Squeeze")
+kcMult       = input.float(1.5, "KC Multiplier",         group="Volatility Squeeze")
+
+// Volume
+volLen       = input.int(20, "Volume MA Length",    group="Volume")
+volMultiplier = input.float(1.0, "Volume Confirmation (x avg)", group="Volume")
+
+// HTF confirmation
+htf          = input.timeframe("60", "Higher Timeframe", group="HTF Confirmation")
+
+// Scoring weights (trend indicators weighted higher)
+wEma         = input.int(2, "Weight: EMA",          group="Weights", minval=1, maxval=3)
+wVwap        = input.int(2, "Weight: VWAP",         group="Weights", minval=1, maxval=3)
+wSupertrend  = input.int(2, "Weight: Supertrend",   group="Weights", minval=1, maxval=3)
+wMacd        = input.int(1, "Weight: MACD",         group="Weights", minval=1, maxval=3)
+wRsi         = input.int(1, "Weight: RSI",          group="Weights", minval=1, maxval=3)
+wAdx         = input.int(1, "Weight: ADX/DMI",      group="Weights", minval=1, maxval=3)
+wHtf         = input.int(2, "Weight: HTF Trend",    group="Weights", minval=1, maxval=3)
+
+// ─────────────────────────────────────────────
+// CALCULATIONS
+// ─────────────────────────────────────────────
+
+// Maximum possible score (for normalisation)
+maxScore = wEma + wVwap + wSupertrend + wMacd + wRsi + wAdx + wHtf
+
+// ── 1. EMA Alignment (fast/mid/slow — tuned for intraday) ──
+ema9   = ta.ema(close, emaFastLen)
+ema21  = ta.ema(close, emaMidLen)
+ema50  = ta.ema(close, emaSlowLen)
+
+emaRawScore = close > ema9 and ema9 > ema21 and ema21 > ema50 ? 1 : close < ema9 and ema9 < ema21 and ema21 < ema50 ? -1 : 0
+
+// ── 2. VWAP (intraday anchor — price above = bullish, below = bearish) ──
+vwapVal = ta.vwap(hlc3)
+vwapDist = (close - vwapVal) / vwapVal * 100  // distance from VWAP in %
+
+// Only count VWAP if price is meaningfully away (>0.05%), not hugging it
+vwapRawScore = not useVwap ? 0 : vwapDist > 0.05 ? 1 : vwapDist < -0.05 ? -1 : 0
+
+// ── 3. RSI ──
+rsiVal   = ta.rsi(close, rsiLen)
+rsiRawScore = rsiVal > rsiBull ? 1 : rsiVal < rsiBear ? -1 : 0
+
+// ── 4. MACD ──
+[macdLine, signalLine, macdHist] = ta.macd(close, macdFast, macdSlow, macdSignal)
+// Use histogram direction for earlier signal: rising histogram = momentum building
+macdRising = macdHist > macdHist[1]
+macdFalling = macdHist < macdHist[1]
+
+macdRawScore = macdLine > signalLine and macdLine > 0 ? 1 : macdLine < signalLine and macdLine < 0 ? -1 : macdLine > signalLine and macdRising ? 1 : macdLine < signalLine and macdFalling ? -1 : 0
+
+// ── 5. Dual Supertrend (fast + slow for confirmation) ──
+[_stVal1, stDir1] = ta.supertrend(stFactor, stAtrLen)
+[_stVal2, stDir2] = ta.supertrend(stFactor2, stAtrLen2)
+
+// Both must agree for full score; single = half credit (0)
+stRawScore = stDir1 == -1 and stDir2 == -1 ? 1 : stDir1 == 1 and stDir2 == 1 ? -1 : 0
+
+// ── 6. ADX + DMI ──
+[diPlus, diMinus, adxVal] = ta.dmi(adxLen, adxSmooth)
+adxRawScore = adxVal > adxMinStr and diPlus > diMinus ? 1 : adxVal > adxMinStr and diMinus > diPlus ? -1 : 0
+
+// ── 7. Higher Timeframe EMA Trend ──
+htfEmaFast = request.security(syminfo.tickerid, htf, ta.ema(close, 9))
+htfEmaSlow = request.security(syminfo.tickerid, htf, ta.ema(close, 21))
+htfClose   = request.security(syminfo.tickerid, htf, close)
+
+htfRawScore = htfClose > htfEmaFast and htfEmaFast > htfEmaSlow ? 1 : htfClose < htfEmaFast and htfEmaFast < htfEmaSlow ? -1 : 0
+
+// ── Bollinger Band Squeeze Detection ──
+// When BB is inside KC = squeeze = low volatility = good for option sellers
+bbBasis = ta.sma(close, bbLen)
+bbUpper = bbBasis + bbMult * ta.stdev(close, bbLen)
+bbLower = bbBasis - bbMult * ta.stdev(close, bbLen)
+bbWidth = bbUpper - bbLower
+
+kcBasis = ta.ema(close, kcLen)
+kcRange = ta.atr(kcLen)
+kcUpper = kcBasis + kcMult * kcRange
+kcLower = kcBasis - kcMult * kcRange
+
+isSqueeze     = bbLower > kcLower and bbUpper < kcUpper
+squeezeFireUp = isSqueeze[1] and not isSqueeze and close > bbBasis  // squeeze released upward
+squeezeFireDn = isSqueeze[1] and not isSqueeze and close < bbBasis  // squeeze released downward
+
+// BB Width percentile — how narrow are bands relative to recent history?
+bbWidthPctile = ta.percentrank(bbWidth, 100)
+isLowVol      = bbWidthPctile < 25   // bottom quartile = very compressed
+
+// ── Volume Confirmation ──
+volMA     = ta.sma(volume, volLen)
+volStrong = volume >= volMA * volMultiplier
+
+// ── Weighted Score ──
+rawTotal = emaRawScore * wEma + vwapRawScore * wVwap + stRawScore * wSupertrend + macdRawScore * wMacd + rsiRawScore * wRsi + adxRawScore * wAdx + htfRawScore * wHtf
+
+// Normalise to percentage (-100 to +100)
+scorePct = math.round(rawTotal / maxScore * 100)
+
+// ── Volume-Gated Signal ──
+// Strong signal: score beyond threshold AND volume confirms
+// Weak signal: score beyond threshold but volume is thin (potential trap)
+strongBull = scorePct >= 50  and volStrong
+strongBear = scorePct <= -50 and volStrong
+weakBull   = scorePct >= 50  and not volStrong
+weakBear   = scorePct <= -50 and not volStrong
+
+isBullish  = scorePct >= 50
+isBearish  = scorePct <= -50
+isNeutral  = not isBullish and not isBearish
+
+// ── Seller Action ──
+// For option sellers: sell CE when bearish, sell PE when bullish
+// Neutral + low/normal volatility = range-bound = sell both sides (strangle/iron condor)
+// Neutral + high volatility (expanding bands) = dangerous, stay flat
+isHighVol     = bbWidthPctile > 75
+isSellBoth    = isNeutral and (isSqueeze or not isHighVol)
+isNoTrade     = isNeutral and isHighVol
+
+sellerAction = strongBull ? "SELL PE" : strongBear ? "SELL CE" : weakBull ? "SELL PE (weak)" : weakBear ? "SELL CE (weak)" : isSellBoth and isSqueeze ? "SELL BOTH (squeeze)" : isSellBoth ? "SELL BOTH" : "NO TRADE"
+
+// ─────────────────────────────────────────────
+// HELPER FUNCTIONS
+// ─────────────────────────────────────────────
+
+scoreColor(s) =>
+    s == 1 ? color.new(color.green, 0) : s == -1 ? color.new(color.red, 0) : color.new(color.gray, 0)
+
+scoreText(s) =>
+    s == 1 ? "▲ Bull" : s == -1 ? "▼ Bear" : "● Neutral"
+
+signalColor() =>
+    result = color.new(color.gray, 0)
+    if strongBull
+        result := color.new(color.green, 0)
+    else if strongBear
+        result := color.new(color.red, 0)
+    else if weakBull
+        result := color.new(color.green, 50)
+    else if weakBear
+        result := color.new(color.red, 50)
+    else if isSellBoth
+        result := color.new(color.orange, 0)
+    else if isNoTrade
+        result := color.new(color.red, 30)
+    result
+
+signalText() =>
+    result = "NEUTRAL"
+    if strongBull
+        result := "BULLISH ✓"
+    else if strongBear
+        result := "BEARISH ✓"
+    else if weakBull
+        result := "BULLISH (low vol)"
+    else if weakBear
+        result := "BEARISH (low vol)"
+    else if isSellBoth and isSqueeze
+        result := "RANGE (squeeze)"
+    else if isSellBoth
+        result := "RANGE-BOUND"
+    else if isNoTrade
+        result := "HIGH VOL — AVOID"
+    result
+
+// ─────────────────────────────────────────────
+// HISTOGRAM PANEL
+// ─────────────────────────────────────────────
+
+histColor = strongBull ? color.new(color.green, 10) : strongBear ? color.new(color.red, 10) : weakBull ? color.new(color.green, 60) : weakBear ? color.new(color.red, 60) : isSellBoth ? color.new(color.orange, 30) : isNoTrade ? color.new(color.red, 70) : color.new(color.gray, 50)
+
+plot(scorePct, "Score %", style=plot.style_columns, color=histColor, linewidth=2)
+hline(0,    "Zero",           color=color.new(color.white, 60),  linestyle=hline.style_dashed)
+hline(50,   "Bull Threshold", color=color.new(color.green, 60),  linestyle=hline.style_dotted)
+hline(-50,  "Bear Threshold", color=color.new(color.red, 60),    linestyle=hline.style_dotted)
+
+// Squeeze background highlight
+bgcolor(isSqueeze ? color.new(color.orange, 90) : na, title="Squeeze Zone")
+
+// ─────────────────────────────────────────────
+// MAIN CHART BAR COLOUR
+// ─────────────────────────────────────────────
+
+_barCol = strongBull ? color.new(color.green, 30) : strongBear ? color.new(color.red, 30) : weakBull ? color.new(color.green, 70) : weakBear ? color.new(color.red, 70) : isSellBoth ? color.new(color.orange, 50) : color.new(color.gray, 70)
+barcolor(_barCol, title="Bar Colour")
+
+// ─────────────────────────────────────────────
+// LABEL ON LAST BAR
+// ─────────────────────────────────────────────
+
+var label signalLabel = na
+if barstate.islast
+    label.delete(signalLabel)
+    signalLabel := label.new(
+         bar_index, scorePct,
+         signalText() + "\n" + sellerAction + "  [" + str.tostring(scorePct) + "%]",
+         style=label.style_label_left,
+         color=signalColor(),
+         textcolor=color.white,
+         size=size.normal)
+
+// ─────────────────────────────────────────────
+// SCORE BREAKDOWN TABLE (top-right)
+// ─────────────────────────────────────────────
+
+var table scoreTable = na
+if barstate.islast
+    table.delete(scoreTable)
+    scoreTable := table.new(position.top_right, 4, 11,
+         bgcolor=color.new(color.black, 75),
+         border_color=color.new(color.white, 60),
+         border_width=1,
+         frame_color=color.new(color.white, 40),
+         frame_width=1,
+         force_overlay=true)
+
+    // Header row
+    table.cell(scoreTable, 0, 0, "Indicator",  text_color=color.new(color.white, 20), text_size=size.small, bgcolor=color.new(color.black, 60))
+    table.cell(scoreTable, 1, 0, "Signal",     text_color=color.new(color.white, 20), text_size=size.small, bgcolor=color.new(color.black, 60))
+    table.cell(scoreTable, 2, 0, "Vote",       text_color=color.new(color.white, 20), text_size=size.small, bgcolor=color.new(color.black, 60))
+    table.cell(scoreTable, 3, 0, "Weight",     text_color=color.new(color.white, 20), text_size=size.small, bgcolor=color.new(color.black, 60))
+
+    // Row 1 – EMA
+    table.cell(scoreTable, 0, 1, "EMA (" + str.tostring(emaFastLen) + "/" + str.tostring(emaMidLen) + "/" + str.tostring(emaSlowLen) + ")", text_color=color.white, text_size=size.small)
+    table.cell(scoreTable, 1, 1, scoreText(emaRawScore),  text_color=scoreColor(emaRawScore), text_size=size.small)
+    table.cell(scoreTable, 2, 1, str.tostring(emaRawScore), text_color=scoreColor(emaRawScore), text_size=size.small)
+    table.cell(scoreTable, 3, 1, "×" + str.tostring(wEma), text_color=color.new(color.white, 40), text_size=size.small)
+
+    // Row 2 – VWAP
+    table.cell(scoreTable, 0, 2, "VWAP", text_color=color.white, text_size=size.small)
+    table.cell(scoreTable, 1, 2, scoreText(vwapRawScore), text_color=scoreColor(vwapRawScore), text_size=size.small)
+    table.cell(scoreTable, 2, 2, str.tostring(vwapRawScore), text_color=scoreColor(vwapRawScore), text_size=size.small)
+    table.cell(scoreTable, 3, 2, "×" + str.tostring(wVwap), text_color=color.new(color.white, 40), text_size=size.small)
+
+    // Row 3 – RSI
+    table.cell(scoreTable, 0, 3, "RSI (" + str.tostring(rsiLen) + ")", text_color=color.white, text_size=size.small)
+    table.cell(scoreTable, 1, 3, scoreText(rsiRawScore), text_color=scoreColor(rsiRawScore), text_size=size.small)
+    table.cell(scoreTable, 2, 3, str.tostring(rsiRawScore), text_color=scoreColor(rsiRawScore), text_size=size.small)
+    table.cell(scoreTable, 3, 3, "×" + str.tostring(wRsi), text_color=color.new(color.white, 40), text_size=size.small)
+
+    // Row 4 – MACD
+    table.cell(scoreTable, 0, 4, "MACD (" + str.tostring(macdFast) + "/" + str.tostring(macdSlow) + "/" + str.tostring(macdSignal) + ")", text_color=color.white, text_size=size.small)
+    table.cell(scoreTable, 1, 4, scoreText(macdRawScore), text_color=scoreColor(macdRawScore), text_size=size.small)
+    table.cell(scoreTable, 2, 4, str.tostring(macdRawScore), text_color=scoreColor(macdRawScore), text_size=size.small)
+    table.cell(scoreTable, 3, 4, "×" + str.tostring(wMacd), text_color=color.new(color.white, 40), text_size=size.small)
+
+    // Row 5 – Supertrend (Dual)
+    stLabel = stDir1 == stDir2 ? (stDir1 == -1 ? "Both ▲" : "Both ▼") : "Split"
+    table.cell(scoreTable, 0, 5, "Supertrend (Dual)", text_color=color.white, text_size=size.small)
+    table.cell(scoreTable, 1, 5, scoreText(stRawScore) + " — " + stLabel, text_color=scoreColor(stRawScore), text_size=size.small)
+    table.cell(scoreTable, 2, 5, str.tostring(stRawScore), text_color=scoreColor(stRawScore), text_size=size.small)
+    table.cell(scoreTable, 3, 5, "×" + str.tostring(wSupertrend), text_color=color.new(color.white, 40), text_size=size.small)
+
+    // Row 6 – ADX / DMI
+    table.cell(scoreTable, 0, 6, "ADX / DMI (" + str.tostring(adxLen) + ")", text_color=color.white, text_size=size.small)
+    table.cell(scoreTable, 1, 6, scoreText(adxRawScore) + " [" + str.tostring(math.round(adxVal)) + "]", text_color=scoreColor(adxRawScore), text_size=size.small)
+    table.cell(scoreTable, 2, 6, str.tostring(adxRawScore), text_color=scoreColor(adxRawScore), text_size=size.small)
+    table.cell(scoreTable, 3, 6, "×" + str.tostring(wAdx), text_color=color.new(color.white, 40), text_size=size.small)
+
+    // Row 7 – HTF Trend
+    table.cell(scoreTable, 0, 7, "HTF (" + htf + "m)", text_color=color.white, text_size=size.small)
+    table.cell(scoreTable, 1, 7, scoreText(htfRawScore), text_color=scoreColor(htfRawScore), text_size=size.small)
+    table.cell(scoreTable, 2, 7, str.tostring(htfRawScore), text_color=scoreColor(htfRawScore), text_size=size.small)
+    table.cell(scoreTable, 3, 7, "×" + str.tostring(wHtf), text_color=color.new(color.white, 40), text_size=size.small)
+
+    // Separator — Volatility Section
+    sqColor = isSqueeze ? color.new(color.orange, 0) : isLowVol ? color.new(color.yellow, 30) : color.new(color.gray, 0)
+    sqText  = isSqueeze ? "SQUEEZE ●" : isLowVol ? "LOW VOL" : "NORMAL"
+    table.cell(scoreTable, 0, 8, "Volatility", text_color=color.white, text_size=size.small, bgcolor=color.new(color.black, 50))
+    table.cell(scoreTable, 1, 8, sqText, text_color=sqColor, text_size=size.small, bgcolor=color.new(color.black, 50))
+    table.cell(scoreTable, 2, 8, str.tostring(math.round(bbWidthPctile)) + "p", text_color=sqColor, text_size=size.small, bgcolor=color.new(color.black, 50))
+    table.cell(scoreTable, 3, 8, "", text_size=size.small, bgcolor=color.new(color.black, 50))
+
+    // Volume row
+    volColor = volStrong ? color.new(color.green, 0) : color.new(color.gray, 30)
+    volText  = volStrong ? "STRONG" : "WEAK"
+    table.cell(scoreTable, 0, 9, "Volume", text_color=color.white, text_size=size.small, bgcolor=color.new(color.black, 50))
+    table.cell(scoreTable, 1, 9, volText, text_color=volColor, text_size=size.small, bgcolor=color.new(color.black, 50))
+    table.cell(scoreTable, 2, 9, str.tostring(math.round(volume / volMA * 100)) + "%", text_color=volColor, text_size=size.small, bgcolor=color.new(color.black, 50))
+    table.cell(scoreTable, 3, 9, "", text_size=size.small, bgcolor=color.new(color.black, 50))
+
+    // Result row
+    resultBg = strongBull ? color.new(color.green, 40) : strongBear ? color.new(color.red, 40) : isSellBoth ? color.new(color.orange, 40) : isNoTrade ? color.new(color.red, 60) : color.new(color.gray, 60)
+    table.cell(scoreTable, 0, 10, sellerAction, text_color=color.white, text_size=size.normal, bgcolor=resultBg)
+    table.cell(scoreTable, 1, 10, signalText(), text_color=color.white, text_size=size.normal, bgcolor=resultBg)
+    table.cell(scoreTable, 2, 10, str.tostring(scorePct) + "%", text_color=color.white, text_size=size.normal, bgcolor=resultBg)
+    table.cell(scoreTable, 3, 10, "", text_size=size.small, bgcolor=resultBg)
+
+// ─────────────────────────────────────────────
+// ALERT CONDITIONS
+// ─────────────────────────────────────────────
+
+alertcondition(strongBull and not strongBull[1], "Strong Bullish → Sell PE",  "MDP → SELL PE (strong bullish)")
+alertcondition(strongBear and not strongBear[1], "Strong Bearish → Sell CE",  "MDP → SELL CE (strong bearish)")
+alertcondition(weakBull and not weakBull[1],     "Weak Bullish",              "MDP → Weak bullish (low volume)")
+alertcondition(weakBear and not weakBear[1],     "Weak Bearish",              "MDP → Weak bearish (low volume)")
+alertcondition(isSqueeze and not isSqueeze[1],   "Squeeze Detected",          "MDP → BB Squeeze — range-bound, sell both sides")
+alertcondition(squeezeFireUp,                    "Squeeze Fire Up",            "MDP → Squeeze released UPWARD — expect breakout")
+alertcondition(squeezeFireDn,                    "Squeeze Fire Down",          "MDP → Squeeze released DOWNWARD — expect breakdown")
+alertcondition(isNeutral and not isNeutral[1],   "Neutral Signal",             "MDP → NEUTRAL")
