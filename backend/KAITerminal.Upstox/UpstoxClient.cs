@@ -17,6 +17,7 @@ public sealed class UpstoxClient
     private readonly IOrderService _orders;
     private readonly IOptionService _options;
     private readonly IMarketQuoteService _quotes;
+    private readonly IChartDataService _charts;
     private readonly Func<IMarketDataStreamer> _marketDataStreamerFactory;
     private readonly Func<IPortfolioStreamer> _portfolioStreamerFactory;
 
@@ -26,6 +27,7 @@ public sealed class UpstoxClient
         IOrderService orders,
         IOptionService options,
         IMarketQuoteService quotes,
+        IChartDataService charts,
         Func<IMarketDataStreamer> marketDataStreamerFactory,
         Func<IPortfolioStreamer> portfolioStreamerFactory)
     {
@@ -34,6 +36,7 @@ public sealed class UpstoxClient
         _orders = orders;
         _options = options;
         _quotes = quotes;
+        _charts = charts;
         _marketDataStreamerFactory = marketDataStreamerFactory;
         _portfolioStreamerFactory = portfolioStreamerFactory;
     }
@@ -199,6 +202,27 @@ public sealed class UpstoxClient
     public Task<IReadOnlyList<OptionContract>> GetOptionContractsAsync(
         string underlyingKey, string? expiryDate = null, CancellationToken cancellationToken = default)
         => _options.GetOptionContractsAsync(underlyingKey, expiryDate, cancellationToken);
+
+    // ═══════════════════════════════════════════════════════
+    // Charts — historical candles + instrument search
+    // ═══════════════════════════════════════════════════════
+
+    /// <summary>Fetch historical OHLCV candles for an instrument.</summary>
+    public Task<IReadOnlyList<CandleData>> GetHistoricalCandlesAsync(
+        string instrumentKey, CandleInterval interval, DateOnly from, DateOnly to,
+        CancellationToken cancellationToken = default)
+        => _charts.GetHistoricalCandlesAsync(instrumentKey, interval, from, to, cancellationToken);
+
+    /// <summary>Fetch today's intraday OHLCV candles for an instrument.</summary>
+    public Task<IReadOnlyList<CandleData>> GetIntradayCandlesAsync(
+        string instrumentKey, CandleInterval interval,
+        CancellationToken cancellationToken = default)
+        => _charts.GetIntradayCandlesAsync(instrumentKey, interval, cancellationToken);
+
+    /// <summary>Search for instruments by name or symbol.</summary>
+    public Task<IReadOnlyList<InstrumentSearchResult>> SearchInstrumentsAsync(
+        string query, CancellationToken cancellationToken = default)
+        => _charts.SearchInstrumentsAsync(query, cancellationToken);
 
     // ═══════════════════════════════════════════════════════
     // WebSocket streaming — streamer factories

@@ -47,6 +47,13 @@
 
 :root {
     --radius: 0.625rem;
+    /* Lightweight-charts candle colours (light theme) */
+    --chart-up: #16a34a;
+    --chart-down: #dc2626;
+    --chart-bg: #ffffff;
+    --chart-text: #64748b;
+    --chart-grid: #f1f5f9;
+    --chart-border: #e2e8f0;
     --background: oklch(1 0 0);
     --foreground: oklch(0.129 0.042 264.695);
     --card: oklch(1 0 0);
@@ -81,6 +88,13 @@
 }
 
 .dark {
+    /* Lightweight-charts candle colours (dark theme) */
+    --chart-up: #22c55e;
+    --chart-down: #ef4444;
+    --chart-bg: #0c0e14;
+    --chart-text: #94a3b8;
+    --chart-grid: #1e2433;
+    --chart-border: #2d3748;
     --background: oklch(0.129 0.042 264.695);
     --foreground: oklch(0.984 0.003 247.858);
     --card: oklch(0.208 0.042 265.755);

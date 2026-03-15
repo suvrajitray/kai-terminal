@@ -153,6 +153,55 @@ internal sealed class UpstoxHttpClient
     }
 
     // ──────────────────────────────────────────────────
+    // Historical / intraday candles
+    // ──────────────────────────────────────────────────
+
+    public async Task<IReadOnlyList<CandleData>> GetHistoricalCandlesAsync(
+        string instrumentKey, string interval, DateOnly from, DateOnly to, CancellationToken ct = default)
+    {
+        var ek   = Uri.EscapeDataString(instrumentKey);
+        var path = $"/v2/historical-candle/{ek}/{interval}/{to:yyyy-MM-dd}/{from:yyyy-MM-dd}";
+        return await FetchCandlesAsync(path, ct);
+    }
+
+    public async Task<IReadOnlyList<CandleData>> GetIntradayCandlesAsync(
+        string instrumentKey, string interval, CancellationToken ct = default)
+    {
+        var ek   = Uri.EscapeDataString(instrumentKey);
+        var path = $"/v2/historical-candle/intraday/{ek}/{interval}";
+        return await FetchCandlesAsync(path, ct);
+    }
+
+    private async Task<IReadOnlyList<CandleData>> FetchCandlesAsync(string path, CancellationToken ct)
+    {
+        var client   = _factory.CreateClient("UpstoxApi");
+        var response = await client.GetAsync(path, ct);
+        var json     = await response.Content.ReadAsStringAsync(ct);
+
+        var wrapper = JsonSerializer.Deserialize<CandlesWrapper>(json, JsonOptions);
+        if (wrapper?.Status != "success" || wrapper.Data?.Candles is null)
+            return Array.Empty<CandleData>();
+
+        return wrapper.Data.Candles
+            .Where(r => r.Count >= 6)
+            .Select(MapCandle)
+            .OrderBy(c => c.Timestamp)
+            .ToList()
+            .AsReadOnly();
+    }
+
+    private static CandleData MapCandle(List<JsonElement> row) => new()
+    {
+        Timestamp = row[0].GetDateTime(),
+        Open      = row[1].GetDecimal(),
+        High      = row[2].GetDecimal(),
+        Low       = row[3].GetDecimal(),
+        Close     = row[4].GetDecimal(),
+        Volume    = row[5].GetInt64(),
+        Oi        = row.Count > 6 ? row[6].GetInt64() : 0
+    };
+
+    // ──────────────────────────────────────────────────
     // Option chain
     // ──────────────────────────────────────────────────
 
@@ -367,5 +416,17 @@ internal sealed class UpstoxHttpClient
     private sealed class AuthorizeResponse
     {
         [JsonPropertyName("authorizedRedirectUri")] public string? AuthorizedRedirectUri { get; init; }
+    }
+
+    // Candle jagged-array response: { "status": "success", "data": { "candles": [[ts,o,h,l,c,v,oi], ...] } }
+    private sealed class CandlesWrapper
+    {
+        [JsonPropertyName("status")] public string?           Status { get; init; }
+        [JsonPropertyName("data")]   public CandlesDataDto?   Data   { get; init; }
+    }
+
+    private sealed class CandlesDataDto
+    {
+        [JsonPropertyName("candles")] public List<List<JsonElement>>? Candles { get; init; }
     }
 }

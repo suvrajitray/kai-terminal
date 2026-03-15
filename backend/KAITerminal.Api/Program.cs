@@ -66,6 +66,7 @@ app.UseHttpsRedirection();
 
 app.MapAuthEndpoints();
 app.MapUpstoxEndpoints();
+app.MapChartEndpoints();
 app.MapBrokerCredentialsEndpoints();
 app.MapUserSettingsEndpoints();
 app.MapHub<PositionsHub>("/hubs/positions");

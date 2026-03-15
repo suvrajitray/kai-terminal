@@ -3,7 +3,7 @@ import { Header } from "./header";
 
 export function AppLayout() {
   const { pathname } = useLocation();
-  const isFullBleed = pathname.startsWith("/terminal");
+  const isFullBleed = pathname.startsWith("/terminal") || pathname.startsWith("/charts");
 
   return (
     <div className="min-h-svh bg-background">
