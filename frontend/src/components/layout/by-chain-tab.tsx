@@ -175,7 +175,7 @@ export function ByChainTab({ underlying, expiry, product, quantity, isActive }: 
       {/* Strategy toggle + ATM info */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1 rounded-lg border border-border/40 bg-muted/20 p-1">
-          {(["straddle", "strangle"] as StrategyMode[]).map((m) => (
+          {(["strangle", "straddle"] as StrategyMode[]).map((m) => (
             <button
               key={m}
               onClick={() => setMode(m)}
