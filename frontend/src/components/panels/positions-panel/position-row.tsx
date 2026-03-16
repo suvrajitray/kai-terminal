@@ -24,16 +24,19 @@ const PRODUCT_LABEL: Record<string, string> = {
   CO: "Cover",
 };
 
-export function PnlCell({ value }: { value: number }) {
+export function PnlCell({ value, pct }: { value: number; pct?: number }) {
+  const color = value > 0 ? "text-green-500" : value < 0 ? "text-red-500" : "text-muted-foreground";
   return (
-    <span
-      className={cn(
-        "tabular-nums",
-        value > 0 ? "text-green-500" : value < 0 ? "text-red-500" : "text-muted-foreground",
+    <div className="flex flex-col items-end gap-0">
+      <span className={cn("tabular-nums", color)}>
+        {value >= 0 ? "+" : ""}₹{INR.format(value)}
+      </span>
+      {pct !== undefined && (
+        <span className={cn("text-[10px] tabular-nums opacity-60", color)}>
+          {pct >= 0 ? "+" : ""}{pct.toFixed(1)}%
+        </span>
       )}
-    >
-      {value >= 0 ? "+" : ""}₹{INR.format(value)}
-    </span>
+    </div>
   );
 }
 
@@ -73,6 +76,10 @@ export function PositionRow({
   onShiftDown,
 }: PositionRowProps) {
   const [dialog, setDialog] = useState<DialogType>(null);
+
+  const avgPrice = p.quantity < 0 ? p.sell_price : p.buy_price;
+  const costBasis = Math.abs(p.quantity) * avgPrice;
+  const toPct = (val: number) => costBasis > 0 ? (val / costBasis) * 100 : undefined;
 
   const lot = getLotSize(p.trading_symbol);
   const num = parseInt(qtyValue, 10);
@@ -128,13 +135,13 @@ export function PositionRow({
         </td>
         <td className="px-3 py-1.5 text-right tabular-nums">₹{INR.format(p.last_price)}</td>
         <td className="px-3 py-1.5 text-right">
-          <PnlCell value={p.pnl} />
+          <PnlCell value={p.pnl} pct={toPct(p.pnl)} />
         </td>
         <td className="px-3 py-1.5 text-right">
-          <PnlCell value={p.unrealised} />
+          <PnlCell value={p.unrealised} pct={toPct(p.unrealised)} />
         </td>
         <td className="px-3 py-1.5 text-right">
-          <PnlCell value={p.realised} />
+          <PnlCell value={p.realised} pct={toPct(p.realised)} />
         </td>
         <td className="px-3 py-1.5 text-right">
           <PositionActions
@@ -152,7 +159,8 @@ export function PositionRow({
             onReduce={onReduce}
             onShiftUp={onShiftUp}
             onShiftDown={onShiftDown}
-            onExit={() => setDialog("exit")}
+            onExit={onExit}
+            onExitDialog={() => setDialog("exit")}
             onSellMore={() => setDialog("more")}
             onConvert={() => setDialog("convert")}
           />

@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "motion/react";
-import { Activity } from "lucide-react";
+import { Activity, LayoutDashboard, MonitorDot, BarChart3, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { APP_NAME, NAV_ITEMS } from "@/lib/constants";
 import { UserMenu } from "./user-menu";
@@ -8,6 +8,12 @@ import { IndexTicker } from "./index-ticker";
 import { QuickTradeButton } from "./quick-trade-button";
 import { MarketStatus } from "./market-status";
 import { useBrokerStore } from "@/stores/broker-store";
+
+const NAV_ICONS: Record<string, LucideIcon> = {
+  "/dashboard": LayoutDashboard,
+  "/terminal":  MonitorDot,
+  "/charts":    BarChart3,
+};
 
 export function Header() {
   const { pathname } = useLocation();
@@ -26,21 +32,33 @@ export function Header() {
             <Activity className="size-5 text-primary" />
             <span>{APP_NAME}</span>
           </Link>
-          <nav className="flex items-center gap-1">
-            {NAV_ITEMS.map((item) => (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm transition-colors",
-                  pathname === item.path
-                    ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {item.label}
-              </Link>
-            ))}
+          <nav className="flex items-center gap-0.5">
+            {NAV_ITEMS.map((item) => {
+              const Icon = NAV_ICONS[item.path];
+              const isActive = pathname === item.path;
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={cn(
+                    "relative flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                    isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {isActive && (
+                    <motion.span
+                      layoutId="nav-pill"
+                      className="absolute inset-0 rounded-md bg-accent"
+                      transition={{ type: "spring", bounce: 0.2, duration: 0.35 }}
+                    />
+                  )}
+                  <span className="relative flex items-center gap-1.5">
+                    {Icon && <Icon className="size-3.5" />}
+                    {item.label}
+                  </span>
+                </Link>
+              );
+            })}
           </nav>
         </div>
         <div className="flex items-center gap-4">

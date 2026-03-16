@@ -25,6 +25,7 @@ interface PositionActionsProps {
   onShiftUp: () => void;
   onShiftDown: () => void;
   onExit: () => void;
+  onExitDialog: () => void;
   onSellMore: () => void;
   onConvert: () => void;
 }
@@ -71,6 +72,7 @@ export function PositionActions({
   onShiftUp,
   onShiftDown,
   onExit,
+  onExitDialog,
   onSellMore,
   onConvert,
 }: PositionActionsProps) {
@@ -145,7 +147,7 @@ export function PositionActions({
             </DropdownMenuItem>
 
             <DropdownMenuItem
-              onClick={onExit}
+              onClick={onExitDialog}
               className="gap-2 cursor-pointer text-red-400 focus:text-red-400 focus:bg-red-500/10"
             >
               <LogOut className="size-3.5" />
