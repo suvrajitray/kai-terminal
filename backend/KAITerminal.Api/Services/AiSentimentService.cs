@@ -57,7 +57,7 @@ public sealed class AiSentimentService : IAiSentimentService
         var chainNiftyTask     = niftyExpiry     is not null ? _options.GetOptionChainAsync(NiftyKey, niftyExpiry, ct)         : Task.FromResult<IReadOnlyList<Upstox.Models.Responses.OptionChainEntry>>([]);
         var chainBankNiftyTask = bankNiftyExpiry is not null ? _options.GetOptionChainAsync(BankNiftyKey, bankNiftyExpiry, ct) : Task.FromResult<IReadOnlyList<Upstox.Models.Responses.OptionChainEntry>>([]);
         var quotesTask         = _quotes.GetMarketQuotesAsync([NiftyKey, BankNiftyKey, SensexKey], ct);
-        var candlesTask        = _charts.GetIntradayCandlesAsync(NiftyKey, CandleInterval.ThirtyMinute, ct);
+        var candlesTask        = _charts.GetIntradayCandlesAsync(NiftyKey, CandleInterval.OneMinute, ct);
 
         await Task.WhenAll(chainNiftyTask, chainBankNiftyTask, quotesTask, candlesTask);
 
@@ -66,8 +66,8 @@ public sealed class AiSentimentService : IAiSentimentService
         var marketQuotes   = quotesTask.Result;
         var allCandles     = candlesTask.Result;
 
-        // Last 8 candles
-        var candles = allCandles.Count <= 8 ? allCandles : allCandles.Skip(allCandles.Count - 8).ToList();
+        // Last 30 candles (30 minutes of 1-min data)
+        var candles = allCandles.Count <= 30 ? allCandles : allCandles.Skip(allCandles.Count - 30).ToList();
 
         // ── 3. Extract key metrics ──────────────────────────────────────────────
         marketQuotes.TryGetValue(NiftyKey.Replace('|', ':'),     out var niftyQuote);
@@ -194,14 +194,14 @@ public sealed class AiSentimentService : IAiSentimentService
         AppendOptionsBlock(sb, niftyOpts);
         AppendOptionsBlock(sb, bankNiftyOpts);
 
-        // 30-min candles
-        sb.AppendLine("=== NIFTY 30-MIN CANDLES (RECENT 8) ===");
-        sb.AppendLine("Time                 | Open    | High    | Low     | Close   | Volume");
-        sb.AppendLine("---------------------|---------|---------|---------|---------|--------");
+        // 1-min candles
+        sb.AppendLine("=== NIFTY 1-MIN CANDLES (RECENT 30) ===");
+        sb.AppendLine("Time  | Open    | High    | Low     | Close   | Volume");
+        sb.AppendLine("------|---------|---------|---------|---------|--------");
         foreach (var c in candles)
         {
             sb.AppendLine(
-                $"{c.Timestamp:HH:mm}                | {c.Open,7:F0} | {c.High,7:F0} | {c.Low,7:F0} | {c.Close,7:F0} | {c.Volume,8}");
+                $"{c.Timestamp:HH:mm} | {c.Open,7:F0} | {c.High,7:F0} | {c.Low,7:F0} | {c.Close,7:F0} | {c.Volume,8}");
         }
         sb.AppendLine();
 
