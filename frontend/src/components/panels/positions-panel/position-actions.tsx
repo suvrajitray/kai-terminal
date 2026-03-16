@@ -1,6 +1,13 @@
-import { Plus, Minus, ArrowUp, ArrowDown, LogOut } from "lucide-react";
+import { Plus, Minus, ArrowUp, ArrowDown, LogOut, MoreHorizontal, TrendingDown, TrendingUp, RefreshCw } from "lucide-react";
 import { QtyInput, type QtyMode } from "./qty-input";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface PositionActionsProps {
   qtyValue: string;
@@ -10,6 +17,7 @@ interface PositionActionsProps {
   positionQty: number;
   acting: string | null;
   hasOpenQty: boolean;
+  isSell: boolean;
   onQtyChange: (v: string) => void;
   onToggleMode: () => void;
   onAdd: () => void;
@@ -17,6 +25,8 @@ interface PositionActionsProps {
   onShiftUp: () => void;
   onShiftDown: () => void;
   onExit: () => void;
+  onSellMore: () => void;
+  onConvert: () => void;
 }
 
 interface ActionBtnProps {
@@ -53,6 +63,7 @@ export function PositionActions({
   positionQty,
   acting,
   hasOpenQty,
+  isSell,
   onQtyChange,
   onToggleMode,
   onAdd,
@@ -60,6 +71,8 @@ export function PositionActions({
   onShiftUp,
   onShiftDown,
   onExit,
+  onSellMore,
+  onConvert,
 }: PositionActionsProps) {
   const disabled    = !!acting;
   const qtyDisabled = disabled || actualQty === 0;
@@ -87,7 +100,6 @@ export function PositionActions({
           <Minus className="size-3.5" />
         </ActionBtn>
 
-        {/* Divider */}
         <div className="w-px bg-border/50 mx-0.5" />
 
         {/* Shift Up / Down */}
@@ -99,13 +111,55 @@ export function PositionActions({
           <ArrowDown className="size-3.5" />
         </ActionBtn>
 
-        {/* Divider */}
         <div className="w-px bg-border/50 mx-0.5" />
 
         {/* Exit */}
         <ActionBtn onClick={onExit} disabled={disabled || !hasOpenQty} title="Exit" className="text-red-500 hover:text-red-400 hover:bg-red-500/10">
           <LogOut className="size-3.5" />
         </ActionBtn>
+
+        <div className="w-px bg-border/50 mx-0.5" />
+
+        {/* More actions */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              disabled={disabled || !hasOpenQty}
+              className={cn(
+                "flex cursor-pointer items-center justify-center px-2 py-1.5 text-muted-foreground transition-colors",
+                "hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30",
+              )}
+            >
+              <MoreHorizontal className="size-3.5" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem onClick={onSellMore} className="gap-2 cursor-pointer">
+              {isSell ? (
+                <TrendingDown className="size-3.5 text-red-400" />
+              ) : (
+                <TrendingUp className="size-3.5 text-green-400" />
+              )}
+              <span>{isSell ? "Sell more" : "Buy more"}</span>
+            </DropdownMenuItem>
+
+            <DropdownMenuItem
+              onClick={onExit}
+              className="gap-2 cursor-pointer text-red-400 focus:text-red-400 focus:bg-red-500/10"
+            >
+              <LogOut className="size-3.5" />
+              <span>Exit position</span>
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuItem onClick={onConvert} className="gap-2 cursor-pointer text-muted-foreground">
+              <RefreshCw className="size-3.5" />
+              <span>Convert position</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );
