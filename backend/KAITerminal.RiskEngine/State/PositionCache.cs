@@ -42,7 +42,8 @@ public sealed class PositionCache : IPositionCache
         foreach (var p in e.Positions)
         {
             var ltp = e.Ltp.TryGetValue(p.InstrumentToken, out var v) ? v : p.LastPrice;
-            total += p.Quantity * (ltp - p.AveragePrice) + p.Realised;
+            var avgPrice = p.Quantity < 0 ? p.SellPrice : p.BuyPrice;
+            total += p.Quantity * (ltp - avgPrice) + p.Realised;
         }
         return total;
     }

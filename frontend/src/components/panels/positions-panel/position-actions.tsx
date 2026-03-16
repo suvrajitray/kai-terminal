@@ -100,14 +100,12 @@ export function PositionActions({
         </ActionBtn>
 
         {/* Divider */}
-        {hasOpenQty && <div className="w-px bg-border/50 mx-0.5" />}
+        <div className="w-px bg-border/50 mx-0.5" />
 
         {/* Exit */}
-        {hasOpenQty && (
-          <ActionBtn onClick={onExit} disabled={disabled} title="Exit" className="text-red-500 hover:text-red-400 hover:bg-red-500/10">
-            <LogOut className="size-3.5" />
-          </ActionBtn>
-        )}
+        <ActionBtn onClick={onExit} disabled={disabled || !hasOpenQty} title="Exit" className="text-red-500 hover:text-red-400 hover:bg-red-500/10">
+          <LogOut className="size-3.5" />
+        </ActionBtn>
       </div>
     </div>
   );

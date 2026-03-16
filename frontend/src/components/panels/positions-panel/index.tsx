@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
+import { useNewRows } from "@/hooks/use-new-rows";
 import { toast } from "sonner";
 import { LogOut, LayoutList } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -121,6 +122,9 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
     return withActing(token + ":reduce", () => placeMarketOrder(token, qty, txn, product));
   };
 
+  const posKey = useCallback((p: Position) => p.instrument_token + p.product, []);
+  const newPositionKeys = useNewRows(positions, posKey);
+
   const openPositions = positions.filter((p) => p.quantity !== 0);
   const closedPositions = positions.filter((p) => p.quantity === 0);
   const sorted = [...openPositions, ...closedPositions];
@@ -204,6 +208,7 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
     <PositionRow
       key={p.instrument_token + p.product}
       position={p}
+      isNew={newPositionKeys.has(p.instrument_token + p.product)}
       qtyValue={qtys[p.instrument_token] ?? ""}
       qtyMode={qtyMode}
       acting={acting}

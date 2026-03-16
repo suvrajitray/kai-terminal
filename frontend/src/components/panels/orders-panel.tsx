@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useNewRows } from "@/hooks/use-new-rows";
 import { RefreshCw, XCircle, AlertCircle, ChevronUp, ChevronDown, Inbox, CheckCircle2 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
@@ -99,6 +100,9 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
       setCancelling(null);
     }
   };
+
+  const orderKey = useCallback((o: Order) => o.order_id, []);
+  const newOrderKeys = useNewRows(orders, orderKey);
 
   const openOrders = orders.filter((o) => !TERMINAL_STATUSES.has(o.status.toLowerCase()));
   const executedOrders = orders.filter((o) => TERMINAL_STATUSES.has(o.status.toLowerCase()));
@@ -215,6 +219,7 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
                     className={cn(
                       "border-b border-border/50 transition-colors hover:bg-muted/30",
                       !isCancellable && "opacity-60",
+                      newOrderKeys.has(o.order_id) && "animate-row-enter",
                     )}
                   >
                     <td className="px-3 py-1.5 tabular-nums text-muted-foreground">

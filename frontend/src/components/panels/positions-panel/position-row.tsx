@@ -37,6 +37,7 @@ interface PositionRowProps {
   qtyMode: QtyMode;
   acting: string | null;
   selected: boolean;
+  isNew?: boolean;
   onToggleSelect: () => void;
   onQtyChange: (v: string) => void;
   onToggleMode: () => void;
@@ -53,6 +54,7 @@ export function PositionRow({
   qtyMode,
   acting,
   selected,
+  isNew,
   onToggleSelect,
   onQtyChange,
   onToggleMode,
@@ -71,15 +73,14 @@ export function PositionRow({
   return (
     <tr
       className={cn(
-        "border-b border-border/40 transition-colors hover:bg-muted/30 align-middle",
+        "border-b border-border/40 transition-colors hover:bg-muted/30 [&>td]:align-middle",
         p.quantity === 0 && "opacity-50",
         selected && "bg-primary/5",
+        isNew && "animate-row-enter",
       )}
     >
       <td className="pl-3 py-1.5 w-7">
-        {p.quantity !== 0 && (
-          <Checkbox checked={selected} onCheckedChange={onToggleSelect} />
-        )}
+        <Checkbox checked={selected} disabled={p.quantity === 0} onCheckedChange={onToggleSelect} />
       </td>
       <td className="px-3 py-1.5">
         {contract ? (
@@ -112,7 +113,7 @@ export function PositionRow({
         {p.quantity}
       </td>
       <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">
-        ₹{INR.format(p.average_price !== 0 ? p.average_price : p.quantity < 0 ? p.sell_price : p.buy_price)}
+        ₹{INR.format(p.quantity < 0 ? p.sell_price : p.buy_price)}
       </td>
       <td className="px-3 py-1.5 text-right tabular-nums">₹{INR.format(p.last_price)}</td>
       <td className="px-3 py-1.5 text-right">
@@ -124,7 +125,7 @@ export function PositionRow({
       <td className="px-3 py-1.5 text-right">
         <PnlCell value={p.realised} />
       </td>
-      <td className="px-3 py-2.5 text-right">
+      <td className="px-3 py-1.5 text-right">
         <PositionActions
           qtyValue={qtyValue}
           qtyMode={qtyMode}

@@ -104,7 +104,7 @@ public sealed class StrikeMonitor
             var optionType = suffix == "CE" ? OptionType.CE : OptionType.PE;
             double slThreshold = optionType == OptionType.CE ? _cfg.CeStopLossPercent : _cfg.PeStopLossPercent;
 
-            var avgPrice = pos.AveragePrice != 0 ? pos.AveragePrice : pos.SellPrice;
+            var avgPrice = pos.SellPrice;
             if (avgPrice == 0) continue;
             var ltp = getLtp(pos.InstrumentToken, pos.LastPrice);
             double lossPercent = (double)((ltp - avgPrice) / avgPrice);
