@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Zap, TrendingUp, TrendingDown, ArrowUpDown, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -75,7 +75,8 @@ export function QuickTradeDialog({ onTabChange }: Props) {
     onTabChange?.(tab);
   }
 
-  return (
+  // Shared controls rendered inside each tab
+  const sharedControls = (
     <div className="space-y-4">
       {/* Underlying */}
       <div className="space-y-2">
@@ -98,9 +99,9 @@ export function QuickTradeDialog({ onTabChange }: Props) {
         </div>
       </div>
 
-      {/* Expiry + Product + Qty */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="col-span-2 space-y-2">
+      {/* Expiry + Product */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
           <Label className="text-xs text-muted-foreground uppercase tracking-wider">Expiry</Label>
           <Select value={expiry} onValueChange={setExpiry} disabled={expiries.length === 0}>
             <SelectTrigger className="h-9 text-sm">
@@ -118,7 +119,7 @@ export function QuickTradeDialog({ onTabChange }: Props) {
 
         <div className="space-y-2">
           <Label className="text-xs text-muted-foreground uppercase tracking-wider">Product</Label>
-          <div className="flex gap-1">
+          <div className="flex gap-1.5">
             {(["I", "D"] as const).map((p) => (
               <button
                 key={p}
@@ -130,107 +131,107 @@ export function QuickTradeDialog({ onTabChange }: Props) {
                     : "bg-muted/30 text-muted-foreground border-border/40 hover:bg-muted/60 hover:text-foreground",
                 )}
               >
-                {p === "I" ? "Intra" : "Del"}
+                {p === "I" ? "Intraday" : "Delivery"}
               </button>
             ))}
           </div>
         </div>
       </div>
-
-      <div className="space-y-2">
-        <Label className="text-xs text-muted-foreground uppercase tracking-wider">Quantity</Label>
-        <QuickTradeQtyInput
-          value={qtyValue}
-          mode={qtyMode}
-          lotSize={lotSize}
-          onChange={setQtyValue}
-          onToggleMode={toggleQtyMode}
-        />
-      </div>
-
-      <div className="h-px bg-border/40" />
-
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="w-full mb-4">
-          <TabsTrigger value="price" className="flex-1 gap-1.5">
-            <TrendingUp className="size-3.5" />
-            By Price
-          </TabsTrigger>
-          <TabsTrigger value="chain" className="flex-1 gap-1.5">
-            <Layers className="size-3.5" />
-            By Chain
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="price" className="mt-0">
-          <ByPriceContent
-            underlying={underlying}
-            expiry={expiry}
-            product={product}
-            quantity={quantity}
-            hasQty={!!qtyValue}
-          />
-        </TabsContent>
-
-        <TabsContent value="chain" className="mt-0">
-          <ByChainTab
-            underlying={underlying}
-            expiry={expiry}
-            product={product}
-            quantity={quantity}
-            isActive={activeTab === "chain"}
-          />
-        </TabsContent>
-      </Tabs>
     </div>
+  );
+
+  return (
+    <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+      <TabsList className="w-full mb-5">
+        <TabsTrigger value="price" className="flex-1 gap-1.5">
+          <TrendingUp className="size-3.5" />
+          By Price
+        </TabsTrigger>
+        <TabsTrigger value="chain" className="flex-1 gap-1.5">
+          <Layers className="size-3.5" />
+          By Chain
+        </TabsTrigger>
+      </TabsList>
+
+      {/* ── By Price ─────────────────────────────────────────────────── */}
+      <TabsContent value="price" className="mt-0">
+        <ByPriceContent
+          underlying={underlying}
+          expiry={expiry}
+          product={product}
+          quantity={quantity}
+          qtyValue={qtyValue}
+          qtyMode={qtyMode}
+          lotSize={lotSize}
+          onQtyChange={setQtyValue}
+          onToggleQtyMode={toggleQtyMode}
+          sharedControls={sharedControls}
+        />
+      </TabsContent>
+
+      {/* ── By Chain ─────────────────────────────────────────────────── */}
+      <TabsContent value="chain" className="mt-0 space-y-4">
+        {sharedControls}
+
+        {/* Qty row */}
+        <div className="space-y-2">
+          <Label className="text-xs text-muted-foreground uppercase tracking-wider">Quantity</Label>
+          <QuickTradeQtyInput
+            value={qtyValue}
+            mode={qtyMode}
+            lotSize={lotSize}
+            onChange={setQtyValue}
+            onToggleMode={toggleQtyMode}
+          />
+        </div>
+
+        <ByChainTab
+          underlying={underlying}
+          expiry={expiry}
+          product={product}
+          quantity={quantity}
+          isActive={activeTab === "chain"}
+        />
+      </TabsContent>
+    </Tabs>
   );
 }
 
-// ── By Price content ─────────────────────────────────────────────────────────
+// ── By Price tab — full self-contained layout ────────────────────────────────
 
-interface ByPriceProps {
+interface ByPriceContentProps {
   underlying: string;
   expiry: string;
   product: "I" | "D";
   quantity: number;
-  hasQty: boolean;
+  qtyValue: string;
+  qtyMode: QtyMode;
+  lotSize: number;
+  onQtyChange: (v: string) => void;
+  onToggleQtyMode: () => void;
+  sharedControls: ReactNode;
 }
 
-function ByPriceContent({ underlying, expiry, product, quantity, hasQty }: ByPriceProps) {
-  const [price, setPrice]     = useState("");
-  const [direction, setDir]   = useState<Direction>("Sell");
-  const [acting, setActing]   = useState<ActionType | null>(null);
+function ByPriceContent({
+  underlying, expiry, product, quantity,
+  qtyValue, qtyMode, lotSize, onQtyChange, onToggleQtyMode,
+  sharedControls,
+}: ByPriceContentProps) {
+  const [price, setPrice]   = useState("");
+  const [direction, setDir] = useState<Direction>("Sell");
+  const [acting, setActing] = useState<ActionType | null>(null);
 
   const isBuy = direction === "Buy";
 
   async function execute(action: ActionType) {
     const targetPremium = parseFloat(price);
-    if (!targetPremium || targetPremium <= 0) {
-      toast.error("Enter a valid target premium");
-      return;
-    }
-    if (!expiry) {
-      toast.error("Select an expiry");
-      return;
-    }
+    if (!targetPremium || targetPremium <= 0) { toast.error("Enter a valid target premium"); return; }
+    if (!expiry) { toast.error("Select an expiry"); return; }
 
     const underlyingKey = UNDERLYING_KEYS[underlying];
     const orders: Promise<void>[] = [];
-
     const add = (optionType: "CE" | "PE") =>
-      orders.push(
-        placeOrderByOptionPrice({
-          underlyingKey,
-          expiryDate: expiry,
-          optionType,
-          targetPremium,
-          priceSearchMode: "Nearest",
-          quantity,
-          transactionType: direction,
-          product,
-        }),
-      );
+      orders.push(placeOrderByOptionPrice({ underlyingKey, expiryDate: expiry, optionType, targetPremium, priceSearchMode: "Nearest", quantity, transactionType: direction, product }));
 
     if (action === "CE")   add("CE");
     if (action === "PE")   add("PE");
@@ -249,18 +250,33 @@ function ByPriceContent({ underlying, expiry, product, quantity, hasQty }: ByPri
 
   return (
     <div className="space-y-5">
-      <div className="space-y-2">
-        <Label className="text-xs text-muted-foreground uppercase tracking-wider">Target Premium</Label>
-        <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
-          <Input
-            type="number"
-            min={0}
-            step={0.5}
-            value={price}
-            onChange={(e) => setPrice(e.target.value)}
-            className="pl-7 h-9 text-sm"
-            placeholder="0.00"
+      {sharedControls}
+
+      {/* Target Premium + Quantity */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label className="text-xs text-muted-foreground uppercase tracking-wider">Target Premium</Label>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
+            <Input
+              type="number"
+              min={0}
+              step={0.5}
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              className="pl-7 h-9 text-sm"
+              placeholder="0.00"
+            />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label className="text-xs text-muted-foreground uppercase tracking-wider">Quantity</Label>
+          <QuickTradeQtyInput
+            value={qtyValue}
+            mode={qtyMode}
+            lotSize={lotSize}
+            onChange={onQtyChange}
+            onToggleMode={onToggleQtyMode}
           />
         </div>
       </div>
@@ -293,22 +309,17 @@ function ByPriceContent({ underlying, expiry, product, quantity, hasQty }: ByPri
       <div className="grid grid-cols-3 gap-2">
         {(["CE", "PE", "BOTH"] as ActionType[]).map((action) => {
           const Icon =
-            action === "BOTH"
-              ? ArrowUpDown
-              : action === "CE"
-                ? isBuy ? TrendingUp : TrendingDown
-                : isBuy ? TrendingDown : TrendingUp;
-
+            action === "BOTH" ? ArrowUpDown
+            : action === "CE" ? (isBuy ? TrendingUp : TrendingDown)
+            : (isBuy ? TrendingDown : TrendingUp);
           return (
             <Button
               key={action}
-              disabled={acting !== null || !hasQty || !price || parseFloat(price) <= 0}
+              disabled={acting !== null || !qtyValue || !price || parseFloat(price) <= 0}
               onClick={() => execute(action)}
               className={cn(
                 "h-11 font-semibold text-sm transition-all gap-1.5",
-                isBuy
-                  ? "bg-green-600 hover:bg-green-700 text-white"
-                  : "bg-red-600 hover:bg-red-700 text-white",
+                isBuy ? "bg-green-600 hover:bg-green-700 text-white" : "bg-red-600 hover:bg-red-700 text-white",
               )}
             >
               {acting === action ? (
