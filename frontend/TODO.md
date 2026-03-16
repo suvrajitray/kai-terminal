@@ -21,16 +21,19 @@
 
 ## Terminal Page
 
-- [ ] **`?` keyboard shortcut help** — small button in stats bar showing all shortcuts in a popover.
 - [ ] **Position age** — subtle indicator per row showing how long position has been open (e.g. "2h 14m").
 
 ## Header / Nav
 
 - [ ] **Index Ticker clickable** — clicking an index copies the value or opens a quick view.
-- [ ] **Quick Trade keyboard trigger** — `Q` key anywhere on terminal opens Quick Trade dialog.
 
 ## Done
 - [x] Market status pill in header (OPEN / PRE-OPEN / CLOSED, IST-aware, updates every 30s)
 - [x] Keyboard shortcuts — Q (Quick Trade), R (Refresh), E (Exit All with confirm)
 - [x] Session timer in stats bar (time since 09:15 IST, market hours only)
 - [x] MTM flash on change (green/red background blink via useValueFlash hook)
+- [x] `?` keyboard shortcut help — `KeyboardShortcutsHelp` component in stats bar (`stats-bar.tsx`), popover lists R / E / Q / ? shortcuts
+- [x] Quick Trade `Q` keyboard trigger — implemented in `quick-trade-button.tsx`
+- [x] Orders panel: rich symbol formatting — `parseOptionSymbol()` in `orders-panel.tsx` shows `NIFTY 23100 [PE pill]` / `NFO 17MAR26 · Intraday`
+- [x] Orders panel: product label — `productLabel()` maps `I→Intraday`, `D→Delivery` in secondary line
+- [x] Orders panel: sticky header — `bg-background z-10` on `<thead>` prevents scroll bleed-through

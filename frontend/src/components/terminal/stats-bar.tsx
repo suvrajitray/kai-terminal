@@ -3,6 +3,7 @@ import { RefreshCw, LogOut, Wifi, WifiOff, ShieldCheck } from "lucide-react";
 import { SessionTimer } from "./session-timer";
 import { MtmDisplay } from "./mtm-display";
 import { PositionCountBadges } from "./position-count-badges";
+import { KeyboardShortcutsHelp } from "./keyboard-shortcuts-help";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
@@ -177,6 +178,7 @@ export function StatsBar({
         >
           <RefreshCw className={cn("size-3", loading && "animate-spin")} />
         </Button>
+        <KeyboardShortcutsHelp />
       </div>
     </div>
   );
