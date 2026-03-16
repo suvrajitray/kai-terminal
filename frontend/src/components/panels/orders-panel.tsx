@@ -6,9 +6,52 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { fetchOrders, cancelAllOrders, cancelOrder } from "@/services/trading-api";
+import { OptionTypeBadge } from "@/components/panels/positions-panel/option-type-badge";
 import type { Order } from "@/types";
 
 const TERMINAL_STATUSES = new Set(["complete", "rejected", "cancelled"]);
+
+// Upstox option symbol parser
+// Weekly format:  {UNDERLYING}{YY}{M}{DD}{STRIKE}{TYPE}  e.g. NIFTY2631723100PE
+// Monthly format: {UNDERLYING}{YY}{MMM}{STRIKE}{TYPE}   e.g. NIFTY26MAR23100PE
+const MONTH_ABBR = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+const WEEKLY_MONTH: Record<string, number> = {
+  "1":1,"2":2,"3":3,"4":4,"5":5,"6":6,"7":7,"8":8,"9":9,"O":10,"N":11,"D":12,
+};
+const KNOWN_UNDERLYINGS = ["BANKNIFTY","MIDCPNIFTY","FINNIFTY","SENSEX","BANKEX","NIFTY"];
+
+interface ParsedOption { underlying: string; strike: number; type: "CE" | "PE"; expiryLabel: string; }
+
+function parseOptionSymbol(symbol: string): ParsedOption | null {
+  const type = symbol.endsWith("CE") ? "CE" : symbol.endsWith("PE") ? "PE" : null;
+  if (!type) return null;
+  const body = symbol.slice(0, -2);
+  let underlying = "", rest = "";
+  for (const u of KNOWN_UNDERLYINGS) {
+    if (body.startsWith(u)) { underlying = u; rest = body.slice(u.length); break; }
+  }
+  if (!underlying || rest.length < 5) return null;
+  const yy = rest.slice(0, 2);
+  rest = rest.slice(2);
+  const upper3 = rest.slice(0, 3).toUpperCase();
+  const monthIdx = MONTH_ABBR.indexOf(upper3);
+  let expiryLabel: string;
+  let strike: number;
+  if (monthIdx >= 0) {
+    // Monthly: MMM + STRIKE
+    strike = parseInt(rest.slice(3), 10);
+    expiryLabel = `${upper3}${yy}`;
+  } else {
+    // Weekly: M (single char) + DD (2 chars) + STRIKE
+    const month = WEEKLY_MONTH[rest[0].toUpperCase()];
+    if (!month) return null;
+    const dd = rest.slice(1, 3);
+    strike = parseInt(rest.slice(3), 10);
+    expiryLabel = `${dd}${MONTH_ABBR[month - 1]}${yy}`;
+  }
+  if (isNaN(strike)) return null;
+  return { underlying, strike, type, expiryLabel };
+}
 
 function StatusBadge({ status }: { status: string }) {
   const s = status.toLowerCase();
@@ -111,7 +154,10 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex h-8 shrink-0 items-center gap-1 border-b border-border bg-muted/40 px-3">
+      <div
+        className={cn("flex h-8 shrink-0 items-center gap-1 border-b border-border bg-muted/40 px-3", !expanded && "cursor-pointer")}
+        onClick={!expanded ? onToggle : undefined}
+      >
         <button
           className={cn(
             "flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-medium transition-colors",
@@ -119,7 +165,7 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
               ? "bg-background text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground",
           )}
-          onClick={() => setTab("open")}
+          onClick={(e) => { e.stopPropagation(); setTab("open"); }}
         >
           Open
           {openOrders.length > 0 && (
@@ -135,7 +181,7 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
               ? "bg-background text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground",
           )}
-          onClick={() => setTab("executed")}
+          onClick={(e) => { e.stopPropagation(); setTab("executed"); }}
         >
           Executed
           {executedOrders.length > 0 && (
@@ -226,12 +272,34 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
                       {formatTime(o.order_timestamp)}
                     </td>
                     <td className="px-3 py-1.5">
-                      <div className="font-medium">{o.trading_symbol}</div>
-                      <div className="text-muted-foreground">{o.exchange} · {o.product}</div>
+                      {(() => {
+                        const parsed = parseOptionSymbol(o.trading_symbol);
+                        return parsed ? (
+                          <>
+                            <div className="flex items-center gap-1.5 font-medium">
+                              {parsed.underlying} {parsed.strike}
+                              <OptionTypeBadge type={parsed.type} />
+                            </div>
+                            <div className="text-[11px] text-muted-foreground">
+                              {o.exchange} {parsed.expiryLabel}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="font-medium">{o.trading_symbol}</div>
+                            <div className="text-[11px] text-muted-foreground">{o.exchange} · {o.product}</div>
+                          </>
+                        );
+                      })()}
                     </td>
                     <td className="px-3 py-1.5 text-muted-foreground">{o.order_type}</td>
-                    <td className={cn("px-3 py-1.5 font-medium", o.transaction_type === "BUY" ? "text-green-500" : "text-red-500")}>
-                      {o.transaction_type}
+                    <td className="px-3 py-1.5">
+                      <span className={cn(
+                        "inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold",
+                        o.transaction_type === "BUY" ? "bg-green-500/15 text-green-500" : "bg-red-500/15 text-red-500"
+                      )}>
+                        {o.transaction_type}
+                      </span>
                     </td>
                     <td className="px-3 py-1.5 text-right tabular-nums">
                       {o.filled_quantity}/{o.quantity}

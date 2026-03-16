@@ -2,17 +2,17 @@
 
 ## Look & Feel (positions panel)
 
-- [ ] **CE/PE colour badge on symbol** — green badge for CE, red for PE next to strike price. Instant directional scan.
+- [x] **CE/PE colour badge on symbol** — `OptionTypeBadge` renders green/red badge in `position-row.tsx`.
 - [ ] **Left border stripe by position side** — 2px left border: green = long, red = short. No layout change.
 - [ ] **P&L row flash per position** — reuse `useValueFlash` hook on each row's P&L cell when LTP updates.
-- [ ] **Animated row entry** — new positions/orders slide in with fade+translate instead of appearing instantly.
+- [x] **Animated row entry** — implemented via `useNewRows` hook + `animate-row-enter` CSS.
 - [ ] **Position age** — subtle indicator per row showing how long position has been open (e.g. "2h 14m").
 
 ## Look & Feel (orders panel)
 
-- [ ] **BUY/SELL pill** — filled pill (`bg-green-500/15 text-green-500` vs red) instead of plain coloured text.
-- [ ] **Order status colours** — trading-specific: complete=green, rejected=red, open/pending=amber pill.
-- [ ] **Empty state icons** — add muted icon (e.g. `Inbox`) above "No positions" / "No open orders" text.
+- [x] **BUY/SELL pill** — filled pill (`bg-green-500/15 text-green-500` vs red) instead of plain coloured text.
+- [x] **Order status colours** — `StatusBadge` in `orders-panel.tsx`: complete=green, rejected=red, open/pending=amber.
+- [x] **Empty state icons** — `EmptyState` with `Inbox`, `CheckCircle2`, `LayoutList` icons already in use.
 
 ## Stats Bar
 
