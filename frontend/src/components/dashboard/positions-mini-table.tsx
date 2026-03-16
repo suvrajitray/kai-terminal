@@ -2,6 +2,8 @@ import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useOptionContractsStore, formatExpiryLabel } from "@/stores/option-contracts-store";
+import { OptionTypeBadge } from "@/components/panels/positions-panel/option-type-badge";
 import type { Position } from "@/types";
 
 const INR = new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 });
@@ -21,6 +23,7 @@ interface PositionsMiniTableProps {
 }
 
 export function PositionsMiniTable({ positions, loading }: PositionsMiniTableProps) {
+  const getByInstrumentKey = useOptionContractsStore((s) => s.getByInstrumentKey);
   const open = positions.filter((p) => p.quantity !== 0);
 
   return (
@@ -56,13 +59,29 @@ export function PositionsMiniTable({ positions, loading }: PositionsMiniTablePro
                 <tbody>
                   {open.map((p) => {
                     const avg = p.quantity < 0 ? p.sell_price : p.buy_price;
+                    const contract = getByInstrumentKey(p.instrument_token);
                     return (
                       <tr
                         key={p.instrument_token}
                         className="border-b border-border/30 hover:bg-muted/20 transition-colors"
                       >
                         <td className="px-4 py-1.5">
-                          <span className="font-medium">{p.trading_symbol}</span>
+                          {contract ? (
+                            <>
+                              <div className="flex items-center gap-1.5 font-medium">
+                                {contract.underlying_symbol} {contract.strike_price}
+                                <OptionTypeBadge type={contract.instrument_type} />
+                              </div>
+                              <div className="text-[10px] text-muted-foreground">
+                                {p.exchange} · {formatExpiryLabel(contract.expiry)}
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="font-medium">{p.trading_symbol}</div>
+                              <div className="text-[10px] text-muted-foreground">{p.exchange}</div>
+                            </>
+                          )}
                         </td>
                         <td
                           className={cn(
