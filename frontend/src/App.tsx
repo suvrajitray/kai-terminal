@@ -8,6 +8,7 @@ import { ConnectBrokersPage } from "@/pages/connect-brokers-page";
 import { BrokerRedirectPage } from "@/pages/broker-redirect-page";
 import { TerminalPage } from "@/pages/terminal-page";
 import { ChartsPage } from "@/pages/charts-page";
+import { AiSignalsPage } from "@/pages/ai-signals-page";
 import { NotFoundPage } from "@/pages/not-found-page";
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/terminal" element={<TerminalPage />} />
           <Route path="/charts" element={<ChartsPage />} />
+          <Route path="/ai-signals" element={<AiSignalsPage />} />
           <Route path="/connect-brokers" element={<ConnectBrokersPage />} />
           <Route path="/redirect/:brokerId" element={<BrokerRedirectPage />} />
         </Route>

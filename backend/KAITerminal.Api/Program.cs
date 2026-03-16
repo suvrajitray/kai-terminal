@@ -69,6 +69,7 @@ app.MapUpstoxEndpoints();
 app.MapChartEndpoints();
 app.MapBrokerCredentialsEndpoints();
 app.MapUserSettingsEndpoints();
+app.MapAiSentimentEndpoints();
 app.MapHub<PositionsHub>("/hubs/positions");
 app.MapHub<IndexHub>("/hubs/indices");
 

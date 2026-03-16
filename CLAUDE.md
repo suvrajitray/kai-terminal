@@ -77,13 +77,15 @@ KAITerminal.Console  ──► KAITerminal.RiskEngine
 
 ### Upstox SDK (`KAITerminal.Upstox`)
 
-Layered: `UpstoxClient` (facade) → `IPositionService` / `IOrderService` / `IOptionService` / `IAuthService` → `UpstoxHttpClient` (internal HTTP layer) → Upstox REST API.
+Layered: `UpstoxClient` (facade) → `IPositionService` / `IOrderService` / `IOptionService` / `IAuthService` / `IMarginService` → `UpstoxHttpClient` (internal HTTP layer) → Upstox REST API.
 
 - **`UpstoxTokenContext`** — `AsyncLocal<string?>` ambient token. Use `UpstoxTokenContext.Use(token)` to scope all API calls within the block to a specific user without passing the token explicitly.
 - **Three named `HttpClient`s**: `"UpstoxApi"` (read, REST), `"UpstoxHft"` (order writes, lower latency), `"UpstoxAuth"` (OAuth exchange only, no Bearer header).
 - Register with `services.AddUpstoxSdk(configuration)` or `services.AddUpstoxSdk(cfg => { ... })`.
 - `IOptionService` supports resolving strikes by premium (`PlaceOrderByOptionPriceAsync`, `GetOrderByOptionPriceAsync`) or by strike type (ATM/OTM1-5/ITM1-5: `PlaceOrderByStrikeV3Async`, `GetOrderByStrikeAsync`). `PriceSearchMode` enum controls option-price resolution: `Nearest` (default), `GreaterThan`, `LessThan`.
 - `Get*` variants (e.g. `GetOrderByOptionPriceAsync`) resolve the strike and return the `PlaceOrderRequest` without placing it — use to inspect before committing.
+- `IMarginService.GetRequiredMarginAsync(items)` — calls `POST /v2/charges/margin`; returns `RequiredMargin` and `FinalMargin`. Exposed via `UpstoxClient.GetRequiredMarginAsync`.
+- `IPositionService.ConvertPositionAsync` — calls `PUT /v2/portfolio/convert-position`. Exposed at `POST /api/upstox/positions/{instrumentToken}/convert`.
 
 ### Risk Engine (`KAITerminal.RiskEngine`)
 
@@ -130,8 +132,16 @@ PostgreSQL via Neon — connection string set in `ConnectionStrings:DefaultConne
 - **Error boundary** — `components/error-boundary.tsx` wraps the entire app in `main.tsx`. Catches unexpected React crashes and renders a recovery screen with reload + recover options.
 - **Env validation** — `lib/constants.ts` checks `VITE_API_URL` on module load and logs a clear error to the console if missing.
 - **Supported indices** — NIFTY, SENSEX, BANKNIFTY, FINNIFTY, BANKEX (in that order). Enforced in `UNDERLYING_KEYS` (`lib/shift-config.ts`), `StrikeMonitor.cs`, and `UserTradingSettings`. Upstox instrument keys: `NSE_INDEX|Nifty 50`, `BSE_INDEX|SENSEX`, `NSE_INDEX|Nifty Bank`, `NSE_INDEX|Nifty Fin Service`, `BSE_INDEX|BANKEX` — note BANKEX uses `BSE_INDEX|BANKEX` (all-caps, no "BSE-" prefix).
-- **Quick Trade** — amber (`bg-amber-500`) button in the header (visible when broker authenticated). Opens a dialog with "By Price" tab (By Chain is disabled/coming soon). Expiry dates fetched from `GET /api/upstox/options/contracts/current-year` and formatted as `TUE, 17th MAR 2026`. Buy/Sell toggle drives CE/PUT/Both action buttons with context-aware icons (`TrendingUp`/`TrendingDown`/`ArrowUpDown`).
+- **Index ticker** — shows any of the 5 indices; defaults to NIFTY + SENSEX. A `SlidersHorizontal` popover lets the user toggle which indices are shown; selection is persisted to `localStorage`. Each card shows LTP + net change on the left and O/H/L as a vertical list on the right separated by a subtle border.
+- **Dashboard page** (`/dashboard`) — live at-a-glance view: Row 1: 4 stat cards (MTM with flash, Unrealised, Realised, Open count). Row 2: 5 index cards with O/H/L mini-columns. Row 3: open positions mini-table + Day Extremes card + Profit Protection status card. All data from `usePositionsFeed`, `useIndicesFeed`, and `localStorage` — no new backend calls.
+- **Quick Trade** — amber (`bg-amber-500`) button in the header (visible when broker authenticated). Has two tabs:
+  - **By Price** — premium input, Buy/Sell toggle, CE/PE/Both action buttons with context-aware icons (`TrendingUp`/`TrendingDown`/`ArrowUpDown`). Expiry from `GET /api/upstox/options/contracts/current-year`, formatted as `TUE, 17th MAR 2026`.
+  - **By Chain** — Straddle/Strangle strategy toggle. Fetches live chain via `GET /api/upstox/options/chain`, auto-scrolls to ATM row. Straddle: CE+PE at same strike. Strangle: symmetric OTM pairs widening from ATM. Shows live required margin (debounced 600ms) via `POST /api/upstox/margin`. Dialog widens to `max-w-2xl` on chain tab.
+- **Position row actions** — three-dot menu on each row opens contextual dialogs: Exit Position (qty + Limit/Market toggle + limit price), Sell/Buy More (same layout, adapts to direction), Convert Position (Intraday↔Delivery, qty input). All dialogs show a symbol chip with contract name, LTP, expiry, qty.
+- **Keyboard shortcuts** — `Q` Quick Trade, `R` Refresh, `E` Exit All (with confirm), `?` opens help popover in stats bar. Help popover implemented in `components/terminal/keyboard-shortcuts-help.tsx`.
 - **Option contracts** — `GET /api/upstox/options/contracts/current-year` returns only contracts expiring in the current calendar year, sorted by expiry. Use this for expiry dropdowns instead of the full contracts endpoint.
+- **AI Signals page** (`/ai-signals`) — `GET /api/ai/market-sentiment` assembles a market snapshot (index quotes, NIFTY+BANKNIFTY option chains, last 8 × 30-min NIFTY candles) and fans out to GPT-4o, Grok, Gemini, Claude in parallel (30s timeout each). Each model returns direction / confidence / reasons / support / resistance / watch_for as JSON. Frontend polls every 15 minutes with a countdown timer; manual refresh button. Page shows a `MarketContextBar` and 4 `SentimentCard` components. API keys configured via `AiSentiment` config section; add with `dotnet user-secrets`. Requires `X-Upstox-Access-Token` header (same as other Upstox endpoints, but endpoint is at `/api/ai/` so the token context is set manually inside the handler).
+- **Profit Protection env defaults** — PP store defaults can be overridden via `frontend/.env` variables: `VITE_PP_MTM_TARGET`, `VITE_PP_MTM_SL`, etc.
 
 ---
 
@@ -139,10 +149,10 @@ PostgreSQL via Neon — connection string set in `ConnectionStrings:DefaultConne
 
 | File | Purpose |
 |---|---|
-| `backend/KAITerminal.Api/appsettings.json` | `Jwt:*`, `GoogleAuth:*`, `Frontend:Url`, `Upstox:ApiBaseUrl/HftBaseUrl`, `ConnectionStrings:DefaultConnection` |
+| `backend/KAITerminal.Api/appsettings.json` | `Jwt:*`, `GoogleAuth:*`, `Frontend:Url`, `Upstox:ApiBaseUrl/HftBaseUrl`, `ConnectionStrings:DefaultConnection`, `AiSentiment:*` |
 | `backend/KAITerminal.Worker/appsettings.json` | `Upstox:*`, `RiskEngine:*` with `Users[]` list |
 | `backend/KAITerminal.Console/appsettings.json` | `Upstox:AccessToken`, `RiskEngine:*` (no `Users[]`) |
-| `frontend/.env` | `VITE_API_URL` (optional) |
+| `frontend/.env` | `VITE_API_URL` (optional), `VITE_PP_MTM_TARGET`, `VITE_PP_MTM_SL`, and other PP defaults |
 
 Store real tokens with `dotnet user-secrets` instead of committing them to `appsettings.json`:
 
@@ -158,6 +168,13 @@ dotnet user-secrets set "Upstox:AccessToken" "<daily_token>"
 
 cd ../KAITerminal.Worker
 dotnet user-secrets set "RiskEngine:Users:0:AccessToken" "<daily_token>"
+
+# AI Signals (KAITerminal.Api)
+cd ../KAITerminal.Api
+dotnet user-secrets set "AiSentiment:OpenAiApiKey"  "sk-..."
+dotnet user-secrets set "AiSentiment:GrokApiKey"    "xai-..."
+dotnet user-secrets set "AiSentiment:GeminiApiKey"  "AIza..."
+dotnet user-secrets set "AiSentiment:ClaudeApiKey"  "sk-ant-..."
 ```
 
 ---

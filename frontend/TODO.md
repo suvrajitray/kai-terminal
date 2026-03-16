@@ -37,3 +37,11 @@
 - [x] Orders panel: rich symbol formatting — `parseOptionSymbol()` in `orders-panel.tsx` shows `NIFTY 23100 [PE pill]` / `NFO 17MAR26 · Intraday`
 - [x] Orders panel: product label — `productLabel()` maps `I→Intraday`, `D→Delivery` in secondary line
 - [x] Orders panel: sticky header — `bg-background z-10` on `<thead>` prevents scroll bleed-through
+- [x] Quick Trade By Chain tab — Straddle/Strangle strategy (`by-chain-tab.tsx`), live option chain, auto-scroll to ATM, live margin estimate (debounced 600ms)
+- [x] Position row action dialogs — Exit, Sell/Buy More, Convert (`position-action-dialogs.tsx`); all wired to backend
+- [x] Dashboard page — stat cards, 5-index overview, positions mini-table, day extremes card, PP status card
+- [x] Animated nav icons — per-route icons with spring-animated active pill (motion layoutId)
+- [x] PnlCell percentage — optional % sub-row in position rows
+- [x] Index ticker — 5-index toggle popover (SlidersHorizontal), persisted to localStorage; vertical OHL layout
+- [x] FINNIFTY + BANKEX — fully supported throughout frontend and backend
+- [x] AI Signals page (`/ai-signals`) — 4-model parallel AI analysis, 15-min auto-refresh with countdown
