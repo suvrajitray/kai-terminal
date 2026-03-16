@@ -100,7 +100,7 @@ public sealed class AiSentimentService : IAiSentimentService
         var results = await Task.WhenAll(
             CallOpenAiAsync("GPT-4o",  "openai",     cfg["OpenAiApiKey"],  cfg["OpenAiModel"]  ?? "gpt-4o-mini",             systemPrompt, userPrompt, ct),
             CallOpenAiAsync("Grok",    "xai",        cfg["GrokApiKey"],    cfg["GrokModel"]    ?? "grok-3-mini",              systemPrompt, userPrompt, ct),
-            CallGeminiAsync("Gemini",  "google",     cfg["GeminiApiKey"],  cfg["GeminiModel"]  ?? "gemini-1.5-flash",         systemPrompt, userPrompt, ct),
+            CallGeminiAsync("Gemini",  "google",     cfg["GeminiApiKey"],  cfg["GeminiModel"]  ?? "gemini-2.0-flash",         systemPrompt, userPrompt, ct),
             CallClaudeAsync("Claude",  "anthropic",  cfg["ClaudeApiKey"],  cfg["ClaudeModel"]  ?? "claude-haiku-4-5-20251001", systemPrompt, userPrompt, ct)
         );
 
