@@ -4,8 +4,10 @@
  */
 const LOT_SIZES: [prefix: string, size: number][] = [
   ["BANKNIFTY", 30],
+  ["FINNIFTY",  40],
   ["NIFTY",     65],
   ["SENSEX",    20],
+  ["BANKEX",    15],
 ];
 
 /**

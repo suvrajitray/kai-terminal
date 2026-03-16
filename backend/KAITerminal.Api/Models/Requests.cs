@@ -15,6 +15,8 @@ public record struct SaveUserTradingSettingsRequest(
     int NiftyShiftOffset,
     int SensexShiftOffset,
     int BankniftyShiftOffset,
+    int FinniftyShiftOffset = 5,
+    int BankexShiftOffset = 10,
     string IndexChangeMode = "prevClose");
 
 public record struct SaveBrokerCredentialRequest(

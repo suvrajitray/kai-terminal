@@ -15,15 +15,19 @@ export interface IndexPrices {
   nifty: IndexQuote;
   bankNifty: IndexQuote;
   sensex: IndexQuote;
+  finNifty: IndexQuote;
+  bankex: IndexQuote;
 }
 
 const EMPTY_QUOTE: IndexQuote = { ltp: null, open: null, high: null, low: null, netChange: null };
-const INITIAL: IndexPrices = { nifty: EMPTY_QUOTE, bankNifty: EMPTY_QUOTE, sensex: EMPTY_QUOTE };
+const INITIAL: IndexPrices = { nifty: EMPTY_QUOTE, bankNifty: EMPTY_QUOTE, sensex: EMPTY_QUOTE, finNifty: EMPTY_QUOTE, bankex: EMPTY_QUOTE };
 
 const TOKEN_MAP: Record<string, keyof IndexPrices> = {
   "NSE_INDEX|Nifty 50": "nifty",
   "NSE_INDEX|Nifty Bank": "bankNifty",
   "BSE_INDEX|SENSEX": "sensex",
+  "NSE_INDEX|Nifty Fin Service": "finNifty",
+  "BSE_INDEX|BANKEX": "bankex",
 };
 
 type IndexUpdate = { instrumentToken: string; ltp: number; open?: number; high?: number; low?: number; netChange?: number };

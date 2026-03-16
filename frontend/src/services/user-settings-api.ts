@@ -5,6 +5,8 @@ export interface UserTradingSettings {
   niftyShiftOffset: number;
   sensexShiftOffset: number;
   bankniftyShiftOffset: number;
+  finniftyShiftOffset: number;
+  bankexShiftOffset: number;
   indexChangeMode: "open" | "prevClose";
 }
 
@@ -13,6 +15,8 @@ export const DEFAULT_TRADING_SETTINGS: UserTradingSettings = {
   niftyShiftOffset: 5,
   sensexShiftOffset: 10,
   bankniftyShiftOffset: 10,
+  finniftyShiftOffset: 5,
+  bankexShiftOffset: 10,
   indexChangeMode: "prevClose",
 };
 

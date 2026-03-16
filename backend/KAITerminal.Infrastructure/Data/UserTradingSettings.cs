@@ -8,6 +8,8 @@ public class UserTradingSettings
     public int NiftyShiftOffset { get; set; } = 5;
     public int SensexShiftOffset { get; set; } = 10;
     public int BankniftyShiftOffset { get; set; } = 10;
+    public int FinniftyShiftOffset { get; set; } = 5;
+    public int BankexShiftOffset { get; set; } = 10;
     public string IndexChangeMode { get; set; } = "prevClose";
     public DateTime UpdatedAt { get; set; }
 }

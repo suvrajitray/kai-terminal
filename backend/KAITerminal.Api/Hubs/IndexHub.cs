@@ -11,6 +11,8 @@ public sealed class IndexHub : Hub
         "NSE_INDEX|Nifty 50",
         "NSE_INDEX|Nifty Bank",
         "BSE_INDEX|SENSEX",
+        "NSE_INDEX|Nifty Fin Service",
+        "BSE_INDEX|BANKEX",
     ];
 
     private const int PollIntervalMs = 3000;

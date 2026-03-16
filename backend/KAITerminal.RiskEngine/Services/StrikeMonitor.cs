@@ -21,6 +21,8 @@ public sealed class StrikeMonitor
         ["NIFTY"]     = "NSE_INDEX|Nifty 50",
         ["SENSEX"]    = "BSE_INDEX|SENSEX",
         ["BANKNIFTY"] = "NSE_INDEX|Nifty Bank",
+        ["FINNIFTY"]  = "NSE_INDEX|Nifty Fin Service",
+        ["BANKEX"]    = "BSE_INDEX|BANKEX",
     };
 
     private readonly UpstoxClient _upstox;

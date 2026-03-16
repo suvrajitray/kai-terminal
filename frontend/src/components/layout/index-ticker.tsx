@@ -1,9 +1,36 @@
-import { useIndicesFeed, type IndexQuote } from "@/hooks/use-indices-feed";
+import { useState } from "react";
+import { SlidersHorizontal } from "lucide-react";
+import { useIndicesFeed, type IndexQuote, type IndexPrices } from "@/hooks/use-indices-feed";
 import { useUserTradingSettingsStore } from "@/stores/user-trading-settings-store";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 
 const FMT = new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmt = (v: number | null) => (v !== null ? FMT.format(v) : "—");
+
+const ALL_INDICES: { key: keyof IndexPrices; label: string }[] = [
+  { key: "nifty",    label: "Nifty" },
+  { key: "sensex",   label: "Sensex" },
+  { key: "bankNifty", label: "Bank Nifty" },
+  { key: "finNifty", label: "Fin Nifty" },
+  { key: "bankex",   label: "Bankex" },
+];
+
+const DEFAULT_VISIBLE: (keyof IndexPrices)[] = ["nifty", "sensex"];
+const STORAGE_KEY = "kai-terminal-visible-indices";
+
+function loadVisible(): (keyof IndexPrices)[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw) as (keyof IndexPrices)[];
+  } catch {}
+  return DEFAULT_VISIBLE;
+}
+
+function saveVisible(keys: (keyof IndexPrices)[]) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(keys));
+}
 
 function OhlcBadge({ label, value, className }: { label: string; value: number | null; className?: string }) {
   return (
@@ -59,16 +86,71 @@ function IndexCard({ label, quote }: { label: string; quote: IndexQuote }) {
   );
 }
 
+function IndexPickerPopover({
+  visible,
+  onChange,
+}: {
+  visible: (keyof IndexPrices)[];
+  onChange: (keys: (keyof IndexPrices)[]) => void;
+}) {
+  const toggle = (key: keyof IndexPrices) => {
+    if (visible.includes(key)) {
+      if (visible.length === 1) return; // keep at least one
+      onChange(visible.filter((k) => k !== key));
+    } else {
+      onChange([...visible, key]);
+    }
+  };
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground">
+          <SlidersHorizontal className="size-3.5" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-44 p-2">
+        <p className="mb-2 px-1 text-[11px] font-medium text-muted-foreground">Show indices</p>
+        <div className="space-y-1">
+          {ALL_INDICES.map(({ key, label }) => (
+            <label
+              key={key}
+              className="flex cursor-pointer items-center gap-2 rounded px-1 py-1 text-sm hover:bg-muted/40"
+            >
+              <Checkbox
+                checked={visible.includes(key)}
+                onCheckedChange={() => toggle(key)}
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function IndexTicker() {
-  const { nifty, bankNifty, sensex } = useIndicesFeed();
+  const [visible, setVisible] = useState<(keyof IndexPrices)[]>(loadVisible);
+  const prices = useIndicesFeed();
+
+  const handleChange = (keys: (keyof IndexPrices)[]) => {
+    setVisible(keys);
+    saveVisible(keys);
+  };
+
+  const visibleIndices = ALL_INDICES.filter(({ key }) => visible.includes(key));
 
   return (
     <div className="hidden items-center gap-3 lg:flex">
-      <IndexCard label="Nifty" quote={nifty} />
+      {visibleIndices.map(({ key, label }, i) => (
+        <div key={key} className="flex items-center gap-3">
+          {i > 0 && <div className="h-8 w-px bg-border/40" />}
+          <IndexCard label={label} quote={prices[key]} />
+        </div>
+      ))}
       <div className="h-8 w-px bg-border/40" />
-      <IndexCard label="Bank Nifty" quote={bankNifty} />
-      <div className="h-8 w-px bg-border/40" />
-      <IndexCard label="Sensex" quote={sensex} />
+      <IndexPickerPopover visible={visible} onChange={handleChange} />
     </div>
   );
 }

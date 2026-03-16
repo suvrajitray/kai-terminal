@@ -17,6 +17,8 @@ const SHIFT_FIELDS: { key: keyof UserTradingSettings; label: string }[] = [
   { key: "niftyShiftOffset", label: "NIFTY" },
   { key: "sensexShiftOffset", label: "SENSEX" },
   { key: "bankniftyShiftOffset", label: "BANKNIFTY" },
+  { key: "finniftyShiftOffset", label: "FINNIFTY" },
+  { key: "bankexShiftOffset", label: "BANKEX" },
 ];
 
 export function UserTradingSettingsDialog({ open, onClose }: Props) {
@@ -26,6 +28,8 @@ export function UserTradingSettingsDialog({ open, onClose }: Props) {
     niftyShiftOffset: store.niftyShiftOffset,
     sensexShiftOffset: store.sensexShiftOffset,
     bankniftyShiftOffset: store.bankniftyShiftOffset,
+    finniftyShiftOffset: store.finniftyShiftOffset,
+    bankexShiftOffset: store.bankexShiftOffset,
     indexChangeMode: store.indexChangeMode,
   }));
   const [saving, setSaving] = useState(false);
@@ -38,6 +42,8 @@ export function UserTradingSettingsDialog({ open, onClose }: Props) {
       niftyShiftOffset: store.niftyShiftOffset,
       sensexShiftOffset: store.sensexShiftOffset,
       bankniftyShiftOffset: store.bankniftyShiftOffset,
+      finniftyShiftOffset: store.finniftyShiftOffset,
+      bankexShiftOffset: store.bankexShiftOffset,
       indexChangeMode: store.indexChangeMode,
     });
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps

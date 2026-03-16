@@ -2,10 +2,20 @@ import { cn } from "@/lib/utils";
 import type { InstrumentSearchResult } from "@/services/charts-api";
 
 const INDICES: InstrumentSearchResult[] = [
-  { instrumentKey: "NSE_INDEX|Nifty 50",  tradingSymbol: "Nifty 50",  name: "NIFTY 50",   exchange: "NSE_INDEX", instrumentType: "INDEX" },
-  { instrumentKey: "NSE_INDEX|Nifty Bank", tradingSymbol: "Nifty Bank", name: "BANK NIFTY", exchange: "NSE_INDEX", instrumentType: "INDEX" },
-  { instrumentKey: "BSE_INDEX|SENSEX",     tradingSymbol: "SENSEX",     name: "BSE SENSEX", exchange: "BSE_INDEX", instrumentType: "INDEX" },
+  { instrumentKey: "NSE_INDEX|Nifty 50",           tradingSymbol: "Nifty 50",           name: "NIFTY 50",   exchange: "NSE_INDEX", instrumentType: "INDEX" },
+  { instrumentKey: "NSE_INDEX|Nifty Bank",          tradingSymbol: "Nifty Bank",          name: "BANK NIFTY", exchange: "NSE_INDEX", instrumentType: "INDEX" },
+  { instrumentKey: "NSE_INDEX|Nifty Fin Service",   tradingSymbol: "Nifty Fin Service",   name: "FIN NIFTY",  exchange: "NSE_INDEX", instrumentType: "INDEX" },
+  { instrumentKey: "BSE_INDEX|SENSEX",              tradingSymbol: "SENSEX",              name: "BSE SENSEX", exchange: "BSE_INDEX", instrumentType: "INDEX" },
+  { instrumentKey: "BSE_INDEX|BANKEX",          tradingSymbol: "BSE-Bankex",          name: "BANKEX",     exchange: "BSE_INDEX", instrumentType: "INDEX" },
 ];
+
+const DISPLAY_LABEL: Record<string, string> = {
+  "NSE_INDEX|Nifty 50":          "Nifty",
+  "NSE_INDEX|Nifty Bank":        "BankNifty",
+  "NSE_INDEX|Nifty Fin Service": "FinNifty",
+  "BSE_INDEX|SENSEX":            "Sensex",
+  "BSE_INDEX|BANKEX":        "Bankex",
+};
 
 interface IndexQuickPickProps {
   selected: InstrumentSearchResult | null;
@@ -26,7 +36,7 @@ export function IndexQuickPick({ selected, onSelect }: IndexQuickPickProps) {
               : "text-muted-foreground hover:text-foreground"
           )}
         >
-          {idx.tradingSymbol === "Nifty 50" ? "Nifty" : idx.tradingSymbol === "Nifty Bank" ? "BankNifty" : "Sensex"}
+          {DISPLAY_LABEL[idx.instrumentKey] ?? idx.name}
         </button>
       ))}
     </div>
