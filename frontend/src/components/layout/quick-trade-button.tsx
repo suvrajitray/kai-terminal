@@ -40,7 +40,7 @@ export function QuickTradeButton() {
       </Button>
       <DialogContent
         className={cn(
-          "transition-[max-width] duration-200",
+          "transition-[max-width] duration-200 max-h-[calc(100dvh-2rem)] overflow-y-auto",
           activeTab === "chain" ? "sm:max-w-2xl" : "sm:max-w-lg",
         )}
       >

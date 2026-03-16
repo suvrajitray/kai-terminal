@@ -111,7 +111,24 @@ public sealed class UpstoxClient
         => _positions.ExitPositionAsync(instrumentToken, product, cancellationToken);
 
     // ═══════════════════════════════════════════════════════
-    // Feature 5 — Cancel All Pending Orders
+    // Feature 5 — Convert Position
+    // ═══════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Convert a position between Intraday ("I") and Delivery ("D") product types.
+    /// </summary>
+    /// <param name="instrumentToken">e.g. "NSE_FO|52618"</param>
+    /// <param name="oldProduct">Current product: "I" or "D".</param>
+    /// <param name="quantity">Units to convert (positive integer).</param>
+    public Task ConvertPositionAsync(
+        string instrumentToken,
+        string oldProduct,
+        int quantity,
+        CancellationToken cancellationToken = default)
+        => _positions.ConvertPositionAsync(instrumentToken, oldProduct, quantity, cancellationToken);
+
+    // ═══════════════════════════════════════════════════════
+    // Feature 6 — Cancel All Pending Orders
     // ═══════════════════════════════════════════════════════
 
     /// <summary>Cancel every open / pending order in the order book.</summary>

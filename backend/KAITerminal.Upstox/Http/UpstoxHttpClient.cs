@@ -37,6 +37,23 @@ internal sealed class UpstoxHttpClient
     public Task<IReadOnlyList<Position>> GetPositionsAsync(CancellationToken ct = default)
         => GetListAsync<Position>("UpstoxApi", "/v2/portfolio/short-term-positions", ct);
 
+    public async Task ConvertPositionAsync(
+        string instrumentToken, string oldProduct, string newProduct,
+        string transactionType, int quantity, CancellationToken ct = default)
+    {
+        var dto = new ConvertPositionDto
+        {
+            InstrumentToken = instrumentToken,
+            OldProduct = oldProduct,
+            NewProduct = newProduct,
+            TransactionType = transactionType,
+            Quantity = quantity
+        };
+        var client = _factory.CreateClient("UpstoxApi");
+        var response = await client.PutAsJsonAsync("/v2/portfolio/convert-position", dto, JsonOptions, ct);
+        await HandleResponseAsync<object>(response, ct);
+    }
+
     // ──────────────────────────────────────────────────
     // Orders
     // ──────────────────────────────────────────────────
@@ -382,6 +399,15 @@ internal sealed class UpstoxHttpClient
         [JsonPropertyName("trigger_price")] public decimal TriggerPrice { get; init; }
         [JsonPropertyName("is_amo")] public bool IsAmo { get; init; }
         [JsonPropertyName("slice")] public bool Slice { get; init; }
+    }
+
+    private sealed class ConvertPositionDto
+    {
+        [JsonPropertyName("instrument_token")] public string InstrumentToken { get; init; } = "";
+        [JsonPropertyName("new_product")]      public string NewProduct      { get; init; } = "";
+        [JsonPropertyName("old_product")]      public string OldProduct      { get; init; } = "";
+        [JsonPropertyName("transaction_type")] public string TransactionType { get; init; } = "";
+        [JsonPropertyName("quantity")]         public int    Quantity        { get; init; }
     }
 
     private sealed class PlaceOrderRawV3

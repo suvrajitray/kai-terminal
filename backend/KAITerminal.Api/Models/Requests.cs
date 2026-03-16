@@ -23,6 +23,8 @@ public record struct SaveBrokerCredentialRequest(
     string ApiSecret,
     string AccessToken = "");
 
+public record struct ConvertPositionRequest(string OldProduct, int Quantity);
+
 public record ResolveByOptionPriceQuery(
     string UnderlyingKey,
     string ExpiryDate,

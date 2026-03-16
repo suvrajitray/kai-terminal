@@ -63,6 +63,15 @@ public static class UpstoxEndpoints
             return Results.Ok(new { OrderId = id });
         });
 
+        group.MapPost("/positions/{instrumentToken}/convert", async (
+            string instrumentToken,
+            [FromBody] ConvertPositionRequest request,
+            UpstoxClient upstox) =>
+        {
+            await upstox.ConvertPositionAsync(instrumentToken, request.OldProduct, request.Quantity);
+            return Results.Ok();
+        });
+
         // ── Orders ────────────────────────────────────────────────────────────
 
         group.MapGet("/orders", async (UpstoxClient upstox) =>

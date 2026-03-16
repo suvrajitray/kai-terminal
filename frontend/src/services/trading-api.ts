@@ -19,6 +19,17 @@ export async function exitPosition(instrumentToken: string, product: string): Pr
   });
 }
 
+export async function convertPosition(
+  instrumentToken: string,
+  oldProduct: string,
+  quantity: number,
+): Promise<void> {
+  await apiClient.post(`/api/upstox/positions/${encodeURIComponent(instrumentToken)}/convert`, {
+    oldProduct,
+    quantity,
+  });
+}
+
 export async function fetchOrders(): Promise<Order[]> {
   const res = await apiClient.get<Order[]>("/api/upstox/orders");
   return res.data;

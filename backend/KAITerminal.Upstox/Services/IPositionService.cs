@@ -37,4 +37,16 @@ public interface IPositionService
         string instrumentToken,
         string product,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Feature 5 — Convert a position between Intraday and Delivery product types.
+    /// </summary>
+    /// <param name="instrumentToken">Instrument key, e.g. "NSE_FO|52618".</param>
+    /// <param name="oldProduct">Current product string: "I" or "D".</param>
+    /// <param name="quantity">Number of units to convert (positive).</param>
+    Task ConvertPositionAsync(
+        string instrumentToken,
+        string oldProduct,
+        int quantity,
+        CancellationToken cancellationToken = default);
 }

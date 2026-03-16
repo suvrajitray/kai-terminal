@@ -16,6 +16,7 @@ import { OptionTypeBadge } from "./option-type-badge";
 import { useOptionContractsStore, formatExpiryLabel } from "@/stores/option-contracts-store";
 import { getLotSize } from "@/lib/lot-sizes";
 import { cn } from "@/lib/utils";
+import { convertPosition } from "@/services/trading-api";
 import type { Position } from "@/types";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -363,15 +364,25 @@ export function ConvertPositionDialog({ open, onOpenChange, position }: ConvertD
   const fromLabel = productLabel(position.product);
   const toLabel   = isIntraday(position.product) ? "Delivery" : "Intraday";
 
+  const [converting, setConverting] = useState(false);
+
   const { qtyValue, setQtyValue, qtyMode, toggleQtyMode, qty } = useQtyState(
     Math.abs(position.quantity),
     open,
     lotSize,
   );
 
-  function handleConfirm() {
-    toast.info("Convert position — backend integration coming soon");
-    onOpenChange(false);
+  async function handleConfirm() {
+    setConverting(true);
+    try {
+      await convertPosition(position.instrument_token, position.product, qty);
+      toast.success(`Converted ${qty} units to ${toLabel}`);
+      onOpenChange(false);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setConverting(false);
+    }
   }
 
   return (
@@ -414,9 +425,9 @@ export function ConvertPositionDialog({ open, onOpenChange, position }: ConvertD
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button disabled={qty === 0} onClick={handleConfirm}>
-            <RefreshCw className="size-3.5" />
-            Convert to {toLabel}
+          <Button disabled={qty === 0 || converting} onClick={handleConfirm}>
+            <RefreshCw className={cn("size-3.5", converting && "animate-spin")} />
+            {converting ? "Converting…" : `Convert to ${toLabel}`}
           </Button>
         </DialogFooter>
       </DialogContent>

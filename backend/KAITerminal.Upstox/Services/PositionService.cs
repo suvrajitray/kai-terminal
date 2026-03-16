@@ -69,6 +69,30 @@ internal sealed class PositionService : IPositionService
         return await ExitSingleAsync(position, cancellationToken);
     }
 
+    /// <inheritdoc />
+    public async Task ConvertPositionAsync(
+        string instrumentToken,
+        string oldProduct,
+        int quantity,
+        CancellationToken cancellationToken = default)
+    {
+        var positions = await GetAllPositionsAsync(cancellationToken);
+        var position = positions.FirstOrDefault(p =>
+            string.Equals(p.InstrumentToken, instrumentToken, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(p.Product, oldProduct, StringComparison.OrdinalIgnoreCase));
+
+        if (position is null)
+            throw new UpstoxException($"Position not found for instrument token: {instrumentToken}, product: {oldProduct}");
+
+        if (!position.IsOpen)
+            throw new UpstoxException($"Position for {instrumentToken}/{oldProduct} is already closed (quantity = 0).");
+
+        var newProduct       = string.Equals(oldProduct, "I", StringComparison.OrdinalIgnoreCase) ? "D" : "I";
+        var transactionType  = position.Quantity >= 0 ? "BUY" : "SELL";
+
+        await _http.ConvertPositionAsync(instrumentToken, oldProduct.ToUpperInvariant(), newProduct, transactionType, quantity, cancellationToken);
+    }
+
     // ──────────────────────────────────────────────────
     // Helpers
     // ──────────────────────────────────────────────────

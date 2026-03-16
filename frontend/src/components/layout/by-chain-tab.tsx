@@ -244,7 +244,7 @@ export function ByChainTab({ underlying, expiry, product, quantity, isActive }: 
         </table>
 
         {/* Scrollable body */}
-        <div ref={scrollRef} className="max-h-[280px] overflow-y-auto">
+        <div ref={scrollRef} className="max-h-[min(280px,35dvh)] overflow-y-auto">
           {loading ? (
             <div className="flex h-44 items-center justify-center gap-2 text-sm text-muted-foreground">
               <RefreshCw className="size-4 animate-spin" /> Loading…
