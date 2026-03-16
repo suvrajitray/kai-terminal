@@ -11,6 +11,11 @@ import type { Order } from "@/types";
 
 const TERMINAL_STATUSES = new Set(["complete", "rejected", "cancelled"]);
 
+const PRODUCT_LABEL: Record<string, string> = {
+  I: "Intraday", D: "Delivery", MTF: "MTF", CO: "Cover", OCO: "OCO",
+};
+function productLabel(p: string) { return PRODUCT_LABEL[p] ?? p; }
+
 // Upstox option symbol parser
 // Weekly format:  {UNDERLYING}{YY}{M}{DD}{STRIKE}{TYPE}  e.g. NIFTY2631723100PE
 // Monthly format: {UNDERLYING}{YY}{MMM}{STRIKE}{TYPE}   e.g. NIFTY26MAR23100PE
@@ -243,7 +248,7 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
           />
         ) : (
           <table className="w-full text-xs">
-            <thead className="sticky top-0 bg-background">
+            <thead className="sticky top-0 z-10 bg-background">
               <tr className="border-b border-border text-muted-foreground">
                 <th className="px-3 py-1.5 text-left font-medium">Time</th>
                 <th className="px-3 py-1.5 text-left font-medium">Symbol</th>
@@ -281,13 +286,13 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
                               <OptionTypeBadge type={parsed.type} />
                             </div>
                             <div className="text-[11px] text-muted-foreground">
-                              {o.exchange} {parsed.expiryLabel}
+                              {o.exchange} {parsed.expiryLabel} · {productLabel(o.product)}
                             </div>
                           </>
                         ) : (
                           <>
                             <div className="font-medium">{o.trading_symbol}</div>
-                            <div className="text-[11px] text-muted-foreground">{o.exchange} · {o.product}</div>
+                            <div className="text-[11px] text-muted-foreground">{o.exchange} · {productLabel(o.product)}</div>
                           </>
                         );
                       })()}
