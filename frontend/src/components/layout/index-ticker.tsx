@@ -32,15 +32,6 @@ function saveVisible(keys: (keyof IndexPrices)[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(keys));
 }
 
-function OhlcBadge({ label, value, className }: { label: string; value: number | null; className?: string }) {
-  return (
-    <span className="flex items-center gap-0.5">
-      <span className={cn("text-[9px] font-semibold uppercase tracking-wide", className)}>{label}</span>
-      <span className="text-[10px] tabular-nums text-foreground/70">{fmt(value)}</span>
-    </span>
-  );
-}
-
 function IndexCard({ label, quote }: { label: string; quote: IndexQuote }) {
   const indexChangeMode = useUserTradingSettingsStore((s) => s.indexChangeMode);
 
@@ -59,28 +50,37 @@ function IndexCard({ label, quote }: { label: string; quote: IndexQuote }) {
   const isUp = change !== null && change >= 0;
 
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-baseline gap-1.5">
-        <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
-        <span className="text-sm font-bold tabular-nums tracking-tight">{fmt(quote.ltp)}</span>
-        {change !== null && changePct !== null && (
-          <span className={cn(
-            "text-[10px] tabular-nums font-medium",
-            isUp ? "text-green-400" : "text-red-400"
-          )}>
+    <div className="flex items-center gap-2.5">
+      {/* Left: label + LTP + change */}
+      <div className="flex flex-col gap-0.5">
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-[9px] font-semibold uppercase tracking-widest text-muted-foreground/50">{label}</span>
+          <span className="text-[13px] font-bold tabular-nums tracking-tight leading-none">{fmt(quote.ltp)}</span>
+        </div>
+        {change !== null && changePct !== null ? (
+          <span className={cn("text-[10px] tabular-nums font-medium leading-none", isUp ? "text-green-400" : "text-red-400")}>
             {isUp ? "+" : ""}{FMT.format(change)}
-            <span className="ml-0.5 text-[9px] opacity-80">
-              ({isUp ? "+" : ""}{changePct.toFixed(2)}%)
-            </span>
+            <span className="ml-0.5 text-[9px] opacity-70">({isUp ? "+" : ""}{changePct.toFixed(2)}%)</span>
           </span>
+        ) : (
+          <span className="text-[10px] text-muted-foreground/30 leading-none">—</span>
         )}
       </div>
-      <div className="flex items-center gap-2 rounded-sm bg-muted/30 px-1.5 py-0.5">
-        <OhlcBadge label="O" value={quote.open}  className="text-sky-400/70" />
-        <span className="text-border/60">·</span>
-        <OhlcBadge label="H" value={quote.high} className="text-green-400/70" />
-        <span className="text-border/60">·</span>
-        <OhlcBadge label="L" value={quote.low}  className="text-red-400/70" />
+
+      {/* Right: OHL as vertical mini-column */}
+      <div className="flex flex-col gap-px border-l border-border/25 pl-2.5 text-[9px] tabular-nums">
+        <span className="flex items-center gap-1 leading-tight">
+          <span className="w-2 font-bold text-sky-400/70">O</span>
+          <span className="text-muted-foreground/55">{fmt(quote.open)}</span>
+        </span>
+        <span className="flex items-center gap-1 leading-tight">
+          <span className="w-2 font-bold text-green-400/70">H</span>
+          <span className="text-muted-foreground/55">{fmt(quote.high)}</span>
+        </span>
+        <span className="flex items-center gap-1 leading-tight">
+          <span className="w-2 font-bold text-red-400/70">L</span>
+          <span className="text-muted-foreground/55">{fmt(quote.low)}</span>
+        </span>
       </div>
     </div>
   );
