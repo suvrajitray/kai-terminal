@@ -273,7 +273,12 @@ public sealed class AiSentimentService : IAiSentimentService
             cts.CancelAfter(TimeSpan.FromSeconds(30));
 
             var response = await client.PostAsJsonAsync("/v1/chat/completions", body, cts.Token);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+            {
+                var errBody = await response.Content.ReadAsStringAsync(cts.Token);
+                sw.Stop();
+                return ErrorResult(model, provider, $"HTTP {(int)response.StatusCode}: {Truncate(errBody)}", sw.ElapsedMilliseconds);
+            }
 
             var json = await response.Content.ReadAsStringAsync(cts.Token);
             var doc  = JsonNode.Parse(json);
@@ -303,7 +308,8 @@ public sealed class AiSentimentService : IAiSentimentService
         try
         {
             var client = _httpFactory.CreateClient("Gemini");
-            var url    = $"/v1beta/models/{modelId}:generateContent?key={apiKey}";
+            // Use absolute URI — relative URIs with colons in the path can mis-resolve with some HttpClient configurations
+            var url = $"https://generativelanguage.googleapis.com/v1beta/models/{modelId}:generateContent?key={apiKey}";
 
             var body = new
             {
@@ -316,7 +322,12 @@ public sealed class AiSentimentService : IAiSentimentService
             cts.CancelAfter(TimeSpan.FromSeconds(30));
 
             var response = await client.PostAsJsonAsync(url, body, cts.Token);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+            {
+                var errBody = await response.Content.ReadAsStringAsync(cts.Token);
+                sw.Stop();
+                return ErrorResult(model, provider, $"HTTP {(int)response.StatusCode}: {Truncate(errBody)}", sw.ElapsedMilliseconds);
+            }
 
             var json = await response.Content.ReadAsStringAsync(cts.Token);
             var doc  = JsonNode.Parse(json);
@@ -368,7 +379,12 @@ public sealed class AiSentimentService : IAiSentimentService
             cts.CancelAfter(TimeSpan.FromSeconds(30));
 
             var response = await client.SendAsync(request, cts.Token);
-            response.EnsureSuccessStatusCode();
+            if (!response.IsSuccessStatusCode)
+            {
+                var errBody = await response.Content.ReadAsStringAsync(cts.Token);
+                sw.Stop();
+                return ErrorResult(model, provider, $"HTTP {(int)response.StatusCode}: {Truncate(errBody)}", sw.ElapsedMilliseconds);
+            }
 
             var json = await response.Content.ReadAsStringAsync(cts.Token);
             var doc  = JsonNode.Parse(json);
@@ -384,6 +400,8 @@ public sealed class AiSentimentService : IAiSentimentService
             return ErrorResult(model, provider, ex.Message, sw.ElapsedMilliseconds);
         }
     }
+
+    private static string Truncate(string s) => s.Length <= 400 ? s : s[..400] + "…";
 
     // ── JSON parser ──────────────────────────────────────────────────────────────
 
