@@ -1,45 +1,51 @@
 import { motion } from "motion/react";
-import { IndianRupee, TrendingUp, BarChart3, ClipboardList } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
-const stats = [
-  { title: "Portfolio Value", value: "--", icon: IndianRupee },
-  { title: "Today's P&L", value: "--", icon: TrendingUp },
-  { title: "Open Positions", value: "--", icon: BarChart3 },
-  { title: "Pending Orders", value: "--", icon: ClipboardList },
-];
+import { usePositionsFeed } from "@/components/panels/positions-panel/use-positions-feed";
+import { StatCard, CountCard } from "@/components/dashboard/stat-card";
+import { IndexOverview } from "@/components/dashboard/index-overview";
+import { PositionsMiniTable } from "@/components/dashboard/positions-mini-table";
+import { DayExtremesCard } from "@/components/dashboard/day-extremes-card";
+import { PpStatusCard } from "@/components/dashboard/pp-status-card";
 
 export function DashboardPage() {
+  const { positions, loading } = usePositionsFeed();
+
+  const hasPositions = positions.length > 0;
+  const totalPnl        = hasPositions ? positions.reduce((s, p) => s + p.pnl, 0) : null;
+  const totalUnrealised = hasPositions ? positions.reduce((s, p) => s + p.unrealised, 0) : null;
+  const totalRealised   = hasPositions ? positions.reduce((s, p) => s + p.realised, 0) : null;
+  const openCount       = hasPositions ? positions.filter((p) => p.quantity !== 0).length : null;
+
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Dashboard</h1>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat, i) => (
-          <motion.div
-            key={stat.title}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: i * 0.08 }}
-          >
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {stat.title}
-                </CardTitle>
-                <stat.icon className="size-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stat.value}</div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
+    <div className="space-y-6 p-1">
+      <motion.h1
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25 }}
+        className="text-xl font-semibold"
+      >
+        Dashboard
+      </motion.h1>
+
+      {/* Row 1 — Stat Cards */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard label="Today's MTM"    value={totalPnl}        index={0} colored flash prefix="₹" />
+        <StatCard label="Unrealised P&L" value={totalUnrealised} index={1} colored prefix="₹" />
+        <StatCard label="Realised P&L"   value={totalRealised}   index={2} colored prefix="₹" />
+        <CountCard label="Open Positions" value={openCount}       index={3} />
       </div>
-      <Card>
-        <CardContent className="flex h-64 items-center justify-center text-muted-foreground">
-          Connect a broker to view live data
-        </CardContent>
-      </Card>
+
+      {/* Row 2 — Index Cards */}
+      <IndexOverview />
+
+      {/* Row 3 — Mini-table + Right column */}
+      <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
+        <PositionsMiniTable positions={positions} loading={loading} />
+
+        <div className="flex flex-col gap-4">
+          <DayExtremesCard positions={positions} />
+          <PpStatusCard />
+        </div>
+      </div>
     </div>
   );
 }
