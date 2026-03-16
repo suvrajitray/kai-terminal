@@ -7,10 +7,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 import { QuickTradeDialog } from "./quick-trade-dialog";
 
 export function QuickTradeButton() {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen]         = useState(false);
+  const [activeTab, setActiveTab] = useState("price");
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -36,14 +38,19 @@ export function QuickTradeButton() {
         Quick Trade
         <kbd className="ml-0.5 hidden rounded bg-black/20 px-1 text-[10px] font-normal sm:inline">Q</kbd>
       </Button>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent
+        className={cn(
+          "transition-[max-width] duration-200",
+          activeTab === "chain" ? "sm:max-w-2xl" : "sm:max-w-lg",
+        )}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Zap className="size-4 text-amber-500" />
             Quick Trade
           </DialogTitle>
         </DialogHeader>
-        <QuickTradeDialog />
+        <QuickTradeDialog onTabChange={setActiveTab} />
       </DialogContent>
     </Dialog>
   );

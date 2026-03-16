@@ -41,6 +41,32 @@ export interface Position {
   day_sell_quantity: number;
 }
 
+export interface OptionMarketData {
+  ltp: number;
+  volume: number;
+  oi: number;
+  close_price: number;
+  bid_price: number;
+  bid_qty: number;
+  ask_price: number;
+  ask_qty: number;
+}
+
+export interface OptionSide {
+  instrument_key: string;
+  market_data?: OptionMarketData;
+}
+
+export interface OptionChainEntry {
+  expiry: string;
+  strike_price: number;
+  underlying_key: string;
+  underlying_spot_price: number;
+  pcr: number;
+  call_options?: OptionSide;
+  put_options?: OptionSide;
+}
+
 export interface OptionContract {
   instrument_key: string;
   trading_symbol: string;

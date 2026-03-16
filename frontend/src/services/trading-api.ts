@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api-client";
-import type { Position, Order, OptionContract } from "@/types";
+import type { Position, Order, OptionContract, OptionChainEntry } from "@/types";
 
 export async function fetchPositions(exchanges?: string[]): Promise<Position[]> {
   const params = exchanges?.length ? { exchange: exchanges.join(",") } : undefined;
@@ -66,6 +66,16 @@ export async function placeOrderByOptionPrice(params: {
     product: productToEnum(params.product),
     slice: true,
   });
+}
+
+export async function fetchOptionChain(
+  underlyingKey: string,
+  expiryDate: string,
+): Promise<OptionChainEntry[]> {
+  const res = await apiClient.get<OptionChainEntry[]>("/api/upstox/options/chain", {
+    params: { underlyingKey, expiryDate },
+  });
+  return res.data;
 }
 
 export async function fetchOptionContracts(underlyingKey: string): Promise<OptionContract[]> {
