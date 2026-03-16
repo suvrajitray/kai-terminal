@@ -18,6 +18,7 @@ public sealed class UpstoxClient
     private readonly IOptionService _options;
     private readonly IMarketQuoteService _quotes;
     private readonly IChartDataService _charts;
+    private readonly IMarginService _margin;
     private readonly Func<IMarketDataStreamer> _marketDataStreamerFactory;
     private readonly Func<IPortfolioStreamer> _portfolioStreamerFactory;
 
@@ -28,6 +29,7 @@ public sealed class UpstoxClient
         IOptionService options,
         IMarketQuoteService quotes,
         IChartDataService charts,
+        IMarginService margin,
         Func<IMarketDataStreamer> marketDataStreamerFactory,
         Func<IPortfolioStreamer> portfolioStreamerFactory)
     {
@@ -37,6 +39,7 @@ public sealed class UpstoxClient
         _options = options;
         _quotes = quotes;
         _charts = charts;
+        _margin = margin;
         _marketDataStreamerFactory = marketDataStreamerFactory;
         _portfolioStreamerFactory = portfolioStreamerFactory;
     }
@@ -240,6 +243,17 @@ public sealed class UpstoxClient
     public Task<IReadOnlyList<InstrumentSearchResult>> SearchInstrumentsAsync(
         string query, CancellationToken cancellationToken = default)
         => _charts.SearchInstrumentsAsync(query, cancellationToken);
+
+    // ═══════════════════════════════════════════════════════
+    // Margin
+    // ═══════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Calculate required margin for a set of hypothetical orders without placing them.
+    /// </summary>
+    public Task<MarginResponse> GetRequiredMarginAsync(
+        IEnumerable<MarginOrderItem> items, CancellationToken cancellationToken = default)
+        => _margin.GetRequiredMarginAsync(items, cancellationToken);
 
     // ═══════════════════════════════════════════════════════
     // WebSocket streaming — streamer factories

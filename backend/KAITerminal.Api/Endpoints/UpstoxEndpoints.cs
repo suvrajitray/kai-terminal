@@ -1,6 +1,7 @@
 using KAITerminal.Api.Models;
 using KAITerminal.Upstox;
 using KAITerminal.Upstox.Models.Requests;
+using KAITerminal.Upstox.Models.Responses;
 using Microsoft.AspNetCore.Mvc;
 
 namespace KAITerminal.Api.Endpoints;
@@ -172,6 +173,18 @@ public static class UpstoxEndpoints
             [FromBody] PlaceOrderByStrikeRequest request,
             UpstoxClient upstox) =>
             Results.Ok(await upstox.PlaceOrderByStrikeV3Async(request)));
+
+        // ── Margin ────────────────────────────────────────────────────────────
+
+        group.MapPost("/margin", async (
+            [FromBody] MarginRequest request,
+            UpstoxClient upstox) =>
+        {
+            var items = request.Instruments.Select(i =>
+                new MarginOrderItem(i.InstrumentToken, i.Quantity, i.Product, i.TransactionType));
+            var margin = await upstox.GetRequiredMarginAsync(items);
+            return Results.Ok(new { requiredMargin = margin.RequiredMargin, finalMargin = margin.FinalMargin });
+        });
     }
 
     /// <summary>

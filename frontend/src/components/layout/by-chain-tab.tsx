@@ -4,8 +4,11 @@ import { RefreshCw, Zap, TrendingUp, TrendingDown, ArrowUpDown } from "lucide-re
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { UNDERLYING_KEYS } from "@/lib/shift-config";
-import { fetchOptionChain, placeMarketOrder } from "@/services/trading-api";
+import { fetchOptionChain, placeMarketOrder, type MarginInstrument } from "@/services/trading-api";
+import { useDirectMarginEstimate } from "./use-margin-estimate";
 import type { OptionChainEntry } from "@/types";
+
+const INR = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -137,6 +140,18 @@ export function ByChainTab({ underlying, expiry, product, quantity, isActive }: 
 
   const selected = rows.find((r) => r.diff === selectedDiff) ?? null;
 
+  const isBuy = direction === "Buy";
+
+  // Build margin instruments for the selected row (both legs)
+  const marginInstruments: MarginInstrument[] | null = selected && selected.ceKey && selected.peKey
+    ? [
+        { instrumentToken: selected.ceKey, quantity, product: product === "D" ? "D" : "I", transactionType: isBuy ? "BUY" : "SELL" },
+        { instrumentToken: selected.peKey, quantity, product: product === "D" ? "D" : "I", transactionType: isBuy ? "BUY" : "SELL" },
+      ]
+    : null;
+
+  const { margin, loading: marginLoading } = useDirectMarginEstimate(marginInstruments);
+
   async function execute(action: ActionType) {
     if (!selected) { toast.error("Select a row first"); return; }
 
@@ -164,8 +179,7 @@ export function ByChainTab({ underlying, expiry, product, quantity, isActive }: 
     }
   }
 
-  const isBuy = direction === "Buy";
-  const fmt   = (n?: number) => (n != null ? n.toFixed(2) : "—");
+  const fmt = (n?: number) => (n != null ? n.toFixed(2) : "—");
 
   // For straddle, ATM is DIFF=0. For strangle, scroll to first row (smallest strangle).
   const scrollTargetDiff = mode === "straddle" ? 0 : rows[0]?.diff ?? 0;
@@ -398,6 +412,18 @@ export function ByChainTab({ underlying, expiry, product, quantity, isActive }: 
             {d}
           </button>
         ))}
+      </div>
+
+      {/* Required margin */}
+      <div className="flex items-center justify-between rounded-lg border border-border/30 bg-muted/10 px-3 py-2 text-xs">
+        <span className="text-muted-foreground">Req. Margin</span>
+        {marginLoading ? (
+          <span className="animate-pulse text-muted-foreground/60 tabular-nums">Computing…</span>
+        ) : margin != null ? (
+          <span className="font-semibold tabular-nums">₹{INR.format(margin)}</span>
+        ) : (
+          <span className="text-muted-foreground/40">—</span>
+        )}
       </div>
 
       {/* Action buttons */}

@@ -39,3 +39,6 @@ public record ResolveByStrikeQuery(
     string ExpiryDate,
     OptionType OptionType,
     StrikeType StrikeType);
+
+public record MarginRequest(List<MarginInstrumentRequest> Instruments);
+public record MarginInstrumentRequest(string InstrumentToken, int Quantity, string Product, string TransactionType);

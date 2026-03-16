@@ -241,6 +241,27 @@ internal sealed class UpstoxHttpClient
     }
 
     // ──────────────────────────────────────────────────
+    // Margin
+    // ──────────────────────────────────────────────────
+
+    public Task<MarginResponse> GetRequiredMarginAsync(
+        IEnumerable<MarginOrderItem> items, CancellationToken ct = default)
+    {
+        var dto = new MarginRequestDto
+        {
+            Instruments = items.Select(i => new MarginInstrumentDto
+            {
+                InstrumentToken = i.InstrumentToken,
+                Quantity        = i.Quantity,
+                Product         = i.Product,
+                TransactionType = i.TransactionType,
+                Price           = 0
+            }).ToList()
+        };
+        return PostAsync<MarginResponse>("UpstoxApi", "/v2/charges/margin", dto, ct);
+    }
+
+    // ──────────────────────────────────────────────────
     // Helpers
     // ──────────────────────────────────────────────────
 
@@ -442,6 +463,20 @@ internal sealed class UpstoxHttpClient
     private sealed class AuthorizeResponse
     {
         [JsonPropertyName("authorizedRedirectUri")] public string? AuthorizedRedirectUri { get; init; }
+    }
+
+    private sealed class MarginRequestDto
+    {
+        [JsonPropertyName("instruments")] public List<MarginInstrumentDto> Instruments { get; init; } = [];
+    }
+
+    private sealed class MarginInstrumentDto
+    {
+        [JsonPropertyName("instrument_key")]   public string  InstrumentToken { get; init; } = "";
+        [JsonPropertyName("quantity")]         public int     Quantity        { get; init; }
+        [JsonPropertyName("product")]          public string  Product         { get; init; } = "";
+        [JsonPropertyName("transaction_type")] public string  TransactionType { get; init; } = "";
+        [JsonPropertyName("price")]            public decimal Price           { get; init; }
     }
 
     // Candle jagged-array response: { "status": "success", "data": { "candles": [[ts,o,h,l,c,v,oi], ...] } }

@@ -100,6 +100,22 @@ export function extractExpiries(contracts: OptionContract[]): string[] {
   return [...new Set(contracts.map((c) => c.expiry))].sort();
 }
 
+export interface MarginInstrument {
+  instrumentToken: string;
+  quantity: number;
+  product: string;
+  transactionType: string;
+}
+
+export async function fetchMargin(
+  instruments: MarginInstrument[],
+): Promise<{ requiredMargin: number; finalMargin: number }> {
+  const res = await apiClient.post<{ requiredMargin: number; finalMargin: number }>("/api/upstox/margin", {
+    instruments,
+  });
+  return res.data;
+}
+
 export async function placeMarketOrder(
   instrumentToken: string,
   quantity: number,
