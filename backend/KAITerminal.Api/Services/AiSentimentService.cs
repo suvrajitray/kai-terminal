@@ -66,8 +66,8 @@ public sealed class AiSentimentService : IAiSentimentService
         var marketQuotes   = quotesTask.Result;
         var allCandles     = candlesTask.Result;
 
-        // Last 30 candles (30 minutes of 1-min data)
-        var candles = allCandles.Count <= 30 ? allCandles : allCandles.Skip(allCandles.Count - 30).ToList();
+        // Last 15 candles (15 minutes of 1-min data)
+        var candles = allCandles.Count <= 15 ? allCandles : allCandles.Skip(allCandles.Count - 15).ToList();
 
         // ── 3. Extract key metrics ──────────────────────────────────────────────
         marketQuotes.TryGetValue(NiftyKey.Replace('|', ':'),     out var niftyQuote);
@@ -195,7 +195,7 @@ public sealed class AiSentimentService : IAiSentimentService
         AppendOptionsBlock(sb, bankNiftyOpts);
 
         // 1-min candles
-        sb.AppendLine("=== NIFTY 1-MIN CANDLES (RECENT 30) ===");
+        sb.AppendLine("=== NIFTY 1-MIN CANDLES (RECENT 15) ===");
         sb.AppendLine("Time  | Open    | High    | Low     | Close   | Volume");
         sb.AppendLine("------|---------|---------|---------|---------|--------");
         foreach (var c in candles)
