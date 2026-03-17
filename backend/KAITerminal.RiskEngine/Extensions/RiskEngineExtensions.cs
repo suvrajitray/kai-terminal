@@ -11,9 +11,7 @@ namespace KAITerminal.RiskEngine.Extensions;
 public static class RiskEngineExtensions
 {
     /// <summary>
-    /// Registers the risk engine services and background workers.
-    /// When <c>RiskEngine:EnableStreamingMode</c> is <c>true</c>, the WebSocket-driven
-    /// <see cref="StreamingRiskWorker"/> is used; otherwise the two interval-based workers are used.
+    /// Registers the risk engine services and the WebSocket-driven <see cref="StreamingRiskWorker"/>.
     /// <typeparamref name="TTokenSource"/> must implement <see cref="IUserTokenSource"/>.
     /// </summary>
     public static IServiceCollection AddRiskEngine<TTokenSource>(
@@ -28,16 +26,7 @@ public static class RiskEngineExtensions
         services.AddSingleton<IUserTokenSource, TTokenSource>();
 
         services.AddSingleton<RiskEvaluator>();
-
-        var streamingEnabled = configuration.GetValue<bool>($"{RiskEngineConfig.SectionName}:EnableStreamingMode");
-        if (streamingEnabled)
-        {
-            services.AddHostedService<StreamingRiskWorker>();
-        }
-        else
-        {
-            services.AddHostedService<PortfolioRiskWorker>();
-        }
+        services.AddHostedService<StreamingRiskWorker>();
 
         return services;
     }

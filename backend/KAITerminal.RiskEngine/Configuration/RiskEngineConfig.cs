@@ -22,19 +22,10 @@ public sealed class RiskEngineConfig
     public bool EnableTrailingStopLoss { get; set; } = true;
 
     /// <summary>
-    /// When true, <see cref="StreamingRiskWorker"/> is used instead of the two interval-based workers.
-    /// The risk engine reacts to Upstox WebSocket events rather than polling on a timer.
-    /// </summary>
-    public bool EnableStreamingMode { get; set; } = false;
-
-    /// <summary>
     /// Minimum milliseconds between portfolio risk evaluations triggered by LTP ticks.
     /// Portfolio-event-triggered evaluations (order/position fills) always run immediately.
     /// </summary>
     public int LtpEvalMinIntervalMs { get; set; } = 500;
-
-    // ── Loop intervals (interval-based mode only) ───────────────────────────
-    public int PortfolioCheckIntervalSeconds { get; set; } = 60;
 
     /// <summary>
     /// Only positions from these exchanges are considered by the risk engine.
