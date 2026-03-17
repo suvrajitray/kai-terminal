@@ -63,14 +63,16 @@ function TerminalPageInner() {
   const trailSlRef = useRef<number>(pp.mtmSl);      // current trailing SL floor
   const lastStepRef = useRef<number>(0);              // last MTM checkpoint for step logic
   const firedRef = useRef(false);                     // prevent double-fire
+  const latestMtmRef = useRef<number>(0);             // always tracks the latest open-positions MTM
   const [currentSl, setCurrentSl] = useState<number>(pp.mtmSl); // reactive copy for display
 
-  // Full reset only when PP is toggled on — config edits must NOT reset trailing progress
-  // (resetting lastStepRef to 0 causes trailing to immediately "catch up" and fire spuriously)
+  // Full reset only when PP is toggled on — config edits must NOT reset trailing progress.
+  // Seed lastStepRef from latestMtmRef so we never retroactively "catch up" steps from 0,
+  // which would push the trailing stop above the current MTM and fire spuriously.
   useEffect(() => {
     if (!pp.enabled) return;
     trailSlRef.current = pp.mtmSl;
-    lastStepRef.current = 0;
+    lastStepRef.current = latestMtmRef.current;   // start from current MTM, not 0
     firedRef.current = false;
     setCurrentSl(pp.mtmSl);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -94,6 +96,7 @@ function TerminalPageInner() {
     if (openPositions.length === 0) return;
 
     const mtm = openPositions.reduce((s, p) => s + p.pnl, 0);
+    latestMtmRef.current = mtm;   // keep latestMtmRef in sync for the reset effect
 
     // Target hit → exit all
     if (mtm >= pp.mtmTarget) {
