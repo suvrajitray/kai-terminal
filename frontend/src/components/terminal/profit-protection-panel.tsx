@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
-import type { ProfitProtectionConfig } from "@/stores/profit-protection-store";
 
 interface ProfitProtectionPanelProps {
   open: boolean;
@@ -14,43 +13,60 @@ interface ProfitProtectionPanelProps {
   currentMtm: number;
 }
 
+// Draft stores numbers as strings so mid-typing states (e.g. "-", "1.") don't get clobbered.
+interface Draft {
+  mtmTarget: string;
+  mtmSl: string;
+  trailingEnabled: boolean;
+  increaseBy: string;
+  trailBy: string;
+}
+
+const toStr = (n: number) => String(n);
+const fromStr = (s: string) => Number(s);
+
 export function ProfitProtectionPanel({ open, onClose, currentMtm }: ProfitProtectionPanelProps) {
   const store = useProfitProtectionStore();
 
-  const [draft, setDraft] = useState({
-    mtmTarget: store.mtmTarget,
-    mtmSl: store.mtmSl,
+  const storeAsDraft = (): Draft => ({
+    mtmTarget:      toStr(store.mtmTarget),
+    mtmSl:          toStr(store.mtmSl),
     trailingEnabled: store.trailingEnabled,
-    increaseBy: store.increaseBy,
-    trailBy: store.trailBy,
+    increaseBy:     toStr(store.increaseBy),
+    trailBy:        toStr(store.trailBy),
   });
 
-  const set = (key: keyof ProfitProtectionConfig, value: number | boolean) =>
+  const [draft, setDraft] = useState<Draft>(storeAsDraft);
+
+  const setStr = (key: keyof Draft, value: string | boolean) =>
     setDraft((d) => ({ ...d, [key]: value }));
 
   const handleOpen = (isOpen: boolean) => {
-    if (isOpen) {
-      // Reset draft to current store values when dialog opens
-      setDraft({
-        mtmTarget: store.mtmTarget,
-        mtmSl: store.mtmSl,
-        trailingEnabled: store.trailingEnabled,
-        increaseBy: store.increaseBy,
-        trailBy: store.trailBy,
-      });
-    } else {
-      onClose();
-    }
+    if (isOpen) setDraft(storeAsDraft());
+    else onClose();
   };
 
-  const targetWarning = draft.mtmTarget <= currentMtm;
-  const slWarning = draft.mtmSl >= currentMtm;
+  const targetVal = fromStr(draft.mtmTarget);
+  const slVal     = fromStr(draft.mtmSl);
+  const hasInvalidNumbers = isNaN(targetVal) || isNaN(slVal);
+  const targetWarning = !isNaN(targetVal) && targetVal <= currentMtm;
+  const slWarning     = !isNaN(slVal)     && slVal >= currentMtm;
 
   const handleSave = () => {
-    if (targetWarning || slWarning) return;
-    store.setConfig({ ...draft, enabled: store.enabled });
+    if (hasInvalidNumbers || targetWarning || slWarning) return;
+    store.setConfig({
+      enabled:         store.enabled,
+      mtmTarget:       targetVal,
+      mtmSl:           slVal,
+      trailingEnabled: draft.trailingEnabled,
+      increaseBy:      fromStr(draft.increaseBy),
+      trailBy:         fromStr(draft.trailBy),
+    });
     onClose();
   };
+
+  const increaseByVal = fromStr(draft.increaseBy);
+  const trailByVal    = fromStr(draft.trailBy);
 
   return (
     <Dialog open={open} onOpenChange={handleOpen}>
@@ -74,9 +90,10 @@ export function ProfitProtectionPanel({ open, onClose, currentMtm }: ProfitProte
             <Label htmlFor="mtm-target">MTM Target</Label>
             <Input
               id="mtm-target"
-              type="number"
+              type="text"
+              inputMode="numeric"
               value={draft.mtmTarget}
-              onChange={(e) => set("mtmTarget", Number(e.target.value))}
+              onChange={(e) => setStr("mtmTarget", e.target.value)}
             />
             {targetWarning && (
               <p className="text-[11px] text-destructive">
@@ -93,9 +110,10 @@ export function ProfitProtectionPanel({ open, onClose, currentMtm }: ProfitProte
             <Label htmlFor="mtm-sl">MTM Stop Loss</Label>
             <Input
               id="mtm-sl"
-              type="number"
+              type="text"
+              inputMode="numeric"
               value={draft.mtmSl}
-              onChange={(e) => set("mtmSl", Number(e.target.value))}
+              onChange={(e) => setStr("mtmSl", e.target.value)}
             />
             {slWarning && (
               <p className="text-[11px] text-destructive">
@@ -112,7 +130,7 @@ export function ProfitProtectionPanel({ open, onClose, currentMtm }: ProfitProte
             <button
               role="switch"
               aria-checked={draft.trailingEnabled}
-              onClick={() => set("trailingEnabled", !draft.trailingEnabled)}
+              onClick={() => setStr("trailingEnabled", !draft.trailingEnabled)}
               className={cn(
                 "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none",
                 draft.trailingEnabled ? "bg-green-500" : "bg-muted-foreground/30",
@@ -137,9 +155,10 @@ export function ProfitProtectionPanel({ open, onClose, currentMtm }: ProfitProte
               <Label htmlFor="increase-by" className="whitespace-nowrap">Increase In Profit By (₹)</Label>
               <Input
                 id="increase-by"
-                type="number"
+                type="text"
+                inputMode="numeric"
                 value={draft.increaseBy}
-                onChange={(e) => set("increaseBy", Number(e.target.value))}
+                onChange={(e) => setStr("increaseBy", e.target.value)}
                 disabled={!draft.trailingEnabled}
               />
               <p className="text-[11px] text-muted-foreground">
@@ -151,9 +170,10 @@ export function ProfitProtectionPanel({ open, onClose, currentMtm }: ProfitProte
               <Label htmlFor="trail-by" className="whitespace-nowrap">Trail MTM SL By (₹)</Label>
               <Input
                 id="trail-by"
-                type="number"
+                type="text"
+                inputMode="numeric"
                 value={draft.trailBy}
-                onChange={(e) => set("trailBy", Number(e.target.value))}
+                onChange={(e) => setStr("trailBy", e.target.value)}
                 disabled={!draft.trailingEnabled}
               />
               <p className="text-[11px] text-muted-foreground">
@@ -164,18 +184,18 @@ export function ProfitProtectionPanel({ open, onClose, currentMtm }: ProfitProte
         </div>
 
         {/* Summary */}
-        {draft.trailingEnabled && (
+        {draft.trailingEnabled && !isNaN(increaseByVal) && !isNaN(trailByVal) && !isNaN(slVal) && (
           <div className="rounded-md bg-muted/40 px-4 py-2.5 text-xs text-muted-foreground">
-            Every time MTM gains <span className="font-medium text-foreground">₹{draft.increaseBy.toLocaleString("en-IN")}</span>,
+            Every time MTM gains <span className="font-medium text-foreground">₹{increaseByVal.toLocaleString("en-IN")}</span>,
             {" "}the stop loss floor rises by{" "}
-            <span className="font-medium text-foreground">₹{draft.trailBy.toLocaleString("en-IN")}</span>.
-            {" "}Starting SL: <span className="font-medium text-foreground">₹{draft.mtmSl.toLocaleString("en-IN")}</span>.
+            <span className="font-medium text-foreground">₹{trailByVal.toLocaleString("en-IN")}</span>.
+            {" "}Starting SL: <span className="font-medium text-foreground">₹{slVal.toLocaleString("en-IN")}</span>.
           </div>
         )}
 
         <div className="flex justify-end gap-2 pt-1">
           <Button variant="outline" onClick={onClose}>Close</Button>
-          <Button onClick={handleSave} disabled={targetWarning || slWarning}>Save</Button>
+          <Button onClick={handleSave} disabled={hasInvalidNumbers || targetWarning || slWarning}>Save</Button>
         </div>
       </DialogContent>
     </Dialog>
