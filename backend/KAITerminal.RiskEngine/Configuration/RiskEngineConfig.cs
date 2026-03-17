@@ -25,7 +25,7 @@ public sealed class RiskEngineConfig
     /// Minimum milliseconds between portfolio risk evaluations triggered by LTP ticks.
     /// Portfolio-event-triggered evaluations (order/position fills) always run immediately.
     /// </summary>
-    public int LtpEvalMinIntervalMs { get; set; } = 500;
+    public int LtpEvalMinIntervalMs { get; set; } = 15_000;
 
     /// <summary>
     /// Only positions from these exchanges are considered by the risk engine.
