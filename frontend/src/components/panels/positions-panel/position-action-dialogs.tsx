@@ -16,7 +16,7 @@ import { OptionTypeBadge } from "./option-type-badge";
 import { useOptionContractsStore, formatExpiryLabel } from "@/stores/option-contracts-store";
 import { getLotSize } from "@/lib/lot-sizes";
 import { cn } from "@/lib/utils";
-import { convertPosition } from "@/services/trading-api";
+import { convertPosition, placeOrder } from "@/services/trading-api";
 import type { Position } from "@/types";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -282,23 +282,41 @@ export function SellBuyMoreDialog({ open, onOpenChange, position }: MoreDialogPr
   );
   const [orderMode, setOrderMode] = useState<OrderMode>("limit");
   const [limitPrice, setLimitPrice] = useState("");
+  const [placing, setPlacing] = useState(false);
 
   useEffect(() => {
     if (open) {
       setOrderMode("limit");
       setLimitPrice("");
+      setPlacing(false);
     }
   }, [open]);
+
+  const label = isSell ? "Sell More" : "Buy More";
 
   const canConfirm =
     qty > 0 && (orderMode === "market" || (!!limitPrice && parseFloat(limitPrice) > 0));
 
-  function handleConfirm() {
-    toast.info(`${isSell ? "Sell more" : "Buy more"} — backend integration coming soon`);
-    onOpenChange(false);
+  async function handleConfirm() {
+    setPlacing(true);
+    try {
+      const txn = isSell ? "Sell" : "Buy";
+      await placeOrder(
+        position.instrument_token,
+        qty,
+        txn,
+        position.product,
+        orderMode,
+        orderMode === "limit" ? parseFloat(limitPrice) : undefined,
+      );
+      toast.success(`${label} order placed`);
+      onOpenChange(false);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setPlacing(false);
+    }
   }
-
-  const label = isSell ? "Sell More" : "Buy More";
   const Icon  = isSell ? TrendingDown : TrendingUp;
   const color = isSell ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700";
 
@@ -334,16 +352,16 @@ export function SellBuyMoreDialog({ open, onOpenChange, position }: MoreDialogPr
         </div>
 
         <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" disabled={placing} onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button
-            disabled={!canConfirm}
+            disabled={!canConfirm || placing}
             onClick={handleConfirm}
             className={cn("text-white", color)}
           >
             <Icon className="size-3.5" />
-            {label}
+            {placing ? "Placing…" : label}
           </Button>
         </DialogFooter>
       </DialogContent>

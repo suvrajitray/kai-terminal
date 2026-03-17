@@ -131,3 +131,22 @@ export async function placeMarketOrder(
     slice: true,
   });
 }
+
+export async function placeOrder(
+  instrumentToken: string,
+  quantity: number,
+  transactionType: "Buy" | "Sell",
+  product: string,
+  orderType: "market" | "limit",
+  limitPrice?: number,
+): Promise<void> {
+  await apiClient.post("/api/upstox/orders/v3", {
+    instrumentToken,
+    quantity,
+    transactionType: transactionType === "Buy" ? 0 : 1,
+    orderType: orderType === "market" ? 0 : 1,
+    price: orderType === "limit" ? (limitPrice ?? 0) : 0,
+    product: productToEnum(product),
+    slice: true,
+  });
+}
