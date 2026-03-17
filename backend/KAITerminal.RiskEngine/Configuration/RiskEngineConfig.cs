@@ -20,15 +20,8 @@ public sealed class RiskEngineConfig
     /// <summary>How much the trailing stop rises each time the profit step is crossed.</summary>
     public decimal IncreaseTrailingBy         { get; set; } =   500m;
 
-    // ── Strike-level thresholds ─────────────────────────────────────────────
-    public double CeStopLossPercent { get; set; } = 0.20;
-    public double PeStopLossPercent { get; set; } = 0.30;
-    public int    StrikeGap         { get; set; } = 100;
-    public int    MaxReentries      { get; set; } = 2;
-
     // ── Feature flags ───────────────────────────────────────────────────────
     public bool EnableTrailingStopLoss { get; set; } = true;
-    public bool EnableStrikeWorker     { get; set; } = true;
 
     /// <summary>
     /// When true, <see cref="StreamingRiskWorker"/> is used instead of the two interval-based workers.
@@ -44,7 +37,6 @@ public sealed class RiskEngineConfig
 
     // ── Loop intervals (interval-based mode only) ───────────────────────────
     public int PortfolioCheckIntervalSeconds { get; set; } = 60;
-    public int StrikeCheckIntervalSeconds    { get; set; } = 5;
 
     /// <summary>
     /// Only positions from these exchanges are considered by the risk engine.

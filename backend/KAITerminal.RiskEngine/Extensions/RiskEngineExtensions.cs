@@ -28,7 +28,6 @@ public static class RiskEngineExtensions
         services.AddSingleton<IUserTokenSource, TTokenSource>();
 
         services.AddSingleton<RiskEvaluator>();
-        services.AddSingleton<StrikeMonitor>();
 
         var streamingEnabled = configuration.GetValue<bool>($"{RiskEngineConfig.SectionName}:EnableStreamingMode");
         if (streamingEnabled)
@@ -38,7 +37,6 @@ public static class RiskEngineExtensions
         else
         {
             services.AddHostedService<PortfolioRiskWorker>();
-            services.AddHostedService<StrikeRiskWorker>();
         }
 
         return services;

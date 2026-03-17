@@ -28,7 +28,6 @@ public sealed class StreamingRiskWorker : BackgroundService
     private readonly UpstoxClient _upstox;
     private readonly IPositionCache _cache;
     private readonly RiskEvaluator _evaluator;
-    private readonly StrikeMonitor _monitor;
     private readonly RiskEngineConfig _cfg;
     private readonly ILogger<StreamingRiskWorker> _logger;
 
@@ -46,7 +45,6 @@ public sealed class StreamingRiskWorker : BackgroundService
         UpstoxClient upstox,
         IPositionCache cache,
         RiskEvaluator evaluator,
-        StrikeMonitor monitor,
         IOptions<RiskEngineConfig> cfg,
         ILogger<StreamingRiskWorker> logger)
     {
@@ -54,7 +52,6 @@ public sealed class StreamingRiskWorker : BackgroundService
         _upstox = upstox;
         _cache = cache;
         _evaluator = evaluator;
-        _monitor = monitor;
         _cfg = cfg.Value;
         _logger = logger;
     }
@@ -183,7 +180,7 @@ public sealed class StreamingRiskWorker : BackgroundService
         try
         {
             using (UpstoxTokenContext.Use(user.AccessToken))
-                await EvaluatePortfolioOnlyAsync(user, ct);
+                await EvaluateAsync(user, ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
         catch (Exception ex)
@@ -192,32 +189,12 @@ public sealed class StreamingRiskWorker : BackgroundService
         }
     }
 
-    // ── Risk evaluation helpers ──────────────────────────────────────────────
+    // ── Risk evaluation helper ───────────────────────────────────────────────
 
-    /// <summary>Full evaluation: portfolio risk + strike monitor.</summary>
     private async Task EvaluateAsync(UserConfig user, CancellationToken ct)
     {
         var gate = _gates.GetOrAdd(user.UserId, _ => new UserGate());
         if (!await gate.Sem.WaitAsync(0, ct)) return; // skip if already evaluating
-        try
-        {
-            var mtm = _cache.GetMtm(user.UserId);
-            await _evaluator.EvaluateAsync(user.UserId, mtm, ct);
-
-            if (_cfg.EnableStrikeWorker)
-                await _monitor.MonitorAsync(user.UserId, _cache, ct);
-        }
-        finally
-        {
-            gate.Sem.Release();
-        }
-    }
-
-    /// <summary>Portfolio-only evaluation (no strike check). Used for LTP ticks to avoid extra noise.</summary>
-    private async Task EvaluatePortfolioOnlyAsync(UserConfig user, CancellationToken ct)
-    {
-        var gate = _gates.GetOrAdd(user.UserId, _ => new UserGate());
-        if (!await gate.Sem.WaitAsync(0, ct)) return;
         try
         {
             var mtm = _cache.GetMtm(user.UserId);

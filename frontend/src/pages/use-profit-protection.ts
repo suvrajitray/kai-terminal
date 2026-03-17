@@ -5,11 +5,15 @@ import type { Position } from "@/types";
 /**
  * Monitors portfolio MTM against the configured profit target and stop loss.
  *
+ * Evaluation order (matches backend RiskEvaluator):
+ *   1. Hard SL (mtmSl)
+ *   2. Profit target (mtmTarget)
+ *   3. Trailing SL
+ *
  * Trailing SL logic:
- * - Floor starts at `mtmSl` and only ever moves up.
- * - Every time MTM gains `increaseBy` from the last step, the floor rises by `trailBy`.
- * - Baseline is seeded from the MTM at the moment PP is first enabled (not from 0),
- *   so no retroactive catch-up happens when PP is toggled on mid-session.
+ * - Gated by `trailingActivateAt`: stays inactive until MTM first reaches that threshold.
+ * - On activation, floor immediately jumps to `lockProfitAt` (guaranteed profit floor).
+ * - Every time MTM then gains `increaseBy` from the last step, the floor rises by `trailBy`.
  *
  * Returns `currentSl` — the live trailing floor value for display.
  */
@@ -19,20 +23,23 @@ export function useProfitProtection(
 ) {
   const pp = useProfitProtectionStore();
 
-  // trailSlRef  — current SL floor; starts at mtmSl, only rises
-  // lastStepRef — MTM baseline for step calculation; null = not yet initialized
-  // firedRef    — one-shot lock: once exit fires, nothing else runs until PP is re-armed
-  const trailSlRef  = useRef<number>(pp.mtmSl);
-  const lastStepRef = useRef<number | null>(null);
-  const firedRef    = useRef(false);
+  // trailSlRef     — current SL floor; starts at mtmSl, only rises
+  // lastStepRef    — MTM baseline for step calculation; null = trailing not yet active
+  // initializedRef — true after first run (distinguishes "not started" from "waiting for activate threshold")
+  // firedRef       — one-shot lock: once exit fires, nothing else runs until PP is re-armed
+  const trailSlRef     = useRef<number>(pp.mtmSl);
+  const lastStepRef    = useRef<number | null>(null);
+  const initializedRef = useRef(false);
+  const firedRef       = useRef(false);
   const [currentSl, setCurrentSl] = useState<number>(pp.mtmSl);
 
   // Reset when PP is toggled off so it re-initialises cleanly on the next enable.
   useEffect(() => {
     if (!pp.enabled) {
-      lastStepRef.current = null;
-      firedRef.current    = false;
-      trailSlRef.current  = pp.mtmSl;
+      lastStepRef.current    = null;
+      initializedRef.current = false;
+      firedRef.current       = false;
+      trailSlRef.current     = pp.mtmSl;
       setCurrentSl(pp.mtmSl);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -46,11 +53,12 @@ export function useProfitProtection(
 
     const mtm = positions.reduce((s, p) => s + p.pnl, 0);
 
-    // Lazy init: seed baseline from current MTM on the first run after enabling.
-    if (lastStepRef.current === null) {
-      lastStepRef.current = mtm;
-      trailSlRef.current  = pp.mtmSl;
+    // First run after enabling: set the SL floor; do NOT seed trailing baseline yet.
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      trailSlRef.current     = pp.mtmSl;
       setCurrentSl(pp.mtmSl);
+      // lastStepRef stays null — trailing waits for the activation threshold
     }
 
     // If the user tightened mtmSl in settings, raise the floor to match.
@@ -60,27 +68,37 @@ export function useProfitProtection(
       setCurrentSl(pp.mtmSl);
     }
 
-    // ── Target hit ──────────────────────────────────────────────────────────
+    // ── 1. Hard SL hit ───────────────────────────────────────────────────────
+    if (mtm <= trailSlRef.current) {
+      firedRef.current = true;
+      onExitAll();
+      return;
+    }
+
+    // ── 2. Target hit ────────────────────────────────────────────────────────
     if (mtm >= pp.mtmTarget) {
       firedRef.current = true;
       onExitAll();
       return;
     }
 
-    // ── Advance trailing floor ───────────────────────────────────────────────
-    if (pp.trailingEnabled && pp.increaseBy > 0) {
+    // ── 3. Trailing SL ───────────────────────────────────────────────────────
+
+    // Activation gate: seed baseline and lock in profit floor on first threshold crossing.
+    if (pp.trailingEnabled && lastStepRef.current === null && mtm >= pp.trailingActivateAt) {
+      lastStepRef.current = mtm;
+      trailSlRef.current  = Math.max(pp.lockProfitAt, trailSlRef.current);
+      setCurrentSl(trailSlRef.current);
+    }
+
+    // Advance trailing floor
+    if (pp.trailingEnabled && lastStepRef.current !== null && pp.increaseBy > 0) {
       const steps = Math.floor((mtm - lastStepRef.current) / pp.increaseBy);
       if (steps > 0) {
         lastStepRef.current += steps * pp.increaseBy;
         trailSlRef.current  += steps * pp.trailBy;
         setCurrentSl(trailSlRef.current);
       }
-    }
-
-    // ── SL hit ───────────────────────────────────────────────────────────────
-    if (mtm <= trailSlRef.current) {
-      firedRef.current = true;
-      onExitAll();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [positions]);
