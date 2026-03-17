@@ -43,12 +43,14 @@ export function ProfitProtectionPanel({ open, onClose, currentMtm }: ProfitProte
     }
   };
 
+  const targetWarning = draft.mtmTarget <= currentMtm;
+  const slWarning = draft.mtmSl >= currentMtm;
+
   const handleSave = () => {
+    if (targetWarning || slWarning) return;
     store.setConfig({ ...draft, enabled: store.enabled });
     onClose();
   };
-
-  const targetWarning = draft.mtmTarget <= currentMtm;
 
   return (
     <Dialog open={open} onOpenChange={handleOpen}>
@@ -77,8 +79,8 @@ export function ProfitProtectionPanel({ open, onClose, currentMtm }: ProfitProte
               onChange={(e) => set("mtmTarget", Number(e.target.value))}
             />
             {targetWarning && (
-              <p className="text-[11px] text-amber-500">
-                Target profit should be greater than current MTM
+              <p className="text-[11px] text-destructive">
+                Target must be above current MTM — saving would immediately exit all positions
               </p>
             )}
             <p className="text-[11px] text-muted-foreground">
@@ -95,6 +97,11 @@ export function ProfitProtectionPanel({ open, onClose, currentMtm }: ProfitProte
               value={draft.mtmSl}
               onChange={(e) => set("mtmSl", Number(e.target.value))}
             />
+            {slWarning && (
+              <p className="text-[11px] text-destructive">
+                Stop loss must be below current MTM — saving would immediately exit all positions
+              </p>
+            )}
             <p className="text-[11px] text-muted-foreground">
               Exit all positions when MTM falls to this loss
             </p>
@@ -168,7 +175,7 @@ export function ProfitProtectionPanel({ open, onClose, currentMtm }: ProfitProte
 
         <div className="flex justify-end gap-2 pt-1">
           <Button variant="outline" onClick={onClose}>Close</Button>
-          <Button onClick={handleSave}>Save</Button>
+          <Button onClick={handleSave} disabled={targetWarning || slWarning}>Save</Button>
         </div>
       </DialogContent>
     </Dialog>

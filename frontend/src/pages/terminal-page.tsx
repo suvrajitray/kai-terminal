@@ -65,13 +65,26 @@ function TerminalPageInner() {
   const firedRef = useRef(false);                     // prevent double-fire
   const [currentSl, setCurrentSl] = useState<number>(pp.mtmSl); // reactive copy for display
 
-  // Reset trail state whenever PP config changes or gets enabled
+  // Full reset only when PP is toggled on — config edits must NOT reset trailing progress
+  // (resetting lastStepRef to 0 causes trailing to immediately "catch up" and fire spuriously)
   useEffect(() => {
+    if (!pp.enabled) return;
     trailSlRef.current = pp.mtmSl;
     lastStepRef.current = 0;
     firedRef.current = false;
     setCurrentSl(pp.mtmSl);
-  }, [pp.enabled, pp.mtmSl, pp.increaseBy, pp.trailBy]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pp.enabled]);
+
+  // When mtmSl is tightened while PP is already running, raise the floor — but never lower it
+  // (lowering would drop a trailing stop that was already raised, which would be wrong)
+  useEffect(() => {
+    if (!pp.enabled) return;
+    if (pp.mtmSl > trailSlRef.current) {
+      trailSlRef.current = pp.mtmSl;
+      setCurrentSl(pp.mtmSl);
+    }
+  }, [pp.enabled, pp.mtmSl]);
 
   // Monitor MTM on every positions update
   useEffect(() => {
