@@ -25,7 +25,8 @@ builder.Services.AddSingleton<PositionStreamManager>();
 builder.Services.AddSingleton<IndexStreamManager>();
 builder.Services.AddScoped<UserTradingSettingsService>();
 
-builder.Services.AddApplicationInsightsTelemetry(builder.Configuration);
+if (!string.IsNullOrEmpty(builder.Configuration["ApplicationInsights:ConnectionString"]))
+    builder.Services.AddApplicationInsightsTelemetry(builder.Configuration);
 
 var app = builder.Build();
 

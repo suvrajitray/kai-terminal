@@ -224,7 +224,10 @@ internal sealed class MarketDataStreamer : IMarketDataStreamer
 
     private async Task ResubscribeAllAsync(CancellationToken ct)
     {
-        var groups = _subscriptions
+        // Snapshot before grouping so concurrent Subscribe/Unsubscribe calls cannot
+        // modify the dictionary mid-enumeration and produce an inconsistent batch.
+        var snapshot = _subscriptions.ToArray();
+        var groups = snapshot
             .GroupBy(kv => kv.Value)
             .Select(g => (Mode: g.Key, Keys: g.Select(kv => kv.Key).ToList()))
             .ToList();

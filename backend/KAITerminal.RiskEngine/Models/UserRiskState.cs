@@ -16,6 +16,17 @@ public sealed class UserRiskState
     public decimal TrailingLastTrigger { get; set; }
 
     // ── Strike re-entry counts ──────────────────────────────────────────────
+    private readonly Dictionary<string, int> _reentryCounts = new(StringComparer.Ordinal);
+
     /// <summary>Keyed by trading symbol (e.g. "NIFTY25JAN2323000CE"). Value = number of re-entries used.</summary>
-    public Dictionary<string, int> ReentryCounts { get; } = new(StringComparer.Ordinal);
+    public IReadOnlyDictionary<string, int> ReentryCounts => _reentryCounts;
+
+    /// <summary>Increments the re-entry count for the given symbol and returns the new value.</summary>
+    public int IncrementReentryCount(string symbol)
+    {
+        _reentryCounts.TryGetValue(symbol, out var current);
+        var next = current + 1;
+        _reentryCounts[symbol] = next;
+        return next;
+    }
 }

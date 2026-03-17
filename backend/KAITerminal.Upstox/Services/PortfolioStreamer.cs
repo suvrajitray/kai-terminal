@@ -16,7 +16,7 @@ internal sealed class PortfolioStreamer : IPortfolioStreamer
     private readonly UpstoxConfig _config;
     private readonly ILogger<PortfolioStreamer> _logger;
 
-    private IEnumerable<UpdateType>? _updateTypes;
+    private IEnumerable<UpdateType>? _capturedUpdateTypes; // captured at ConnectAsync; never mutated after
     private ClientWebSocket? _ws;
     private CancellationTokenSource? _cts;
     private Task _receiveLoop = Task.CompletedTask;
@@ -52,10 +52,10 @@ internal sealed class PortfolioStreamer : IPortfolioStreamer
         ObjectDisposedException.ThrowIf(_disposed, this);
 
         _capturedToken = UpstoxTokenContext.Current; // capture so reconnects reuse the same token
-        _updateTypes = updateTypes;
+        _capturedUpdateTypes = updateTypes;           // capture so reconnects use the same subscriptions
         _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
 
-        var uri = await _http.GetPortfolioStreamFeedUriAsync(updateTypes, _cts.Token);
+        var uri = await _http.GetPortfolioStreamFeedUriAsync(_capturedUpdateTypes, _cts.Token);
         _ws = new ClientWebSocket();
         await _ws.ConnectAsync(new Uri(uri), _cts.Token);
 
@@ -169,7 +169,7 @@ internal sealed class PortfolioStreamer : IPortfolioStreamer
 
                 string uri;
                 using (UpstoxTokenContext.Use(_capturedToken))
-                    uri = await _http.GetPortfolioStreamFeedUriAsync(_updateTypes, ct);
+                    uri = await _http.GetPortfolioStreamFeedUriAsync(_capturedUpdateTypes, ct);
                 _ws?.Dispose();
                 _ws = new ClientWebSocket();
                 await _ws.ConnectAsync(new Uri(uri), ct);

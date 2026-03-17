@@ -24,6 +24,7 @@ public sealed class DbUserTokenSource(IServiceScopeFactory scopeFactory) : IUser
                 r => r.Username,
                 c => c.Username,
                 (r, c) => new { r, c })
+            .Where(x => x.c.AccessToken != null && x.c.AccessToken != "" && x.c.AccessToken != "NA")
             .ToListAsync(ct);
 
         return configs
@@ -39,7 +40,6 @@ public sealed class DbUserTokenSource(IServiceScopeFactory scopeFactory) : IUser
                 WhenProfitIncreasesBy = x.r.IncreaseBy,
                 IncreaseTrailingBy   = x.r.TrailBy,
             })
-            .Where(u => !string.IsNullOrEmpty(u.AccessToken) && u.AccessToken != "NA")
             .ToList()
             .AsReadOnly();
     }

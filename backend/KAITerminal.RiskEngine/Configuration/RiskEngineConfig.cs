@@ -52,12 +52,15 @@ public sealed class RiskEngineConfig
     /// </summary>
     public List<string> Exchanges { get; set; } = ["NFO", "BFO"];
 
+    // Cached upper-case exchange set — built once on first use; Exchanges is never mutated after config binding.
+    private HashSet<string>? _exchangeSet;
+
     /// <summary>Filters a position list to the configured exchanges (case-insensitive).</summary>
     public IReadOnlyList<KAITerminal.Upstox.Models.Responses.Position> FilterPositions(
         IReadOnlyList<KAITerminal.Upstox.Models.Responses.Position> positions)
     {
         if (Exchanges.Count == 0) return positions;
-        var set = Exchanges.Select(e => e.ToUpperInvariant()).ToHashSet();
+        var set = _exchangeSet ??= Exchanges.Select(e => e.ToUpperInvariant()).ToHashSet();
         return positions.Where(p => set.Contains(p.Exchange.ToUpperInvariant())).ToList().AsReadOnly();
     }
 

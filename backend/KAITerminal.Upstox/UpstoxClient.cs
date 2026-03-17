@@ -33,6 +33,16 @@ public sealed class UpstoxClient
         Func<IMarketDataStreamer> marketDataStreamerFactory,
         Func<IPortfolioStreamer> portfolioStreamerFactory)
     {
+        ArgumentNullException.ThrowIfNull(auth);
+        ArgumentNullException.ThrowIfNull(positions);
+        ArgumentNullException.ThrowIfNull(orders);
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(quotes);
+        ArgumentNullException.ThrowIfNull(charts);
+        ArgumentNullException.ThrowIfNull(margin);
+        ArgumentNullException.ThrowIfNull(marketDataStreamerFactory);
+        ArgumentNullException.ThrowIfNull(portfolioStreamerFactory);
+
         _auth = auth;
         _positions = positions;
         _orders = orders;

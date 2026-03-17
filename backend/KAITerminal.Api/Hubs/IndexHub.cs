@@ -41,10 +41,9 @@ public sealed class IndexHub : Hub
         }
 
         var connectionId = Context.ConnectionId;
-        var hubContext = _hubContext;
         var ct = _manager.Add(connectionId);
 
-        _ = Task.Run(() => PollLoopAsync(token, connectionId, hubContext, ct), ct);
+        _ = Task.Run(() => PollLoopAsync(token, connectionId, _hubContext, ct), ct);
 
         return base.OnConnectedAsync();
     }
@@ -91,13 +90,14 @@ public sealed class IndexHub : Hub
                     first = false;
                 }
             }
-            catch (OperationCanceledException) { break; }
+            catch (OperationCanceledException) { return; }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Index quotes poll failed for connection {ConnectionId} — skipping tick", connectionId);
             }
 
-            await Task.Delay(PollIntervalMs, ct).ContinueWith(_ => { });
+            try { await Task.Delay(PollIntervalMs, ct); }
+            catch (OperationCanceledException) { return; }
         }
     }
 }

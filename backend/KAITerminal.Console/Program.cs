@@ -12,7 +12,8 @@ Console.WriteLine();
 
 builder.Services.AddUpstoxSdk(builder.Configuration);
 builder.Services.AddRiskEngine<SingleUserTokenSource>(builder.Configuration);
-builder.Services.AddApplicationInsightsTelemetryWorkerService(builder.Configuration);
+if (!string.IsNullOrEmpty(builder.Configuration["ApplicationInsights:ConnectionString"]))
+    builder.Services.AddApplicationInsightsTelemetryWorkerService(builder.Configuration);
 
 var host = builder.Build();
 host.Run();

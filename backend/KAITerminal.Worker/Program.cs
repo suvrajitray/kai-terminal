@@ -8,7 +8,8 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddUpstoxSdk(builder.Configuration);
 builder.Services.AddDatabase(builder.Configuration);
 builder.Services.AddRiskEngine<DbUserTokenSource>(builder.Configuration);
-builder.Services.AddApplicationInsightsTelemetryWorkerService(builder.Configuration);
+if (!string.IsNullOrEmpty(builder.Configuration["ApplicationInsights:ConnectionString"]))
+    builder.Services.AddApplicationInsightsTelemetryWorkerService(builder.Configuration);
 
 var host = builder.Build();
 host.Run();
