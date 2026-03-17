@@ -39,7 +39,7 @@ The frontend `@` alias resolves to `frontend/src/`.
 | Project | SDK | Role |
 |---|---|---|
 | `KAITerminal.Api` | `Sdk.Web` | ASP.NET Core REST API — auth, credentials, Upstox proxy |
-| `KAITerminal.Worker` | `Sdk.Worker` | Multi-user risk engine host — reads `RiskEngine:Users[]` from config |
+| `KAITerminal.Worker` | `Sdk.Worker` | Multi-user risk engine host — reads enabled users from `UserRiskConfigs` DB table |
 | `KAITerminal.Console` | `Sdk` | Single-user risk engine host — reads `Upstox:AccessToken` from config |
 | `KAITerminal.RiskEngine` | Library | Risk engine library — all risk logic, workers, state |
 | `KAITerminal.Upstox` | Library | Upstox SDK — HTTP client, WebSocket streamers, order/option services |
@@ -52,9 +52,10 @@ The frontend `@` alias resolves to `frontend/src/`.
 ```
 KAITerminal.Api      ──► KAITerminal.Upstox
                      ──► KAITerminal.Infrastructure
-                     ──► KAITerminal.Auth
+                     ──► KAITerminal.Auth ──► KAITerminal.Infrastructure
 
 KAITerminal.Worker   ──► KAITerminal.RiskEngine ──► KAITerminal.Upstox
+                     ──► KAITerminal.Infrastructure
 KAITerminal.Console  ──► KAITerminal.RiskEngine
 ```
 
@@ -66,7 +67,8 @@ KAITerminal.Console  ──► KAITerminal.RiskEngine
 
 - `Program.cs` wires services via extension methods in `Extensions/` and maps endpoint groups in `Endpoints/`.
 - Minimal-API style — no controllers.
-- Auth flow: `GET /auth/google` → Google OAuth → `GET /auth/google/callback` issues a JWT → frontend redirected to `/auth/callback?token=<jwt>`. All subsequent API calls use `Authorization: Bearer <token>`.
+- Auth flow: `GET /auth/google` → Google OAuth → `GET /auth/google/callback` → `UserService.EnsureExistsAsync` creates user if new → if `IsActive=false` redirects to `{Frontend:Url}/auth/inactive` (no JWT) → if active issues JWT with `isActive` + `isAdmin` claims → frontend redirected to `/auth/callback?token=<jwt>`. All subsequent API calls use `Authorization: Bearer <token>`.
+- **User access control** — `AppUsers` table gates access. New users are created with `IsActive=false` on first login. `suvrajit.ray@gmail.com` is auto-activated as admin on first login. Inactive users are redirected to `/auth/inactive` before a JWT is issued. `ProtectedRoute` also checks the `isActive` claim from the stored JWT and redirects to `/auth/inactive` if false.
 - `BrokerExtensions.AddBrokerServices()` registers `AddUpstoxSdk()`. The API uses `UpstoxTokenContext.Use(token)` per-request to inject the user's Upstox access token into broker calls (passed by frontend as `X-Upstox-AccessToken` header).
 - Credentials (`Jwt:Key`, `GoogleAuth:ClientId/Secret`, `ConnectionStrings:DefaultConnection`) and `Frontend:Url` must be set in `appsettings.json` or `dotnet user-secrets` before the API starts.
 - `Frontend:Url` (default `http://localhost:3000`) controls CORS allowed origins and the OAuth redirect.
@@ -91,42 +93,50 @@ Layered: `UpstoxClient` (facade) → `IPositionService` / `IOrderService` / `IOp
 
 A library; consumed by Worker and Console via `services.AddRiskEngine<TTokenSource>(configuration)`.
 
-**Background workers** (one or the other depending on `EnableStreamingMode`):
-- `PortfolioRiskWorker` (interval: `PortfolioCheckIntervalSeconds`, default 60 s) — interval-based; calls `RiskEvaluator.EvaluateAsync` per user.
-- `StreamingRiskWorker` — WebSocket-driven; reacts to Upstox portfolio + market-data events and rate-limits LTP-triggered evaluations via `LtpEvalMinIntervalMs`.
+**Background worker:** `StreamingRiskWorker` — WebSocket-driven; reacts to Upstox portfolio + market-data events per user in parallel. LTP-triggered evaluations are rate-limited via `LtpEvalMinIntervalMs` (default 15 s). Portfolio events (order fills, position changes) always evaluate immediately bypassing the rate limit.
 
-**`RiskEvaluator` checks (in order):**
-1. Overall stop loss (`OverallStopLoss`, default −₹25k) → exit all
-2. Profit target (`ProfitTarget`, default +₹25k) → exit all
-3. Trailing SL (`EnableTrailingStopLoss: true`):
-   - Activates when MTM ≥ `TrailingActivateAt` (default +₹5k)
-   - Stop locks at `LockProfitAt` (default +₹2k) — a fixed floor, not relative to MTM at activation
-   - Raised by `IncreaseTrailingBy` (default ₹500) every time MTM gains `WhenProfitIncreasesBy` (default ₹1k) from last step
+**`RiskEvaluator` checks (in order)** — thresholds read from `UserConfig` (per-user, from DB):
+1. MTM stop loss (`MtmSl`) → exit all
+2. MTM profit target (`MtmTarget`) → exit all
+3. Trailing SL (`TrailingEnabled: true`):
+   - Activates when MTM ≥ `TrailingActivateAt`
+   - Stop locks at `LockProfitAt` — a fixed floor, not relative to MTM at activation
+   - Raised by `IncreaseTrailingBy` every time MTM gains `WhenProfitIncreasesBy` from last step
    - Fires (exit all) when MTM falls to or below the trailing stop
 
 **State:** `InMemoryRiskRepository` (`ConcurrentDictionary<string, UserRiskState>`) holds trailing SL state and squared-off flag per `userId`. State resets on host restart.
 
-**`IUserTokenSource`** decouples token supply from the engine:
-- `ConfigTokenSource` (Worker) — reads `RiskEngine:Users[]` from config
+**`IUserTokenSource`** (async) decouples user/token supply from the engine:
+- `DbUserTokenSource` (Worker) — queries `UserRiskConfigs WHERE Enabled=true` joined with `BrokerCredentials` on every tick; auto-picks up DB changes without restart
 - `SingleUserTokenSource` (Console) — reads `Upstox:AccessToken` from config
 
 ### API Data Storage
 
-PostgreSQL via Neon — connection string set in `ConnectionStrings:DefaultConnection`. `AppDbContext` (in `KAITerminal.Infrastructure`) has a single `BrokerCredentials` table for per-user broker API key, secret, and access token. Table is created automatically on first startup via `EnsureCreatedAsync()`. `BrokerCredentialService` is scoped (per-request).
+PostgreSQL via Neon — connection string set in `ConnectionStrings:DefaultConnection`. `AppDbContext` (in `KAITerminal.Infrastructure`) manages these tables (created automatically via `EnsureCreatedAsync()` on first startup — new tables require manual `ALTER TABLE` / `CREATE TABLE` on Neon):
+
+| Table | Purpose |
+|---|---|
+| `BrokerCredentials` | Per-user broker API key, secret, and access token |
+| `UserTradingSettings` | Per-user trading preferences (underlying, expiry, etc.) |
+| `AppUsers` | User registry — `Email`, `Name`, `IsActive`, `IsAdmin`, `CreatedAt` |
+| `UserRiskConfigs` | Per-user PP/risk config — `Enabled`, `MtmTarget`, `MtmSl`, trailing SL fields |
+
+Services: `BrokerCredentialService`, `UserService` (`IUserService`), `RiskConfigService` (`IRiskConfigService`) — all scoped, registered via `AddDatabase()`.
 
 ### Frontend (`frontend/src`)
 
-- Routing: React Router v7; routes in `App.tsx`. Non-auth pages wrapped in `ProtectedRoute`.
-- State: Zustand stores in `stores/` persisted to `localStorage` (`kai-terminal-auth`, `kai-terminal-brokers`, `kai-terminal-profit-protection`). Logout clears all stores and calls `localStorage.clear()`.
+- Routing: React Router v7; routes in `App.tsx`. Non-auth pages wrapped in `ProtectedRoute`. `/auth/inactive` is public — shown to users pending activation.
+- State: Zustand stores in `stores/` persisted to `localStorage` (`kai-terminal-auth`, `kai-terminal-brokers`). Logout clears all stores and calls `localStorage.clear()`. **PP store is not persisted** — loaded from `GET /api/risk-config` on mount via `useRiskConfig` hook.
 - All backend HTTP calls go through `services/broker-api.ts`; reads `VITE_API_URL` (default `https://localhost:5001`). Trading-specific calls (positions with exchange filter) go through `services/trading-api.ts`.
 - Live positions use `@microsoft/signalr` — `PositionsPanel` connects to `WSS /hubs/positions?upstoxToken=...` on mount, handles `ReceivePositions` (full refresh), `ReceiveLtpBatch` (in-place LTP + P&L update), and `ReceiveOrderUpdate` (toast notification + Orders panel refresh). Shows a live `Wifi`/`WifiOff` indicator.
 - UI: shadcn/ui components; add new ones with `npx shadcn add <component>`.
 - **Always use shadcn components over native HTML equivalents** — e.g. `Checkbox` instead of `<input type="checkbox">`. shadcn `Checkbox` supports `checked="indeterminate"` natively (no `ref` hack). `onCheckedChange` receives `CheckedState` (`boolean | "indeterminate"`).
 - **Auth / session management:**
   - `lib/logout.ts` — `performLogout()` is the single source of truth for logout. Clears all Zustand stores, `localStorage`, and redirects to `/login`. Use this everywhere instead of duplicating store-clearing logic.
-  - `ProtectedRoute` checks JWT expiry on every render — if expired, calls `performLogout()` immediately before any API call fires.
+  - `ProtectedRoute` checks JWT expiry on every render — if expired, calls `performLogout()`. Also checks `isActive` claim — if false, redirects to `/auth/inactive`.
   - `api-client.ts` request interceptor calls `isTokenExpired` before attaching the `Authorization` header — aborts the request if expired.
   - `api-client.ts` response interceptor catches `401` responses mid-session and calls `performLogout()` automatically.
+  - `auth-store.ts` stores `isActive` and `isAdmin` decoded from JWT claims.
 - **Error boundary** — `components/error-boundary.tsx` wraps the entire app in `main.tsx`. Catches unexpected React crashes and renders a recovery screen with reload + recover options.
 - **Env validation** — `lib/constants.ts` checks `VITE_API_URL` on module load and logs a clear error to the console if missing.
 - **Supported indices** — NIFTY, SENSEX, BANKNIFTY, FINNIFTY, BANKEX (in that order). Enforced in `UNDERLYING_KEYS` (`lib/shift-config.ts`) and `UserTradingSettings`. Upstox instrument keys: `NSE_INDEX|Nifty 50`, `BSE_INDEX|SENSEX`, `NSE_INDEX|Nifty Bank`, `NSE_INDEX|Nifty Fin Service`, `BSE_INDEX|BANKEX` — note BANKEX uses `BSE_INDEX|BANKEX` (all-caps, no "BSE-" prefix).
@@ -139,7 +149,8 @@ PostgreSQL via Neon — connection string set in `ConnectionStrings:DefaultConne
 - **Keyboard shortcuts** — `Q` Quick Trade, `R` Refresh, `E` Exit All (with confirm), `?` opens help popover in stats bar. Help popover implemented in `components/terminal/keyboard-shortcuts-help.tsx`.
 - **Option contracts** — `GET /api/upstox/options/contracts/current-year` returns only contracts expiring in the current calendar year, sorted by expiry. Use this for expiry dropdowns instead of the full contracts endpoint.
 - **AI Signals page** (`/ai-signals`) — `GET /api/ai/market-sentiment` assembles a market snapshot (index quotes, NIFTY+BANKNIFTY option chains, last 30 × 1-min NIFTY candles) and fans out to GPT-4o, Grok, Gemini, Claude in parallel (30s timeout each). Each model returns direction / confidence / reasons / support / resistance / watch_for as JSON. Frontend polls every 15 minutes with a countdown timer; manual refresh button. Page shows a `MarketContextBar` and 4 `SentimentCard` components. API keys configured via `AiSentiment` config section; add with `dotnet user-secrets`. Requires `X-Upstox-Access-Token` header (same as other Upstox endpoints, but endpoint is at `/api/ai/` so the token context is set manually inside the handler).
-- **Profit Protection env defaults** — PP store defaults can be overridden via `frontend/.env` variables: `VITE_PP_MTM_TARGET`, `VITE_PP_MTM_SL`, `VITE_PP_TRAILING_ENABLED`, `VITE_PP_TRAILING_ACTIVATE_AT`, `VITE_PP_LOCK_PROFIT_AT`, `VITE_PP_INCREASE_BY`, `VITE_PP_TRAIL_BY`. Frontend PP logic mirrors the backend `RiskEvaluator` exactly: hard SL → target → trailing, with `lockProfitAt` locking in a profit floor the moment trailing activates.
+- **Profit Protection** — config is DB-backed. `useRiskConfig` hook loads from `GET /api/risk-config` on mount and saves via `PUT /api/risk-config`. The PP toggle uses an optimistic update (flips instantly, API call in background, reverts on failure). `useProfitProtection` hook is **display-only** — computes `currentSl` for the stats bar from live positions feed; exit orders are fired by the backend Worker, not the frontend. PP store (`profit-protection-store.ts`) is not persisted to localStorage.
+- **Profit Protection env defaults** — PP store initial defaults can be overridden via `frontend/.env` variables: `VITE_PP_MTM_TARGET`, `VITE_PP_MTM_SL`, `VITE_PP_TRAILING_ENABLED`, `VITE_PP_TRAILING_ACTIVATE_AT`, `VITE_PP_LOCK_PROFIT_AT`, `VITE_PP_INCREASE_BY`, `VITE_PP_TRAIL_BY`. These are only used before the API config loads.
 
 ---
 
@@ -148,8 +159,8 @@ PostgreSQL via Neon — connection string set in `ConnectionStrings:DefaultConne
 | File | Purpose |
 |---|---|
 | `backend/KAITerminal.Api/appsettings.json` | `Jwt:*`, `GoogleAuth:*`, `Frontend:Url`, `Upstox:ApiBaseUrl/HftBaseUrl`, `ConnectionStrings:DefaultConnection`, `AiSentiment:*` |
-| `backend/KAITerminal.Worker/appsettings.json` | `Upstox:*`, `RiskEngine:*` with `Users[]` list |
-| `backend/KAITerminal.Console/appsettings.json` | `Upstox:AccessToken`, `RiskEngine:*` (no `Users[]`) |
+| `backend/KAITerminal.Worker/appsettings.json` | `Upstox:*`, `RiskEngine:*`, `ConnectionStrings:DefaultConnection` |
+| `backend/KAITerminal.Console/appsettings.json` | `Upstox:AccessToken`, `RiskEngine:*` |
 | `frontend/.env` | `VITE_API_URL` (optional), `VITE_PP_MTM_TARGET`, `VITE_PP_MTM_SL`, and other PP defaults |
 
 Store real tokens with `dotnet user-secrets` instead of committing them to `appsettings.json`:
@@ -165,7 +176,7 @@ cd ../KAITerminal.Console
 dotnet user-secrets set "Upstox:AccessToken" "<daily_token>"
 
 cd ../KAITerminal.Worker
-dotnet user-secrets set "RiskEngine:Users:0:AccessToken" "<daily_token>"
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=...;Database=...;Username=...;Password=...;SSL Mode=Require"
 
 # AI Signals (KAITerminal.Api)
 cd ../KAITerminal.Api
