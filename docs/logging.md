@@ -13,7 +13,7 @@ App Insights is wired up in all three host projects (`Api`, `Worker`, `Console`)
 - **API** — `Microsoft.ApplicationInsights.AspNetCore 3.0.0` → `AddApplicationInsightsTelemetry()`
 - **Worker / Console** — `Microsoft.ApplicationInsights.WorkerService 3.0.0` → `AddApplicationInsightsTelemetryWorkerService()`
 
-The SDK is a **no-op when `ConnectionString` is empty** — all logs fall back to console only, so local development requires no configuration.
+App Insights registration is **guarded by a connection string check** in each `Program.cs` — the SDK is only registered when `ApplicationInsights:ConnectionString` is non-empty. When unset, all logs fall back to console only and local development requires no configuration. (Note: `Microsoft.ApplicationInsights` v3.x uses the Azure Monitor OpenTelemetry exporter internally, which throws at startup if registered with an empty connection string — the guard prevents this.)
 
 Set the connection string via `dotnet user-secrets` (never commit it):
 
