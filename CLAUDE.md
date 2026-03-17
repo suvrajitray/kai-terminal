@@ -91,9 +91,9 @@ Layered: `UpstoxClient` (facade) → `IPositionService` / `IOrderService` / `IOp
 
 A library; consumed by Worker and Console via `services.AddRiskEngine<TTokenSource>(configuration)`.
 
-**Two background workers:**
-- `PortfolioRiskWorker` (interval: `PortfolioCheckIntervalSeconds`, default 60 s) — calls `RiskEvaluator.EvaluateAsync` per user inside a `UpstoxTokenContext.Use(token)` scope.
-- `StrikeRiskWorker` (interval: `StrikeCheckIntervalSeconds`, default 5 s) — calls `StrikeMonitor` per user, same token pattern. Disabled entirely when `EnableStrikeWorker: false`.
+**Background workers** (one or the other depending on `EnableStreamingMode`):
+- `PortfolioRiskWorker` (interval: `PortfolioCheckIntervalSeconds`, default 60 s) — interval-based; calls `RiskEvaluator.EvaluateAsync` per user.
+- `StreamingRiskWorker` — WebSocket-driven; reacts to Upstox portfolio + market-data events and rate-limits LTP-triggered evaluations via `LtpEvalMinIntervalMs`.
 
 **`RiskEvaluator` checks (in order):**
 1. Overall stop loss (`OverallStopLoss`, default −₹25k) → exit all
@@ -104,9 +104,7 @@ A library; consumed by Worker and Console via `services.AddRiskEngine<TTokenSour
    - Raised by `IncreaseTrailingBy` (default ₹500) every time MTM gains `WhenProfitIncreasesBy` (default ₹1k) from last step
    - Fires (exit all) when MTM falls to or below the trailing stop
 
-**`StrikeMonitor`** checks per-position % loss: CE > `CeStopLossPercent` (20%), PE > `PeStopLossPercent` (30%). On trigger: exit position, then if `reentryCount < MaxReentries` (2) place a new OTM1 SELL via `PlaceOrderByStrikeV3Async`.
-
-**State:** `InMemoryRiskRepository` (`ConcurrentDictionary<string, UserRiskState>`) holds trailing SL state, squared-off flag, and re-entry counts per `userId`. State resets on host restart.
+**State:** `InMemoryRiskRepository` (`ConcurrentDictionary<string, UserRiskState>`) holds trailing SL state and squared-off flag per `userId`. State resets on host restart.
 
 **`IUserTokenSource`** decouples token supply from the engine:
 - `ConfigTokenSource` (Worker) — reads `RiskEngine:Users[]` from config
@@ -131,7 +129,7 @@ PostgreSQL via Neon — connection string set in `ConnectionStrings:DefaultConne
   - `api-client.ts` response interceptor catches `401` responses mid-session and calls `performLogout()` automatically.
 - **Error boundary** — `components/error-boundary.tsx` wraps the entire app in `main.tsx`. Catches unexpected React crashes and renders a recovery screen with reload + recover options.
 - **Env validation** — `lib/constants.ts` checks `VITE_API_URL` on module load and logs a clear error to the console if missing.
-- **Supported indices** — NIFTY, SENSEX, BANKNIFTY, FINNIFTY, BANKEX (in that order). Enforced in `UNDERLYING_KEYS` (`lib/shift-config.ts`), `StrikeMonitor.cs`, and `UserTradingSettings`. Upstox instrument keys: `NSE_INDEX|Nifty 50`, `BSE_INDEX|SENSEX`, `NSE_INDEX|Nifty Bank`, `NSE_INDEX|Nifty Fin Service`, `BSE_INDEX|BANKEX` — note BANKEX uses `BSE_INDEX|BANKEX` (all-caps, no "BSE-" prefix).
+- **Supported indices** — NIFTY, SENSEX, BANKNIFTY, FINNIFTY, BANKEX (in that order). Enforced in `UNDERLYING_KEYS` (`lib/shift-config.ts`) and `UserTradingSettings`. Upstox instrument keys: `NSE_INDEX|Nifty 50`, `BSE_INDEX|SENSEX`, `NSE_INDEX|Nifty Bank`, `NSE_INDEX|Nifty Fin Service`, `BSE_INDEX|BANKEX` — note BANKEX uses `BSE_INDEX|BANKEX` (all-caps, no "BSE-" prefix).
 - **Index ticker** — shows any of the 5 indices; defaults to NIFTY + SENSEX. A `SlidersHorizontal` popover lets the user toggle which indices are shown; selection is persisted to `localStorage`. Each card shows LTP + net change on the left and O/H/L as a vertical list on the right separated by a subtle border.
 - **Dashboard page** (`/dashboard`) — live at-a-glance view: Row 1: 4 stat cards (MTM with flash, Unrealised, Realised, Open count). Row 2: 5 index cards with O/H/L mini-columns. Row 3: open positions mini-table + Day Extremes card + Profit Protection status card. All data from `usePositionsFeed`, `useIndicesFeed`, and `localStorage` — no new backend calls.
 - **Quick Trade** — amber (`bg-amber-500`) button in the header (visible when broker authenticated). Has two tabs:
@@ -141,7 +139,7 @@ PostgreSQL via Neon — connection string set in `ConnectionStrings:DefaultConne
 - **Keyboard shortcuts** — `Q` Quick Trade, `R` Refresh, `E` Exit All (with confirm), `?` opens help popover in stats bar. Help popover implemented in `components/terminal/keyboard-shortcuts-help.tsx`.
 - **Option contracts** — `GET /api/upstox/options/contracts/current-year` returns only contracts expiring in the current calendar year, sorted by expiry. Use this for expiry dropdowns instead of the full contracts endpoint.
 - **AI Signals page** (`/ai-signals`) — `GET /api/ai/market-sentiment` assembles a market snapshot (index quotes, NIFTY+BANKNIFTY option chains, last 30 × 1-min NIFTY candles) and fans out to GPT-4o, Grok, Gemini, Claude in parallel (30s timeout each). Each model returns direction / confidence / reasons / support / resistance / watch_for as JSON. Frontend polls every 15 minutes with a countdown timer; manual refresh button. Page shows a `MarketContextBar` and 4 `SentimentCard` components. API keys configured via `AiSentiment` config section; add with `dotnet user-secrets`. Requires `X-Upstox-Access-Token` header (same as other Upstox endpoints, but endpoint is at `/api/ai/` so the token context is set manually inside the handler).
-- **Profit Protection env defaults** — PP store defaults can be overridden via `frontend/.env` variables: `VITE_PP_MTM_TARGET`, `VITE_PP_MTM_SL`, etc.
+- **Profit Protection env defaults** — PP store defaults can be overridden via `frontend/.env` variables: `VITE_PP_MTM_TARGET`, `VITE_PP_MTM_SL`, `VITE_PP_TRAILING_ENABLED`, `VITE_PP_TRAILING_ACTIVATE_AT`, `VITE_PP_LOCK_PROFIT_AT`, `VITE_PP_INCREASE_BY`, `VITE_PP_TRAIL_BY`. Frontend PP logic mirrors the backend `RiskEvaluator` exactly: hard SL → target → trailing, with `lockProfitAt` locking in a profit floor the moment trailing activates.
 
 ---
 

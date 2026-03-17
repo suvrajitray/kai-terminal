@@ -1,17 +1,17 @@
 # KAITerminal.RiskEngine
 
-A self-contained .NET library that implements autonomous risk management for options trading on Upstox. Drop it into any host (Worker Service or Console) via a single `AddRiskEngine<T>()` call.
+A self-contained .NET library that implements autonomous portfolio risk management for options trading on Upstox. Drop it into any host (Worker Service or Console) via a single `AddRiskEngine<T>()` call.
 
 ---
 
 ## What It Does
 
-Two background workers run continuously and take autonomous action:
+One of two background workers runs continuously and takes autonomous action:
 
-| Worker | Interval | Checks |
-|---|---|---|
-| `PortfolioRiskWorker` | 60 s (configurable) | Overall stop loss, profit target, trailing stop loss |
-| `StrikeRiskWorker` | 5 s (configurable) | Per-strike CE/PE loss %; exits + OTM1 re-entry |
+| Mode | Worker | Trigger | Checks |
+|---|---|---|---|
+| Interval (`EnableStreamingMode: false`) | `PortfolioRiskWorker` | Every `PortfolioCheckIntervalSeconds` | Overall SL, profit target, trailing SL |
+| Streaming (`EnableStreamingMode: true`) | `StreamingRiskWorker` | Upstox WebSocket events + rate-limited LTP ticks | Same checks via `RiskEvaluator` |
 
 All logic fires without any manual intervention. State is held in memory and resets when the host restarts.
 
@@ -19,15 +19,15 @@ All logic fires without any manual intervention. State is held in memory and res
 
 ## Portfolio Risk Rules
 
-Evaluated every `PortfolioCheckIntervalSeconds` seconds against total MTM P&L.
+Evaluated against total MTM P&L. Checks run in this order:
 
-| Rule | Config key | Default | Action |
-|---|---|---|---|
-| Overall Stop Loss | `OverallStopLoss` | MTM ≤ −₹25,000 | Square off all positions |
-| Profit Target | `ProfitTarget` | MTM ≥ +₹25,000 | Square off all positions |
-| Trailing SL — activation | `TrailingActivateAt` | MTM ≥ +₹5,000 | Arm trailing; stop locked at `LockProfitAt` |
-| Trailing SL — step up | `WhenProfitIncreasesBy` | Every +₹1,000 gain | Raise stop by `IncreaseTrailingBy` (₹500) |
-| Trailing SL — fire | — | MTM ≤ trailing stop | Square off all positions |
+| # | Rule | Config key | Default | Action |
+|---|---|---|---|---|
+| 1 | Overall Stop Loss | `OverallStopLoss` | MTM ≤ −₹25,000 | Square off all positions |
+| 2 | Profit Target | `ProfitTarget` | MTM ≥ +₹25,000 | Square off all positions |
+| 3 | Trailing SL — activation | `TrailingActivateAt` | MTM ≥ +₹5,000 | Arm trailing; stop locked at `LockProfitAt` |
+| 3 | Trailing SL — step up | `WhenProfitIncreasesBy` | Every +₹1,000 gain | Raise stop by `IncreaseTrailingBy` (₹500) |
+| 3 | Trailing SL — fire | — | MTM ≤ trailing stop | Square off all positions |
 
 **Trailing SL example** (defaults):
 
@@ -63,23 +63,6 @@ Trailing SL raised  stop=+2500
 
 ---
 
-## Strike Risk Rules
-
-Evaluated every `StrikeCheckIntervalSeconds` seconds against each open NFO position.
-
-| Option | Loss threshold | Formula |
-|---|---|---|
-| CE | > 20% | `(LTP − AvgPrice) / AvgPrice > 0.20` |
-| PE | > 30% | `(LTP − AvgPrice) / AvgPrice > 0.30` |
-
-On trigger:
-1. Exit the position via `ExitPositionAsync`.
-2. If `reentryCount < MaxReentries` (default 2): place a new SELL order at OTM1 of the same underlying/expiry via `PlaceOrderByStrikeV3Async`.
-
-Re-entry count is tracked per trading symbol and resets when the host restarts.
-
----
-
 ## Project Structure
 
 ```
@@ -88,18 +71,17 @@ KAITerminal.RiskEngine/
 │   └── RiskEngineConfig.cs          All thresholds + intervals + Users[] list
 ├── Models/
 │   ├── UserConfig.cs                UserId + AccessToken (used by Worker)
-│   └── UserRiskState.cs             Per-user mutable state (trailing, squared-off, re-entries)
+│   └── UserRiskState.cs             Per-user mutable state (trailing, squared-off)
 ├── Abstractions/
 │   ├── IRiskRepository.cs           GetOrCreate / Update / Reset per userId
 │   └── IUserTokenSource.cs          GetUsers() → IReadOnlyList<UserConfig>
 ├── State/
 │   └── InMemoryRiskRepository.cs    ConcurrentDictionary-backed, thread-safe
 ├── Services/
-│   ├── RiskEvaluator.cs             Portfolio-level checks (overall SL, target, trailing SL)
-│   └── StrikeMonitor.cs             Per-strike CE/PE checks + OTM re-entry
+│   └── RiskEvaluator.cs             Portfolio-level checks (overall SL, target, trailing SL)
 ├── Workers/
-│   ├── PortfolioRiskWorker.cs       BackgroundService — 60 s loop
-│   └── StrikeRiskWorker.cs          BackgroundService — 5 s loop
+│   ├── PortfolioRiskWorker.cs       BackgroundService — interval-based loop
+│   └── StreamingRiskWorker.cs       BackgroundService — WebSocket-driven
 └── Extensions/
     └── RiskEngineExtensions.cs      AddRiskEngine<TTokenSource>() DI helper
 ```
@@ -145,8 +127,8 @@ builder.Services.AddRiskEngine<ConfigTokenSource>(builder.Configuration);
 `AddRiskEngine<T>` registers:
 - `IRiskRepository` → `InMemoryRiskRepository` (singleton)
 - `IUserTokenSource` → `T` (singleton)
-- `RiskEvaluator` and `StrikeMonitor` (singletons)
-- `PortfolioRiskWorker` and `StrikeRiskWorker` as hosted services
+- `RiskEvaluator` (singleton)
+- `PortfolioRiskWorker` or `StreamingRiskWorker` as a hosted service (based on `EnableStreamingMode`)
 
 ### 3. Token scoping
 
@@ -178,12 +160,10 @@ All settings live under the `RiskEngine` key in `appsettings.json`. No code chan
     "LockProfitAt": 2000,
     "WhenProfitIncreasesBy": 1000,
     "IncreaseTrailingBy": 500,
-    "EnableStrikeWorker": true,
-    "CeStopLossPercent": 0.20,
-    "PeStopLossPercent": 0.30,
-    "MaxReentries": 2,
+    "EnableStreamingMode": false,
+    "LtpEvalMinIntervalMs": 500,
     "PortfolioCheckIntervalSeconds": 60,
-    "StrikeCheckIntervalSeconds": 5,
+    "Exchanges": ["NFO", "BFO"],
     "Users": [
       { "UserId": "user@example.com", "AccessToken": "" }
     ]
@@ -195,17 +175,15 @@ All settings live under the `RiskEngine` key in `appsettings.json`. No code chan
 |---|---|---|
 | `OverallStopLoss` | −25,000 | Square off immediately if MTM hits this |
 | `ProfitTarget` | +25,000 | Square off immediately if MTM hits this |
-| `EnableTrailingStopLoss` | `true` | Set to `false` to disable trailing SL entirely; only overall SL and profit target apply |
+| `EnableTrailingStopLoss` | `true` | Set to `false` to disable trailing SL entirely |
 | `TrailingActivateAt` | +5,000 | MTM level that arms the trailing SL |
 | `LockProfitAt` | +2,000 | Trailing stop value the moment TSL arms — your guaranteed floor |
 | `WhenProfitIncreasesBy` | +1,000 | MTM must gain this much from last step to raise the stop |
 | `IncreaseTrailingBy` | +500 | How much the stop rises each time the profit step is crossed |
-| `EnableStrikeWorker` | `true` | Set to `false` to disable per-strike CE/PE checks entirely |
-| `CeStopLossPercent` | 0.20 (20%) | CE loss threshold relative to entry price |
-| `PeStopLossPercent` | 0.30 (30%) | PE loss threshold relative to entry price |
-| `MaxReentries` | 2 | Max OTM re-entries after a strike SL |
-| `PortfolioCheckIntervalSeconds` | 60 | How often portfolio risk is evaluated |
-| `StrikeCheckIntervalSeconds` | 5 | How often per-strike risk is evaluated |
+| `EnableStreamingMode` | `false` | Use `StreamingRiskWorker` (WebSocket) instead of `PortfolioRiskWorker` (interval) |
+| `LtpEvalMinIntervalMs` | 500 | Minimum ms between LTP-tick-triggered evaluations (streaming mode only) |
+| `PortfolioCheckIntervalSeconds` | 60 | How often portfolio risk is evaluated (interval mode only) |
+| `Exchanges` | `["NFO","BFO"]` | Only positions from these exchanges are considered |
 
 `Users[]` is only needed when using `ConfigTokenSource` (Worker). For Console, omit it.
 
@@ -223,7 +201,7 @@ dotnet user-secrets set "RiskEngine:Users:0:AccessToken" "<daily_upstox_token>"
 |---|---|
 | Host starts | `UserRiskState` created fresh for each user on first check |
 | Trailing SL activates | `TrailingActive = true`, `TrailingStop = LockProfitAt`, `TrailingLastTrigger = mtm` |
-| Square-off | `IsSquaredOff = true`; both workers skip further evaluation |
+| Square-off | `IsSquaredOff = true`; worker skips further evaluation |
 | Host restarts | All state lost; engine starts fresh |
 
 State is intentionally in-memory only. Persistence across restarts is not implemented — the intent is that the engine is set up fresh each trading day.
@@ -301,9 +279,8 @@ public sealed class RiskMonitorWorker : BackgroundService
 | | `AddRiskEngine<T>()` | Custom worker |
 |---|---|---|
 | Trailing SL | Yes | Implement yourself |
-| Per-strike CE/PE checks | Yes | Implement yourself |
 | Multi-user support | Yes (`IUserTokenSource`) | Manual token scoping |
-| Re-entry logic | Yes | Implement yourself |
+| Streaming + interval modes | Yes | Implement yourself |
 | Complexity | Managed by the library | Full control |
 
 Use `AddRiskEngine<T>()` for production trading. Use a custom worker when you need a minimal, self-contained monitor (e.g. a quick stop-loss guard for a single account).
