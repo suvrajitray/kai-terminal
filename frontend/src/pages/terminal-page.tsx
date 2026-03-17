@@ -6,6 +6,7 @@ import { StatsBar } from "@/components/terminal/stats-bar";
 import { ProfitProtectionPanel } from "@/components/terminal/profit-protection-panel";
 import { BrokerAuthRequired } from "@/components/terminal/broker-auth-required";
 import { usePositionsFeed } from "@/components/panels/positions-panel/use-positions-feed";
+import { useProfitProtection } from "./use-profit-protection";
 import { exitAllPositions } from "@/services/trading-api";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
 import { useBrokerStore } from "@/stores/broker-store";
@@ -58,70 +59,20 @@ function TerminalPageInner() {
     }
   };
 
-  // Profit protection monitoring state
+  const handleExitAll = async () => {
+    setActing("all");
+    try {
+      await exitAllPositions();
+      await load();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setActing(null);
+    }
+  };
+
   const pp = useProfitProtectionStore();
-  const trailSlRef = useRef<number>(pp.mtmSl);      // current trailing SL floor
-  const lastStepRef = useRef<number>(0);              // last MTM checkpoint for step logic
-  const firedRef = useRef(false);                     // prevent double-fire
-  const latestMtmRef = useRef<number>(0);             // always tracks the latest open-positions MTM
-  const [currentSl, setCurrentSl] = useState<number>(pp.mtmSl); // reactive copy for display
-
-  // Full reset only when PP is toggled on — config edits must NOT reset trailing progress.
-  // Seed lastStepRef from latestMtmRef so we never retroactively "catch up" steps from 0,
-  // which would push the trailing stop above the current MTM and fire spuriously.
-  useEffect(() => {
-    if (!pp.enabled) return;
-    trailSlRef.current = pp.mtmSl;
-    lastStepRef.current = latestMtmRef.current;   // start from current MTM, not 0
-    firedRef.current = false;
-    setCurrentSl(pp.mtmSl);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pp.enabled]);
-
-  // When mtmSl is tightened while PP is already running, raise the floor — but never lower it
-  // (lowering would drop a trailing stop that was already raised, which would be wrong)
-  useEffect(() => {
-    if (!pp.enabled) return;
-    if (pp.mtmSl > trailSlRef.current) {
-      trailSlRef.current = pp.mtmSl;
-      setCurrentSl(pp.mtmSl);
-    }
-  }, [pp.enabled, pp.mtmSl]);
-
-  // Monitor MTM on every positions update
-  useEffect(() => {
-    if (!pp.enabled || firedRef.current) return;
-
-    const openPositions = positions.filter((p) => p.quantity !== 0);
-    if (openPositions.length === 0) return;
-
-    const mtm = openPositions.reduce((s, p) => s + p.pnl, 0);
-    latestMtmRef.current = mtm;   // keep latestMtmRef in sync for the reset effect
-
-    // Target hit → exit all
-    if (mtm >= pp.mtmTarget) {
-      firedRef.current = true;
-      handleExitAll();
-      return;
-    }
-
-    // Update trailing SL if trailing is enabled
-    if (pp.trailingEnabled) {
-      const steps = Math.floor((mtm - lastStepRef.current) / pp.increaseBy);
-      if (steps > 0) {
-        lastStepRef.current += steps * pp.increaseBy;
-        trailSlRef.current += steps * pp.trailBy;
-        setCurrentSl(trailSlRef.current);
-      }
-    }
-
-    // SL hit → exit all
-    if (mtm <= trailSlRef.current) {
-      firedRef.current = true;
-      handleExitAll();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [positions]);
+  const { currentSl } = useProfitProtection(positions, handleExitAll);
 
   // Keyboard shortcuts: R = refresh, E = exit all (with confirm)
   useEffect(() => {
@@ -137,18 +88,6 @@ function TerminalPageInner() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [load, positions]);
-
-  const handleExitAll = async () => {
-    setActing("all");
-    try {
-      await exitAllPositions();
-      await load();
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setActing(null);
-    }
-  };
 
   const onDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
