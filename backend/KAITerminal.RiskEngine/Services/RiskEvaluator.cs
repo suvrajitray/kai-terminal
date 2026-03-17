@@ -30,8 +30,8 @@ public sealed class RiskEvaluator
         _logger = logger;
     }
 
-    /// <summary>Fetches MTM via REST then evaluates risk. Used by the interval-based worker.</summary>
-    public async Task EvaluateAsync(string userId, CancellationToken ct = default)
+    /// <summary>Fetches MTM via REST then evaluates risk using per-user config.</summary>
+    public async Task EvaluateAsync(string userId, UserConfig config, CancellationToken ct = default)
     {
         decimal mtm;
         try
@@ -45,11 +45,11 @@ public sealed class RiskEvaluator
             return;
         }
 
-        await EvaluateAsync(userId, mtm, ct);
+        await EvaluateAsync(userId, mtm, config, ct);
     }
 
-    /// <summary>Evaluates risk using a pre-computed MTM value. Used by the streaming worker.</summary>
-    public async Task EvaluateAsync(string userId, decimal mtm, CancellationToken ct = default)
+    /// <summary>Evaluates risk using a pre-computed MTM value and per-user config.</summary>
+    public async Task EvaluateAsync(string userId, decimal mtm, UserConfig config, CancellationToken ct = default)
     {
         var state = _repo.GetOrCreate(userId);
 
@@ -59,10 +59,10 @@ public sealed class RiskEvaluator
             return;
         }
 
-        LogStatus(userId, mtm, state);
+        LogStatus(userId, mtm, state, config);
 
         // ── 1. Hard stop loss ────────────────────────────────────────────────
-        if (mtm <= _cfg.OverallStopLoss)
+        if (mtm <= config.MtmSl)
         {
             _logger.LogWarning("Hard SL hit for userId={UserId} — exiting all positions", userId);
             await SquareOffAsync(userId, state, ct);
@@ -70,7 +70,7 @@ public sealed class RiskEvaluator
         }
 
         // ── 2. Profit target ─────────────────────────────────────────────────
-        if (mtm >= _cfg.ProfitTarget)
+        if (mtm >= config.MtmTarget)
         {
             _logger.LogInformation("Target hit for userId={UserId} — exiting all positions", userId);
             await SquareOffAsync(userId, state, ct);
@@ -78,14 +78,14 @@ public sealed class RiskEvaluator
         }
 
         // ── 3. Trailing stop loss ────────────────────────────────────────────
-        if (!_cfg.EnableTrailingStopLoss) return;
+        if (!config.TrailingEnabled) return;
 
         if (!state.TrailingActive)
         {
-            if (mtm >= _cfg.TrailingActivateAt)
+            if (mtm >= config.TrailingActivateAt)
             {
                 state.TrailingActive      = true;
-                state.TrailingStop        = _cfg.LockProfitAt;   // fixed floor, not relative to MTM
+                state.TrailingStop        = config.LockProfitAt;   // fixed floor, not relative to MTM
                 state.TrailingLastTrigger = mtm;
                 _repo.Update(userId, state);
                 _logger.LogInformation(
@@ -96,11 +96,11 @@ public sealed class RiskEvaluator
         else
         {
             decimal gain = mtm - state.TrailingLastTrigger;
-            if (gain >= _cfg.WhenProfitIncreasesBy)
+            if (gain >= config.WhenProfitIncreasesBy)
             {
-                long steps = (long)(gain / _cfg.WhenProfitIncreasesBy);
-                state.TrailingStop        += steps * _cfg.IncreaseTrailingBy;
-                state.TrailingLastTrigger += steps * _cfg.WhenProfitIncreasesBy;
+                long steps = (long)(gain / config.WhenProfitIncreasesBy);
+                state.TrailingStop        += steps * config.IncreaseTrailingBy;
+                state.TrailingLastTrigger += steps * config.WhenProfitIncreasesBy;
                 _repo.Update(userId, state);
                 _logger.LogInformation(
                     "Trailing SL raised for userId={UserId}  stop={Stop:+0;-0}",
@@ -117,19 +117,19 @@ public sealed class RiskEvaluator
         }
     }
 
-    private void LogStatus(string userId, decimal mtm, UserRiskState state)
+    private void LogStatus(string userId, decimal mtm, UserRiskState state, UserConfig config)
     {
         if (state.TrailingActive)
         {
             _logger.LogInformation(
                 "[{UserId}]  PnL={Mtm:+0;-0}  Target={Target:+0}  TSL={Stop:+0;-0}",
-                userId, mtm, _cfg.ProfitTarget, state.TrailingStop);
+                userId, mtm, config.MtmTarget, state.TrailingStop);
         }
         else
         {
             _logger.LogInformation(
                 "[{UserId}]  PnL={Mtm:+0;-0}  SL={Sl:0}  Target={Target:+0}  TSL=inactive (activates at {Threshold:+0})",
-                userId, mtm, _cfg.OverallStopLoss, _cfg.ProfitTarget, _cfg.TrailingActivateAt);
+                userId, mtm, config.MtmSl, config.MtmTarget, config.TrailingActivateAt);
         }
     }
 

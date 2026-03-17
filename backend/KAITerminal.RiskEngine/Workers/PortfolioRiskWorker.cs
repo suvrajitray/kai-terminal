@@ -37,7 +37,7 @@ public sealed class PortfolioRiskWorker : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            var users = _tokenSource.GetUsers();
+            var users = await _tokenSource.GetUsersAsync(stoppingToken);
 
             foreach (var user in users)
             {
@@ -46,7 +46,7 @@ public sealed class PortfolioRiskWorker : BackgroundService
                 {
                     using (UpstoxTokenContext.Use(user.AccessToken))
                     {
-                        await _evaluator.EvaluateAsync(user.UserId, stoppingToken);
+                        await _evaluator.EvaluateAsync(user.UserId, user, stoppingToken);
                     }
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

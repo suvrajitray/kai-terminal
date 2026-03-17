@@ -60,7 +60,7 @@ public sealed class StreamingRiskWorker : BackgroundService
     {
         _logger.LogInformation("StreamingRiskWorker started");
 
-        var users = _tokenSource.GetUsers();
+        var users = await _tokenSource.GetUsersAsync(stoppingToken);
         if (!users.Any())
         {
             _logger.LogWarning("StreamingRiskWorker: no users configured — nothing to monitor");
@@ -198,7 +198,7 @@ public sealed class StreamingRiskWorker : BackgroundService
         try
         {
             var mtm = _cache.GetMtm(user.UserId);
-            await _evaluator.EvaluateAsync(user.UserId, mtm, ct);
+            await _evaluator.EvaluateAsync(user.UserId, mtm, user, ct);
         }
         finally
         {

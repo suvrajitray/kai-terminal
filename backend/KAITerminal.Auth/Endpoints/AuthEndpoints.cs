@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using KAITerminal.Auth.Services;
+using KAITerminal.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Google;
 using Microsoft.AspNetCore.Builder;
@@ -22,18 +23,26 @@ public static class AuthEndpoints
                 });
         });
 
-        app.MapGet("/auth/google/callback", async (HttpContext ctx, JwtService jwtService, IConfiguration config) =>
+        app.MapGet("/auth/google/callback", async (
+            HttpContext ctx,
+            JwtService jwtService,
+            IUserService userService,
+            IConfiguration config) =>
         {
             var result = await ctx.AuthenticateAsync(GoogleDefaults.AuthenticationScheme);
             if (!result.Succeeded) return Results.Unauthorized();
 
-            var user = result.Principal!;
+            var principal = result.Principal!;
+            var email = principal.FindFirstValue(ClaimTypes.Email)!;
+            var name  = principal.FindFirstValue(ClaimTypes.Name)!;
+            var sub   = principal.FindFirstValue(ClaimTypes.NameIdentifier)!;
 
-            var token = jwtService.GenerateToken(
-                user.FindFirstValue(ClaimTypes.NameIdentifier)!,
-                user.FindFirstValue(ClaimTypes.Name)!,
-                user.FindFirstValue(ClaimTypes.Email)!
-            );
+            var user = await userService.EnsureExistsAsync(email, name);
+
+            if (!user.IsActive)
+                return Results.Redirect($"{config["Frontend:Url"]}/auth/inactive");
+
+            var token = jwtService.GenerateToken(sub, name, email, isActive: true, isAdmin: user.IsAdmin);
 
             return Results.Redirect(
                 $"{config["Frontend:Url"]}/auth/callback?token={token}"

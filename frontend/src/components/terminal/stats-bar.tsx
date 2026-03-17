@@ -7,6 +7,7 @@ import { KeyboardShortcutsHelp } from "./keyboard-shortcuts-help";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
+import { useRiskConfig } from "@/hooks/use-risk-config";
 import type { Position } from "@/types";
 
 
@@ -35,7 +36,8 @@ export function StatsBar({
   ppCurrentSl,
   ppTrailing,
 }: StatsBarProps) {
-  const { enabled, setEnabled } = useProfitProtectionStore();
+  const { enabled } = useProfitProtectionStore();
+  const { setEnabled } = useRiskConfig();
 
   const openCount = positions.filter((p) => p.quantity !== 0).length;
   const closedCount = positions.filter((p) => p.quantity === 0).length;

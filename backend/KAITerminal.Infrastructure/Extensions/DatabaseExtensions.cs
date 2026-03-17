@@ -1,4 +1,5 @@
 using KAITerminal.Infrastructure.Data;
+using KAITerminal.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,6 +12,9 @@ public static class DatabaseExtensions
     {
         services.AddDbContext<AppDbContext>(options =>
             options.UseNpgsql(config.GetConnectionString("DefaultConnection")));
+
+        services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IRiskConfigService, RiskConfigService>();
 
         return services;
     }

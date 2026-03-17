@@ -1,5 +1,3 @@
-using KAITerminal.RiskEngine.Models;
-
 namespace KAITerminal.RiskEngine.Configuration;
 
 public sealed class RiskEngineConfig
@@ -53,6 +51,4 @@ public sealed class RiskEngineConfig
         return positions.Where(p => set.Contains(p.Exchange.ToUpperInvariant())).ToList().AsReadOnly();
     }
 
-    // ── Multi-user config (used by Worker via ConfigTokenSource) ────────────
-    public List<UserConfig> Users { get; set; } = [];
 }

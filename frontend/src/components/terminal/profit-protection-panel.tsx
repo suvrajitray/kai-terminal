@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
+import { useRiskConfig } from "@/hooks/use-risk-config";
 
 interface ProfitProtectionPanelProps {
   open: boolean;
@@ -29,6 +30,7 @@ const fromStr = (s: string) => Number(s);
 
 export function ProfitProtectionPanel({ open, onClose, currentMtm }: ProfitProtectionPanelProps) {
   const store = useProfitProtectionStore();
+  const { save } = useRiskConfig();
 
   const storeAsDraft = (): Draft => ({
     mtmTarget:          toStr(store.mtmTarget),
@@ -60,9 +62,9 @@ export function ProfitProtectionPanel({ open, onClose, currentMtm }: ProfitProte
   const activateAtWarning  = draft.trailingEnabled && !isNaN(activateAtVal) && !isNaN(targetVal) && activateAtVal >= targetVal;
   const lockProfitWarning  = draft.trailingEnabled && !isNaN(lockProfitAtVal) && !isNaN(targetVal) && lockProfitAtVal >= targetVal;
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (hasInvalidNumbers || targetWarning || slWarning || activateAtWarning || lockProfitWarning) return;
-    store.setConfig({
+    await save({
       enabled:            store.enabled,
       mtmTarget:          targetVal,
       mtmSl:              slVal,

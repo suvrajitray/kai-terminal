@@ -10,12 +10,14 @@ import { TerminalPage } from "@/pages/terminal-page";
 import { ChartsPage } from "@/pages/charts-page";
 import { AiSignalsPage } from "@/pages/ai-signals-page";
 import { NotFoundPage } from "@/pages/not-found-page";
+import { InactivePage } from "@/pages/inactive-page";
 
 function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
+      <Route path="/auth/inactive" element={<InactivePage />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />

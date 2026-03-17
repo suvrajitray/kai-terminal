@@ -70,6 +70,7 @@ app.MapChartEndpoints();
 app.MapBrokerCredentialsEndpoints();
 app.MapUserSettingsEndpoints();
 app.MapAiSentimentEndpoints();
+app.MapRiskConfigEndpoints();
 app.MapHub<PositionsHub>("/hubs/positions");
 app.MapHub<IndexHub>("/hubs/indices");
 

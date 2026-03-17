@@ -7,6 +7,7 @@ import { ProfitProtectionPanel } from "@/components/terminal/profit-protection-p
 import { BrokerAuthRequired } from "@/components/terminal/broker-auth-required";
 import { usePositionsFeed } from "@/components/panels/positions-panel/use-positions-feed";
 import { useProfitProtection } from "./use-profit-protection";
+import { useRiskConfig } from "@/hooks/use-risk-config";
 import { exitAllPositions } from "@/services/trading-api";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
 import { useBrokerStore } from "@/stores/broker-store";
@@ -72,7 +73,8 @@ function TerminalPageInner() {
   };
 
   const pp = useProfitProtectionStore();
-  const { currentSl } = useProfitProtection(positions, handleExitAll);
+  useRiskConfig(); // load config from API on mount
+  const { currentSl } = useProfitProtection(positions);
 
   // Keyboard shortcuts: R = refresh, E = exit all (with confirm)
   useEffect(() => {

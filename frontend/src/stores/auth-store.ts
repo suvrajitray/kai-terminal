@@ -6,7 +6,9 @@ interface AuthState {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
-  login: (user: User, token: string) => void;
+  isActive: boolean;
+  isAdmin: boolean;
+  login: (user: User, token: string, isActive?: boolean, isAdmin?: boolean) => void;
   logout: () => void;
 }
 
@@ -16,8 +18,11 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       token: null,
       isAuthenticated: false,
-      login: (user, token) => set({ user, token, isAuthenticated: true }),
-      logout: () => set({ user: null, token: null, isAuthenticated: false }),
+      isActive: false,
+      isAdmin: false,
+      login: (user, token, isActive = true, isAdmin = false) =>
+        set({ user, token, isAuthenticated: true, isActive, isAdmin }),
+      logout: () => set({ user: null, token: null, isAuthenticated: false, isActive: false, isAdmin: false }),
     }),
     { name: "kai-terminal-auth" },
   ),

@@ -1,5 +1,4 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
 
 export interface ProfitProtectionConfig {
   enabled: boolean;
@@ -24,19 +23,18 @@ const defaults: ProfitProtectionConfig = {
 };
 
 interface ProfitProtectionState extends ProfitProtectionConfig {
+  isLoaded: boolean;
   setEnabled: (enabled: boolean) => void;
   setConfig: (config: Partial<ProfitProtectionConfig>) => void;
+  markLoaded: () => void;
   reset: () => void;
 }
 
-export const useProfitProtectionStore = create<ProfitProtectionState>()(
-  persist(
-    (set) => ({
-      ...defaults,
-      setEnabled: (enabled) => set({ enabled }),
-      setConfig: (config) => set((s) => ({ ...s, ...config })),
-      reset: () => set(defaults),
-    }),
-    { name: "kai-terminal-profit-protection" },
-  ),
-);
+export const useProfitProtectionStore = create<ProfitProtectionState>()((set) => ({
+  ...defaults,
+  isLoaded: false,
+  setEnabled: (enabled) => set({ enabled }),
+  setConfig: (config) => set((s) => ({ ...s, ...config })),
+  markLoaded: () => set({ isLoaded: true }),
+  reset: () => set({ ...defaults, isLoaded: false }),
+}));

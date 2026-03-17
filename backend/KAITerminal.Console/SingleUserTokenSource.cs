@@ -19,5 +19,6 @@ public sealed class SingleUserTokenSource : IUserTokenSource
         _users = [new UserConfig { UserId = "Console", AccessToken = cfg.Value.AccessToken ?? "" }];
     }
 
-    public IReadOnlyList<UserConfig> GetUsers() => _users;
+    public Task<IReadOnlyList<UserConfig>> GetUsersAsync(CancellationToken ct = default) =>
+        Task.FromResult(_users);
 }

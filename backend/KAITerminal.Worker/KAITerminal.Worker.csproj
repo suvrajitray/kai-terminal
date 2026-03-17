@@ -12,6 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\KAITerminal.Infrastructure\KAITerminal.Infrastructure.csproj" />
     <ProjectReference Include="..\KAITerminal.RiskEngine\KAITerminal.RiskEngine.csproj" />
     <ProjectReference Include="..\KAITerminal.Upstox\KAITerminal.Upstox.csproj" />
   </ItemGroup>

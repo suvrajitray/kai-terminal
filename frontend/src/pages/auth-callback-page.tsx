@@ -5,7 +5,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useBrokerStore } from "@/stores/broker-store";
 import { BROKERS } from "@/lib/constants";
 
-function parseJwtPayload(token: string): { sub: string; name: string; email: string } | null {
+function parseJwtPayload(token: string): { sub: string; name: string; email: string; isActive: boolean; isAdmin: boolean } | null {
   try {
     const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
     const payload = JSON.parse(atob(base64));
@@ -18,6 +18,8 @@ function parseJwtPayload(token: string): { sub: string; name: string; email: str
       email:
         payload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"] ??
         payload.email,
+      isActive: payload.isActive === "true" || payload.isActive === true,
+      isAdmin:  payload.isAdmin  === "true" || payload.isAdmin  === true,
     };
   } catch {
     return null;
@@ -42,7 +44,7 @@ export function AuthCallbackPage() {
       return;
     }
 
-    login({ id: claims.sub, name: claims.name, email: claims.email }, token);
+    login({ id: claims.sub, name: claims.name, email: claims.email }, token, claims.isActive, claims.isAdmin);
 
     // If any broker already has a valid access token, go straight to terminal.
     // Otherwise send to connect-brokers so they can authenticate.
