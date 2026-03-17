@@ -6,6 +6,7 @@ using KAITerminal.Upstox.Configuration;
 using KAITerminal.Upstox.Http;
 using KAITerminal.Upstox.Models.WebSocket;
 using KAITerminal.Upstox.Protos;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace KAITerminal.Upstox.Services;
@@ -14,6 +15,7 @@ internal sealed class MarketDataStreamer : IMarketDataStreamer
 {
     private readonly UpstoxHttpClient _http;
     private readonly UpstoxConfig _config;
+    private readonly ILogger<MarketDataStreamer> _logger;
     private readonly SemaphoreSlim _sendLock = new(1, 1);
     private readonly ConcurrentDictionary<string, FeedMode> _subscriptions = new();
 
@@ -32,10 +34,11 @@ internal sealed class MarketDataStreamer : IMarketDataStreamer
     public event EventHandler<MarketDataMessage>? FeedReceived;
     public event EventHandler<MarketSegmentStatus>? MarketStatusReceived;
 
-    public MarketDataStreamer(UpstoxHttpClient http, IOptions<UpstoxConfig> options)
+    public MarketDataStreamer(UpstoxHttpClient http, IOptions<UpstoxConfig> options, ILogger<MarketDataStreamer> logger)
     {
         _http = http;
         _config = options.Value;
+        _logger = logger;
     }
 
     // ──────────────────────────────────────────────────
@@ -205,12 +208,17 @@ internal sealed class MarketDataStreamer : IMarketDataStreamer
             {
                 return;
             }
-            catch
+            catch (Exception ex)
             {
-                // Try next attempt
+                _logger.LogWarning(ex,
+                    "Market data stream reconnect attempt {Attempt}/{Max} failed",
+                    attempt, _config.MaxReconnectAttempts);
             }
         }
 
+        _logger.LogError(
+            "Market data stream failed to reconnect after {Max} attempt(s) — stream permanently disconnected",
+            _config.MaxReconnectAttempts);
         AutoReconnectStopped?.Invoke(this, EventArgs.Empty);
     }
 
@@ -262,9 +270,9 @@ internal sealed class MarketDataStreamer : IMarketDataStreamer
                 Instruments = instruments
             });
         }
-        catch
+        catch (Exception ex)
         {
-            // Swallow parse errors — don't crash the receive loop
+            _logger.LogWarning(ex, "Failed to parse market data frame ({Length} bytes)", count);
         }
     }
 

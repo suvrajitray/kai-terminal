@@ -31,15 +31,24 @@ await app.InitializeDatabaseAsync();
 
 app.UseExceptionHandler(errApp => errApp.Run(async ctx =>
 {
+    var logger = ctx.RequestServices.GetRequiredService<ILoggerFactory>()
+        .CreateLogger("KAITerminal.Api.GlobalExceptionHandler");
     var feature = ctx.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+
     if (feature?.Error is KAITerminal.Upstox.Exceptions.UpstoxException ex)
     {
+        logger.LogWarning(ex,
+            "Upstox API error on {Method} {Path}: {Message}",
+            ctx.Request.Method, ctx.Request.Path, ex.Message);
         ctx.Response.StatusCode = ex.HttpStatusCode ?? 422;
         ctx.Response.ContentType = "application/json";
         await ctx.Response.WriteAsJsonAsync(new { message = ex.Message });
     }
-    else
+    else if (feature?.Error is not null)
     {
+        logger.LogError(feature.Error,
+            "Unhandled exception on {Method} {Path}",
+            ctx.Request.Method, ctx.Request.Path);
         ctx.Response.StatusCode = 500;
         ctx.Response.ContentType = "application/json";
         await ctx.Response.WriteAsJsonAsync(new { message = "An unexpected error occurred." });
@@ -54,7 +63,6 @@ app.UseWhen(ctx => ctx.Request.Path.StartsWithSegments("/api/upstox"),
     upstox => upstox.Use(async (ctx, next) =>
     {
         var token = ctx.Request.Headers["X-Upstox-Access-Token"].FirstOrDefault();
-        Console.WriteLine("token: ", token);
         using (UpstoxTokenContext.Use(token))
             await next(ctx);
     }));

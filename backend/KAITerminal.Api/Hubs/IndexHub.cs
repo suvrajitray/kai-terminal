@@ -20,12 +20,14 @@ public sealed class IndexHub : Hub
     private readonly UpstoxClient _upstox;
     private readonly IndexStreamManager _manager;
     private readonly IHubContext<IndexHub> _hubContext;
+    private readonly ILogger<IndexHub> _logger;
 
-    public IndexHub(UpstoxClient upstox, IndexStreamManager manager, IHubContext<IndexHub> hubContext)
+    public IndexHub(UpstoxClient upstox, IndexStreamManager manager, IHubContext<IndexHub> hubContext, ILogger<IndexHub> logger)
     {
         _upstox = upstox;
         _manager = manager;
         _hubContext = hubContext;
+        _logger = logger;
     }
 
     public override Task OnConnectedAsync()
@@ -90,7 +92,10 @@ public sealed class IndexHub : Hub
                 }
             }
             catch (OperationCanceledException) { break; }
-            catch { /* API error — skip tick */ }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Index quotes poll failed for connection {ConnectionId} — skipping tick", connectionId);
+            }
 
             await Task.Delay(PollIntervalMs, ct).ContinueWith(_ => { });
         }

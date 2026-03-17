@@ -131,7 +131,10 @@ public sealed class PositionsHub : Hub
                     if (updates.Count > 0)
                         await hubContext.Clients.Client(connectionId).SendAsync("ReceiveLtpBatch", updates);
                 }
-                catch { /* connection closed */ }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "LTP push failed for connection {ConnectionId} — client likely disconnected", connectionId);
+                }
             });
         };
 

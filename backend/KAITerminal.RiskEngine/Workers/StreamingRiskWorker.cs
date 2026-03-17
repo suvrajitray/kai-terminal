@@ -30,9 +30,13 @@ public sealed class StreamingRiskWorker : BackgroundService
     private readonly RiskEvaluator _evaluator;
     private readonly RiskEngineConfig _cfg;
     private readonly ILogger<StreamingRiskWorker> _logger;
+    private readonly TimeZoneInfo _tradingTz;
 
     // Per-user evaluation gate: prevents concurrent evaluations and rate-limits LTP-triggered ones.
     private readonly ConcurrentDictionary<string, UserGate> _gates = new(StringComparer.Ordinal);
+
+    // Trading window state: -1 = unknown, 0 = outside, 1 = inside. Used to log transitions once.
+    private int _tradingWindowState = -1;
 
     private sealed class UserGate
     {
@@ -54,11 +58,17 @@ public sealed class StreamingRiskWorker : BackgroundService
         _evaluator = evaluator;
         _cfg = cfg.Value;
         _logger = logger;
+        _tradingTz = TimeZoneInfo.FindSystemTimeZoneById(_cfg.TradingTimeZone);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("StreamingRiskWorker started");
+        _logger.LogInformation(
+            "StreamingRiskWorker started — trading window={Start}–{End} {Tz}  LTP eval interval={IntervalMs}ms",
+            _cfg.TradingWindowStart.ToString(@"hh\:mm"),
+            _cfg.TradingWindowEnd.ToString(@"hh\:mm"),
+            _cfg.TradingTimeZone,
+            _cfg.LtpEvalMinIntervalMs);
 
         var users = await _tokenSource.GetUsersAsync(stoppingToken);
         if (!users.Any())
@@ -67,7 +77,9 @@ public sealed class StreamingRiskWorker : BackgroundService
             return;
         }
 
-        await Task.WhenAll(users.Select(u => RunUserAsync(u, stoppingToken)));
+        _logger.LogInformation("Starting risk sessions for {Count} user(s)", users.Count());
+
+        await Task.WhenAll(users.Select(u => RunUserWithRestartAsync(u, stoppingToken)));
 
         _logger.LogInformation("StreamingRiskWorker stopped");
     }
@@ -95,17 +107,25 @@ public sealed class StreamingRiskWorker : BackgroundService
                 await marketDataStreamer.ConnectAsync(ct);
 
                 if (tokens.Count > 0)
+                {
+                    _logger.LogInformation(
+                        "Subscribing market data for {Count} instrument(s) — userId={UserId}",
+                        tokens.Count, user.UserId);
                     await marketDataStreamer.SubscribeAsync(tokens, FeedMode.Ltpc);
+                }
             }
 
             _logger.LogInformation(
-                "Streams connected for userId={UserId}; monitoring {Count} instrument(s)",
+                "Streams connected for userId={UserId}; monitoring {Count} open instrument(s)",
                 user.UserId, _cache.GetOpenInstrumentTokens(user.UserId).Count);
 
             // ── Event handlers ───────────────────────────────────────────────
             portfolioStreamer.UpdateReceived += (_, update) =>
             {
                 if (update.Type is not ("order_update" or "position_update")) return;
+                _logger.LogDebug(
+                    "Portfolio event received: {EventType} for userId={UserId}",
+                    update.Type, user.UserId);
                 _ = Task.Run(() => HandlePortfolioUpdateAsync(user, marketDataStreamer, ct));
             };
 
@@ -129,7 +149,42 @@ public sealed class StreamingRiskWorker : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unhandled error in streaming session for userId={UserId}", user.UserId);
+            _logger.LogError(ex, "Streaming session failed for userId={UserId}", user.UserId);
+            throw;
+        }
+    }
+
+    // ── Session restart wrapper ──────────────────────────────────────────────
+
+    private async Task RunUserWithRestartAsync(UserConfig user, CancellationToken ct)
+    {
+        const int initialDelaySeconds = 30;
+        const int maxDelaySeconds     = 300; // 5-minute cap
+        int delaySeconds = initialDelaySeconds;
+
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await RunUserAsync(user, ct);
+                return; // Clean shutdown (cancellation handled inside RunUserAsync)
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                return;
+            }
+            catch
+            {
+                // Already logged inside RunUserAsync with full exception details.
+                _logger.LogWarning(
+                    "Restarting streaming session for userId={UserId} in {Delay}s",
+                    user.UserId, delaySeconds);
+
+                try { await Task.Delay(TimeSpan.FromSeconds(delaySeconds), ct); }
+                catch (OperationCanceledException) { return; }
+
+                delaySeconds = Math.Min(delaySeconds * 2, maxDelaySeconds);
+            }
         }
     }
 
@@ -140,6 +195,8 @@ public sealed class StreamingRiskWorker : BackgroundService
     {
         try
         {
+            _logger.LogDebug("Re-fetching positions after portfolio event for userId={UserId}", user.UserId);
+
             IReadOnlyList<Upstox.Models.Responses.Position> positions;
             using (UpstoxTokenContext.Use(user.AccessToken))
                 positions = _cfg.FilterPositions(await _upstox.GetAllPositionsAsync(ct));
@@ -149,8 +206,13 @@ public sealed class StreamingRiskWorker : BackgroundService
             // Re-subscribe market data for any new instruments
             var tokens = _cache.GetOpenInstrumentTokens(user.UserId);
             if (tokens.Count > 0)
+            {
+                _logger.LogDebug(
+                    "Re-subscribing market data for {Count} instrument(s) — userId={UserId}",
+                    tokens.Count, user.UserId);
                 using (UpstoxTokenContext.Use(user.AccessToken))
                     await marketDataStreamer.SubscribeAsync(tokens, FeedMode.Ltpc);
+            }
 
             using (UpstoxTokenContext.Use(user.AccessToken))
                 await EvaluateAsync(user, ct);
@@ -175,7 +237,11 @@ public sealed class StreamingRiskWorker : BackgroundService
         }
 
         // Rate-limit: skip evaluation if last one was within the configured interval
-        if (!CanEvaluateFromLtp(user.UserId)) return;
+        if (!CanEvaluateFromLtp(user.UserId))
+        {
+            _logger.LogDebug("LTP eval rate-limited for userId={UserId} — skipping", user.UserId);
+            return;
+        }
 
         try
         {
@@ -193,8 +259,18 @@ public sealed class StreamingRiskWorker : BackgroundService
 
     private async Task EvaluateAsync(UserConfig user, CancellationToken ct)
     {
+        if (!CheckTradingWindow())
+        {
+            _logger.LogDebug("Skipping evaluation for userId={UserId} — outside trading hours", user.UserId);
+            return;
+        }
+
         var gate = _gates.GetOrAdd(user.UserId, _ => new UserGate());
-        if (!await gate.Sem.WaitAsync(0, ct)) return; // skip if already evaluating
+        if (!await gate.Sem.WaitAsync(0, ct))
+        {
+            _logger.LogDebug("Evaluation already in progress for userId={UserId} — skipping", user.UserId);
+            return;
+        }
         try
         {
             var mtm = _cache.GetMtm(user.UserId);
@@ -204,6 +280,36 @@ public sealed class StreamingRiskWorker : BackgroundService
         {
             gate.Sem.Release();
         }
+    }
+
+    /// <summary>
+    /// Returns true if the current time (in the configured timezone) is within the trading window.
+    /// Logs a single message on each open→closed or closed→open transition.
+    /// </summary>
+    private bool CheckTradingWindow()
+    {
+        var now = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, _tradingTz).TimeOfDay;
+        bool inWindow = now >= _cfg.TradingWindowStart && now <= _cfg.TradingWindowEnd;
+
+        int newState = inWindow ? 1 : 0;
+        int prev = Interlocked.Exchange(ref _tradingWindowState, newState);
+
+        if (prev != newState)
+        {
+            if (inWindow)
+                _logger.LogInformation(
+                    "Market open — risk engine active (window: {Start}–{End} {Tz})",
+                    _cfg.TradingWindowStart.ToString(@"hh\:mm"),
+                    _cfg.TradingWindowEnd.ToString(@"hh\:mm"),
+                    _cfg.TradingTimeZone);
+            else
+                _logger.LogInformation(
+                    "Market closed — risk engine paused until {Start} {Tz}",
+                    _cfg.TradingWindowStart.ToString(@"hh\:mm"),
+                    _cfg.TradingTimeZone);
+        }
+
+        return inWindow;
     }
 
     private bool CanEvaluateFromLtp(string userId)

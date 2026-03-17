@@ -64,7 +64,9 @@ public sealed class RiskEvaluator
         // ── 1. Hard stop loss ────────────────────────────────────────────────
         if (mtm <= config.MtmSl)
         {
-            _logger.LogWarning("Hard SL hit for userId={UserId} — exiting all positions", userId);
+            _logger.LogWarning(
+                "Hard SL hit for userId={UserId}  MTM={Mtm:+0;-0}  SL={Sl:+0;-0} — exiting all positions",
+                userId, mtm, config.MtmSl);
             await SquareOffAsync(userId, state, ct);
             return;
         }
@@ -72,7 +74,9 @@ public sealed class RiskEvaluator
         // ── 2. Profit target ─────────────────────────────────────────────────
         if (mtm >= config.MtmTarget)
         {
-            _logger.LogInformation("Target hit for userId={UserId} — exiting all positions", userId);
+            _logger.LogInformation(
+                "Target hit for userId={UserId}  MTM={Mtm:+0;-0}  Target={Target:+0} — exiting all positions",
+                userId, mtm, config.MtmTarget);
             await SquareOffAsync(userId, state, ct);
             return;
         }
@@ -140,10 +144,18 @@ public sealed class RiskEvaluator
             await _upstox.ExitAllPositionsAsync(cancellationToken: ct);
             state.IsSquaredOff = true;
             _repo.Update(userId, state);
+            _logger.LogWarning("Square-off complete for userId={UserId} — all positions exited", userId);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to exit all positions for userId={UserId}", userId);
+            // Mark as squared-off even on failure so the risk engine does not repeatedly
+            // attempt to exit on every subsequent evaluation cycle. The exit order may have
+            // been partially or fully filled; the operator must verify manually.
+            state.IsSquaredOff = true;
+            _repo.Update(userId, state);
+            _logger.LogError(ex,
+                "Failed to exit all positions for userId={UserId} — marked as squared-off to prevent retry loops; manual verification required",
+                userId);
         }
     }
 }

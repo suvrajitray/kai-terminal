@@ -5,6 +5,7 @@ using KAITerminal.Upstox;
 using KAITerminal.Upstox.Configuration;
 using KAITerminal.Upstox.Http;
 using KAITerminal.Upstox.Models.WebSocket;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace KAITerminal.Upstox.Services;
@@ -13,6 +14,7 @@ internal sealed class PortfolioStreamer : IPortfolioStreamer
 {
     private readonly UpstoxHttpClient _http;
     private readonly UpstoxConfig _config;
+    private readonly ILogger<PortfolioStreamer> _logger;
 
     private IEnumerable<UpdateType>? _updateTypes;
     private ClientWebSocket? _ws;
@@ -34,10 +36,11 @@ internal sealed class PortfolioStreamer : IPortfolioStreamer
     public event EventHandler? AutoReconnectStopped;
     public event EventHandler<PortfolioStreamUpdate>? UpdateReceived;
 
-    public PortfolioStreamer(UpstoxHttpClient http, IOptions<UpstoxConfig> options)
+    public PortfolioStreamer(UpstoxHttpClient http, IOptions<UpstoxConfig> options, ILogger<PortfolioStreamer> logger)
     {
         _http = http;
         _config = options.Value;
+        _logger = logger;
     }
 
     // ──────────────────────────────────────────────────
@@ -180,12 +183,17 @@ internal sealed class PortfolioStreamer : IPortfolioStreamer
             {
                 return;
             }
-            catch
+            catch (Exception ex)
             {
-                // Try next attempt
+                _logger.LogWarning(ex,
+                    "Portfolio stream reconnect attempt {Attempt}/{Max} failed",
+                    attempt, _config.MaxReconnectAttempts);
             }
         }
 
+        _logger.LogError(
+            "Portfolio stream failed to reconnect after {Max} attempt(s) — stream permanently disconnected",
+            _config.MaxReconnectAttempts);
         AutoReconnectStopped?.Invoke(this, EventArgs.Empty);
     }
 
@@ -202,9 +210,9 @@ internal sealed class PortfolioStreamer : IPortfolioStreamer
             if (update is not null)
                 UpdateReceived?.Invoke(this, update);
         }
-        catch
+        catch (Exception ex)
         {
-            // Swallow parse errors
+            _logger.LogWarning(ex, "Failed to parse portfolio stream message ({Length} bytes)", count);
         }
     }
 }

@@ -27,6 +27,25 @@ public sealed class RiskEngineConfig
     /// </summary>
     public int LtpEvalMinIntervalMs { get; set; } = 15_000;
 
+    // ── Trading window ───────────────────────────────────────────────────────
+    /// <summary>
+    /// Time of day when the risk engine begins evaluating. Format: "HH:mm:ss".
+    /// Defaults to 09:15:00 (NSE market open).
+    /// </summary>
+    public TimeSpan TradingWindowStart { get; set; } = new(9, 15, 0);
+
+    /// <summary>
+    /// Time of day when the risk engine stops evaluating. Format: "HH:mm:ss".
+    /// Defaults to 15:30:00 (NSE market close).
+    /// </summary>
+    public TimeSpan TradingWindowEnd { get; set; } = new(15, 30, 0);
+
+    /// <summary>
+    /// IANA timezone ID used to evaluate trading hours.
+    /// Defaults to "Asia/Kolkata" (IST, UTC+5:30).
+    /// </summary>
+    public string TradingTimeZone { get; set; } = "Asia/Kolkata";
+
     /// <summary>
     /// Only positions from these exchanges are considered by the risk engine.
     /// An empty list means all exchanges are included.
