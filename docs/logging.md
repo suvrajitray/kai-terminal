@@ -1,6 +1,94 @@
 # Logging Reference
 
-All backend logging uses the standard .NET `Microsoft.Extensions.Logging` abstractions. Logs go to the console by default. This document is the single reference for every log message emitted across the backend — use it for monitoring, alerting, and troubleshooting.
+All backend logging uses the standard .NET `Microsoft.Extensions.Logging` abstractions with **Azure Application Insights** as the remote sink. Logs go to both the console and App Insights when a connection string is configured. This document is the single reference for every log message emitted across the backend — use it for monitoring, alerting, and troubleshooting.
+
+---
+
+## Azure Application Insights
+
+### Setup
+
+App Insights is wired up in all three host projects (`Api`, `Worker`, `Console`) via:
+
+- **API** — `Microsoft.ApplicationInsights.AspNetCore 3.0.0` → `AddApplicationInsightsTelemetry()`
+- **Worker / Console** — `Microsoft.ApplicationInsights.WorkerService 3.0.0` → `AddApplicationInsightsTelemetryWorkerService()`
+
+The SDK is a **no-op when `ConnectionString` is empty** — all logs fall back to console only, so local development requires no configuration.
+
+Set the connection string via `dotnet user-secrets` (never commit it):
+
+```bash
+# Run from each project directory
+dotnet user-secrets set "ApplicationInsights:ConnectionString" "InstrumentationKey=xxx;IngestionEndpoint=https://..."
+```
+
+The connection string is found in the Azure portal under your Application Insights resource → **Overview** → **Connection String**.
+
+### How ILogger maps to App Insights telemetry
+
+| `ILogger` call | App Insights telemetry type |
+|---|---|
+| `LogDebug` / `LogInformation` / `LogWarning` | **Trace** (with corresponding severity level) |
+| `LogError` / `LogCritical` | **Exception** (includes full stack trace) |
+
+All structured log properties (e.g. `{UserId}`, `{Mtm}`) are promoted to custom dimensions in App Insights, making them filterable and searchable in Log Analytics.
+
+### Dual-sink log levels
+
+The console and App Insights sinks have independent log level filters. Console is verbose for local visibility; App Insights is selective to reduce noise and cost.
+
+**Console** — controlled by `Logging:LogLevel`
+**App Insights** — controlled by `Logging:ApplicationInsights:LogLevel`
+
+#### Worker / Console projects
+
+```json
+"Logging": {
+  "LogLevel": {
+    "Default": "Information",
+    "KAITerminal.RiskEngine": "Information",
+    "KAITerminal.Upstox": "Warning"
+  },
+  "ApplicationInsights": {
+    "LogLevel": {
+      "Default": "Warning",
+      "KAITerminal.RiskEngine": "Information",
+      "KAITerminal.Upstox": "Warning"
+    }
+  }
+}
+```
+
+App Insights receives all `KAITerminal.RiskEngine` logs at `Information+` — this includes:
+- Session lifecycle (start, stop, restart)
+- Trading window transitions (market open/close)
+- Risk evaluation heartbeat (~every 15s per user during market hours)
+- All risk triggers (SL hits, target hits, trailing SL changes)
+- Square-off results
+
+The 15-second heartbeat is intentionally included. It enables **Azure Monitor availability alerts** — e.g. "alert if no heartbeat for more than 20 minutes during market hours (09:15–15:30 IST)".
+
+#### API project
+
+```json
+"ApplicationInsights": {
+  "LogLevel": {
+    "Default": "Warning"
+  }
+}
+```
+
+App Insights receives `Warning+` from the API — Upstox API errors, hub errors, and all unhandled exceptions with full stack traces.
+
+### Suggested Azure Monitor alerts
+
+| Alert | Query | Threshold |
+|---|---|---|
+| Risk engine down during market hours | `traces \| where message contains "Market open"` missing for 20 min | 0 results in 20 min window |
+| Square-off failure | `traces \| where severityLevel >= 3 and message contains "Failed to exit"` | Any occurrence |
+| Stream permanently disconnected | `traces \| where message contains "permanently disconnected"` | Any occurrence |
+| Session crash loop | `traces \| where message contains "Restarting streaming session"` | > 3 in 10 min |
+| High API error rate | `exceptions \| where outerMessage contains "Upstox"` | > 10 in 5 min |
 
 ---
 
@@ -232,11 +320,21 @@ Logging__LogLevel__KAITerminal__Upstox=Debug
 
 ## Log Level Quick Reference
 
-| Scenario | Minimum Level |
+### Console
+
+| Scenario | Minimum level |
 |---|---|
-| Production monitoring | `Information` |
+| Normal production | `Information` |
 | Investigating a missed evaluation | `Debug` for `KAITerminal.RiskEngine` |
 | Investigating stream parse errors | `Debug` for `KAITerminal.Upstox` |
 | Full trace (very verbose) | `Debug` for `Default` |
 
-**Important:** Setting `KAITerminal.Upstox` to `Debug` will emit a log on every rate-limited LTP tick (every 15s per user). In production keep it at `Warning` or `Information`.
+### App Insights (via `Logging:ApplicationInsights:LogLevel`)
+
+| Namespace | Default setting | Why |
+|---|---|---|
+| `Default` | `Warning` | Avoids noise from framework internals |
+| `KAITerminal.RiskEngine` | `Information` | Captures heartbeat + all risk events; enables availability alerting |
+| `KAITerminal.Upstox` | `Warning` | Reconnect failures and parse errors only |
+
+**Important:** Setting `KAITerminal.Upstox` to `Debug` in App Insights will emit a trace on every rate-limited LTP tick (~every 15s per user). Keep it at `Warning` in production to avoid excessive telemetry ingestion costs.

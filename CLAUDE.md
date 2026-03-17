@@ -158,9 +158,9 @@ Services: `BrokerCredentialService`, `UserService` (`IUserService`), `RiskConfig
 
 | File | Purpose |
 |---|---|
-| `backend/KAITerminal.Api/appsettings.json` | `Jwt:*`, `GoogleAuth:*`, `Frontend:Url`, `Upstox:ApiBaseUrl/HftBaseUrl`, `ConnectionStrings:DefaultConnection`, `AiSentiment:*` |
-| `backend/KAITerminal.Worker/appsettings.json` | `Upstox:*`, `RiskEngine:*`, `ConnectionStrings:DefaultConnection` |
-| `backend/KAITerminal.Console/appsettings.json` | `Upstox:AccessToken`, `RiskEngine:*` |
+| `backend/KAITerminal.Api/appsettings.json` | `Jwt:*`, `GoogleAuth:*`, `Frontend:Url`, `Upstox:ApiBaseUrl/HftBaseUrl`, `ConnectionStrings:DefaultConnection`, `AiSentiment:*`, `ApplicationInsights:ConnectionString` |
+| `backend/KAITerminal.Worker/appsettings.json` | `Upstox:*`, `RiskEngine:*`, `ConnectionStrings:DefaultConnection`, `ApplicationInsights:ConnectionString` |
+| `backend/KAITerminal.Console/appsettings.json` | `Upstox:AccessToken`, `RiskEngine:*`, `ApplicationInsights:ConnectionString` |
 | `frontend/.env` | `VITE_API_URL` (optional), `VITE_PP_MTM_TARGET`, `VITE_PP_MTM_SL`, and other PP defaults |
 
 Store real tokens with `dotnet user-secrets` instead of committing them to `appsettings.json`:
@@ -184,7 +184,19 @@ dotnet user-secrets set "AiSentiment:OpenAiApiKey"  "sk-..."
 dotnet user-secrets set "AiSentiment:GrokApiKey"    "xai-..."
 dotnet user-secrets set "AiSentiment:GeminiApiKey"  "AIza..."
 dotnet user-secrets set "AiSentiment:ClaudeApiKey"  "sk-ant-..."
+
+# Azure Application Insights — set in each project that sends telemetry
+cd ../KAITerminal.Api
+dotnet user-secrets set "ApplicationInsights:ConnectionString" "InstrumentationKey=...;IngestionEndpoint=..."
+
+cd ../KAITerminal.Worker
+dotnet user-secrets set "ApplicationInsights:ConnectionString" "InstrumentationKey=...;IngestionEndpoint=..."
+
+cd ../KAITerminal.Console
+dotnet user-secrets set "ApplicationInsights:ConnectionString" "InstrumentationKey=...;IngestionEndpoint=..."
 ```
+
+App Insights is **optional** — if `ConnectionString` is empty the SDK is a no-op and all logs go to console only. See `docs/logging.md` for the full log level configuration and troubleshooting guide.
 
 ---
 
