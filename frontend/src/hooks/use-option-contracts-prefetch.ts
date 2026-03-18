@@ -31,15 +31,10 @@ export function useOptionContractsPrefetch() {
       return !!token && !isBrokerTokenExpired("zerodha", token);
     })();
 
-    if (hasUpstox && UNDERLYINGS.every((u) => getContracts(`upstox:${u}`).length === 0)) {
-      fetchMasterContracts("upstox")
-        .then((d) => setIndexContracts("upstox", d))
-        .catch(() => {});
-    }
-
-    if (hasZerodha && UNDERLYINGS.every((u) => getContracts(`zerodha:${u}`).length === 0)) {
-      fetchMasterContracts("zerodha")
-        .then((d) => setIndexContracts("zerodha", d))
+    const anyBrokerConnected = hasUpstox || hasZerodha;
+    if (anyBrokerConnected && UNDERLYINGS.every((u) => getContracts(u).length === 0)) {
+      fetchMasterContracts()
+        .then((d) => setIndexContracts(d))
         .catch(() => {});
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

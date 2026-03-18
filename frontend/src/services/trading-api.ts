@@ -95,10 +95,8 @@ export async function fetchOptionChain(
   return res.data;
 }
 
-export async function fetchMasterContracts(broker: string): Promise<IndexContracts[]> {
-  const res = await apiClient.get<IndexContracts[]>("/api/masterdata/contracts", {
-    params: { broker },
-  });
+export async function fetchMasterContracts(): Promise<IndexContracts[]> {
+  const res = await apiClient.get<IndexContracts[]>("/api/masterdata/contracts");
   return res.data;
 }
 

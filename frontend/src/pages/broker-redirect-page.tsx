@@ -83,9 +83,8 @@ export function BrokerRedirectPage() {
         addStep("User trading settings loaded");
 
         // Step 4 — prefetch option contracts for all indices via unified master data API
-        const brokerId_ = brokerId!;
-        const data = await fetchMasterContracts(brokerId_);
-        setIndexContracts(brokerId_, data);
+        const data = await fetchMasterContracts();
+        setIndexContracts(data);
         addStep(`Option contracts loaded (${data.map((d) => d.index).join(", ")})`);
 
         setStatus("success");

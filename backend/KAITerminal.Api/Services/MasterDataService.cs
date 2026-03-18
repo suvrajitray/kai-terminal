@@ -1,19 +1,16 @@
-using System.Text.Json;
 using KAITerminal.Api.Models;
-using KAITerminal.Infrastructure.Data;
 using KAITerminal.Upstox;
 using KAITerminal.Upstox.Models.Responses;
 using KAITerminal.Zerodha;
-using KAITerminal.Zerodha.Models;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace KAITerminal.Api.Services;
 
 /// <summary>
-/// Provides unified, broker-agnostic option contract master data with DB caching (once per IST day).
+/// Provides unified, broker-agnostic option contract master data with in-memory caching (expires at IST midnight).
 /// </summary>
 public sealed class MasterDataService(
-    AppDbContext db,
+    IMemoryCache cache,
     UpstoxClient upstox,
     ZerodhaClient zerodha,
     ILogger<MasterDataService> logger)
@@ -32,54 +29,64 @@ public sealed class MasterDataService(
     private static readonly string[] ZerodhaUnderlyingSymbols =
         ["NIFTY", "SENSEX", "BANKNIFTY", "FINNIFTY", "BANKEX"];
 
-    private static readonly JsonSerializerOptions JsonOpts = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-    };
-
     public async Task<IReadOnlyList<IndexContracts>> GetContractsAsync(
+        HttpContext httpContext, CancellationToken ct)
+    {
+        var upstoxToken  = httpContext.Request.Headers["X-Upstox-Access-Token"].FirstOrDefault();
+        var zerodhaToken = httpContext.Request.Headers["X-Zerodha-Access-Token"].FirstOrDefault();
+        bool hasUpstox   = !string.IsNullOrEmpty(upstoxToken);
+        bool hasZerodha  = !string.IsNullOrEmpty(zerodhaToken);
+
+        IReadOnlyList<IndexContracts>? upstoxContracts  = hasUpstox  ? await LoadBrokerContractsAsync("upstox",  httpContext, ct) : null;
+        IReadOnlyList<IndexContracts>? zerodhaContracts = hasZerodha ? await LoadBrokerContractsAsync("zerodha", httpContext, ct) : null;
+
+        if (upstoxContracts is not null && zerodhaContracts is not null)
+            return MergeContracts(upstoxContracts, zerodhaContracts);
+
+        return upstoxContracts ?? zerodhaContracts ?? [];
+    }
+
+    private async Task<IReadOnlyList<IndexContracts>> LoadBrokerContractsAsync(
         string broker, HttpContext httpContext, CancellationToken ct)
     {
-        var today = IstToday();
+        var key = $"contracts:{broker}:{IstToday()}";
 
-        // Cache hit?
-        var cached = await db.OptionContracts
-            .FirstOrDefaultAsync(o => o.Broker == broker, ct);
-
-        if (cached is not null && cached.LastUpdatedDate == today)
+        if (cache.TryGetValue(key, out IReadOnlyList<IndexContracts>? cached))
         {
-            logger.LogInformation("MasterData cache hit for broker={Broker} date={Date}", broker, today);
-            return JsonSerializer.Deserialize<IReadOnlyList<IndexContracts>>(cached.Data, JsonOpts)!;
+            logger.LogInformation("MasterData cache hit for broker={Broker}", broker);
+            return cached!;
         }
 
-        // Cache miss — fetch from broker
         logger.LogInformation("MasterData cache miss for broker={Broker}, fetching from broker API", broker);
 
         var contracts = broker == "zerodha"
             ? await FetchZerodhaAsync(ct)
             : await FetchUpstoxAsync(httpContext, ct);
 
-        var json = JsonSerializer.Serialize(contracts, JsonOpts);
-
-        if (cached is null)
-        {
-            db.OptionContracts.Add(new OptionContractCache
-            {
-                Broker          = broker,
-                Data            = json,
-                LastUpdatedDate = today,
-                UpdatedAt       = DateTime.UtcNow,
-            });
-        }
-        else
-        {
-            cached.Data            = json;
-            cached.LastUpdatedDate = today;
-            cached.UpdatedAt       = DateTime.UtcNow;
-        }
-
-        await db.SaveChangesAsync(ct);
+        cache.Set(key, contracts, NextIst0815());
         return contracts;
+    }
+
+    private static IReadOnlyList<IndexContracts> MergeContracts(
+        IReadOnlyList<IndexContracts> upstox,
+        IReadOnlyList<IndexContracts> zerodha)
+    {
+        var zerodhaMap = zerodha.ToDictionary(z => z.Index);
+        return upstox.Select(u =>
+        {
+            if (!zerodhaMap.TryGetValue(u.Index, out var z))
+                return u;
+
+            var zLookup = z.Contracts.ToDictionary(c => (c.Expiry, c.ExchangeToken));
+
+            var merged = u.Contracts.Select(uc =>
+                zLookup.TryGetValue((uc.Expiry, uc.ExchangeToken), out var zc)
+                    ? uc with { ZerodhaToken = zc.ZerodhaToken }
+                    : uc
+            ).ToList();
+
+            return new IndexContracts(u.Index, merged);
+        }).ToList();
     }
 
     private async Task<IReadOnlyList<IndexContracts>> FetchUpstoxAsync(
@@ -136,4 +143,12 @@ public sealed class MasterDataService(
 
     private static DateOnly IstToday() =>
         DateOnly.FromDateTime(DateTime.UtcNow.AddHours(5.5));
+
+    private static DateTimeOffset NextIst0815()
+    {
+        var istOffset = TimeSpan.FromHours(5.5);
+        var istNow    = DateTimeOffset.UtcNow.ToOffset(istOffset);
+        var todayAt0815 = new DateTimeOffset(istNow.Date, istOffset).AddHours(8).AddMinutes(15);
+        return istNow < todayAt0815 ? todayAt0815 : todayAt0815.AddDays(1);
+    }
 }

@@ -18,6 +18,7 @@ builder.Services
     .AddAuthServices(builder.Configuration)
     .AddAuthorization()
     .AddOpenApi()
+    .AddMemoryCache()
     .AddDatabase(builder.Configuration)
     .AddBrokerServices(builder.Configuration)
     .AddSignalR();
@@ -25,7 +26,7 @@ builder.Services
 builder.Services.AddSingleton<PositionStreamManager>();
 builder.Services.AddSingleton<IndexStreamManager>();
 builder.Services.AddScoped<UserTradingSettingsService>();
-builder.Services.AddScoped<MasterDataService>();
+builder.Services.AddSingleton<MasterDataService>();
 
 if (!string.IsNullOrEmpty(builder.Configuration["ApplicationInsights:ConnectionString"]))
     builder.Services.AddApplicationInsightsTelemetry(builder.Configuration);

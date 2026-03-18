@@ -17,8 +17,8 @@ export interface ContractLookup {
 }
 
 interface OptionContractsState {
-  contracts: Record<string, ContractEntry[]>; // keyed by "broker:INDEX" e.g. "upstox:NIFTY" or "zerodha:NIFTY"
-  setIndexContracts: (broker: string, data: IndexContracts[]) => void;
+  contracts: Record<string, ContractEntry[]>; // keyed by index name e.g. "NIFTY", "BANKNIFTY"
+  setIndexContracts: (data: IndexContracts[]) => void;
   getContracts: (key: string) => ContractEntry[];
   getByInstrumentKey: (instrumentToken: string) => ContractLookup | undefined;
   getExpiries: (key: string) => string[];
@@ -30,9 +30,9 @@ export const useOptionContractsStore = create<OptionContractsState>()(
     (set, get) => ({
       contracts: {},
 
-      setIndexContracts: (broker, data) => {
+      setIndexContracts: (data) => {
         const next: Record<string, ContractEntry[]> = {};
-        for (const idx of data) next[`${broker}:${idx.index}`] = idx.contracts;
+        for (const idx of data) next[idx.index] = idx.contracts;
         set((s) => ({ contracts: { ...s.contracts, ...next } }));
       },
 
@@ -50,8 +50,7 @@ export const useOptionContractsStore = create<OptionContractsState>()(
                    c.zerodhaToken === numericPart,
           );
           if (found) {
-            const index = key.includes(":") ? key.split(":").pop()! : key;
-            return { contract: found, index };
+            return { contract: found, index: key };
           }
         }
         return undefined;
