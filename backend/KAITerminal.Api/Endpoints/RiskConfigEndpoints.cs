@@ -23,10 +23,13 @@ public static class RiskConfigEndpoints
 
     public static void MapRiskConfigEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/api/risk-config", async (ClaimsPrincipal user, IRiskConfigService svc) =>
+        app.MapGet("/api/risk-config", async (
+            ClaimsPrincipal user,
+            IRiskConfigService svc,
+            [Microsoft.AspNetCore.Mvc.FromQuery] string broker = "upstox") =>
         {
             var username = user.FindFirstValue(ClaimTypes.Email)!;
-            var config   = await svc.GetAsync(username) ?? Defaults;
+            var config   = await svc.GetAsync(username, broker) ?? Defaults;
             return Results.Ok(config);
         })
         .RequireAuthorization();
@@ -34,10 +37,11 @@ public static class RiskConfigEndpoints
         app.MapPut("/api/risk-config", async (
             ClaimsPrincipal user,
             IRiskConfigService svc,
-            UserRiskConfig body) =>
+            UserRiskConfig body,
+            [Microsoft.AspNetCore.Mvc.FromQuery] string broker = "upstox") =>
         {
             var username = user.FindFirstValue(ClaimTypes.Email)!;
-            await svc.UpsertAsync(username, body);
+            await svc.UpsertAsync(username, broker, body);
             return Results.NoContent();
         })
         .RequireAuthorization();

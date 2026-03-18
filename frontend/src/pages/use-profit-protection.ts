@@ -13,8 +13,8 @@ import type { Position } from "@/types";
  *
  * Returns `currentSl` — the live trailing floor value for display.
  */
-export function useProfitProtection(positions: Position[]) {
-  const pp = useProfitProtectionStore();
+export function useProfitProtection(positions: Position[], brokerType: string = "upstox") {
+  const pp = useProfitProtectionStore((s) => s.getConfig(brokerType));
 
   const trailSlRef     = useRef<number>(pp.mtmSl);
   const lastStepRef    = useRef<number | null>(null);

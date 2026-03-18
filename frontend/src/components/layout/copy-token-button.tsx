@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Copy, Check } from "lucide-react";
 import { useBrokerStore } from "@/stores/broker-store";
-import { isTokenExpired } from "@/lib/token-utils";
+import { isBrokerTokenExpired } from "@/lib/token-utils";
 import { Button } from "@/components/ui/button";
 
 interface CopyTokenButtonProps {
@@ -12,10 +12,10 @@ export function CopyTokenButton({ brokerId = "upstox" }: CopyTokenButtonProps) {
   const token = useBrokerStore((s) => s.getCredentials(brokerId)?.accessToken);
   const [copied, setCopied] = useState(false);
 
-  if (!token || isTokenExpired(token)) return null;
+  if (isBrokerTokenExpired(brokerId, token)) return null;
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(token);
+    await navigator.clipboard.writeText(token!);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   };

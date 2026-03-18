@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { apiClient } from "@/lib/api-client";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
+import { useBrokerStore } from "@/stores/broker-store";
 import type { ProfitProtectionConfig } from "@/stores/profit-protection-store";
 
 // API shape matches the C# UserRiskConfig (camelCase via System.Text.Json)
@@ -28,31 +29,33 @@ function toDto(config: ProfitProtectionConfig): RiskConfigDto {
   };
 }
 
-export function useRiskConfig() {
+export function useRiskConfig(brokerType: string = "upstox") {
   const store = useProfitProtectionStore();
+  const isAuthenticated = useBrokerStore((s) => s.isAuthenticated(brokerType));
 
   useEffect(() => {
-    apiClient.get<RiskConfigDto>("/api/risk-config").then((res) => {
-      store.setConfig(res.data);
-      store.markLoaded();
+    if (!isAuthenticated) return;
+    apiClient.get<RiskConfigDto>(`/api/risk-config?broker=${brokerType}`).then((res) => {
+      store.setConfig(brokerType, res.data);
+      store.markLoaded(brokerType);
     }).catch(() => {
-      store.markLoaded(); // show defaults on error
+      store.markLoaded(brokerType);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [brokerType, isAuthenticated]);
 
   async function save(config: ProfitProtectionConfig) {
-    await apiClient.put("/api/risk-config", toDto(config));
-    store.setConfig(config);
+    await apiClient.put(`/api/risk-config?broker=${brokerType}`, toDto(config));
+    store.setConfig(brokerType, config);
   }
 
   function setEnabled(enabled: boolean) {
     // Optimistic update — flip immediately so the toggle feels instant
-    store.setEnabled(enabled);
+    store.setEnabled(brokerType, enabled);
     // Persist in background; revert on failure
-    const updated = { ...useProfitProtectionStore.getState(), enabled };
-    apiClient.put("/api/risk-config", toDto(updated)).catch(() => {
-      store.setEnabled(!enabled);
+    const updated = { ...useProfitProtectionStore.getState().getConfig(brokerType), enabled };
+    apiClient.put(`/api/risk-config?broker=${brokerType}`, toDto(updated)).catch(() => {
+      store.setEnabled(brokerType, !enabled);
     });
   }
 

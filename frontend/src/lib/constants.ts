@@ -4,7 +4,8 @@ export const APP_NAME = (import.meta.env.VITE_APP_NAME as string) || "KAI Termin
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL as string;
 
-export const UPSTOX_OAUTH_URL = import.meta.env.VITE_UPSTOX_OAUTH_URL as string;
+export const UPSTOX_OAUTH_URL  = import.meta.env.VITE_UPSTOX_OAUTH_URL  as string;
+export const ZERODHA_OAUTH_URL = import.meta.env.VITE_ZERODHA_OAUTH_URL as string;
 
 const REQUIRED_ENV_VARS: Record<string, string | undefined> = {
   VITE_API_URL: import.meta.env.VITE_API_URL,

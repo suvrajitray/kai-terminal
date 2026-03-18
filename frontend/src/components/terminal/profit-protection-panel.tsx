@@ -7,6 +7,9 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
 import { useRiskConfig } from "@/hooks/use-risk-config";
+import { useBrokerStore } from "@/stores/broker-store";
+import { BROKERS } from "@/lib/constants";
+import { useShallow } from "zustand/react/shallow";
 
 interface ProfitProtectionPanelProps {
   open: boolean;
@@ -29,17 +32,36 @@ const toStr = (n: number) => String(n);
 const fromStr = (s: string) => Number(s);
 
 export function ProfitProtectionPanel({ open, onClose, currentMtm }: ProfitProtectionPanelProps) {
-  const store = useProfitProtectionStore();
-  const { save } = useRiskConfig();
+  const connectedBrokers = useBrokerStore(useShallow((s) => BROKERS.filter((b) => s.isAuthenticated(b.id))));
+  const multipleConnected = connectedBrokers.length > 1;
+
+  const [activeBroker, setActiveBroker] = useState<string>(
+    connectedBrokers[0]?.id ?? "upstox"
+  );
+
+  // Hooks must be called unconditionally — one per known broker in BROKERS.
+  // When adding a new broker (e.g. "dhan"), add one line here and to the record below.
+  const upstoxRiskConfig  = useRiskConfig("upstox");
+  const zerodhaRiskConfig = useRiskConfig("zerodha");
+  const dhanRiskConfig    = useRiskConfig("dhan");
+
+  const riskConfigs: Record<string, ReturnType<typeof useRiskConfig>> = {
+    upstox:  upstoxRiskConfig,
+    zerodha: zerodhaRiskConfig,
+    dhan:    dhanRiskConfig,
+  };
+  const { save, setEnabled } = riskConfigs[activeBroker] ?? upstoxRiskConfig;
+
+  const pp = useProfitProtectionStore((s) => s.getConfig(activeBroker));
 
   const storeAsDraft = (): Draft => ({
-    mtmTarget:          toStr(store.mtmTarget),
-    mtmSl:              toStr(store.mtmSl),
-    trailingEnabled:    store.trailingEnabled,
-    trailingActivateAt: toStr(store.trailingActivateAt),
-    lockProfitAt:       toStr(store.lockProfitAt),
-    increaseBy:         toStr(store.increaseBy),
-    trailBy:            toStr(store.trailBy),
+    mtmTarget:          toStr(pp.mtmTarget),
+    mtmSl:              toStr(pp.mtmSl),
+    trailingEnabled:    pp.trailingEnabled,
+    trailingActivateAt: toStr(pp.trailingActivateAt),
+    lockProfitAt:       toStr(pp.lockProfitAt),
+    increaseBy:         toStr(pp.increaseBy),
+    trailBy:            toStr(pp.trailBy),
   });
 
   const [draft, setDraft] = useState<Draft>(storeAsDraft);
@@ -50,6 +72,21 @@ export function ProfitProtectionPanel({ open, onClose, currentMtm }: ProfitProte
   const handleOpen = (isOpen: boolean) => {
     if (isOpen) setDraft(storeAsDraft());
     else onClose();
+  };
+
+  // Reset draft when switching broker tabs
+  const handleBrokerSwitch = (broker: string) => {
+    setActiveBroker(broker);
+    const brokerPp = useProfitProtectionStore.getState().getConfig(broker);
+    setDraft({
+      mtmTarget:          toStr(brokerPp.mtmTarget),
+      mtmSl:              toStr(brokerPp.mtmSl),
+      trailingEnabled:    brokerPp.trailingEnabled,
+      trailingActivateAt: toStr(brokerPp.trailingActivateAt),
+      lockProfitAt:       toStr(brokerPp.lockProfitAt),
+      increaseBy:         toStr(brokerPp.increaseBy),
+      trailBy:            toStr(brokerPp.trailBy),
+    });
   };
 
   const targetVal          = fromStr(draft.mtmTarget);
@@ -65,7 +102,7 @@ export function ProfitProtectionPanel({ open, onClose, currentMtm }: ProfitProte
   const handleSave = async () => {
     if (hasInvalidNumbers || targetWarning || slWarning || activateAtWarning || lockProfitWarning) return;
     await save({
-      enabled:            store.enabled,
+      enabled:            pp.enabled,
       mtmTarget:          targetVal,
       mtmSl:              slVal,
       trailingEnabled:    draft.trailingEnabled,
@@ -95,6 +132,26 @@ export function ProfitProtectionPanel({ open, onClose, currentMtm }: ProfitProte
             </span>
           </DialogTitle>
         </DialogHeader>
+
+        {/* Broker selector — only shown when multiple brokers are connected */}
+        {multipleConnected && (
+          <div className="flex gap-1 rounded-lg bg-muted/40 p-1">
+            {connectedBrokers.map((b) => (
+              <button
+                key={b.id}
+                onClick={() => handleBrokerSwitch(b.id)}
+                className={cn(
+                  "flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                  activeBroker === b.id
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {b.name}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-x-8 gap-y-5 pt-2">
           {/* MTM Target */}
@@ -250,6 +307,34 @@ export function ProfitProtectionPanel({ open, onClose, currentMtm }: ProfitProte
             {" "}Hard SL: <span className="font-medium text-foreground">₹{slVal.toLocaleString("en-IN")}</span>.
           </div>
         )}
+
+        {/* PP enable/disable toggle for active broker */}
+        <div className="flex items-center justify-between rounded-md border border-border bg-muted/20 px-4 py-3">
+          <div>
+            <span className="text-sm font-medium capitalize">
+              {multipleConnected ? `${connectedBrokers.find((b) => b.id === activeBroker)?.name ?? activeBroker} ` : ""}Profit Protection
+            </span>
+            <p className="text-[11px] text-muted-foreground">
+              Enable to activate automatic stop loss and target management
+            </p>
+          </div>
+          <button
+            role="switch"
+            aria-checked={pp.enabled}
+            onClick={() => setEnabled(!pp.enabled)}
+            className={cn(
+              "relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none",
+              pp.enabled ? "bg-green-500" : "bg-muted-foreground/30",
+            )}
+          >
+            <span
+              className={cn(
+                "pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow-lg transition-transform",
+                pp.enabled ? "translate-x-4" : "translate-x-0",
+              )}
+            />
+          </button>
+        </div>
 
         <div className="flex justify-end gap-2 pt-1">
           <Button variant="outline" onClick={onClose}>Close</Button>

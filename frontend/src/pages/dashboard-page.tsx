@@ -5,8 +5,13 @@ import { IndexOverview } from "@/components/dashboard/index-overview";
 import { PositionsMiniTable } from "@/components/dashboard/positions-mini-table";
 import { DayExtremesCard } from "@/components/dashboard/day-extremes-card";
 import { PpStatusCard } from "@/components/dashboard/pp-status-card";
+import { useRiskConfig } from "@/hooks/use-risk-config";
 
 export function DashboardPage() {
+  // One call per known broker — add a line here when integrating a new broker.
+  useRiskConfig("upstox");
+  useRiskConfig("zerodha");
+  useRiskConfig("dhan");
   const { positions, loading } = usePositionsFeed();
 
   const hasPositions = positions.length > 0;

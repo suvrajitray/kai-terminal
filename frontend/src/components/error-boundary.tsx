@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { AlertTriangle, RefreshCw, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { performLogout } from "@/lib/logout";
 
 interface Props {
   children: ReactNode;
@@ -45,6 +46,10 @@ export class ErrorBoundary extends Component<Props, State> {
               Reload page
             </Button>
             <Button onClick={this.reset}>Try to recover</Button>
+            <Button variant="ghost" className="text-muted-foreground" onClick={performLogout}>
+              <LogOut className="mr-2 size-4" />
+              Sign out & re-login
+            </Button>
           </div>
         </div>
       );

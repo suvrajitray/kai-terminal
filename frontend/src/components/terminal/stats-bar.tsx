@@ -7,10 +7,19 @@ import { PositionCountBadges } from "./position-count-badges";
 import { KeyboardShortcutsHelp } from "./keyboard-shortcuts-help";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useProfitProtectionStore } from "@/stores/profit-protection-store";
 import { useRiskConfig } from "@/hooks/use-risk-config";
+import { useBrokerStore } from "@/stores/broker-store";
+import { BROKERS } from "@/lib/constants";
+import { useShallow } from "zustand/react/shallow";
 import type { Position } from "@/types";
 
+
+export interface PpBrokerEntry {
+  broker: string;
+  target: number;
+  currentSl: number;
+  trailing: boolean;
+}
 
 interface StatsBarProps {
   positions: Position[];
@@ -20,9 +29,7 @@ interface StatsBarProps {
   onRefresh: () => void;
   onExitAll: () => void;
   onOpenProfitProtection: () => void;
-  ppTarget: number | null;
-  ppCurrentSl: number | null;
-  ppTrailing: boolean;
+  ppBrokers: PpBrokerEntry[];
 }
 
 export function StatsBar({
@@ -33,12 +40,15 @@ export function StatsBar({
   onRefresh,
   onExitAll,
   onOpenProfitProtection,
-  ppTarget,
-  ppCurrentSl,
-  ppTrailing,
+  ppBrokers,
 }: StatsBarProps) {
-  const { enabled } = useProfitProtectionStore();
-  const { setEnabled } = useRiskConfig();
+  const connectedBrokers = useBrokerStore(useShallow((s) => BROKERS.filter((b) => s.isAuthenticated(b.id))));
+  const multipleConnected = connectedBrokers.length > 1;
+  // For single-broker: the inline PP toggle controls the active broker's enabled state.
+  // For multi-broker: the inline toggle is hidden; user manages per-broker state in the panel.
+  const singleBroker   = connectedBrokers[0]?.id ?? "upstox";
+  const { setEnabled } = useRiskConfig(singleBroker);
+  const ppEnabled      = ppBrokers.length > 0;
   const { funds, allFunds, loading: fundsLoading } = useFunds();
   const [fundsVisible, setFundsVisible] = useState(
     () => localStorage.getItem("kai-terminal-funds-visible") !== "false"
@@ -114,18 +124,39 @@ export function StatsBar({
         </>
       )}
 
-      {ppTarget !== null && ppCurrentSl !== null && (
+      {ppBrokers.length > 0 && (
         <>
           <div className="h-4 w-px bg-border" />
           <span className="flex items-center gap-2 text-xs">
-            <span className="text-muted-foreground">Target</span>
-            <span className="font-medium tabular-nums text-green-500">
-              ₹{ppTarget.toLocaleString("en-IN")}
-            </span>
-            <span className="text-muted-foreground">{ppTrailing ? "Trail SL" : "SL"}</span>
-            <span className="font-medium tabular-nums text-red-500">
-              ₹{ppCurrentSl.toLocaleString("en-IN")}
-            </span>
+            {ppBrokers.length === 1 ? (
+              // Single enabled broker — no prefix label
+              <>
+                <span className="text-muted-foreground">Target</span>
+                <span className="font-medium tabular-nums text-green-500">
+                  ₹{ppBrokers[0].target.toLocaleString("en-IN")}
+                </span>
+                <span className="text-muted-foreground">{ppBrokers[0].trailing ? "Trail SL" : "SL"}</span>
+                <span className="font-medium tabular-nums text-red-500">
+                  ₹{ppBrokers[0].currentSl.toLocaleString("en-IN")}
+                </span>
+              </>
+            ) : (
+              // Both brokers enabled — show U / Z labelled entries
+              ppBrokers.map((b, i) => (
+                <span key={b.broker} className="flex items-center gap-1.5">
+                  {i > 0 && <span className="text-muted-foreground/40">·</span>}
+                  <span className="text-muted-foreground/60 text-[10px] uppercase">{b.broker[0]}</span>
+                  <span className="text-muted-foreground">Target</span>
+                  <span className="font-medium tabular-nums text-green-500">
+                    ₹{b.target.toLocaleString("en-IN")}
+                  </span>
+                  <span className="text-muted-foreground">{b.trailing ? "Trail SL" : "SL"}</span>
+                  <span className="font-medium tabular-nums text-red-500">
+                    ₹{b.currentSl.toLocaleString("en-IN")}
+                  </span>
+                </span>
+              ))
+            )}
           </span>
         </>
       )}
@@ -180,29 +211,31 @@ export function StatsBar({
           onClick={onOpenProfitProtection}
           className={cn(
             "flex items-center gap-1.5 rounded px-2 py-1 text-xs font-medium transition-colors",
-            enabled
+            ppEnabled
               ? "text-green-500 hover:bg-green-500/10"
               : "text-muted-foreground hover:bg-muted hover:text-foreground",
           )}
-          title={enabled ? "Profit Protection ON — click to configure" : "Click to configure Profit Protection"}
+          title={ppEnabled ? "Profit Protection ON — click to configure" : "Click to configure Profit Protection"}
         >
           <ShieldCheck className="size-3.5" />
           Profit Protection
-          {/* inline toggle dot */}
-          <span
-            onClick={(e) => { e.stopPropagation(); setEnabled(!enabled); }}
-            className={cn(
-              "ml-0.5 inline-flex h-4 w-7 items-center rounded-full border border-transparent transition-colors",
-              enabled ? "bg-green-500" : "bg-muted-foreground/30",
-            )}
-          >
+          {/* inline toggle — only shown for single-broker sessions */}
+          {!multipleConnected && (
             <span
+              onClick={(e) => { e.stopPropagation(); setEnabled(!ppEnabled); }}
               className={cn(
-                "mx-0.5 h-3 w-3 rounded-full bg-white transition-transform",
-                enabled ? "translate-x-3" : "translate-x-0",
+                "ml-0.5 inline-flex h-4 w-7 items-center rounded-full border border-transparent transition-colors",
+                ppEnabled ? "bg-green-500" : "bg-muted-foreground/30",
               )}
-            />
-          </span>
+            >
+              <span
+                className={cn(
+                  "mx-0.5 h-3 w-3 rounded-full bg-white transition-transform",
+                  ppEnabled ? "translate-x-3" : "translate-x-0",
+                )}
+              />
+            </span>
+          )}
         </button>
 
         <div className="h-4 w-px bg-border" />

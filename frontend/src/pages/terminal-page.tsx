@@ -72,9 +72,18 @@ function TerminalPageInner() {
     }
   };
 
-  const pp = useProfitProtectionStore();
-  useRiskConfig(); // load config from API on mount
-  const { currentSl } = useProfitProtection(positions);
+  // Hooks must be called unconditionally — one set per known broker in BROKERS.
+  // When adding a new broker (e.g. "dhan"), add useRiskConfig, useProfitProtection,
+  // getConfig, and one entry in ppBrokers below.
+  useRiskConfig("upstox");
+  useRiskConfig("zerodha");
+  useRiskConfig("dhan");
+  const { currentSl: upstoxSl }  = useProfitProtection(positions, "upstox");
+  const { currentSl: zerodhasl } = useProfitProtection(positions, "zerodha");
+  const { currentSl: dhanSl }    = useProfitProtection(positions, "dhan");
+  const upstoxPp  = useProfitProtectionStore((s) => s.getConfig("upstox"));
+  const zerodhaP  = useProfitProtectionStore((s) => s.getConfig("zerodha"));
+  const dhanPp    = useProfitProtectionStore((s) => s.getConfig("dhan"));
 
   // Keyboard shortcuts: R = refresh, E = exit all (with confirm)
   useEffect(() => {
@@ -127,9 +136,11 @@ function TerminalPageInner() {
         onRefresh={load}
         onExitAll={() => setExitAllConfirmOpen(true)}
         onOpenProfitProtection={() => setPpOpen(true)}
-        ppTarget={pp.enabled ? pp.mtmTarget : null}
-        ppCurrentSl={pp.enabled ? currentSl : null}
-        ppTrailing={pp.enabled && pp.trailingEnabled}
+        ppBrokers={[
+          upstoxPp.enabled ? { broker: "upstox",  target: upstoxPp.mtmTarget, currentSl: upstoxSl,  trailing: upstoxPp.trailingEnabled } : null,
+          zerodhaP.enabled ? { broker: "zerodha", target: zerodhaP.mtmTarget, currentSl: zerodhasl, trailing: zerodhaP.trailingEnabled } : null,
+          dhanPp.enabled   ? { broker: "dhan",    target: dhanPp.mtmTarget,   currentSl: dhanSl,    trailing: dhanPp.trailingEnabled }   : null,
+        ].filter((x): x is NonNullable<typeof x> => x !== null)}
       />
 
       {/* Positions — flex-1, scrollable */}

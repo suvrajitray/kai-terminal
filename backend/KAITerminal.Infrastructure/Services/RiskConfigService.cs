@@ -5,22 +5,23 @@ namespace KAITerminal.Infrastructure.Services;
 
 public interface IRiskConfigService
 {
-    Task<UserRiskConfig?> GetAsync(string username);
-    Task UpsertAsync(string username, UserRiskConfig config);
+    Task<UserRiskConfig?> GetAsync(string username, string brokerType);
+    Task UpsertAsync(string username, string brokerType, UserRiskConfig config);
 }
 
 public sealed class RiskConfigService(AppDbContext db) : IRiskConfigService
 {
-    public Task<UserRiskConfig?> GetAsync(string username) =>
-        db.UserRiskConfigs.FirstOrDefaultAsync(r => r.Username == username);
+    public Task<UserRiskConfig?> GetAsync(string username, string brokerType) =>
+        db.UserRiskConfigs.FirstOrDefaultAsync(r => r.Username == username && r.BrokerType == brokerType);
 
-    public async Task UpsertAsync(string username, UserRiskConfig config)
+    public async Task UpsertAsync(string username, string brokerType, UserRiskConfig config)
     {
-        var existing = await db.UserRiskConfigs.FirstOrDefaultAsync(r => r.Username == username);
+        var existing = await db.UserRiskConfigs.FirstOrDefaultAsync(r => r.Username == username && r.BrokerType == brokerType);
         if (existing is null)
         {
-            config.Username  = username;
-            config.UpdatedAt = DateTime.UtcNow;
+            config.Username   = username;
+            config.BrokerType = brokerType;
+            config.UpdatedAt  = DateTime.UtcNow;
             db.UserRiskConfigs.Add(config);
         }
         else

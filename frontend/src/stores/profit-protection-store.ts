@@ -11,7 +11,7 @@ export interface ProfitProtectionConfig {
   trailBy: number;             // ...raise the SL floor by this much
 }
 
-const defaults: ProfitProtectionConfig = {
+export const defaults: ProfitProtectionConfig = {
   enabled:            false,
   mtmTarget:          Number(import.meta.env.VITE_PP_MTM_TARGET)            || 25000,
   mtmSl:              Number(import.meta.env.VITE_PP_MTM_SL)                || -25000,
@@ -22,19 +22,36 @@ const defaults: ProfitProtectionConfig = {
   trailBy:            Number(import.meta.env.VITE_PP_TRAIL_BY)              || 33,
 };
 
-interface ProfitProtectionState extends ProfitProtectionConfig {
-  isLoaded: boolean;
-  setEnabled: (enabled: boolean) => void;
-  setConfig: (config: Partial<ProfitProtectionConfig>) => void;
-  markLoaded: () => void;
+interface ProfitProtectionState {
+  configs: Record<string, ProfitProtectionConfig>;  // keyed by brokerType ("upstox" | "zerodha")
+  loadedBrokers: string[];                          // replaces single isLoaded boolean
+  getConfig: (broker: string) => ProfitProtectionConfig;
+  setEnabled: (broker: string, enabled: boolean) => void;
+  setConfig: (broker: string, config: Partial<ProfitProtectionConfig>) => void;
+  markLoaded: (broker: string) => void;
   reset: () => void;
 }
 
-export const useProfitProtectionStore = create<ProfitProtectionState>()((set) => ({
-  ...defaults,
-  isLoaded: false,
-  setEnabled: (enabled) => set({ enabled }),
-  setConfig: (config) => set((s) => ({ ...s, ...config })),
-  markLoaded: () => set({ isLoaded: true }),
-  reset: () => set({ ...defaults, isLoaded: false }),
+export const useProfitProtectionStore = create<ProfitProtectionState>()((set, get) => ({
+  configs: {},
+  loadedBrokers: [],
+
+  getConfig: (broker) => get().configs[broker] ?? defaults,
+
+  setEnabled: (broker, enabled) =>
+    set((s) => ({
+      configs: { ...s.configs, [broker]: { ...(s.configs[broker] ?? defaults), enabled } },
+    })),
+
+  setConfig: (broker, config) =>
+    set((s) => ({
+      configs: { ...s.configs, [broker]: { ...(s.configs[broker] ?? defaults), ...config } },
+    })),
+
+  markLoaded: (broker) =>
+    set((s) => ({
+      loadedBrokers: s.loadedBrokers.includes(broker) ? s.loadedBrokers : [...s.loadedBrokers, broker],
+    })),
+
+  reset: () => set({ configs: {}, loadedBrokers: [] }),
 }));

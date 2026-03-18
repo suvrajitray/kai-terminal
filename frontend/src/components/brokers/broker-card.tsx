@@ -8,8 +8,22 @@ import { Button } from "@/components/ui/button";
 import { ConnectBrokerDialog } from "./connect-broker-dialog";
 import { BrokerSettingsDialog } from "./broker-settings-dialog";
 import { useBrokerStore } from "@/stores/broker-store";
-import { UPSTOX_OAUTH_URL } from "@/lib/constants";
-import type { BrokerInfo } from "@/types";
+import { UPSTOX_OAUTH_URL, ZERODHA_OAUTH_URL } from "@/lib/constants";
+import type { BrokerInfo, BrokerCredentials } from "@/types";
+
+function buildAuthUrl(brokerId: string, creds: BrokerCredentials): string {
+  if (brokerId === "zerodha") {
+    const params = new URLSearchParams({ v: "3", api_key: creds.apiKey });
+    return `${ZERODHA_OAUTH_URL}?${params.toString()}`;
+  }
+  // Upstox (and future brokers that use standard OAuth code flow)
+  const params = new URLSearchParams({
+    response_type: "code",
+    client_id: creds.apiKey,
+    redirect_uri: creds.redirectUrl ?? "",
+  });
+  return `${UPSTOX_OAUTH_URL}?${params.toString()}`;
+}
 
 interface BrokerCardProps {
   broker: BrokerInfo;
@@ -24,12 +38,7 @@ export function BrokerCard({ broker }: BrokerCardProps) {
   const handleAuthenticate = () => {
     const creds = getCredentials(broker.id);
     if (!creds) return;
-    const params = new URLSearchParams({
-      response_type: "code",
-      client_id: creds.apiKey,
-      redirect_uri: creds.redirectUrl,
-    });
-    window.location.href = `${UPSTOX_OAUTH_URL}?${params.toString()}`;
+    window.location.href = buildAuthUrl(broker.id, creds);
   };
 
   return (
