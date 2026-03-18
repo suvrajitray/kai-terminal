@@ -113,23 +113,23 @@ public sealed class StreamingRiskWorker : BackgroundService
                 if (tokens.Count > 0)
                 {
                     _logger.LogInformation(
-                        "Subscribing market data for {Count} instrument(s) — userId={UserId}",
-                        tokens.Count, user.UserId);
+                        "Subscribing market data for {Count} instrument(s) — userId={UserId} broker={Broker}",
+                        tokens.Count, user.UserId, user.BrokerType);
                     await marketDataStreamer.SubscribeAsync(tokens, FeedMode.Ltpc);
                 }
             }
 
             _logger.LogInformation(
-                "Streams connected for userId={UserId}; monitoring {Count} open instrument(s)",
-                user.UserId, _cache.GetOpenInstrumentTokens(user.UserId).Count);
+                "Streams connected for userId={UserId} broker={Broker}; monitoring {Count} open instrument(s)",
+                user.UserId, user.BrokerType, _cache.GetOpenInstrumentTokens(user.UserId).Count);
 
             // ── Event handlers ───────────────────────────────────────────────
             portfolioStreamer.UpdateReceived += (_, update) =>
             {
                 if (update.Type is not ("order_update" or "position_update")) return;
                 _logger.LogDebug(
-                    "Portfolio event received: {EventType} for userId={UserId}",
-                    update.Type, user.UserId);
+                    "Portfolio event received: {EventType} for userId={UserId} broker={Broker}",
+                    update.Type, user.UserId, user.BrokerType);
                 _ = Task.Run(() => HandlePortfolioUpdateAsync(user, broker, marketDataStreamer, ct));
             };
 
@@ -139,17 +139,17 @@ public sealed class StreamingRiskWorker : BackgroundService
             };
 
             portfolioStreamer.Reconnecting += (_, _) =>
-                _logger.LogWarning("Portfolio stream reconnecting for userId={UserId}", user.UserId);
+                _logger.LogWarning("Portfolio stream reconnecting for userId={UserId} broker={Broker}", user.UserId, user.BrokerType);
 
             marketDataStreamer.Reconnecting += (_, _) =>
-                _logger.LogWarning("Market data stream reconnecting for userId={UserId}", user.UserId);
+                _logger.LogWarning("Market data stream reconnecting for userId={UserId} broker={Broker}", user.UserId, user.BrokerType);
 
             await Task.Delay(Timeout.InfiniteTimeSpan, ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Streaming session failed for userId={UserId}", user.UserId);
+            _logger.LogError(ex, "Streaming session failed for userId={UserId} broker={Broker}", user.UserId, user.BrokerType);
             throw;
         }
     }
@@ -176,8 +176,8 @@ public sealed class StreamingRiskWorker : BackgroundService
             catch
             {
                 _logger.LogWarning(
-                    "Restarting streaming session for userId={UserId} in {Delay}s",
-                    user.UserId, delaySeconds);
+                    "Restarting streaming session for userId={UserId} broker={Broker} in {Delay}s",
+                    user.UserId, user.BrokerType, delaySeconds);
 
                 try { await Task.Delay(TimeSpan.FromSeconds(delaySeconds), ct); }
                 catch (OperationCanceledException) { return; }
@@ -195,7 +195,7 @@ public sealed class StreamingRiskWorker : BackgroundService
     {
         try
         {
-            _logger.LogDebug("Re-fetching positions after portfolio event for userId={UserId}", user.UserId);
+            _logger.LogDebug("Re-fetching positions after portfolio event for userId={UserId} broker={Broker}", user.UserId, user.BrokerType);
 
             var positions = _cfg.FilterPositions(await broker.GetAllPositionsAsync(ct));
             _cache.UpdatePositions(user.UserId, positions);
@@ -204,8 +204,8 @@ public sealed class StreamingRiskWorker : BackgroundService
             if (tokens.Count > 0)
             {
                 _logger.LogDebug(
-                    "Re-subscribing market data for {Count} instrument(s) — userId={UserId}",
-                    tokens.Count, user.UserId);
+                    "Re-subscribing market data for {Count} instrument(s) — userId={UserId} broker={Broker}",
+                    tokens.Count, user.UserId, user.BrokerType);
                 using (broker.UseToken())
                     await marketDataStreamer.SubscribeAsync(tokens, FeedMode.Ltpc);
             }
@@ -215,7 +215,7 @@ public sealed class StreamingRiskWorker : BackgroundService
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error handling portfolio update for userId={UserId}", user.UserId);
+            _logger.LogError(ex, "Error handling portfolio update for userId={UserId} broker={Broker}", user.UserId, user.BrokerType);
         }
     }
 
@@ -233,7 +233,7 @@ public sealed class StreamingRiskWorker : BackgroundService
 
         if (!CanEvaluateFromLtp(user.UserId))
         {
-            _logger.LogDebug("LTP eval rate-limited for userId={UserId} — skipping", user.UserId);
+            _logger.LogDebug("LTP eval rate-limited for userId={UserId} broker={Broker} — skipping", user.UserId, user.BrokerType);
             return;
         }
 
@@ -244,7 +244,7 @@ public sealed class StreamingRiskWorker : BackgroundService
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during LTP-triggered evaluation for userId={UserId}", user.UserId);
+            _logger.LogError(ex, "Error during LTP-triggered evaluation for userId={UserId} broker={Broker}", user.UserId, user.BrokerType);
         }
     }
 
@@ -254,14 +254,14 @@ public sealed class StreamingRiskWorker : BackgroundService
     {
         if (!CheckTradingWindow())
         {
-            _logger.LogDebug("Skipping evaluation for userId={UserId} — outside trading hours", user.UserId);
+            _logger.LogDebug("Skipping evaluation for userId={UserId} broker={Broker} — outside trading hours", user.UserId, user.BrokerType);
             return;
         }
 
         var gate = _gates.GetOrAdd(user.UserId, _ => new UserGate());
         if (!await gate.Sem.WaitAsync(0, ct))
         {
-            _logger.LogDebug("Evaluation already in progress for userId={UserId} — skipping", user.UserId);
+            _logger.LogDebug("Evaluation already in progress for userId={UserId} broker={Broker} — skipping", user.UserId, user.BrokerType);
             return;
         }
         try

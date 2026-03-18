@@ -154,13 +154,13 @@ Logging__LogLevel__KAITerminal__Upstox=Debug
 
 | Level | Message | Meaning |
 |---|---|---|
-| `Information` | `Starting streaming risk session for userId={UserId}` | Streams are about to connect for this user. |
-| `Information` | `Subscribing market data for {Count} instrument(s) — userId={UserId}` | Initial market data subscription after fetching open positions. |
-| `Information` | `Streams connected for userId={UserId}; monitoring {Count} open instrument(s)` | Both WebSocket streams are live. Risk engine is active for this user. |
-| `Warning` | `Portfolio stream reconnecting for userId={UserId}` | Upstox portfolio WebSocket disconnected; auto-reconnect in progress. |
-| `Warning` | `Market data stream reconnecting for userId={UserId}` | Upstox market data WebSocket disconnected; auto-reconnect in progress. |
-| `Error` | `Streaming session failed for userId={UserId}` | Unhandled exception in the session. The restart wrapper will retry. |
-| `Warning` | `Restarting streaming session for userId={UserId} in {Delay}s` | Session crashed and will restart after the given delay (30s → 60s → 120s → ... → 300s cap). |
+| `Information` | `Starting streaming risk session for userId={UserId} broker={Broker}` | Streams are about to connect for this user. |
+| `Information` | `Subscribing market data for {Count} instrument(s) — userId={UserId} broker={Broker}` | Initial market data subscription after fetching open positions. |
+| `Information` | `Streams connected for userId={UserId} broker={Broker}; monitoring {Count} open instrument(s)` | Both WebSocket streams are live. Risk engine is active for this user. |
+| `Warning` | `Portfolio stream reconnecting for userId={UserId} broker={Broker}` | Upstox portfolio WebSocket disconnected; auto-reconnect in progress. |
+| `Warning` | `Market data stream reconnecting for userId={UserId} broker={Broker}` | Upstox market data WebSocket disconnected; auto-reconnect in progress. |
+| `Error` | `Streaming session failed for userId={UserId} broker={Broker}` | Unhandled exception in the session. The restart wrapper will retry. |
+| `Warning` | `Restarting streaming session for userId={UserId} broker={Broker} in {Delay}s` | Session crashed and will restart after the given delay (30s → 60s → 120s → ... → 300s cap). |
 
 #### Trading window
 
@@ -173,18 +173,19 @@ Logging__LogLevel__KAITerminal__Upstox=Debug
 
 | Level | Message | Meaning |
 |---|---|---|
-| `Debug` | `Portfolio event received: {EventType} for userId={UserId}` | Raw event type from Upstox (`order_update` / `position_update`). Visible only at Debug level. |
-| `Debug` | `Re-fetching positions after portfolio event for userId={UserId}` | REST call about to be made to refresh position cache. |
-| `Debug` | `Re-subscribing market data for {Count} instrument(s) — userId={UserId}` | Market data subscription updated after position refresh. |
-| `Error` | `Error handling portfolio update for userId={UserId}` | Position re-fetch or subscription failed. Includes exception. |
+| `Debug` | `Portfolio event received: {EventType} for userId={UserId} broker={Broker}` | Raw event type from Upstox (`order_update` / `position_update`). Visible only at Debug level. |
+| `Debug` | `Re-fetching positions after portfolio event for userId={UserId} broker={Broker}` | REST call about to be made to refresh position cache. |
+| `Debug` | `Re-subscribing market data for {Count} instrument(s) — userId={UserId} broker={Broker}` | Market data subscription updated after position refresh. |
+| `Error` | `Error handling portfolio update for userId={UserId} broker={Broker}` | Position re-fetch or subscription failed. Includes exception. |
 
 #### LTP tick evaluation
 
 | Level | Message | Meaning |
 |---|---|---|
-| `Debug` | `LTP eval rate-limited for userId={UserId} — skipping` | Tick arrived but the minimum interval (`LtpEvalMinIntervalMs`) has not elapsed since last evaluation. Expected and frequent. |
-| `Debug` | `Evaluation already in progress for userId={UserId} — skipping` | A concurrent evaluation is running; this tick is dropped to avoid double-evaluation. |
-| `Error` | `Error during LTP-triggered evaluation for userId={UserId}` | Evaluation threw unexpectedly. Includes exception. |
+| `Debug` | `LTP eval rate-limited for userId={UserId} broker={Broker} — skipping` | Tick arrived but the minimum interval (`LtpEvalMinIntervalMs`) has not elapsed since last evaluation. Expected and frequent. |
+| `Debug` | `Evaluation already in progress for userId={UserId} broker={Broker} — skipping` | A concurrent evaluation is running; this tick is dropped to avoid double-evaluation. |
+| `Debug` | `Skipping evaluation for userId={UserId} broker={Broker} — outside trading hours` | Evaluation requested but the current time is outside the configured trading window. |
+| `Error` | `Error during LTP-triggered evaluation for userId={UserId} broker={Broker}` | Evaluation threw unexpectedly. Includes exception. |
 
 ---
 
@@ -195,27 +196,27 @@ Logging__LogLevel__KAITerminal__Upstox=Debug
 
 | Level | Message | Meaning |
 |---|---|---|
-| `Information` | `[{UserId}]  PnL={Mtm}  SL={Sl}  Target={Target}  TSL=inactive (activates at {Threshold})` | Normal status line. Trailing SL not yet active. Emitted every evaluation cycle. |
-| `Information` | `[{UserId}]  PnL={Mtm}  Target={Target}  TSL={Stop}` | Normal status line. Trailing SL is active; shows current stop floor. |
-| `Debug` | `Portfolio check skipped for userId={UserId}: already squared off` | User is already exited; no further checks needed. |
+| `Information` | `[{UserId}] [{Broker}]  PnL={Mtm}  SL={Sl}  Target={Target}  TSL=inactive (activates at {Threshold})` | Normal status line. Trailing SL not yet active. Emitted every evaluation cycle. |
+| `Information` | `[{UserId}] [{Broker}]  PnL={Mtm}  Target={Target}  TSL={Stop}` | Normal status line. Trailing SL is active; shows current stop floor. |
+| `Debug` | `Portfolio check skipped for userId={UserId} broker={Broker}: already squared off` | User is already exited; no further checks needed. |
 
 #### Risk triggers
 
 | Level | Message | Meaning |
 |---|---|---|
-| `Warning` | `Hard SL hit for userId={UserId}  MTM={Mtm}  SL={Sl} — exiting all positions` | MTM fell to or below the hard stop loss. Exit sequence initiated. |
-| `Information` | `Target hit for userId={UserId}  MTM={Mtm}  Target={Target} — exiting all positions` | MTM reached the profit target. Exit sequence initiated. |
-| `Information` | `Trailing SL activated for userId={UserId}  stop locked at={Stop}` | MTM crossed `TrailingActivateAt`; trailing floor is now live. |
-| `Information` | `Trailing SL raised for userId={UserId}  stop={Stop}` | MTM advanced by `WhenProfitIncreasesBy`; trailing floor stepped up. |
-| `Warning` | `Trailing SL hit for userId={UserId}  MTM={Mtm}  stop={Stop} — exiting all positions` | MTM fell back to the trailing floor. Exit sequence initiated. |
+| `Warning` | `Hard SL hit for userId={UserId} broker={Broker}  MTM={Mtm}  SL={Sl} — exiting all positions` | MTM fell to or below the hard stop loss. Exit sequence initiated. |
+| `Information` | `Target hit for userId={UserId} broker={Broker}  MTM={Mtm}  Target={Target} — exiting all positions` | MTM reached the profit target. Exit sequence initiated. |
+| `Information` | `Trailing SL activated for userId={UserId} broker={Broker}  stop locked at={Stop}` | MTM crossed `TrailingActivateAt`; trailing floor is now live. |
+| `Information` | `Trailing SL raised for userId={UserId} broker={Broker}  stop={Stop}` | MTM advanced by `WhenProfitIncreasesBy`; trailing floor stepped up. |
+| `Warning` | `Trailing SL hit for userId={UserId} broker={Broker}  MTM={Mtm}  stop={Stop} — exiting all positions` | MTM fell back to the trailing floor. Exit sequence initiated. |
 
 #### Square-off
 
 | Level | Message | Meaning |
 |---|---|---|
-| `Warning` | `Square-off complete for userId={UserId} — all positions exited` | `ExitAllPositionsAsync` succeeded. All positions should be closed. |
-| `Error` | `Failed to exit all positions for userId={UserId} — marked as squared-off to prevent retry loops; manual verification required` | Exit order call failed. The user is **marked as squared-off** to prevent infinite retries. **Operator must verify manually** — positions may be partially or fully open. |
-| `Warning` | `Portfolio check: failed to fetch MTM for userId={UserId}` | REST call to get positions failed. This evaluation cycle is skipped entirely; risk checks do not run. |
+| `Warning` | `Square-off complete for userId={UserId} broker={Broker} — all positions exited` | `ExitAllPositionsAsync` succeeded. All positions should be closed. |
+| `Error` | `Failed to exit all positions for userId={UserId} broker={Broker} — marked as squared-off to prevent retry loops; manual verification required` | Exit order call failed. The user is **marked as squared-off** to prevent infinite retries. **Operator must verify manually** — positions may be partially or fully open. |
+| `Warning` | `Portfolio check: failed to fetch MTM for userId={UserId} broker={Broker}` | REST call to get positions failed. This evaluation cycle is skipped entirely; risk checks do not run. |
 
 ---
 
@@ -238,6 +239,16 @@ Logging__LogLevel__KAITerminal__Upstox=Debug
 | `Warning` | `Market data stream reconnect attempt {Attempt}/{Max} failed` | A reconnect attempt failed. Will retry up to `MaxReconnectAttempts`. Includes exception. |
 | `Error` | `Market data stream failed to reconnect after {Max} attempt(s) — stream permanently disconnected` | All reconnect attempts exhausted. LTP ticks stop; risk evaluations will use stale cached values. Restart required. |
 | `Warning` | `Failed to parse market data frame ({Length} bytes)` | Received a protobuf binary frame that could not be decoded. The frame is dropped. Repeated occurrences may indicate a proto schema mismatch. |
+
+---
+
+### `MasterDataService`
+**Namespace:** `KAITerminal.Api.Services.MasterDataService`
+
+| Level | Message | Meaning |
+|---|---|---|
+| `Information` | `MasterData cache hit for broker={Broker}` | Contracts returned from `IMemoryCache` — no broker API call made. |
+| `Information` | `MasterData cache miss for broker={Broker}, fetching from broker API` | Cache entry absent or expired; fetching fresh contracts from the broker. Cache is populated and expires at 8:15 AM IST. |
 
 ---
 

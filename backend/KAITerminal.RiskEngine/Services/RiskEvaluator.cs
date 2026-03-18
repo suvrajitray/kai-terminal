@@ -44,7 +44,9 @@ public sealed class RiskEvaluator
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Portfolio check: failed to fetch MTM for userId={UserId}", userId);
+            _logger.LogWarning(ex,
+                "Portfolio check: failed to fetch MTM for userId={UserId} broker={Broker}",
+                userId, config.BrokerType);
             return;
         }
 
@@ -59,7 +61,9 @@ public sealed class RiskEvaluator
 
         if (state.IsSquaredOff)
         {
-            _logger.LogDebug("Portfolio check skipped for userId={UserId}: already squared off", userId);
+            _logger.LogDebug(
+                "Portfolio check skipped for userId={UserId} broker={Broker}: already squared off",
+                userId, config.BrokerType);
             return;
         }
 
@@ -69,9 +73,9 @@ public sealed class RiskEvaluator
         if (mtm <= config.MtmSl)
         {
             _logger.LogWarning(
-                "Hard SL hit for userId={UserId}  MTM={Mtm:+0;-0}  SL={Sl:+0;-0} — exiting all positions",
-                userId, mtm, config.MtmSl);
-            await SquareOffAsync(userId, state, broker, ct);
+                "Hard SL hit for userId={UserId} broker={Broker}  MTM={Mtm:+0;-0}  SL={Sl:+0;-0} — exiting all positions",
+                userId, config.BrokerType, mtm, config.MtmSl);
+            await SquareOffAsync(userId, config.BrokerType, state, broker, ct);
             return;
         }
 
@@ -79,9 +83,9 @@ public sealed class RiskEvaluator
         if (mtm >= config.MtmTarget)
         {
             _logger.LogInformation(
-                "Target hit for userId={UserId}  MTM={Mtm:+0;-0}  Target={Target:+0} — exiting all positions",
-                userId, mtm, config.MtmTarget);
-            await SquareOffAsync(userId, state, broker, ct);
+                "Target hit for userId={UserId} broker={Broker}  MTM={Mtm:+0;-0}  Target={Target:+0} — exiting all positions",
+                userId, config.BrokerType, mtm, config.MtmTarget);
+            await SquareOffAsync(userId, config.BrokerType, state, broker, ct);
             return;
         }
 
@@ -97,8 +101,8 @@ public sealed class RiskEvaluator
                 state.TrailingLastTrigger = mtm;
                 _repo.Update(userId, state);
                 _logger.LogInformation(
-                    "Trailing SL activated for userId={UserId}  stop locked at={Stop:+0;-0}",
-                    userId, state.TrailingStop);
+                    "Trailing SL activated for userId={UserId} broker={Broker}  stop locked at={Stop:+0;-0}",
+                    userId, config.BrokerType, state.TrailingStop);
             }
         }
         else
@@ -111,16 +115,16 @@ public sealed class RiskEvaluator
                 state.TrailingLastTrigger += steps * config.WhenProfitIncreasesBy;
                 _repo.Update(userId, state);
                 _logger.LogInformation(
-                    "Trailing SL raised for userId={UserId}  stop={Stop:+0;-0}",
-                    userId, state.TrailingStop);
+                    "Trailing SL raised for userId={UserId} broker={Broker}  stop={Stop:+0;-0}",
+                    userId, config.BrokerType, state.TrailingStop);
             }
 
             if (mtm <= state.TrailingStop)
             {
                 _logger.LogWarning(
-                    "Trailing SL hit for userId={UserId}  MTM={Mtm:+0;-0}  stop={Stop:+0;-0} — exiting all positions",
-                    userId, mtm, state.TrailingStop);
-                await SquareOffAsync(userId, state, broker, ct);
+                    "Trailing SL hit for userId={UserId} broker={Broker}  MTM={Mtm:+0;-0}  stop={Stop:+0;-0} — exiting all positions",
+                    userId, config.BrokerType, mtm, state.TrailingStop);
+                await SquareOffAsync(userId, config.BrokerType, state, broker, ct);
             }
         }
     }
@@ -130,34 +134,36 @@ public sealed class RiskEvaluator
         if (state.TrailingActive)
         {
             _logger.LogInformation(
-                "[{UserId}]  PnL={Mtm:+0;-0}  Target={Target:+0}  TSL={Stop:+0;-0}",
-                userId, mtm, config.MtmTarget, state.TrailingStop);
+                "[{UserId}] [{Broker}]  PnL={Mtm:+0;-0}  Target={Target:+0}  TSL={Stop:+0;-0}",
+                userId, config.BrokerType, mtm, config.MtmTarget, state.TrailingStop);
         }
         else
         {
             _logger.LogInformation(
-                "[{UserId}]  PnL={Mtm:+0;-0}  SL={Sl:0}  Target={Target:+0}  TSL=inactive (activates at {Threshold:+0})",
-                userId, mtm, config.MtmSl, config.MtmTarget, config.TrailingActivateAt);
+                "[{UserId}] [{Broker}]  PnL={Mtm:+0;-0}  SL={Sl:0}  Target={Target:+0}  TSL=inactive (activates at {Threshold:+0})",
+                userId, config.BrokerType, mtm, config.MtmSl, config.MtmTarget, config.TrailingActivateAt);
         }
     }
 
     private async Task SquareOffAsync(
-        string userId, UserRiskState state, IBrokerClient broker, CancellationToken ct)
+        string userId, string brokerType, UserRiskState state, IBrokerClient broker, CancellationToken ct)
     {
         try
         {
             await broker.ExitAllPositionsAsync(ct: ct);
             state.IsSquaredOff = true;
             _repo.Update(userId, state);
-            _logger.LogWarning("Square-off complete for userId={UserId} — all positions exited", userId);
+            _logger.LogWarning(
+                "Square-off complete for userId={UserId} broker={Broker} — all positions exited",
+                userId, brokerType);
         }
         catch (Exception ex)
         {
             state.IsSquaredOff = true;
             _repo.Update(userId, state);
             _logger.LogError(ex,
-                "Failed to exit all positions for userId={UserId} — marked as squared-off to prevent retry loops; manual verification required",
-                userId);
+                "Failed to exit all positions for userId={UserId} broker={Broker} — marked as squared-off to prevent retry loops; manual verification required",
+                userId, brokerType);
         }
     }
 }
