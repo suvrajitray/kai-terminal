@@ -15,10 +15,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- IBrokerClientFactory, IBrokerClient — also transitively pulls in KAITerminal.Upstox -->
+    <!-- IBrokerClientFactory, IBrokerClient -->
     <ProjectReference Include="..\KAITerminal.Broker\KAITerminal.Broker.csproj" />
-    <!-- Explicit reference for FeedMode, IMarketDataStreamer, IPortfolioStreamer -->
-    <ProjectReference Include="..\KAITerminal.Upstox\KAITerminal.Upstox.csproj" />
+    <!-- Contracts: Position, streaming interfaces -->
+    <ProjectReference Include="..\KAITerminal.Contracts\KAITerminal.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

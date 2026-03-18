@@ -1,4 +1,4 @@
-using KAITerminal.Upstox.Models.Responses;
+using KAITerminal.Contracts.Domain;
 
 namespace KAITerminal.RiskEngine.Abstractions;
 
@@ -24,7 +24,7 @@ public interface IPositionCache
 
     /// <summary>
     /// Computes total MTM using cached positions and live LTP values.
-    /// Formula per position: <c>quantity * (effectiveLtp - avgPrice) + realised</c>.
+    /// Formula per position: <c>pnl + quantity * (liveLtp - ltp)</c>.
     /// </summary>
     decimal GetMtm(string userId);
 

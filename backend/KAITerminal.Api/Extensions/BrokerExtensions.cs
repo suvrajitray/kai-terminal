@@ -1,10 +1,13 @@
 using KAITerminal.Api.Services;
 using KAITerminal.Broker;
 using KAITerminal.Broker.Adapters;
+using KAITerminal.Contracts.Broker;
 using KAITerminal.Upstox;
 using KAITerminal.Upstox.Extensions;
+using KAITerminal.Upstox.Options;
 using KAITerminal.Zerodha;
 using KAITerminal.Zerodha.Extensions;
+using KAITerminal.Zerodha.Options;
 
 namespace KAITerminal.Api.Extensions;
 
@@ -31,6 +34,10 @@ public static class BrokerExtensions
 
             return new BrokerClientFactory(creators);
         });
+
+        // Register broker-agnostic option contract providers
+        services.AddSingleton<IOptionContractProvider, UpstoxOptionContractProvider>();
+        services.AddSingleton<IOptionContractProvider, ZerodhaOptionContractProvider>();
 
         services.AddScoped<BrokerCredentialService>();
         services.AddScoped<IAiSentimentService, AiSentimentService>();

@@ -1,4 +1,4 @@
-using KAITerminal.Upstox.Models.Responses;
+using KAITerminal.Contracts.Domain;
 
 namespace KAITerminal.Zerodha.Services;
 

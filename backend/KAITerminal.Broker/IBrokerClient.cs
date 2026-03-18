@@ -1,5 +1,5 @@
-using KAITerminal.Upstox.Models.Responses;
-using KAITerminal.Upstox.Services;
+using KAITerminal.Contracts.Domain;
+using KAITerminal.Contracts.Streaming;
 
 namespace KAITerminal.Broker;
 

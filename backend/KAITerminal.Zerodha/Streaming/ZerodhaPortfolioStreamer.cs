@@ -1,5 +1,4 @@
-using KAITerminal.Upstox.Models.WebSocket;
-using KAITerminal.Upstox.Services;
+using KAITerminal.Contracts.Streaming;
 using Microsoft.Extensions.Logging;
 
 namespace KAITerminal.Zerodha.Streaming;
@@ -20,14 +19,11 @@ public sealed class ZerodhaPortfolioStreamer : IPortfolioStreamer
     public bool IsConnected { get; private set; }
 
 #pragma warning disable CS0067  // Events intentionally unused in stub
-    public event EventHandler? Connected;
-    public event EventHandler<Exception?>? Disconnected;
+    public event EventHandler<PortfolioUpdate>? UpdateReceived;
     public event EventHandler? Reconnecting;
-    public event EventHandler? AutoReconnectStopped;
-    public event EventHandler<PortfolioStreamUpdate>? UpdateReceived;
 #pragma warning restore CS0067
 
-    public Task ConnectAsync(IEnumerable<UpdateType>? updateTypes = null, CancellationToken ct = default)
+    public Task ConnectAsync(CancellationToken ct)
     {
         _logger.LogWarning(
             "ZerodhaPortfolioStreamer: Portfolio streaming is not yet implemented. " +

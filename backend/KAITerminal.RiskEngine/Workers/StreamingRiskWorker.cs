@@ -1,12 +1,11 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using KAITerminal.Broker;
+using KAITerminal.Contracts.Streaming;
 using KAITerminal.RiskEngine.Abstractions;
 using KAITerminal.RiskEngine.Configuration;
 using KAITerminal.RiskEngine.Models;
 using KAITerminal.RiskEngine.Services;
-using KAITerminal.Upstox.Models.WebSocket;
-using KAITerminal.Upstox.Services;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -107,7 +106,7 @@ public sealed class StreamingRiskWorker : BackgroundService
             // ── Connect streamers (token context needed for WebSocket auth) ───
             using (broker.UseToken())
             {
-                await portfolioStreamer.ConnectAsync(null, ct);
+                await portfolioStreamer.ConnectAsync(ct);
                 await marketDataStreamer.ConnectAsync(ct);
 
                 if (tokens.Count > 0)
@@ -126,16 +125,16 @@ public sealed class StreamingRiskWorker : BackgroundService
             // ── Event handlers ───────────────────────────────────────────────
             portfolioStreamer.UpdateReceived += (_, update) =>
             {
-                if (update.Type is not ("order_update" or "position_update")) return;
+                if (update.UpdateType is not ("order_update" or "position_update")) return;
                 _logger.LogDebug(
                     "Portfolio event received: {EventType} for userId={UserId} broker={Broker}",
-                    update.Type, user.UserId, user.BrokerType);
+                    update.UpdateType, user.UserId, user.BrokerType);
                 _ = Task.Run(() => HandlePortfolioUpdateAsync(user, broker, marketDataStreamer, ct));
             };
 
-            marketDataStreamer.FeedReceived += (_, msg) =>
+            marketDataStreamer.FeedReceived += (_, update) =>
             {
-                _ = Task.Run(() => HandleLtpTickAsync(user, broker, msg, ct));
+                _ = Task.Run(() => HandleLtpTickAsync(user, broker, update, ct));
             };
 
             portfolioStreamer.Reconnecting += (_, _) =>
@@ -222,14 +221,10 @@ public sealed class StreamingRiskWorker : BackgroundService
     // ── LTP tick handler ─────────────────────────────────────────────────────
 
     private async Task HandleLtpTickAsync(
-        UserConfig user, IBrokerClient broker, MarketDataMessage msg, CancellationToken ct)
+        UserConfig user, IBrokerClient broker, LtpUpdate update, CancellationToken ct)
     {
-        foreach (var (token, feed) in msg.Instruments)
-        {
-            var ltp = feed.Ltpc?.Ltp ?? feed.Full?.Ltpc?.Ltp ?? feed.OptionGreeks?.Ltpc?.Ltp;
-            if (ltp.HasValue)
-                _cache.UpdateLtp(user.UserId, token, ltp.Value);
-        }
+        foreach (var (token, ltp) in update.Ltps)
+            _cache.UpdateLtp(user.UserId, token, ltp);
 
         if (!CanEvaluateFromLtp(user.UserId))
         {

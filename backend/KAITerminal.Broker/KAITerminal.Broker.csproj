@@ -11,8 +11,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Position, IMarketDataStreamer, IPortfolioStreamer live in Upstox for now -->
-    <ProjectReference Include="..\KAITerminal.Upstox\KAITerminal.Upstox.csproj" />
+    <ProjectReference Include="..\KAITerminal.Contracts\KAITerminal.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

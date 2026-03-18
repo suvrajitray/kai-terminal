@@ -21,6 +21,8 @@
   <ItemGroup>
     <!-- IBrokerClient, BrokerFunds, etc. -->
     <ProjectReference Include="..\KAITerminal.Broker\KAITerminal.Broker.csproj" />
+    <!-- Contracts types: Position, streaming interfaces -->
+    <ProjectReference Include="..\KAITerminal.Contracts\KAITerminal.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

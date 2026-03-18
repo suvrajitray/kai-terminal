@@ -1,7 +1,6 @@
+using KAITerminal.Contracts.Streaming;
 using KAITerminal.Upstox;
 using KAITerminal.Upstox.Models.Responses;
-using KAITerminal.Upstox.Models.WebSocket;
-using KAITerminal.Upstox.Services;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 
@@ -45,14 +44,14 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
         {
             _portfolio = _upstox.CreatePortfolioStreamer();
             _marketData = _upstox.CreateMarketDataStreamer();
-            await _portfolio.ConnectAsync([UpdateType.Order, UpdateType.Position], ct);
+            await _portfolio.ConnectAsync(ct);
             await _marketData.ConnectAsync(ct);
         }
 
         var instrumentKeys = GetInstrumentKeys(initialPositions);
         if (instrumentKeys.Count > 0)
             using (UpstoxTokenContext.Use(_token))
-                await _marketData.SubscribeAsync(instrumentKeys, FeedMode.Ltpc, ct);
+                await _marketData.SubscribeAsync(instrumentKeys, FeedMode.Ltpc);
 
         _portfolio.UpdateReceived += OnPortfolioUpdate;
         _marketData.FeedReceived += OnFeedReceived;
@@ -60,13 +59,13 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
 
     // ── Event handlers ─────────────────────────────────────────────────────
 
-    private void OnPortfolioUpdate(object? sender, PortfolioStreamUpdate update)
+    private void OnPortfolioUpdate(object? sender, PortfolioUpdate update)
     {
-        if (update.Type is not ("order" or "position")) return;
+        if (update.UpdateType is not ("order" or "position")) return;
         _ = Task.Run(() => HandlePortfolioUpdateAsync(update));
     }
 
-    private async Task HandlePortfolioUpdateAsync(PortfolioStreamUpdate update)
+    private async Task HandlePortfolioUpdateAsync(PortfolioUpdate update)
     {
         try
         {
@@ -77,7 +76,7 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
             fresh = ApplyFilter(fresh);
             await _hubContext.Clients.Client(_connectionId).SendAsync("ReceivePositions", fresh);
 
-            if (update.Type == "order")
+            if (update.UpdateType == "order")
             {
                 _logger.LogInformation(
                     "Sending ReceiveOrderUpdate: orderId={OrderId} status={Status} symbol={Symbol}",
@@ -102,23 +101,17 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
         }
     }
 
-    private void OnFeedReceived(object? sender, MarketDataMessage msg)
+    private void OnFeedReceived(object? sender, LtpUpdate update)
     {
-        _ = Task.Run(() => HandleFeedAsync(msg));
+        _ = Task.Run(() => HandleFeedAsync(update));
     }
 
-    private async Task HandleFeedAsync(MarketDataMessage msg)
+    private async Task HandleFeedAsync(LtpUpdate update)
     {
         try
         {
-            var updates = msg.Instruments
-                .Select(kvp => new
-                {
-                    instrumentToken = kvp.Key,
-                    ltp = kvp.Value.Ltpc?.Ltp ?? kvp.Value.Full?.Ltpc?.Ltp ?? kvp.Value.OptionGreeks?.Ltpc?.Ltp
-                })
-                .Where(x => x.ltp.HasValue)
-                .Select(x => new { x.instrumentToken, ltp = x.ltp!.Value })
+            var updates = update.Ltps
+                .Select(kvp => new { instrumentToken = kvp.Key, ltp = kvp.Value })
                 .ToList();
 
             if (updates.Count > 0)

@@ -1,4 +1,4 @@
-using KAITerminal.Upstox.Models.Responses;
+using KAITerminal.Contracts.Domain;
 using KAITerminal.Zerodha.Http;
 
 namespace KAITerminal.Zerodha.Services;
@@ -52,14 +52,14 @@ public sealed class ZerodhaPositionService : IZerodhaPositionService
 
         if (pos is null || pos.Quantity == 0) return;
 
-        var txType   = pos.Quantity > 0 ? "SELL" : "BUY";
-        var quantity = Math.Abs(pos.Quantity);
+        var txType      = pos.Quantity > 0 ? "SELL" : "BUY";
+        var quantity    = Math.Abs(pos.Quantity);
         var kiteProduct = MapProductBack(product);
         await _http.PlaceOrderAsync(pos.TradingSymbol, pos.Exchange, txType, kiteProduct, "MARKET", quantity, null, ct);
     }
 
-    /// <summary>Map Upstox product back to Kite product code.</summary>
-    private static string MapProductBack(string upstoxProduct) => upstoxProduct.ToUpperInvariant() switch
+    /// <summary>Map unified product codes back to Kite product codes for order placement.</summary>
+    private static string MapProductBack(string product) => product.ToUpperInvariant() switch
     {
         "I"   => "MIS",
         "D"   => "CNC",

@@ -3,8 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using KAITerminal.Broker;
-using KAITerminal.Upstox.Models.Responses;
+using KAITerminal.Contracts.Domain;
 
 namespace KAITerminal.Zerodha.Http;
 
@@ -75,12 +74,12 @@ public sealed class ZerodhaHttpClient
 
         var form = new Dictionary<string, string>
         {
-            ["tradingsymbol"]   = tradingSymbol,
-            ["exchange"]        = exchange,
+            ["tradingsymbol"]    = tradingSymbol,
+            ["exchange"]         = exchange,
             ["transaction_type"] = transactionType.ToUpperInvariant(),
-            ["product"]         = product.ToUpperInvariant(),
-            ["order_type"]      = orderType.ToUpperInvariant(),
-            ["quantity"]        = quantity.ToString(),
+            ["product"]          = product.ToUpperInvariant(),
+            ["order_type"]       = orderType.ToUpperInvariant(),
+            ["quantity"]         = quantity.ToString(),
         };
 
         if (orderType.Equals("LIMIT", StringComparison.OrdinalIgnoreCase) && price.HasValue)
@@ -148,19 +147,19 @@ public sealed class ZerodhaHttpClient
         TradingSymbol   = p.TradingSymbol ?? "",
         Product         = MapProduct(p.Product),
         Quantity        = p.Quantity,
-        Multiplier      = p.Multiplier,
         AveragePrice    = p.AveragePrice,
-        LastPrice       = p.LastPrice,
+        Ltp             = p.LastPrice,
         Pnl             = p.Pnl,
         Unrealised      = p.Unrealised,
         Realised        = p.Realised,
         BuyPrice        = p.BuyPrice,
         SellPrice       = p.SellPrice,
-        DayBuyQuantity  = p.DayBuyQuantity,
-        DaySellQuantity = p.DaySellQuantity,
+        BuyQuantity     = p.DayBuyQuantity,
+        SellQuantity    = p.DaySellQuantity,
+        Broker          = "zerodha",
     };
 
-    /// <summary>Normalise Zerodha product codes to Upstox equivalents.</summary>
+    /// <summary>Normalise Zerodha product codes to unified broker codes.</summary>
     private static string MapProduct(string? zerodhaProduct) => zerodhaProduct?.ToUpperInvariant() switch
     {
         "MIS"  => "I",
@@ -187,21 +186,21 @@ public sealed class ZerodhaHttpClient
 
     private sealed class KiteNetPosition
     {
-        [JsonPropertyName("tradingsymbol")]    public string?  TradingSymbol   { get; init; }
-        [JsonPropertyName("exchange")]         public string?  Exchange        { get; init; }
-        [JsonPropertyName("instrument_token")] public long     InstrumentToken { get; init; }
-        [JsonPropertyName("product")]          public string?  Product         { get; init; }
-        [JsonPropertyName("quantity")]         public int      Quantity        { get; init; }
-        [JsonPropertyName("multiplier")]       public decimal  Multiplier      { get; init; } = 1;
-        [JsonPropertyName("average_price")]    public decimal  AveragePrice    { get; init; }
-        [JsonPropertyName("last_price")]       public decimal  LastPrice       { get; init; }
-        [JsonPropertyName("pnl")]              public decimal  Pnl             { get; init; }
-        [JsonPropertyName("unrealised")]       public decimal  Unrealised      { get; init; }
-        [JsonPropertyName("realised")]         public decimal  Realised        { get; init; }
-        [JsonPropertyName("buy_price")]        public decimal  BuyPrice        { get; init; }
-        [JsonPropertyName("sell_price")]       public decimal  SellPrice       { get; init; }
-        [JsonPropertyName("day_buy_quantity")] public int      DayBuyQuantity  { get; init; }
-        [JsonPropertyName("day_sell_quantity")] public int     DaySellQuantity { get; init; }
+        [JsonPropertyName("tradingsymbol")]     public string?  TradingSymbol   { get; init; }
+        [JsonPropertyName("exchange")]          public string?  Exchange        { get; init; }
+        [JsonPropertyName("instrument_token")]  public long     InstrumentToken { get; init; }
+        [JsonPropertyName("product")]           public string?  Product         { get; init; }
+        [JsonPropertyName("quantity")]          public int      Quantity        { get; init; }
+        [JsonPropertyName("multiplier")]        public decimal  Multiplier      { get; init; } = 1;
+        [JsonPropertyName("average_price")]     public decimal  AveragePrice    { get; init; }
+        [JsonPropertyName("last_price")]        public decimal  LastPrice       { get; init; }
+        [JsonPropertyName("pnl")]               public decimal  Pnl             { get; init; }
+        [JsonPropertyName("unrealised")]        public decimal  Unrealised      { get; init; }
+        [JsonPropertyName("realised")]          public decimal  Realised        { get; init; }
+        [JsonPropertyName("buy_price")]         public decimal  BuyPrice        { get; init; }
+        [JsonPropertyName("sell_price")]        public decimal  SellPrice       { get; init; }
+        [JsonPropertyName("day_buy_quantity")]  public int      DayBuyQuantity  { get; init; }
+        [JsonPropertyName("day_sell_quantity")] public int      DaySellQuantity { get; init; }
     }
 
     private sealed class KiteMarginsData
@@ -219,17 +218,17 @@ public sealed class ZerodhaHttpClient
 
     private sealed class KiteAvailableMargins
     {
-        [JsonPropertyName("live_balance")]   public decimal LiveBalance   { get; init; }
-        [JsonPropertyName("cash")]           public decimal Cash          { get; init; }
-        [JsonPropertyName("collateral")]     public decimal Collateral    { get; init; }
+        [JsonPropertyName("live_balance")] public decimal LiveBalance { get; init; }
+        [JsonPropertyName("cash")]         public decimal Cash        { get; init; }
+        [JsonPropertyName("collateral")]   public decimal Collateral  { get; init; }
     }
 
     private sealed class KiteUtilisedMargins
     {
-        [JsonPropertyName("m2m_unrealised")] public decimal M2mUnrealised  { get; init; }
-        [JsonPropertyName("debits")]         public decimal Debits         { get; init; }
-        [JsonPropertyName("exposure")]       public decimal Exposure       { get; init; }
-        [JsonPropertyName("option_premium")] public decimal OptionPremium  { get; init; }
+        [JsonPropertyName("m2m_unrealised")] public decimal M2mUnrealised { get; init; }
+        [JsonPropertyName("debits")]         public decimal Debits        { get; init; }
+        [JsonPropertyName("exposure")]       public decimal Exposure      { get; init; }
+        [JsonPropertyName("option_premium")] public decimal OptionPremium { get; init; }
     }
 
     private sealed class KiteOrderData

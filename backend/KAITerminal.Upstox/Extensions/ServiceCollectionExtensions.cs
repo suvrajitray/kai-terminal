@@ -1,3 +1,4 @@
+using KAITerminal.Contracts.Streaming;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using KAITerminal.Upstox.Configuration;
@@ -12,20 +13,6 @@ public static class ServiceCollectionExtensions
     /// Registers the Upstox SDK services with the DI container.
     /// Reads configuration from <c>IConfiguration</c> section "Upstox".
     /// </summary>
-    /// <example>
-    /// appsettings.json:
-    /// <code>
-    /// {
-    ///   "Upstox": {
-    ///     "AccessToken": "your_daily_token_here"
-    ///   }
-    /// }
-    /// </code>
-    /// Program.cs:
-    /// <code>
-    /// builder.Services.AddUpstoxSdk(builder.Configuration);
-    /// </code>
-    /// </example>
     public static IServiceCollection AddUpstoxSdk(
         this IServiceCollection services,
         IConfiguration configuration)
@@ -48,12 +35,8 @@ public static class ServiceCollectionExtensions
     private static IServiceCollection RegisterCore(
         IServiceCollection services, IConfiguration? configuration)
     {
-        // UpstoxAuthHandler injects the Bearer token per request.
-        // It reads from UpstoxTokenContext.Current first (per-call override),
-        // then falls back to UpstoxConfig.AccessToken (config / worker-service default).
         services.AddTransient<UpstoxAuthHandler>();
 
-        // Plain client for the token endpoint — no Bearer injection.
         services.AddHttpClient("UpstoxAuth", (sp, client) =>
         {
             var cfg = ResolveConfig(sp);
@@ -87,9 +70,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IMarginService, MarginService>();
         services.AddSingleton<IFundsService, FundsService>();
 
-        // Streamers are stateful (own a WebSocket connection) — Transient gives each caller
-        // its own independent instance.  The Func<T> factory delegates let UpstoxClient create
-        // new streamers on demand without holding a stateful singleton itself.
+        // Streamers implement Contracts.Streaming interfaces — Transient so each caller gets
+        // its own independent WebSocket connection.
         services.AddTransient<IMarketDataStreamer, MarketDataStreamer>();
         services.AddTransient<IPortfolioStreamer, PortfolioStreamer>();
         services.AddSingleton<Func<IMarketDataStreamer>>(sp => () => sp.GetRequiredService<IMarketDataStreamer>());

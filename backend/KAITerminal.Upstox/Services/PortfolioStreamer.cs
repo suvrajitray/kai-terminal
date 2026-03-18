@@ -1,6 +1,7 @@
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using KAITerminal.Contracts.Streaming;
 using KAITerminal.Upstox;
 using KAITerminal.Upstox.Configuration;
 using KAITerminal.Upstox.Http;
@@ -16,25 +17,27 @@ internal sealed class PortfolioStreamer : IPortfolioStreamer
     private readonly UpstoxConfig _config;
     private readonly ILogger<PortfolioStreamer> _logger;
 
-    private IEnumerable<UpdateType>? _capturedUpdateTypes; // captured at ConnectAsync; never mutated after
     private ClientWebSocket? _ws;
     private CancellationTokenSource? _cts;
     private Task _receiveLoop = Task.CompletedTask;
     private bool _disposed;
-    private string? _capturedToken; // token active at ConnectAsync time; restored during auto-reconnect
+    private string? _capturedToken;
+
+    private static readonly IEnumerable<UpdateType> DefaultUpdateTypes =
+        [UpdateType.Order, UpdateType.Position];
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
 
-    public bool IsConnected => _ws?.State == WebSocketState.Open;
+    public event EventHandler<PortfolioUpdate>? UpdateReceived;
+    public event EventHandler? Reconnecting;
 
+    // Additional Upstox-specific events kept on the implementation (not in Contracts interface)
     public event EventHandler? Connected;
     public event EventHandler<Exception?>? Disconnected;
-    public event EventHandler? Reconnecting;
     public event EventHandler? AutoReconnectStopped;
-    public event EventHandler<PortfolioStreamUpdate>? UpdateReceived;
 
     public PortfolioStreamer(UpstoxHttpClient http, IOptions<UpstoxConfig> options, ILogger<PortfolioStreamer> logger)
     {
@@ -44,18 +47,18 @@ internal sealed class PortfolioStreamer : IPortfolioStreamer
     }
 
     // ──────────────────────────────────────────────────
-    // Public API
+    // IPortfolioStreamer (Contracts)
     // ──────────────────────────────────────────────────
 
-    public async Task ConnectAsync(IEnumerable<UpdateType>? updateTypes = null, CancellationToken ct = default)
+    public async Task ConnectAsync(CancellationToken ct)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _capturedToken = UpstoxTokenContext.Current; // capture so reconnects reuse the same token
-        _capturedUpdateTypes = updateTypes;           // capture so reconnects use the same subscriptions
+        _capturedToken = UpstoxTokenContext.Current;
         _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
 
-        var uri = await _http.GetPortfolioStreamFeedUriAsync(_capturedUpdateTypes, _cts.Token);
+        // Always subscribe to Order + Position updates internally
+        var uri = await _http.GetPortfolioStreamFeedUriAsync(DefaultUpdateTypes, _cts.Token);
         _ws = new ClientWebSocket();
         await _ws.ConnectAsync(new Uri(uri), _cts.Token);
 
@@ -169,7 +172,7 @@ internal sealed class PortfolioStreamer : IPortfolioStreamer
 
                 string uri;
                 using (UpstoxTokenContext.Use(_capturedToken))
-                    uri = await _http.GetPortfolioStreamFeedUriAsync(_capturedUpdateTypes, ct);
+                    uri = await _http.GetPortfolioStreamFeedUriAsync(DefaultUpdateTypes, ct);
                 _ws?.Dispose();
                 _ws = new ClientWebSocket();
                 await _ws.ConnectAsync(new Uri(uri), ct);
@@ -198,7 +201,7 @@ internal sealed class PortfolioStreamer : IPortfolioStreamer
     }
 
     // ──────────────────────────────────────────────────
-    // JSON decoding
+    // JSON decoding → PortfolioUpdate (Contracts type)
     // ──────────────────────────────────────────────────
 
     private void ProcessTextMessage(byte[] buffer, int count)
@@ -206,9 +209,14 @@ internal sealed class PortfolioStreamer : IPortfolioStreamer
         try
         {
             var json = Encoding.UTF8.GetString(buffer, 0, count);
-            var update = JsonSerializer.Deserialize<PortfolioStreamUpdate>(json, JsonOptions);
-            if (update is not null)
-                UpdateReceived?.Invoke(this, update);
+            var raw  = JsonSerializer.Deserialize<PortfolioStreamUpdate>(json, JsonOptions);
+            if (raw is not null)
+                UpdateReceived?.Invoke(this, new PortfolioUpdate(
+                    raw.Type,
+                    raw.OrderId,
+                    raw.Status,
+                    raw.StatusMessage,
+                    raw.TradingSymbol));
         }
         catch (Exception ex)
         {

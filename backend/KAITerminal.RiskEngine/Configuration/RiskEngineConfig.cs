@@ -1,3 +1,5 @@
+using KAITerminal.Contracts.Domain;
+
 namespace KAITerminal.RiskEngine.Configuration;
 
 public sealed class RiskEngineConfig
@@ -28,23 +30,9 @@ public sealed class RiskEngineConfig
     public int LtpEvalMinIntervalMs { get; set; } = 15_000;
 
     // ── Trading window ───────────────────────────────────────────────────────
-    /// <summary>
-    /// Time of day when the risk engine begins evaluating. Format: "HH:mm:ss".
-    /// Defaults to 09:15:00 (NSE market open).
-    /// </summary>
     public TimeSpan TradingWindowStart { get; set; } = new(9, 15, 0);
-
-    /// <summary>
-    /// Time of day when the risk engine stops evaluating. Format: "HH:mm:ss".
-    /// Defaults to 15:30:00 (NSE market close).
-    /// </summary>
-    public TimeSpan TradingWindowEnd { get; set; } = new(15, 30, 0);
-
-    /// <summary>
-    /// IANA timezone ID used to evaluate trading hours.
-    /// Defaults to "Asia/Kolkata" (IST, UTC+5:30).
-    /// </summary>
-    public string TradingTimeZone { get; set; } = "Asia/Kolkata";
+    public TimeSpan TradingWindowEnd   { get; set; } = new(15, 30, 0);
+    public string   TradingTimeZone    { get; set; } = "Asia/Kolkata";
 
     /// <summary>
     /// Only positions from these exchanges are considered by the risk engine.
@@ -52,16 +40,14 @@ public sealed class RiskEngineConfig
     /// </summary>
     public List<string> Exchanges { get; set; } = ["NFO", "BFO"];
 
-    // Cached upper-case exchange set — built once on first use; Exchanges is never mutated after config binding.
+    // Cached upper-case exchange set — built once on first use
     private HashSet<string>? _exchangeSet;
 
     /// <summary>Filters a position list to the configured exchanges (case-insensitive).</summary>
-    public IReadOnlyList<KAITerminal.Upstox.Models.Responses.Position> FilterPositions(
-        IReadOnlyList<KAITerminal.Upstox.Models.Responses.Position> positions)
+    public IReadOnlyList<Position> FilterPositions(IReadOnlyList<Position> positions)
     {
         if (Exchanges.Count == 0) return positions;
         var set = _exchangeSet ??= Exchanges.Select(e => e.ToUpperInvariant()).ToHashSet();
         return positions.Where(p => set.Contains(p.Exchange.ToUpperInvariant())).ToList().AsReadOnly();
     }
-
 }

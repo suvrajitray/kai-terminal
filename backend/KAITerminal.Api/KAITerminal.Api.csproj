@@ -14,6 +14,7 @@
   <ItemGroup>
     <ProjectReference Include="../KAITerminal.Auth/KAITerminal.Auth.csproj" />
     <ProjectReference Include="../KAITerminal.Broker/KAITerminal.Broker.csproj" />
+    <ProjectReference Include="../KAITerminal.Contracts/KAITerminal.Contracts.csproj" />
     <ProjectReference Include="../KAITerminal.Infrastructure/KAITerminal.Infrastructure.csproj" />
     <ProjectReference Include="../KAITerminal.Upstox/KAITerminal.Upstox.csproj" />
     <ProjectReference Include="../KAITerminal.Zerodha/KAITerminal.Zerodha.csproj" />

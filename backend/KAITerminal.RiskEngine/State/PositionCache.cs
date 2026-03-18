@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
+using KAITerminal.Contracts.Domain;
 using KAITerminal.RiskEngine.Abstractions;
-using KAITerminal.Upstox.Models.Responses;
 
 namespace KAITerminal.RiskEngine.State;
 
@@ -41,12 +41,10 @@ public sealed class PositionCache : IPositionCache
         decimal total = 0m;
         foreach (var p in e.Positions)
         {
-            // Use Upstox's authoritative Pnl as baseline, then adjust for live LTP movement
-            // since the last REST position fetch.  This is more accurate than recomputing
-            // from buy/sell prices because Upstox accounts for overnight carry, partial exits,
-            // and other edge cases in its own Pnl field.
+            // Use the broker's authoritative Pnl as baseline, then adjust for live LTP movement
+            // since the last REST position fetch.
             if (e.Ltp.TryGetValue(p.InstrumentToken, out var ltp))
-                total += p.Pnl + p.Quantity * (ltp - p.LastPrice);
+                total += p.Pnl + p.Quantity * (ltp - p.Ltp);
             else
                 total += p.Pnl;
         }

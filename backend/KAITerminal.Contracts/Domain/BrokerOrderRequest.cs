@@ -1,4 +1,4 @@
-namespace KAITerminal.Broker;
+namespace KAITerminal.Contracts.Domain;
 
 /// <summary>Broker-agnostic order placement parameters.</summary>
 /// <param name="InstrumentToken">Broker-specific instrument identifier.</param>
@@ -8,9 +8,9 @@ namespace KAITerminal.Broker;
 /// <param name="OrderType">"MARKET" or "LIMIT".</param>
 /// <param name="Price">Limit price; ignored for market orders.</param>
 public sealed record BrokerOrderRequest(
-    string InstrumentToken,
-    int    Quantity,
-    string TransactionType,
-    string Product,
-    string OrderType,
+    string   InstrumentToken,
+    int      Quantity,
+    string   TransactionType,
+    string   Product,
+    string   OrderType,
     decimal? Price = null);

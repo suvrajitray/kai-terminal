@@ -1,5 +1,4 @@
-using KAITerminal.Upstox.Models.WebSocket;
-using KAITerminal.Upstox.Services;
+using KAITerminal.Contracts.Streaming;
 using Microsoft.Extensions.Logging;
 
 namespace KAITerminal.Zerodha.Streaming;
@@ -18,15 +17,11 @@ public sealed class KiteTickerStreamer : IMarketDataStreamer
     public bool IsConnected { get; private set; }
 
 #pragma warning disable CS0067  // Events intentionally unused in stub
-    public event EventHandler? Connected;
-    public event EventHandler<Exception?>? Disconnected;
+    public event EventHandler<LtpUpdate>? FeedReceived;
     public event EventHandler? Reconnecting;
-    public event EventHandler? AutoReconnectStopped;
-    public event EventHandler<MarketDataMessage>? FeedReceived;
-    public event EventHandler<MarketSegmentStatus>? MarketStatusReceived;
 #pragma warning restore CS0067
 
-    public Task ConnectAsync(CancellationToken cancellationToken = default)
+    public Task ConnectAsync(CancellationToken ct)
     {
         _logger.LogWarning(
             "KiteTickerStreamer: KiteTicker streaming is not yet implemented. " +
@@ -41,14 +36,7 @@ public sealed class KiteTickerStreamer : IMarketDataStreamer
         return Task.CompletedTask;
     }
 
-    public Task SubscribeAsync(
-        IEnumerable<string> instrumentKeys, FeedMode mode = FeedMode.Ltpc, CancellationToken ct = default)
-        => Task.CompletedTask;
-
-    public Task UnsubscribeAsync(IEnumerable<string> instrumentKeys, CancellationToken ct = default)
-        => Task.CompletedTask;
-
-    public Task ChangeModeAsync(IEnumerable<string> instrumentKeys, FeedMode mode, CancellationToken ct = default)
+    public Task SubscribeAsync(IReadOnlyCollection<string> instrumentTokens, FeedMode mode)
         => Task.CompletedTask;
 
     public ValueTask DisposeAsync()

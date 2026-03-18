@@ -1,6 +1,6 @@
 using KAITerminal.Broker;
-using KAITerminal.Upstox.Models.Responses;
-using KAITerminal.Upstox.Services;
+using KAITerminal.Contracts.Domain;
+using KAITerminal.Contracts.Streaming;
 using KAITerminal.Zerodha.Models;
 using KAITerminal.Zerodha.Services;
 using KAITerminal.Zerodha.Streaming;

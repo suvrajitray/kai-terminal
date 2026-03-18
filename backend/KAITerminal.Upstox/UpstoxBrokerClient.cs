@@ -1,14 +1,16 @@
+using KAITerminal.Broker;
+using KAITerminal.Contracts.Domain;
+using KAITerminal.Contracts.Streaming;
 using KAITerminal.Upstox;
 using KAITerminal.Upstox.Models.Enums;
 using KAITerminal.Upstox.Models.Requests;
-using KAITerminal.Upstox.Models.Responses;
-using KAITerminal.Upstox.Services;
 
 namespace KAITerminal.Broker.Adapters;
 
 /// <summary>
 /// Adapts <see cref="UpstoxClient"/> to the broker-agnostic <see cref="IBrokerClient"/> interface.
 /// Each instance is token-scoped — wraps every call in <c>UpstoxTokenContext.Use(token)</c>.
+/// Maps Upstox-internal types to <see cref="KAITerminal.Contracts"/> types at the boundary.
 /// </summary>
 public sealed class UpstoxBrokerClient : IBrokerClient
 {
@@ -30,7 +32,8 @@ public sealed class UpstoxBrokerClient : IBrokerClient
     public async Task<IReadOnlyList<Position>> GetAllPositionsAsync(CancellationToken ct = default)
     {
         using var _ = UseToken();
-        return await _upstox.GetAllPositionsAsync(ct);
+        var upstoxPositions = await _upstox.GetAllPositionsAsync(ct);
+        return upstoxPositions.Select(MapPosition).ToList().AsReadOnly();
     }
 
     public async Task<decimal> GetTotalMtmAsync(CancellationToken ct = default)
@@ -90,4 +93,27 @@ public sealed class UpstoxBrokerClient : IBrokerClient
 
     public IMarketDataStreamer CreateMarketDataStreamer() => _upstox.CreateMarketDataStreamer();
     public IPortfolioStreamer  CreatePortfolioStreamer()  => _upstox.CreatePortfolioStreamer();
+
+    // ── Position mapping ─────────────────────────────────────────────────────
+
+    private static Position MapPosition(KAITerminal.Upstox.Models.Responses.Position p) => new()
+    {
+        Exchange        = p.Exchange,
+        InstrumentToken = p.InstrumentToken,
+        TradingSymbol   = p.TradingSymbol,
+        Product         = p.Product,
+        Quantity        = p.Quantity,
+        BuyQuantity     = p.DayBuyQuantity,
+        SellQuantity    = p.DaySellQuantity,
+        AveragePrice    = p.AveragePrice,
+        BuyPrice        = p.BuyPrice,
+        SellPrice       = p.SellPrice,
+        Ltp             = p.LastPrice,
+        Pnl             = p.Pnl,
+        Unrealised      = p.Unrealised,
+        Realised        = p.Realised,
+        BuyValue        = p.BuyValue,
+        SellValue       = p.SellValue,
+        Broker          = "upstox",
+    };
 }

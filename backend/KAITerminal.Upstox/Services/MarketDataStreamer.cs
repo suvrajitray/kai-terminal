@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text.Json;
+using KAITerminal.Contracts.Streaming;
 using KAITerminal.Upstox;
 using KAITerminal.Upstox.Configuration;
 using KAITerminal.Upstox.Http;
@@ -8,6 +9,7 @@ using KAITerminal.Upstox.Models.WebSocket;
 using KAITerminal.Upstox.Protos;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using UpstoxFeedMode = KAITerminal.Upstox.Models.WebSocket.FeedMode;
 
 namespace KAITerminal.Upstox.Services;
 
@@ -17,7 +19,7 @@ internal sealed class MarketDataStreamer : IMarketDataStreamer
     private readonly UpstoxConfig _config;
     private readonly ILogger<MarketDataStreamer> _logger;
     private readonly SemaphoreSlim _sendLock = new(1, 1);
-    private readonly ConcurrentDictionary<string, FeedMode> _subscriptions = new();
+    private readonly ConcurrentDictionary<string, UpstoxFeedMode> _subscriptions = new();
 
     private ClientWebSocket? _ws;
     private CancellationTokenSource? _cts;
@@ -25,13 +27,13 @@ internal sealed class MarketDataStreamer : IMarketDataStreamer
     private bool _disposed;
     private string? _capturedToken; // token active at ConnectAsync time; restored during auto-reconnect
 
-    public bool IsConnected => _ws?.State == WebSocketState.Open;
+    public event EventHandler<LtpUpdate>? FeedReceived;
+    public event EventHandler? Reconnecting;
 
+    // Additional Upstox-specific events kept on the implementation (not in Contracts interface)
     public event EventHandler? Connected;
     public event EventHandler<Exception?>? Disconnected;
-    public event EventHandler? Reconnecting;
     public event EventHandler? AutoReconnectStopped;
-    public event EventHandler<MarketDataMessage>? FeedReceived;
     public event EventHandler<MarketSegmentStatus>? MarketStatusReceived;
 
     public MarketDataStreamer(UpstoxHttpClient http, IOptions<UpstoxConfig> options, ILogger<MarketDataStreamer> logger)
@@ -42,15 +44,15 @@ internal sealed class MarketDataStreamer : IMarketDataStreamer
     }
 
     // ──────────────────────────────────────────────────
-    // Public API
+    // IMarketDataStreamer (Contracts)
     // ──────────────────────────────────────────────────
 
-    public async Task ConnectAsync(CancellationToken cancellationToken = default)
+    public async Task ConnectAsync(CancellationToken ct)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        _capturedToken = UpstoxTokenContext.Current; // capture so reconnects reuse the same token
-        _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _capturedToken = UpstoxTokenContext.Current;
+        _cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
 
         var uri = await _http.GetMarketDataFeedUriV3Async(_cts.Token);
         _ws = new ClientWebSocket();
@@ -74,29 +76,12 @@ internal sealed class MarketDataStreamer : IMarketDataStreamer
         }
     }
 
-    public async Task SubscribeAsync(
-        IEnumerable<string> instrumentKeys,
-        FeedMode mode = FeedMode.Ltpc,
-        CancellationToken ct = default)
+    public async Task SubscribeAsync(IReadOnlyCollection<string> instrumentTokens, Contracts.Streaming.FeedMode mode)
     {
-        var keys = instrumentKeys.ToList();
-        foreach (var k in keys) _subscriptions[k] = mode;
-        await SendJsonAsync(BuildSubscribeMessage(keys, mode), ct);
-    }
-
-    public async Task UnsubscribeAsync(IEnumerable<string> instrumentKeys, CancellationToken ct = default)
-    {
-        var keys = instrumentKeys.ToList();
-        foreach (var k in keys) _subscriptions.TryRemove(k, out _);
-        await SendJsonAsync(BuildUnsubscribeMessage(keys), ct);
-    }
-
-    public async Task ChangeModeAsync(
-        IEnumerable<string> instrumentKeys, FeedMode mode, CancellationToken ct = default)
-    {
-        var keys = instrumentKeys.ToList();
-        foreach (var k in keys) _subscriptions[k] = mode;
-        await SendJsonAsync(BuildChangeModeMessage(keys, mode), ct);
+        var keys = instrumentTokens.ToList();
+        var upstoxMode = MapFeedMode(mode);
+        foreach (var k in keys) _subscriptions[k] = upstoxMode;
+        await SendJsonAsync(BuildSubscribeMessage(keys, upstoxMode), CancellationToken.None);
     }
 
     public async ValueTask DisposeAsync()
@@ -125,6 +110,24 @@ internal sealed class MarketDataStreamer : IMarketDataStreamer
     }
 
     // ──────────────────────────────────────────────────
+    // Upstox-specific helpers (used within SDK only)
+    // ──────────────────────────────────────────────────
+
+    public async Task UnsubscribeAsync(IEnumerable<string> instrumentKeys, CancellationToken ct = default)
+    {
+        var keys = instrumentKeys.ToList();
+        foreach (var k in keys) _subscriptions.TryRemove(k, out _);
+        await SendJsonAsync(BuildUnsubscribeMessage(keys), ct);
+    }
+
+    public async Task ChangeModeAsync(IEnumerable<string> instrumentKeys, UpstoxFeedMode mode, CancellationToken ct = default)
+    {
+        var keys = instrumentKeys.ToList();
+        foreach (var k in keys) _subscriptions[k] = mode;
+        await SendJsonAsync(BuildChangeModeMessage(keys, mode), ct);
+    }
+
+    // ──────────────────────────────────────────────────
     // Receive loop + auto-reconnect
     // ──────────────────────────────────────────────────
 
@@ -135,7 +138,7 @@ internal sealed class MarketDataStreamer : IMarketDataStreamer
         try
         {
             await ReadFramesAsync(ct);
-            if (ct.IsCancellationRequested) return; // Intentional disconnect — no reconnect
+            if (ct.IsCancellationRequested) return;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -168,7 +171,7 @@ internal sealed class MarketDataStreamer : IMarketDataStreamer
             {
                 result = await _ws.ReceiveAsync(buffer, ct);
                 if (result.MessageType == WebSocketMessageType.Close)
-                    return; // Server-initiated close → caller will fire Disconnected + reconnect
+                    return;
                 ms.Write(buffer, 0, result.Count);
             } while (!result.EndOfMessage);
 
@@ -200,7 +203,6 @@ internal sealed class MarketDataStreamer : IMarketDataStreamer
                 Connected?.Invoke(this, EventArgs.Empty);
                 await ResubscribeAllAsync(ct);
 
-                // Continue the receive loop in-place (tail call avoids new Task allocation)
                 await ReceiveLoopAsync(ct);
                 return;
             }
@@ -224,8 +226,6 @@ internal sealed class MarketDataStreamer : IMarketDataStreamer
 
     private async Task ResubscribeAllAsync(CancellationToken ct)
     {
-        // Snapshot before grouping so concurrent Subscribe/Unsubscribe calls cannot
-        // modify the dictionary mid-enumeration and produce an inconsistent batch.
         var snapshot = _subscriptions.ToArray();
         var groups = snapshot
             .GroupBy(kv => kv.Value)
@@ -237,7 +237,7 @@ internal sealed class MarketDataStreamer : IMarketDataStreamer
     }
 
     // ──────────────────────────────────────────────────
-    // Protobuf decoding → domain models
+    // Protobuf decoding → LtpUpdate
     // ──────────────────────────────────────────────────
 
     private void ProcessBinaryMessage(byte[] buffer, int count)
@@ -256,22 +256,17 @@ internal sealed class MarketDataStreamer : IMarketDataStreamer
 
             if (proto.Feeds.Count == 0) return;
 
-            var messageType = proto.Type switch
+            // Extract LTPs; Contracts interface exposes a simple token→ltp map
+            var ltps = new Dictionary<string, decimal>(proto.Feeds.Count);
+            foreach (var kv in proto.Feeds)
             {
-                FeedResponse.Types.Type.InitialFeed => MessageType.InitialFeed,
-                FeedResponse.Types.Type.LiveFeed    => MessageType.LiveFeed,
-                _                                   => MessageType.LiveFeed
-            };
+                var ltp = ExtractLtp(kv.Value);
+                if (ltp.HasValue)
+                    ltps[kv.Key] = ltp.Value;
+            }
 
-            var instruments = proto.Feeds.ToDictionary(kv => kv.Key, kv => MapFeed(kv.Value));
-
-            FeedReceived?.Invoke(this, new MarketDataMessage
-            {
-                Type        = messageType,
-                TimestampMs = proto.CurrentTs,
-                Timestamp   = DateTimeOffset.FromUnixTimeMilliseconds(proto.CurrentTs),
-                Instruments = instruments
-            });
+            if (ltps.Count > 0)
+                FeedReceived?.Invoke(this, new LtpUpdate(ltps));
         }
         catch (Exception ex)
         {
@@ -279,107 +274,13 @@ internal sealed class MarketDataStreamer : IMarketDataStreamer
         }
     }
 
-    private static InstrumentFeed MapFeed(Feed proto) => proto.FeedUnionCase switch
+    private static decimal? ExtractLtp(Feed feed) => feed.FeedUnionCase switch
     {
-        Feed.FeedUnionOneofCase.Ltpc => new InstrumentFeed
-        {
-            Mode = FeedMode.Ltpc,
-            Ltpc = MapLtpc(proto.Ltpc)
-        },
-
-        Feed.FeedUnionOneofCase.FullFeed when proto.FullFeed.MarketFF is not null => new InstrumentFeed
-        {
-            Mode = FeedMode.Full,
-            Full = MapMarketFF(proto.FullFeed.MarketFF)
-        },
-
-        Feed.FeedUnionOneofCase.FullFeed => new InstrumentFeed
-        {
-            Mode = FeedMode.Full,
-            Full = MapIndexFF(proto.FullFeed.IndexFF)
-        },
-
-        Feed.FeedUnionOneofCase.FirstLevelWithGreeks => new InstrumentFeed
-        {
-            Mode        = FeedMode.OptionGreeks,
-            OptionGreeks = MapFirstLevelWithGreeks(proto.FirstLevelWithGreeks)
-        },
-
-        _ => new InstrumentFeed { Mode = FeedMode.Ltpc }
-    };
-
-    private static LtpcData MapLtpc(LTPC p) => new()
-    {
-        Ltp = (decimal)p.Ltp,
-        Ltt = DateTimeOffset.FromUnixTimeMilliseconds(p.Ltt),
-        Ltq = p.Ltq,
-        Cp  = (decimal)p.Cp
-    };
-
-    private static FullFeedData MapMarketFF(MarketFF p) => new()
-    {
-        Ltpc    = MapLtpc(p.Ltpc),
-        Vtt     = p.Vtt,
-        Atp     = (decimal)p.Atp,
-        Oi      = (decimal)p.Oi,
-        Iv      = (decimal)p.Iv,
-        Depth   = MapDepth(p.Depth),
-        Ohlc    = p.OhlcData.Select(MapOhlc).ToList(),
-        Greeks  = p.OptionGreeks is { } og ? MapGreeks(og) : null,
-        IsIndex = false
-    };
-
-    private static FullFeedData MapIndexFF(IndexFF p) => new()
-    {
-        Ltpc    = MapLtpc(p.Ltpc),
-        Ohlc    = p.OhlcData.Select(MapOhlc).ToList(),
-        IsIndex = true
-    };
-
-    private static OptionGreeksFeedData MapFirstLevelWithGreeks(FirstLevelWithGreeks p) => new()
-    {
-        Ltpc   = MapLtpc(p.Ltpc),
-        Vtt    = p.Vtt,
-        Atp    = (decimal)p.Atp,
-        Oi     = (decimal)p.Oi,
-        Iv     = (decimal)p.Iv,
-        Depth  = MapDepth(p.Depth),
-        Greeks = p.OptionGreeks is { } og ? MapGreeks(og) : null
-    };
-
-    private static Models.WebSocket.Depth? MapDepth(Protos.Depth? p)
-    {
-        if (p is null) return null;
-        return new Models.WebSocket.Depth(
-            Bids: p.Bid.Select(MapBidAsk).ToList(),
-            Asks: p.Ask.Select(MapBidAsk).ToList());
-    }
-
-    private static Models.WebSocket.BidAsk MapBidAsk(Protos.BidAsk b) => new()
-    {
-        Price    = (decimal)b.Price,
-        Quantity = b.Quantity,
-        Orders   = b.Orders
-    };
-
-    private static OhlcBar MapOhlc(OHLCData o) => new()
-    {
-        Interval  = o.Interval,
-        Open      = (decimal)o.Open,
-        High      = (decimal)o.High,
-        Low       = (decimal)o.Low,
-        Close     = (decimal)o.Close,
-        Volume    = o.Vol,
-        Timestamp = DateTimeOffset.FromUnixTimeMilliseconds(o.Ts)
-    };
-
-    private static Greeks MapGreeks(Protos.OptionGreeks g) => new()
-    {
-        Delta = (decimal)g.Delta,
-        Gamma = (decimal)g.Gamma,
-        Theta = (decimal)g.Theta,
-        Vega  = (decimal)g.Vega,
-        Iv    = (decimal)g.Iv
+        Feed.FeedUnionOneofCase.Ltpc                                             => (decimal?)feed.Ltpc.Ltp,
+        Feed.FeedUnionOneofCase.FullFeed when feed.FullFeed.MarketFF is not null => (decimal?)feed.FullFeed.MarketFF.Ltpc.Ltp,
+        Feed.FeedUnionOneofCase.FullFeed                                         => (decimal?)feed.FullFeed.IndexFF?.Ltpc.Ltp,
+        Feed.FeedUnionOneofCase.FirstLevelWithGreeks                             => (decimal?)feed.FirstLevelWithGreeks.Ltpc.Ltp,
+        _                                                                        => null
     };
 
     // ──────────────────────────────────────────────────
@@ -400,7 +301,7 @@ internal sealed class MarketDataStreamer : IMarketDataStreamer
         }
     }
 
-    private static object BuildSubscribeMessage(IEnumerable<string> keys, FeedMode mode) => new
+    private static object BuildSubscribeMessage(IEnumerable<string> keys, UpstoxFeedMode mode) => new
     {
         guid   = Guid.NewGuid().ToString("N"),
         method = "sub",
@@ -414,19 +315,25 @@ internal sealed class MarketDataStreamer : IMarketDataStreamer
         data   = new { instrumentKeys = keys }
     };
 
-    private static object BuildChangeModeMessage(IEnumerable<string> keys, FeedMode mode) => new
+    private static object BuildChangeModeMessage(IEnumerable<string> keys, UpstoxFeedMode mode) => new
     {
         guid   = Guid.NewGuid().ToString("N"),
         method = "change_mode",
         data   = new { mode = ToModeString(mode), instrumentKeys = keys }
     };
 
-    private static string ToModeString(FeedMode mode) => mode switch
+    private static UpstoxFeedMode MapFeedMode(Contracts.Streaming.FeedMode mode) => mode switch
     {
-        FeedMode.Ltpc         => "ltpc",
-        FeedMode.Full         => "full",
-        FeedMode.OptionGreeks => "option_greeks",
-        FeedMode.FullD30      => "full_d30",
+        Contracts.Streaming.FeedMode.Full => UpstoxFeedMode.Full,
+        _                                 => UpstoxFeedMode.Ltpc,
+    };
+
+    private static string ToModeString(UpstoxFeedMode mode) => mode switch
+    {
+        UpstoxFeedMode.Ltpc         => "ltpc",
+        UpstoxFeedMode.Full         => "full",
+        UpstoxFeedMode.OptionGreeks => "option_greeks",
+        UpstoxFeedMode.FullD30      => "full_d30",
         _ => throw new ArgumentOutOfRangeException(nameof(mode))
     };
 }

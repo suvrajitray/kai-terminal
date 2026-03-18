@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>KAITerminal.Contracts</RootNamespace>
+    <AssemblyName>KAITerminal.Contracts</AssemblyName>
+    <Version>1.0.0</Version>
+    <Description>Broker-agnostic domain types and interfaces for KAI Terminal — no dependencies.</Description>
+  </PropertyGroup>
+
+</Project>

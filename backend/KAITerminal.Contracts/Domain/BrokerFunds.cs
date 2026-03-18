@@ -1,4 +1,4 @@
-namespace KAITerminal.Broker;
+namespace KAITerminal.Contracts.Domain;
 
 /// <summary>Broker-agnostic funds summary.</summary>
 public sealed record BrokerFunds(decimal Available, decimal Used, decimal Payin = 0);

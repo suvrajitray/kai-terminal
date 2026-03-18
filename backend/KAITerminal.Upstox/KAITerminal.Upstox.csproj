@@ -18,5 +18,9 @@
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\KAITerminal.Contracts\KAITerminal.Contracts.csproj" />
+    <ProjectReference Include="..\KAITerminal.Broker\KAITerminal.Broker.csproj" />
+  </ItemGroup>
 
 </Project>

@@ -1,3 +1,4 @@
+using KAITerminal.Contracts.Streaming;
 using KAITerminal.Upstox.Models.Enums;
 using KAITerminal.Upstox.Models.Requests;
 using KAITerminal.Upstox.Models.Responses;
@@ -20,8 +21,8 @@ public sealed class UpstoxClient
     private readonly IChartDataService _charts;
     private readonly IMarginService _margin;
     private readonly IFundsService _funds;
-    private readonly Func<IMarketDataStreamer> _marketDataStreamerFactory;
-    private readonly Func<IPortfolioStreamer> _portfolioStreamerFactory;
+    private readonly Func<IMarketDataStreamer>  _marketDataStreamerFactory;
+    private readonly Func<IPortfolioStreamer>   _portfolioStreamerFactory;
 
     public UpstoxClient(
         IAuthService auth,
@@ -32,8 +33,8 @@ public sealed class UpstoxClient
         IChartDataService charts,
         IMarginService margin,
         IFundsService funds,
-        Func<IMarketDataStreamer> marketDataStreamerFactory,
-        Func<IPortfolioStreamer> portfolioStreamerFactory)
+        Func<IMarketDataStreamer>  marketDataStreamerFactory,
+        Func<IPortfolioStreamer>   portfolioStreamerFactory)
     {
         ArgumentNullException.ThrowIfNull(auth);
         ArgumentNullException.ThrowIfNull(positions);
