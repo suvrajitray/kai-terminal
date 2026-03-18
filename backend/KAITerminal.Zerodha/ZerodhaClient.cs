@@ -12,25 +12,28 @@ namespace KAITerminal.Zerodha;
 /// </summary>
 public sealed class ZerodhaClient
 {
-    private readonly IZerodhaAuthService     _auth;
-    private readonly IZerodhaPositionService _positions;
-    private readonly IZerodhaOrderService    _orders;
-    private readonly IZerodhaFundsService    _funds;
+    private readonly IZerodhaAuthService       _auth;
+    private readonly IZerodhaPositionService   _positions;
+    private readonly IZerodhaOrderService      _orders;
+    private readonly IZerodhaFundsService      _funds;
+    private readonly IZerodhaInstrumentService _instruments;
     private readonly Func<KiteTickerStreamer>         _marketDataStreamerFactory;
     private readonly Func<ZerodhaPortfolioStreamer>   _portfolioStreamerFactory;
 
     public ZerodhaClient(
-        IZerodhaAuthService     auth,
-        IZerodhaPositionService positions,
-        IZerodhaOrderService    orders,
-        IZerodhaFundsService    funds,
+        IZerodhaAuthService       auth,
+        IZerodhaPositionService   positions,
+        IZerodhaOrderService      orders,
+        IZerodhaFundsService      funds,
+        IZerodhaInstrumentService instruments,
         Func<KiteTickerStreamer>         marketDataStreamerFactory,
         Func<ZerodhaPortfolioStreamer>   portfolioStreamerFactory)
     {
-        _auth                    = auth;
-        _positions               = positions;
-        _orders                  = orders;
-        _funds                   = funds;
+        _auth                     = auth;
+        _positions                = positions;
+        _orders                   = orders;
+        _funds                    = funds;
+        _instruments              = instruments;
         _marketDataStreamerFactory = marketDataStreamerFactory;
         _portfolioStreamerFactory  = portfolioStreamerFactory;
     }
@@ -68,6 +71,12 @@ public sealed class ZerodhaClient
 
     public Task<BrokerFunds> GetFundsAsync(CancellationToken ct = default)
         => _funds.GetFundsAsync(ct);
+
+    // ── Instruments ───────────────────────────────────────────────────────────
+
+    public Task<IReadOnlyList<OptionContract>> GetOptionContractsAsync(
+        string underlyingSymbol, CancellationToken ct = default)
+        => _instruments.GetCurrentYearContractsAsync(underlyingSymbol, ct);
 
     // ── Streaming ─────────────────────────────────────────────────────────────
 

@@ -1,8 +1,10 @@
 import { useState, useCallback } from "react";
+import { cn } from "@/lib/utils";
 import { useNewRows } from "@/hooks/use-new-rows";
 import { toast } from "sonner";
 import { LogOut, LayoutList } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
+import { BrokerBadge } from "@/components/ui/broker-badge";
 import { getLotSize } from "@/lib/lot-sizes";
 import { exitPosition, placeMarketOrder, placeOrderByOptionPrice } from "@/services/trading-api";
 import { getShiftOffset, UNDERLYING_KEYS } from "@/lib/shift-config";
@@ -28,6 +30,7 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
   const [qtys, setQtys] = useState<Record<string, string>>({});
   const [qtyMode, setQtyMode] = useState<QtyMode>("qty");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [brokerFilter, setBrokerFilter] = useState<string | null>(null);
 
   const getByInstrumentKey = useOptionContractsStore((s) => s.getByInstrumentKey);
 
@@ -125,8 +128,13 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
   const posKey = useCallback((p: Position) => p.instrument_token + p.product, []);
   const newPositionKeys = useNewRows(positions, posKey);
 
-  const openPositions = positions.filter((p) => p.quantity !== 0);
-  const closedPositions = positions.filter((p) => p.quantity === 0);
+  // Unique brokers present in positions — drives filter pills
+  const brokersInPositions = Array.from(new Set(positions.map((p) => p.broker ?? "upstox")));
+  const showFilter = brokersInPositions.length > 1;
+
+  const filtered = brokerFilter ? positions.filter((p) => (p.broker ?? "upstox") === brokerFilter) : positions;
+  const openPositions = filtered.filter((p) => p.quantity !== 0);
+  const closedPositions = filtered.filter((p) => p.quantity === 0);
   const sorted = [...openPositions, ...closedPositions];
 
   // Selection helpers
@@ -226,6 +234,36 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
 
   return (
     <div className="flex h-full flex-col">
+      {showFilter && (
+        <div className="flex shrink-0 items-center gap-1 border-b border-border/40 bg-muted/20 px-3 py-1.5">
+          <button
+            onClick={() => setBrokerFilter(null)}
+            className={cn(
+              "rounded px-2 py-0.5 text-[11px] font-medium transition-colors",
+              brokerFilter === null
+                ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            All
+          </button>
+          {brokersInPositions.map((bId) => (
+            <button
+              key={bId}
+              onClick={() => setBrokerFilter(brokerFilter === bId ? null : bId)}
+              className={cn(
+                "flex items-center gap-1.5 rounded px-2 py-0.5 text-[11px] font-medium transition-colors",
+                brokerFilter === bId
+                  ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <BrokerBadge brokerId={bId} size={12} />
+              {bId.charAt(0).toUpperCase() + bId.slice(1)}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="flex-1 overflow-auto">
         {sorted.length === 0 && !loading ? (
           <EmptyState icon={LayoutList} message="No positions" />

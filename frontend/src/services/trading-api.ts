@@ -102,6 +102,14 @@ export async function fetchOptionContracts(underlyingKey: string): Promise<Optio
   return res.data;
 }
 
+// underlying = symbol name (e.g. "NIFTY", "BANKNIFTY") — Zerodha uses name not instrument key
+export async function fetchZerodhaOptionContracts(underlying: string): Promise<OptionContract[]> {
+  const res = await apiClient.get<OptionContract[]>("/api/zerodha/options/contracts/current-year", {
+    params: { underlying },
+  });
+  return res.data;
+}
+
 export function extractExpiries(contracts: OptionContract[]): string[] {
   return [...new Set(contracts.map((c) => c.expiry))].sort();
 }

@@ -6,6 +6,7 @@ import { type QtyMode } from "./qty-input";
 import { PositionActions } from "./position-actions";
 import { OptionTypeBadge } from "./option-type-badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { BrokerBadge } from "@/components/ui/broker-badge";
 import {
   ExitPositionDialog,
   SellBuyMoreDialog,
@@ -107,14 +108,18 @@ export function PositionRow({
                 {contract.underlying_symbol} {contract.strike_price}
                 <OptionTypeBadge type={contract.instrument_type} />
               </div>
-              <div className="text-[11px] text-muted-foreground">
+              <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                <BrokerBadge brokerId={p.broker ?? "upstox"} size={12} />
                 {p.exchange} {formatExpiryLabel(contract.expiry)}
               </div>
             </>
           ) : (
             <>
               <div className="font-medium">{p.trading_symbol}</div>
-              <div className="text-[11px] text-muted-foreground">{p.exchange}</div>
+              <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                <BrokerBadge brokerId={p.broker ?? "upstox"} size={12} />
+                {p.exchange}
+              </div>
             </>
           )}
         </td>

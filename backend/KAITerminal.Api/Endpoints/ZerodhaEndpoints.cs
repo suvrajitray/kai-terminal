@@ -84,6 +84,25 @@ public static class ZerodhaEndpoints
             return Results.Ok(positions);
         });
 
+        // ── Instruments ──────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Returns CE/PE contracts for the given underlying expiring in the current year,
+        /// sourced from the public Kite instruments CSV for NFO + BFO.
+        /// Pass the underlying symbol name: NIFTY, BANKNIFTY, SENSEX, FINNIFTY, BANKEX.
+        /// </summary>
+        group.MapGet("/options/contracts/current-year", async (
+            ZerodhaClient zerodha,
+            [FromQuery] string underlying,
+            CancellationToken ct) =>
+        {
+            if (string.IsNullOrWhiteSpace(underlying))
+                return Results.BadRequest(new { error = "underlying is required." });
+
+            var contracts = await zerodha.GetOptionContractsAsync(underlying, ct);
+            return Results.Ok(contracts);
+        });
+
         // ── Funds ─────────────────────────────────────────────────────────────
 
         /// <summary>Returns available and used margin for the Zerodha equity/F&amp;O segment.</summary>
