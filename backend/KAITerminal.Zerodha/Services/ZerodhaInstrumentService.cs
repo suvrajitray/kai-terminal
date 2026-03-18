@@ -1,4 +1,4 @@
-using KAITerminal.Upstox.Models.Responses;
+using KAITerminal.Zerodha.Models;
 using Microsoft.Extensions.Logging;
 
 namespace KAITerminal.Zerodha.Services;
@@ -11,7 +11,7 @@ public sealed class ZerodhaInstrumentService : IZerodhaInstrumentService
 {
     private static readonly string[] Exchanges = ["NFO", "BFO"];
 
-    private static readonly HashSet<string> AllowedSegments   = ["NFO-OPT", "BFO-OPT"];
+    private static readonly HashSet<string> AllowedSegments = ["NFO-OPT", "BFO-OPT"];
     private static readonly HashSet<string> AllowedUnderlyings = ["NIFTY", "BANKNIFTY", "SENSEX", "BANKEX", "FINNIFTY"];
 
     private readonly IHttpClientFactory _httpFactory;
@@ -22,10 +22,10 @@ public sealed class ZerodhaInstrumentService : IZerodhaInstrumentService
         ILogger<ZerodhaInstrumentService> logger)
     {
         _httpFactory = httpFactory;
-        _logger      = logger;
+        _logger = logger;
     }
 
-    public async Task<IReadOnlyList<OptionContract>> GetCurrentYearContractsAsync(
+    public async Task<IReadOnlyList<ZerodhaOptionContract>> GetCurrentYearContractsAsync(
         string underlyingSymbol, CancellationToken ct = default)
     {
         var year = DateTimeOffset.UtcNow.Year;
@@ -35,10 +35,10 @@ public sealed class ZerodhaInstrumentService : IZerodhaInstrumentService
         var filtered = results
             .SelectMany(x => x)
             .Where(c =>
-                c.UnderlyingSymbol.Equals(underlyingSymbol, StringComparison.OrdinalIgnoreCase) &&
+                c.Name.Equals(underlyingSymbol, StringComparison.OrdinalIgnoreCase) &&
                 DateOnly.TryParse(c.Expiry, out var d) && d.Year == year)
             .OrderBy(c => c.Expiry)
-            .ThenBy(c => c.StrikePrice)
+            .ThenBy(c => c.Strike)
             .ToList()
             .AsReadOnly();
 
@@ -49,10 +49,10 @@ public sealed class ZerodhaInstrumentService : IZerodhaInstrumentService
         return filtered;
     }
 
-    private async Task<IReadOnlyList<OptionContract>> FetchContractsAsync(
+    private async Task<IReadOnlyList<ZerodhaOptionContract>> FetchContractsAsync(
         string exchange, CancellationToken ct)
     {
-        var http     = _httpFactory.CreateClient("ZerodhaData");
+        var http = _httpFactory.CreateClient("ZerodhaData");
         var response = await http.GetAsync($"/instruments/{exchange}", ct);
 
         _logger.LogInformation(
@@ -78,7 +78,7 @@ public sealed class ZerodhaInstrumentService : IZerodhaInstrumentService
 
     // ── CSV parsing ───────────────────────────────────────────────────────────
 
-    private IReadOnlyList<OptionContract> ParseCsv(string csv, string exchange)
+    private IReadOnlyList<ZerodhaOptionContract> ParseCsv(string csv, string exchange)
     {
         var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries);
         if (lines.Length < 2)
@@ -89,18 +89,20 @@ public sealed class ZerodhaInstrumentService : IZerodhaInstrumentService
 
         // Strip UTF-8 BOM if present
         var headerLine = lines[0].TrimStart('\uFEFF').TrimEnd('\r');
-        var headers    = headerLine.Split(',').Select(h => h.Trim()).ToArray();
+        var headers = headerLine.Split(',').Select(h => h.Trim()).ToArray();
         int Idx(string col) => Array.IndexOf(headers, col);
 
-        int tokenIdx   = Idx("instrument_token");
-        int symbolIdx  = Idx("tradingsymbol");
-        int nameIdx    = Idx("name");
-        int expiryIdx  = Idx("expiry");
-        int strikeIdx  = Idx("strike");
-        int tickIdx    = Idx("tick_size");
-        int lotIdx     = Idx("lot_size");
-        int typeIdx    = Idx("instrument_type");
-        int segmentIdx = Idx("segment");
+        int tokenIdx         = Idx("instrument_token");
+        int exchangeTokenIdx = Idx("exchange_token");
+        int symbolIdx        = Idx("tradingsymbol");
+        int nameIdx          = Idx("name");
+        int lastPriceIdx     = Idx("last_price");
+        int expiryIdx        = Idx("expiry");
+        int strikeIdx        = Idx("strike");
+        int tickIdx          = Idx("tick_size");
+        int lotIdx           = Idx("lot_size");
+        int typeIdx          = Idx("instrument_type");
+        int segmentIdx       = Idx("segment");
 
         if (tokenIdx < 0 || typeIdx < 0 || expiryIdx < 0)
         {
@@ -110,7 +112,7 @@ public sealed class ZerodhaInstrumentService : IZerodhaInstrumentService
             return [];
         }
 
-        var contracts = new List<OptionContract>();
+        var contracts = new List<ZerodhaOptionContract>();
 
         foreach (var line in lines.Skip(1))
         {
@@ -120,36 +122,38 @@ public sealed class ZerodhaInstrumentService : IZerodhaInstrumentService
             var instrType = Unquote(cols[typeIdx]);
             if (instrType is not ("CE" or "PE")) continue;
 
-            var segment        = segmentIdx >= 0 && cols.Length > segmentIdx ? Unquote(cols[segmentIdx]) : "";
+            var segment = segmentIdx >= 0 && cols.Length > segmentIdx ? Unquote(cols[segmentIdx]) : "";
             if (!AllowedSegments.Contains(segment)) continue;
 
-            var underlyingName = nameIdx >= 0 ? Unquote(cols[nameIdx]) : "";
-            if (!AllowedUnderlyings.Contains(underlyingName)) continue;
+            var name = nameIdx >= 0 ? Unquote(cols[nameIdx]) : "";
+            if (!AllowedUnderlyings.Contains(name)) continue;
 
-            var token  = Unquote(cols[tokenIdx]);
-            var expiry = expiryIdx >= 0 ? Unquote(cols[expiryIdx]) : "";
+            var instrumentToken = Unquote(cols[tokenIdx]);
+            var exchangeToken   = exchangeTokenIdx >= 0 && cols.Length > exchangeTokenIdx
+                ? Unquote(cols[exchangeTokenIdx])
+                : "";
+            var expiry = Unquote(cols[expiryIdx]);
 
-            _ = decimal.TryParse(Unquote(cols[strikeIdx]), out var strike);
-            _ = decimal.TryParse(tickIdx >= 0 ? Unquote(cols[tickIdx]) : "", out var tick);
-            _ = decimal.TryParse(lotIdx  >= 0 ? Unquote(cols[lotIdx])  : "", out var lot);
+            _ = decimal.TryParse(cols.Length > strikeIdx    ? Unquote(cols[strikeIdx])    : "", out var strike);
+            _ = decimal.TryParse(cols.Length > tickIdx      ? Unquote(cols[tickIdx])      : "", out var tick);
+            _ = decimal.TryParse(cols.Length > lotIdx       ? Unquote(cols[lotIdx])       : "", out var lot);
+            _ = decimal.TryParse(cols.Length > lastPriceIdx ? Unquote(cols[lastPriceIdx]) : "", out var lastPrice);
 
-            contracts.Add(new OptionContract
-            {
-                // instrument_key uses exchange|token to match ZerodhaHttpClient.MapPosition format
-                InstrumentKey    = $"{exchange}|{token}",
-                ExchangeToken    = token,
-                TradingSymbol    = symbolIdx >= 0 ? Unquote(cols[symbolIdx]) : "",
-                Expiry           = expiry,
-                StrikePrice      = strike,
-                TickSize         = tick,
-                LotSize          = lot,
-                InstrumentType   = instrType,
-                Segment          = segment,
-                Exchange         = exchange,
-                UnderlyingKey    = "",
-                UnderlyingSymbol = underlyingName,
-                Weekly           = IsWeeklyExpiry(expiry),
-            });
+            contracts.Add(new ZerodhaOptionContract(
+                InstrumentToken: instrumentToken,
+                ExchangeToken:   exchangeToken,
+                TradingSymbol:   symbolIdx >= 0 ? Unquote(cols[symbolIdx]) : "",
+                Name:            name,
+                LastPrice:       lastPrice,
+                Expiry:          expiry,
+                Strike:          strike,
+                TickSize:        tick,
+                LotSize:         lot,
+                InstrumentType:  instrType,
+                Segment:         segment,
+                Exchange:        exchange,
+                Weekly:          IsWeeklyExpiry(expiry)
+            ));
         }
 
         _logger.LogInformation(

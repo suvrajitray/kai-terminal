@@ -25,6 +25,7 @@ builder.Services
 builder.Services.AddSingleton<PositionStreamManager>();
 builder.Services.AddSingleton<IndexStreamManager>();
 builder.Services.AddScoped<UserTradingSettingsService>();
+builder.Services.AddScoped<MasterDataService>();
 
 if (!string.IsNullOrEmpty(builder.Configuration["ApplicationInsights:ConnectionString"]))
     builder.Services.AddApplicationInsightsTelemetry(builder.Configuration);
@@ -93,6 +94,7 @@ app.MapBrokerCredentialsEndpoints();
 app.MapUserSettingsEndpoints();
 app.MapAiSentimentEndpoints();
 app.MapRiskConfigEndpoints();
+app.MapMasterDataEndpoints();
 app.MapHub<PositionsHub>("/hubs/positions");
 app.MapHub<IndexHub>("/hubs/indices");
 

@@ -59,7 +59,9 @@ export function PositionsMiniTable({ positions, loading }: PositionsMiniTablePro
                 <tbody>
                   {open.map((p) => {
                     const avg = p.quantity < 0 ? p.sell_price : p.buy_price;
-                    const contract = getByInstrumentKey(p.instrument_token);
+                    const lookup = getByInstrumentKey(p.instrument_token);
+                    const contract = lookup?.contract;
+                    const index = lookup?.index;
                     return (
                       <tr
                         key={p.instrument_token}
@@ -69,8 +71,8 @@ export function PositionsMiniTable({ positions, loading }: PositionsMiniTablePro
                           {contract ? (
                             <>
                               <div className="flex items-center gap-1.5 font-medium">
-                                {contract.underlying_symbol} {contract.strike_price}
-                                <OptionTypeBadge type={contract.instrument_type} />
+                                {index} {contract.strikePrice}
+                                <OptionTypeBadge type={contract.instrumentType} />
                               </div>
                               <div className="text-[10px] text-muted-foreground">
                                 {p.exchange} · {formatExpiryLabel(contract.expiry)}

@@ -85,9 +85,10 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
     product: string,
     direction: "up" | "down",
   ) => {
-    const contract = getByInstrumentKey(token);
-    if (!contract) return;
+    const lookup = getByInstrumentKey(token);
+    if (!lookup) return;
 
+    const { contract, index } = lookup;
     const lot = getLotSize(tradingSymbol);
     const num = parseInt(qtys[token] ?? "", 10);
     const qty = isNaN(num) || num <= 0 ? 0 : qtyMode === "lot" ? num * lot : num;
@@ -96,17 +97,17 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
     const position = positions.find((p) => p.instrument_token === token && p.product === product)!;
     const closeTxn = position.quantity < 0 ? "Buy" : "Sell";
     const openTxn  = position.quantity < 0 ? "Sell" : "Buy";
-    const underlying = Object.keys(UNDERLYING_KEYS).find((k) => UNDERLYING_KEYS[k] === contract.underlying_key) ?? contract.underlying_symbol;
-    const offset = getShiftOffset(underlying);
+    const offset = getShiftOffset(index);
     const targetPremium = position.last_price + (direction === "up" ? offset : -offset);
     const priceSearchMode = direction === "up" ? "GreaterThan" : "LessThan";
+    const underlyingKey = UNDERLYING_KEYS[index];
 
     return withActing(token + ":shift-" + direction, async () => {
       await placeMarketOrder(token, qty, closeTxn, product);
       await placeOrderByOptionPrice({
-        underlyingKey: contract.underlying_key,
+        underlyingKey,
         expiryDate: contract.expiry,
-        optionType: contract.instrument_type,
+        optionType: contract.instrumentType,
         targetPremium,
         priceSearchMode,
         quantity: qty,

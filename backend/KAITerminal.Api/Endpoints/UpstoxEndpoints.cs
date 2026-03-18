@@ -9,15 +9,6 @@ namespace KAITerminal.Api.Endpoints;
 
 public static class UpstoxEndpoints
 {
-    private static readonly HashSet<string> AllowedUpstoxUnderlyings =
-    [
-        "NSE_INDEX|Nifty 50",       // NIFTY
-        "BSE_INDEX|SENSEX",          // SENSEX
-        "NSE_INDEX|Nifty Bank",      // BANKNIFTY
-        "NSE_INDEX|Nifty Fin Service", // FINNIFTY
-        "BSE_INDEX|BANKEX",          // BANKEX
-    ];
-
     public static void MapUpstoxEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/upstox").RequireAuthorization();
@@ -143,28 +134,6 @@ public static class UpstoxEndpoints
                 .ToList();
 
             return Results.Ok(currentMonth);
-        });
-
-        group.MapGet("/options/contracts/current-year", async (
-            [FromQuery] string? underlyingKey,
-            UpstoxClient upstox) =>
-        {
-            if (string.IsNullOrEmpty(underlyingKey))
-                return Results.BadRequest(new { error = "underlyingKey is required." });
-
-            if (!AllowedUpstoxUnderlyings.Contains(underlyingKey))
-                return Results.BadRequest(new { error = $"underlyingKey '{underlyingKey}' is not supported." });
-
-            var today = DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(5.5));
-            var contracts = await upstox.GetOptionContractsAsync(underlyingKey);
-            var currentYear = contracts
-                .Where(c =>
-                    (c.InstrumentType == "CE" || c.InstrumentType == "PE") &&
-                    DateOnly.TryParse(c.Expiry, out var expiry) && expiry.Year == today.Year)
-                .OrderBy(c => c.Expiry)
-                .ToList();
-
-            return Results.Ok(currentYear);
         });
 
         group.MapGet("/orders/by-option-price/resolve", async (

@@ -69,17 +69,19 @@ export interface OptionChainEntry {
   put_options?: OptionSide;
 }
 
-export interface OptionContract {
-  instrument_key: string;
-  trading_symbol: string;
+export interface ContractEntry {
   expiry: string;
-  strike_price: number;
-  instrument_type: "CE" | "PE";
-  lot_size: number;
-  underlying_key: string;
-  underlying_symbol: string;
-  exchange: string;
-  weekly: boolean;
+  exchangeToken: string;
+  lotSize: number;
+  instrumentType: "CE" | "PE";
+  upstoxToken: string;       // "NSE_FO|37590"  — empty for Zerodha rows
+  zerodhaToken: string;    // "15942914"      — raw numeric token, empty for Upstox rows
+  strikePrice: number;
+}
+
+export interface IndexContracts {
+  index: string;
+  contracts: ContractEntry[];
 }
 
 export interface Order {

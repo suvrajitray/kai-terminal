@@ -86,7 +86,9 @@ export function PositionRow({
   const num = parseInt(qtyValue, 10);
   const actualQty = isNaN(num) || num <= 0 ? 0 : qtyMode === "lot" ? num * lot : num;
   const getByInstrumentKey = useOptionContractsStore((s) => s.getByInstrumentKey);
-  const contract = getByInstrumentKey(p.instrument_token);
+  const lookup = getByInstrumentKey(p.instrument_token);
+  const contract = lookup?.contract;
+  const index = lookup?.index;
 
   return (
     <>
@@ -105,8 +107,8 @@ export function PositionRow({
           {contract ? (
             <>
               <div className="flex items-center gap-1.5 font-medium">
-                {contract.underlying_symbol} {contract.strike_price}
-                <OptionTypeBadge type={contract.instrument_type} />
+                {index} {contract.strikePrice}
+                <OptionTypeBadge type={contract.instrumentType} />
               </div>
               <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
                 <BrokerBadge brokerId={p.broker ?? "upstox"} size={12} />

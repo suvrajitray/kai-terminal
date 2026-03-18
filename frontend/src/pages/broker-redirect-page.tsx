@@ -10,9 +10,8 @@ import { useBrokerStore } from "@/stores/broker-store";
 import { useUserTradingSettingsStore } from "@/stores/user-trading-settings-store";
 import { exchangeAccessToken, exchangeZerodhaToken, updateBrokerAccessToken } from "@/services/broker-api";
 import { fetchUserTradingSettings } from "@/services/user-settings-api";
-import { fetchOptionContracts, fetchZerodhaOptionContracts } from "@/services/trading-api";
+import { fetchMasterContracts } from "@/services/trading-api";
 import { useOptionContractsStore } from "@/stores/option-contracts-store";
-import { UNDERLYING_KEYS } from "@/lib/shift-config";
 import { toast } from "sonner";
 
 interface Step {
@@ -28,7 +27,7 @@ export function BrokerRedirectPage() {
   const getCredentials = useBrokerStore((s) => s.getCredentials);
   const setAccessToken = useBrokerStore((s) => s.setAccessToken);
   const setTradingSettings = useUserTradingSettingsStore((s) => s.setSettings);
-  const setContracts = useOptionContractsStore((s) => s.setContracts);
+  const setIndexContracts = useOptionContractsStore((s) => s.setIndexContracts);
 
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
@@ -83,22 +82,11 @@ export function BrokerRedirectPage() {
         setTradingSettings(settings);
         addStep("User trading settings loaded");
 
-        // Step 4 — prefetch option contracts for all indices in parallel
-        const underlyings = Object.keys(UNDERLYING_KEYS);
-        if (isZerodha) {
-          // Zerodha: use symbol name directly (NIFTY, BANKNIFTY, etc.)
-          const results = await Promise.all(
-            underlyings.map((u) => fetchZerodhaOptionContracts(u))
-          );
-          underlyings.forEach((u, i) => setContracts(`zerodha:${u}`, results[i]));
-        } else {
-          // Upstox: use instrument key (NSE_INDEX|Nifty 50, etc.)
-          const results = await Promise.all(
-            underlyings.map((u) => fetchOptionContracts(UNDERLYING_KEYS[u]))
-          );
-          underlyings.forEach((u, i) => setContracts(u, results[i]));
-        }
-        addStep(`Option contracts loaded (${underlyings.join(", ")})`);
+        // Step 4 — prefetch option contracts for all indices via unified master data API
+        const brokerId_ = brokerId!;
+        const data = await fetchMasterContracts(brokerId_);
+        setIndexContracts(brokerId_, data);
+        addStep(`Option contracts loaded (${data.map((d) => d.index).join(", ")})`);
 
         setStatus("success");
         toast.success("Happy Trading! 🎉");

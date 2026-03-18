@@ -55,7 +55,7 @@ export function QuickTradeDialog({ onTabChange }: Props) {
   const [activeTab, setActiveTab]   = useState("price");
 
   const getExpiries = useOptionContractsStore((s) => s.getExpiries);
-  const expiries = getExpiries(underlying);
+  const expiries = getExpiries(`${broker}:${underlying}`);
 
   useEffect(() => {
     setExpiry(expiries[0] ?? "");

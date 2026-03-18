@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api-client";
-import type { Position, Order, OptionContract, OptionChainEntry } from "@/types";
+import type { Position, Order, IndexContracts, OptionChainEntry } from "@/types";
 
 export async function fetchPositions(exchanges?: string[]): Promise<Position[]> {
   const params = exchanges?.length ? { exchange: exchanges.join(",") } : undefined;
@@ -95,23 +95,11 @@ export async function fetchOptionChain(
   return res.data;
 }
 
-export async function fetchOptionContracts(underlyingKey: string): Promise<OptionContract[]> {
-  const res = await apiClient.get<OptionContract[]>("/api/upstox/options/contracts/current-year", {
-    params: { underlyingKey },
+export async function fetchMasterContracts(broker: string): Promise<IndexContracts[]> {
+  const res = await apiClient.get<IndexContracts[]>("/api/masterdata/contracts", {
+    params: { broker },
   });
   return res.data;
-}
-
-// underlying = symbol name (e.g. "NIFTY", "BANKNIFTY") — Zerodha uses name not instrument key
-export async function fetchZerodhaOptionContracts(underlying: string): Promise<OptionContract[]> {
-  const res = await apiClient.get<OptionContract[]>("/api/zerodha/options/contracts/current-year", {
-    params: { underlying },
-  });
-  return res.data;
-}
-
-export function extractExpiries(contracts: OptionContract[]): string[] {
-  return [...new Set(contracts.map((c) => c.expiry))].sort();
 }
 
 export interface MarginInstrument {

@@ -1,6 +1,7 @@
 using KAITerminal.Broker;
 using KAITerminal.Upstox.Models.Responses;
 using KAITerminal.Upstox.Services;
+using KAITerminal.Zerodha.Models;
 using KAITerminal.Zerodha.Services;
 using KAITerminal.Zerodha.Streaming;
 
@@ -74,7 +75,7 @@ public sealed class ZerodhaClient
 
     // ── Instruments ───────────────────────────────────────────────────────────
 
-    public Task<IReadOnlyList<OptionContract>> GetOptionContractsAsync(
+    public Task<IReadOnlyList<ZerodhaOptionContract>> GetOptionContractsAsync(
         string underlyingSymbol, CancellationToken ct = default)
         => _instruments.GetCurrentYearContractsAsync(underlyingSymbol, ct);
 

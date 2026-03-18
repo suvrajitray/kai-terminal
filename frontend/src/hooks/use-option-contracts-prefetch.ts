@@ -2,8 +2,10 @@ import { useEffect, useRef } from "react";
 import { useBrokerStore } from "@/stores/broker-store";
 import { useOptionContractsStore } from "@/stores/option-contracts-store";
 import { isBrokerTokenExpired } from "@/lib/token-utils";
-import { fetchOptionContracts, fetchZerodhaOptionContracts } from "@/services/trading-api";
+import { fetchMasterContracts } from "@/services/trading-api";
 import { UNDERLYING_KEYS } from "@/lib/shift-config";
+
+const UNDERLYINGS = Object.keys(UNDERLYING_KEYS);
 
 /**
  * Fetches option contracts for all authenticated brokers if the in-memory store is empty.
@@ -16,30 +18,29 @@ export function useOptionContractsPrefetch() {
     if (calledRef.current) return;
     calledRef.current = true;
 
-    const { getCredentials, credentials } = useBrokerStore.getState();
-    const { getContracts, setContracts } = useOptionContractsStore.getState();
-    const underlyings = Object.keys(UNDERLYING_KEYS);
+    const { getCredentials } = useBrokerStore.getState();
+    const { getContracts, setIndexContracts } = useOptionContractsStore.getState();
 
-    // Upstox
-    const upstoxToken = getCredentials("upstox")?.accessToken;
-    if (upstoxToken && !isBrokerTokenExpired("upstox", upstoxToken)) {
-      const missing = underlyings.filter((u) => getContracts(u).length === 0);
-      if (missing.length > 0) {
-        Promise.all(missing.map((u) => fetchOptionContracts(UNDERLYING_KEYS[u])))
-          .then((results) => missing.forEach((u, i) => setContracts(u, results[i])))
-          .catch(() => {});
-      }
+    const hasUpstox = (() => {
+      const token = getCredentials("upstox")?.accessToken;
+      return !!token && !isBrokerTokenExpired("upstox", token);
+    })();
+
+    const hasZerodha = (() => {
+      const token = getCredentials("zerodha")?.accessToken;
+      return !!token && !isBrokerTokenExpired("zerodha", token);
+    })();
+
+    if (hasUpstox && UNDERLYINGS.every((u) => getContracts(`upstox:${u}`).length === 0)) {
+      fetchMasterContracts("upstox")
+        .then((d) => setIndexContracts("upstox", d))
+        .catch(() => {});
     }
 
-    // Zerodha
-    const zerodhaToken = getCredentials("zerodha")?.accessToken;
-    if (zerodhaToken && !isBrokerTokenExpired("zerodha", zerodhaToken)) {
-      const missing = underlyings.filter((u) => getContracts(`zerodha:${u}`).length === 0);
-      if (missing.length > 0) {
-        Promise.all(missing.map((u) => fetchZerodhaOptionContracts(u)))
-          .then((results) => missing.forEach((u, i) => setContracts(`zerodha:${u}`, results[i])))
-          .catch(() => {});
-      }
+    if (hasZerodha && UNDERLYINGS.every((u) => getContracts(`zerodha:${u}`).length === 0)) {
+      fetchMasterContracts("zerodha")
+        .then((d) => setIndexContracts("zerodha", d))
+        .catch(() => {});
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

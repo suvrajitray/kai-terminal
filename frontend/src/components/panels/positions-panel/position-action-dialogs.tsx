@@ -70,7 +70,9 @@ function useQtyState(initialQty: number, open: boolean, lotSize: number) {
 
 function SymbolChip({ position }: { position: Position }) {
   const getByInstrumentKey = useOptionContractsStore((s) => s.getByInstrumentKey);
-  const contract = getByInstrumentKey(position.instrument_token);
+  const lookup = getByInstrumentKey(position.instrument_token);
+  const contract = lookup?.contract;
+  const index = lookup?.index;
 
   return (
     <div className="rounded-lg border border-border/40 bg-muted/20 px-3 py-2.5 space-y-1.5">
@@ -80,9 +82,9 @@ function SymbolChip({ position }: { position: Position }) {
           {contract ? (
             <>
               <span className="font-semibold text-sm">
-                {contract.underlying_symbol} {contract.strike_price}
+                {index} {contract.strikePrice}
               </span>
-              <OptionTypeBadge type={contract.instrument_type} />
+              <OptionTypeBadge type={contract.instrumentType} />
             </>
           ) : (
             <span className="font-semibold text-sm truncate">{position.trading_symbol}</span>

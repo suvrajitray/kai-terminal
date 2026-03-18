@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { OptionContract } from "@/types";
+import type { ContractEntry, IndexContracts } from "@/types";
 
 const MONTH_ABBR = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
 
@@ -10,12 +10,18 @@ export function formatExpiryLabel(iso: string): string {
   return `${String(d).padStart(2, "0")}${MONTH_ABBR[m - 1]}${String(y).slice(-2)}`;
 }
 
+export interface ContractLookup {
+  contract: ContractEntry;
+  /** The index name derived from the store key, e.g. "NIFTY", "BANKNIFTY" */
+  index: string;
+}
+
 interface OptionContractsState {
-  contracts: Record<string, OptionContract[]>; // keyed by underlying e.g. "NIFTY" or "zerodha:NIFTY"
-  setContracts: (underlying: string, contracts: OptionContract[]) => void;
-  getContracts: (underlying: string) => OptionContract[];
-  getByInstrumentKey: (instrumentKey: string) => OptionContract | undefined;
-  getExpiries: (underlying: string) => string[];
+  contracts: Record<string, ContractEntry[]>; // keyed by "broker:INDEX" e.g. "upstox:NIFTY" or "zerodha:NIFTY"
+  setIndexContracts: (broker: string, data: IndexContracts[]) => void;
+  getContracts: (key: string) => ContractEntry[];
+  getByInstrumentKey: (instrumentToken: string) => ContractLookup | undefined;
+  getExpiries: (key: string) => string[];
   clear: () => void;
 }
 
@@ -24,21 +30,35 @@ export const useOptionContractsStore = create<OptionContractsState>()(
     (set, get) => ({
       contracts: {},
 
-      setContracts: (underlying, contracts) =>
-        set((state) => ({ contracts: { ...state.contracts, [underlying]: contracts } })),
+      setIndexContracts: (broker, data) => {
+        const next: Record<string, ContractEntry[]> = {};
+        for (const idx of data) next[`${broker}:${idx.index}`] = idx.contracts;
+        set((s) => ({ contracts: { ...s.contracts, ...next } }));
+      },
 
-      getContracts: (underlying) => get().contracts[underlying] ?? [],
+      getContracts: (key) => get().contracts[key] ?? [],
 
-      getByInstrumentKey: (instrumentKey) => {
-        for (const contracts of Object.values(get().contracts)) {
-          const found = contracts.find((c) => c.instrument_key === instrumentKey);
-          if (found) return found;
+      getByInstrumentKey: (instrumentToken) => {
+        // Zerodha positions report instrument_token as "NFO|15942914"; strip exchange prefix for comparison
+        const numericPart = instrumentToken.includes("|")
+          ? instrumentToken.split("|")[1]
+          : instrumentToken;
+
+        for (const [key, contracts] of Object.entries(get().contracts)) {
+          const found = contracts.find(
+            (c) => c.upstoxToken === instrumentToken ||
+                   c.zerodhaToken === numericPart,
+          );
+          if (found) {
+            const index = key.includes(":") ? key.split(":").pop()! : key;
+            return { contract: found, index };
+          }
         }
         return undefined;
       },
 
-      getExpiries: (underlying) => {
-        const contracts = get().contracts[underlying] ?? [];
+      getExpiries: (key) => {
+        const contracts = get().contracts[key] ?? [];
         return [...new Set(contracts.map((c) => c.expiry))].sort();
       },
 
