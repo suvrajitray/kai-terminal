@@ -8,10 +8,11 @@ import { BrokerAuthRequired } from "@/components/terminal/broker-auth-required";
 import { usePositionsFeed } from "@/components/panels/positions-panel/use-positions-feed";
 import { useProfitProtection } from "./use-profit-protection";
 import { useRiskConfig } from "@/hooks/use-risk-config";
+import { useOptionContractsPrefetch } from "@/hooks/use-option-contracts-prefetch";
 import { exitAllPositions } from "@/services/trading-api";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
 import { useBrokerStore } from "@/stores/broker-store";
-import { isTokenExpired } from "@/lib/token-utils";
+import { isBrokerTokenExpired } from "@/lib/token-utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,9 +28,13 @@ const DEFAULT_ORDERS_HEIGHT = 180;
 const MIN_HEIGHT = 32;
 
 export function TerminalPage() {
-  const token = useBrokerStore((s) => s.getCredentials("upstox")?.accessToken);
-  if (!token || isTokenExpired(token)) {
-    return <BrokerAuthRequired expired={!!token} />;
+  const credentials = useBrokerStore((s) => s.credentials);
+  const brokerEntries = Object.entries(credentials);
+  const hasValid = brokerEntries.some(([id, c]) => !isBrokerTokenExpired(id, c?.accessToken));
+  const hasExpired = brokerEntries.length > 0 && brokerEntries.every(([id, c]) => isBrokerTokenExpired(id, c?.accessToken));
+
+  if (!hasValid) {
+    return <BrokerAuthRequired expired={hasExpired} />;
   }
 
   return <TerminalPageInner />;
@@ -71,6 +76,8 @@ function TerminalPageInner() {
       setActing(null);
     }
   };
+
+  useOptionContractsPrefetch();
 
   // Hooks must be called unconditionally — one set per known broker in BROKERS.
   // When adding a new broker (e.g. "dhan"), add useRiskConfig, useProfitProtection,

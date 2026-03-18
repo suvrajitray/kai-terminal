@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { fetchOrders, cancelAllOrders, cancelOrder } from "@/services/trading-api";
 import { OptionTypeBadge } from "@/components/panels/positions-panel/option-type-badge";
+import { isBrokerTokenExpired } from "@/lib/token-utils";
+import { useBrokerStore } from "@/stores/broker-store";
 import type { Order } from "@/types";
 
 const TERMINAL_STATUSES = new Set(["complete", "rejected", "cancelled"]);
@@ -105,6 +107,8 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
   const [tab, setTab] = useState<Tab>("open");
 
   const load = useCallback(async () => {
+    const upstoxToken = useBrokerStore.getState().getCredentials("upstox")?.accessToken;
+    if (isBrokerTokenExpired("upstox", upstoxToken)) return;
     setLoading(true);
     setError(null);
     try {

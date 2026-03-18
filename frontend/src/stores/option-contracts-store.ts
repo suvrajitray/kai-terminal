@@ -11,7 +11,7 @@ export function formatExpiryLabel(iso: string): string {
 }
 
 interface OptionContractsState {
-  contracts: Record<string, OptionContract[]>; // keyed by underlying e.g. "NIFTY"
+  contracts: Record<string, OptionContract[]>; // keyed by underlying e.g. "NIFTY" or "zerodha:NIFTY"
   setContracts: (underlying: string, contracts: OptionContract[]) => void;
   getContracts: (underlying: string) => OptionContract[];
   getByInstrumentKey: (instrumentKey: string) => OptionContract | undefined;

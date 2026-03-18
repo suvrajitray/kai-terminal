@@ -28,8 +28,10 @@ export function usePositionsFeed(onOrderUpdate?: () => void) {
   const load = useCallback(async (exchanges = ["NFO", "BFO"]) => {
     setLoading(true);
     try {
+      const upstoxToken = useBrokerStore.getState().getCredentials("upstox")?.accessToken;
+      const hasUpstox = !!upstoxToken && !isBrokerTokenExpired("upstox", upstoxToken);
       const [upstox, zerodha] = await Promise.all([
-        fetchPositions(exchanges),
+        hasUpstox ? fetchPositions(exchanges) : Promise.resolve([] as Position[]),
         loadZerodhaPositions(exchanges),
       ]);
       setPositions([...upstox, ...zerodha]);

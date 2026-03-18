@@ -19,8 +19,8 @@ export function BrokerAuthRequired({ expired }: BrokerAuthRequiredProps) {
           </h2>
           <p className="text-sm text-muted-foreground">
             {expired
-              ? "Your Upstox token has expired — please re-authenticate."
-              : "No Upstox token found — please authenticate with your broker first."}
+              ? "Your broker token has expired — please re-authenticate."
+              : "No broker token found — please authenticate with your broker first."}
           </p>
         </div>
         <Button onClick={() => navigate("/connect-brokers")}>Connect Broker</Button>

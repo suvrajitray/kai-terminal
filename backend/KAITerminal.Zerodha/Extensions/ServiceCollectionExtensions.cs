@@ -51,6 +51,7 @@ public static class ServiceCollectionExtensions
             var cfg = ResolveConfig(sp);
             client.BaseAddress = new Uri(cfg.ApiBaseUrl);
             client.Timeout = TimeSpan.FromSeconds(60); // instrument CSVs can be large
+            client.DefaultRequestHeaders.Add("X-Kite-Version", "3");
         });
 
         services.AddSingleton<ZerodhaHttpClient>();
