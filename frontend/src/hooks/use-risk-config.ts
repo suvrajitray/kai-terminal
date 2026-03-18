@@ -30,11 +30,11 @@ function toDto(config: ProfitProtectionConfig): RiskConfigDto {
 }
 
 export function useRiskConfig(brokerType: string = "upstox") {
-  const store = useProfitProtectionStore();
   const isAuthenticated = useBrokerStore((s) => s.isAuthenticated(brokerType));
 
   useEffect(() => {
     if (!isAuthenticated) return;
+    const store = useProfitProtectionStore.getState();
     apiClient.get<RiskConfigDto>(`/api/risk-config?broker=${brokerType}`).then((res) => {
       store.setConfig(brokerType, res.data);
       store.markLoaded(brokerType);
@@ -46,16 +46,16 @@ export function useRiskConfig(brokerType: string = "upstox") {
 
   async function save(config: ProfitProtectionConfig) {
     await apiClient.put(`/api/risk-config?broker=${brokerType}`, toDto(config));
-    store.setConfig(brokerType, config);
+    useProfitProtectionStore.getState().setConfig(brokerType, config);
   }
 
   function setEnabled(enabled: boolean) {
     // Optimistic update — flip immediately so the toggle feels instant
-    store.setEnabled(brokerType, enabled);
+    useProfitProtectionStore.getState().setEnabled(brokerType, enabled);
     // Persist in background; revert on failure
     const updated = { ...useProfitProtectionStore.getState().getConfig(brokerType), enabled };
     apiClient.put(`/api/risk-config?broker=${brokerType}`, toDto(updated)).catch(() => {
-      store.setEnabled(brokerType, !enabled);
+      useProfitProtectionStore.getState().setEnabled(brokerType, !enabled);
     });
   }
 

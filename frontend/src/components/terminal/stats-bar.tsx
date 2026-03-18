@@ -11,6 +11,7 @@ import { useRiskConfig } from "@/hooks/use-risk-config";
 import { useBrokerStore } from "@/stores/broker-store";
 import { BROKERS } from "@/lib/constants";
 import { useShallow } from "zustand/react/shallow";
+import { BrokerBadge } from "@/components/ui/broker-badge";
 import type { Position } from "@/types";
 
 
@@ -30,6 +31,7 @@ interface StatsBarProps {
   onExitAll: () => void;
   onOpenProfitProtection: () => void;
   ppBrokers: PpBrokerEntry[];
+  mtmByBroker: Record<string, number>;
 }
 
 export function StatsBar({
@@ -41,6 +43,7 @@ export function StatsBar({
   onExitAll,
   onOpenProfitProtection,
   ppBrokers,
+  mtmByBroker,
 }: StatsBarProps) {
   const connectedBrokers = useBrokerStore(useShallow((s) => BROKERS.filter((b) => s.isAuthenticated(b.id))));
   const multipleConnected = connectedBrokers.length > 1;
@@ -82,26 +85,49 @@ export function StatsBar({
   }, [totalPnl, positions.length]);
 
   return (
-    <div className="flex h-9 shrink-0 items-center gap-4 border-b border-border bg-muted/40 px-3">
+    <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border bg-muted/40 px-3">
+      {/* Live indicator — icon only below xl */}
       <span
         title={isLive ? "Live" : "Offline"}
-        className={cn("flex items-center gap-1 text-xs font-medium", isLive ? "text-green-500" : "text-muted-foreground")}
+        className={cn("flex shrink-0 items-center gap-1 text-xs font-medium", isLive ? "text-green-500" : "text-muted-foreground")}
       >
         {isLive ? <Wifi className="size-3.5" /> : <WifiOff className="size-3.5" />}
-        {isLive ? "Live" : "Offline"}
+        <span className="hidden xl:inline">{isLive ? "Live" : "Offline"}</span>
       </span>
 
-      <SessionTimer />
+      {/* Session timer — hidden below xl */}
+      <span className="hidden xl:flex">
+        <SessionTimer />
+      </span>
 
       {positions.length > 0 && (
         <>
           <MtmDisplay value={totalPnl} />
+
+          {multipleConnected && Object.keys(mtmByBroker).length > 1 && (
+            <span className="flex items-center gap-1.5 text-xs">
+              {connectedBrokers.map((b, i) => {
+                const val = mtmByBroker[b.id] ?? 0;
+                return (
+                  <span key={b.id} className="flex items-center gap-1">
+                    {i > 0 && <span className="text-muted-foreground/40">·</span>}
+                    <BrokerBadge brokerId={b.id} />
+                    <span className={cn("tabular-nums font-medium", val >= 0 ? "text-green-500" : "text-red-500")}>
+                      {val >= 0 ? "+" : "-"}₹{Math.abs(val).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                    </span>
+                  </span>
+                );
+              })}
+            </span>
+          )}
+
           <PositionCountBadges openCount={openCount} closedCount={closedCount} />
 
+          {/* Peak / Trough — hidden below 2xl */}
           {(maxProfit !== null || maxLoss !== null) && (
             <>
-              <div className="h-4 w-px bg-border" />
-              <span className="flex items-center gap-3 text-xs">
+              <div className="hidden 2xl:block h-4 w-px bg-border" />
+              <span className="hidden 2xl:flex items-center gap-3 text-xs">
                 {maxProfit !== null && (
                   <span className="flex items-center gap-1">
                     <span className="text-muted-foreground">Peak</span>
@@ -124,33 +150,32 @@ export function StatsBar({
         </>
       )}
 
+      {/* PP target / SL — abbreviated labels */}
       {ppBrokers.length > 0 && (
         <>
           <div className="h-4 w-px bg-border" />
-          <span className="flex items-center gap-2 text-xs">
+          <span className="flex items-center gap-1.5 text-xs">
             {ppBrokers.length === 1 ? (
-              // Single enabled broker — no prefix label
               <>
-                <span className="text-muted-foreground">Target</span>
+                <span className="text-muted-foreground">TGT</span>
                 <span className="font-medium tabular-nums text-green-500">
                   ₹{ppBrokers[0].target.toLocaleString("en-IN")}
                 </span>
-                <span className="text-muted-foreground">{ppBrokers[0].trailing ? "Trail SL" : "SL"}</span>
+                <span className="text-muted-foreground">SL</span>
                 <span className="font-medium tabular-nums text-red-500">
                   ₹{ppBrokers[0].currentSl.toLocaleString("en-IN")}
                 </span>
               </>
             ) : (
-              // Both brokers enabled — show U / Z labelled entries
               ppBrokers.map((b, i) => (
-                <span key={b.broker} className="flex items-center gap-1.5">
+                <span key={b.broker} className="flex items-center gap-1">
                   {i > 0 && <span className="text-muted-foreground/40">·</span>}
-                  <span className="text-muted-foreground/60 text-[10px] uppercase">{b.broker[0]}</span>
-                  <span className="text-muted-foreground">Target</span>
+                  <BrokerBadge brokerId={b.broker} />
+                  <span className="text-muted-foreground">TGT</span>
                   <span className="font-medium tabular-nums text-green-500">
                     ₹{b.target.toLocaleString("en-IN")}
                   </span>
-                  <span className="text-muted-foreground">{b.trailing ? "Trail SL" : "SL"}</span>
+                  <span className="text-muted-foreground">SL</span>
                   <span className="font-medium tabular-nums text-red-500">
                     ₹{b.currentSl.toLocaleString("en-IN")}
                   </span>
@@ -161,26 +186,24 @@ export function StatsBar({
         </>
       )}
 
-      {/* Available Margin — shows per-broker when both connected */}
-      <div className="ml-auto flex items-center gap-1 rounded px-2 py-1 text-xs">
+      {/* Available Margin — "Avail" label hidden below xl */}
+      <div className="ml-auto flex shrink-0 items-center gap-1 rounded px-2 py-1 text-xs">
         <Wallet className="size-3.5 text-muted-foreground" />
-        <span className="text-muted-foreground">Avail</span>
         {fundsLoading ? (
           <span className="animate-pulse tabular-nums text-muted-foreground/60 ml-1">…</span>
         ) : !fundsVisible ? (
           <span className="font-semibold tabular-nums text-muted-foreground/40 ml-1 tracking-widest">••••••</span>
         ) : allFunds.upstox?.availableMargin != null && allFunds.zerodha?.availableMargin != null ? (
-          // Both brokers connected — show labelled breakdown
           <span className="flex items-center gap-2 ml-1">
-            <span className="flex items-center gap-0.5">
-              <span className="text-muted-foreground/60 text-[10px]">U</span>
+            <span className="flex items-center gap-1">
+              <BrokerBadge brokerId="upstox" />
               <span className="font-semibold tabular-nums text-foreground">
                 ₹{allFunds.upstox.availableMargin.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
               </span>
             </span>
             <span className="text-muted-foreground/40">·</span>
-            <span className="flex items-center gap-0.5">
-              <span className="text-muted-foreground/60 text-[10px]">Z</span>
+            <span className="flex items-center gap-1">
+              <BrokerBadge brokerId="zerodha" />
               <span className="font-semibold tabular-nums text-foreground">
                 ₹{allFunds.zerodha.availableMargin.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
               </span>
@@ -205,8 +228,8 @@ export function StatsBar({
         </button>
       </div>
 
-      <div className="flex items-center gap-2">
-        {/* Profit Protection */}
+      <div className="flex shrink-0 items-center gap-2">
+        {/* Profit Protection — text hidden below xl, icon always visible */}
         <button
           onClick={onOpenProfitProtection}
           className={cn(
@@ -218,7 +241,7 @@ export function StatsBar({
           title={ppEnabled ? "Profit Protection ON — click to configure" : "Click to configure Profit Protection"}
         >
           <ShieldCheck className="size-3.5" />
-          Profit Protection
+          <span className="hidden xl:inline">Profit Protection</span>
           {/* inline toggle — only shown for single-broker sessions */}
           {!multipleConnected && (
             <span

@@ -36,7 +36,9 @@ export function useProfitProtection(positions: Position[], brokerType: string = 
   useEffect(() => {
     if (!pp.enabled || positions.length === 0) return;
 
-    const mtm = positions.reduce((s, p) => s + p.pnl, 0);
+    const mtm = positions
+      .filter((p) => (p.broker ?? "upstox") === brokerType)
+      .reduce((s, p) => s + p.pnl, 0);
 
     if (!initializedRef.current) {
       initializedRef.current = true;

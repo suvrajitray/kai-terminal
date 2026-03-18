@@ -6,6 +6,7 @@ import { useProfitProtectionStore } from "@/stores/profit-protection-store";
 import { useBrokerStore } from "@/stores/broker-store";
 import { BROKERS } from "@/lib/constants";
 import { useShallow } from "zustand/react/shallow";
+import { BrokerBadge } from "@/components/ui/broker-badge";
 
 const INR = new Intl.NumberFormat("en-IN", { minimumFractionDigits: 0 });
 
@@ -23,7 +24,7 @@ function BrokerConfigRows({ broker, label }: { broker: string; label?: string })
           ) : (
             <ShieldOff className="size-3.5 text-muted-foreground/50" />
           )}
-          <span className="text-[11px] font-medium capitalize text-muted-foreground">{label}</span>
+          <BrokerBadge brokerId={broker} size={16} />
           <span
             className={cn(
               "rounded-full px-1.5 py-0 text-[10px] font-semibold",

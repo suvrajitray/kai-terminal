@@ -63,6 +63,27 @@ public static class ZerodhaEndpoints
             return Results.Ok(new { accessToken });
         });
 
+        // ── Positions ─────────────────────────────────────────────────────────
+
+        /// <summary>Returns net positions, optionally filtered by a comma-separated exchange list.</summary>
+        group.MapGet("/positions", async (
+            ZerodhaClient zerodha,
+            [FromQuery] string? exchange,
+            CancellationToken ct) =>
+        {
+            var positions = await zerodha.GetAllPositionsAsync(ct);
+            if (!string.IsNullOrWhiteSpace(exchange))
+            {
+                var exchanges = exchange.Split(',')
+                    .Select(e => e.Trim().ToUpperInvariant())
+                    .ToHashSet();
+                positions = positions
+                    .Where(p => exchanges.Contains(p.Exchange.ToUpperInvariant()))
+                    .ToList();
+            }
+            return Results.Ok(positions);
+        });
+
         // ── Funds ─────────────────────────────────────────────────────────────
 
         /// <summary>Returns available and used margin for the Zerodha equity/F&amp;O segment.</summary>

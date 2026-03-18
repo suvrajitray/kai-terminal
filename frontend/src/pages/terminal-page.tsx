@@ -123,7 +123,12 @@ function TerminalPageInner() {
     window.addEventListener("mouseup", onMouseUp);
   }, [ordersHeight]);
 
-  const totalPnl = positions.reduce((s, p) => s + p.pnl, 0);
+  // Per-broker MTM — positions are tagged with broker field; untagged positions fall under "upstox"
+  const mtmByBroker = positions.reduce<Record<string, number>>((acc, p) => {
+    const key = p.broker ?? "upstox";
+    acc[key] = (acc[key] ?? 0) + p.pnl;
+    return acc;
+  }, {});
 
   return (
     <div className="relative flex h-[calc(100svh-3.5rem)] flex-col overflow-hidden">
@@ -136,6 +141,7 @@ function TerminalPageInner() {
         onRefresh={load}
         onExitAll={() => setExitAllConfirmOpen(true)}
         onOpenProfitProtection={() => setPpOpen(true)}
+        mtmByBroker={mtmByBroker}
         ppBrokers={[
           upstoxPp.enabled ? { broker: "upstox",  target: upstoxPp.mtmTarget, currentSl: upstoxSl,  trailing: upstoxPp.trailingEnabled } : null,
           zerodhaP.enabled ? { broker: "zerodha", target: zerodhaP.mtmTarget, currentSl: zerodhasl, trailing: zerodhaP.trailingEnabled } : null,
@@ -175,7 +181,7 @@ function TerminalPageInner() {
       <ProfitProtectionPanel
         open={ppOpen}
         onClose={() => setPpOpen(false)}
-        currentMtm={totalPnl}
+        mtmByBroker={mtmByBroker}
       />
 
       {/* Exit All confirmation (triggered by E key or button) */}

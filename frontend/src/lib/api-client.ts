@@ -9,7 +9,8 @@ export const apiClient = axios.create({ baseURL: API_BASE_URL });
 
 apiClient.interceptors.request.use((config) => {
   const token = useAuthStore.getState().token;
-  const accessToken = useBrokerStore.getState().getCredentials("upstox")?.accessToken;
+  const upstoxCreds  = useBrokerStore.getState().getCredentials("upstox");
+  const zerodhaCreds = useBrokerStore.getState().getCredentials("zerodha");
 
   if (token) {
     if (isTokenExpired(token)) {
@@ -19,7 +20,9 @@ apiClient.interceptors.request.use((config) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
 
-  if (accessToken) config.headers["X-Upstox-Access-Token"] = accessToken;
+  if (upstoxCreds?.accessToken)  config.headers["X-Upstox-Access-Token"]  = upstoxCreds.accessToken;
+  if (zerodhaCreds?.accessToken) config.headers["X-Zerodha-Access-Token"] = zerodhaCreds.accessToken;
+  if (zerodhaCreds?.apiKey)      config.headers["X-Zerodha-Api-Key"]      = zerodhaCreds.apiKey;
   return config;
 });
 

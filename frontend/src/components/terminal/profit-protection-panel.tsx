@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ShieldCheck } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import { useShallow } from "zustand/react/shallow";
 interface ProfitProtectionPanelProps {
   open: boolean;
   onClose: () => void;
-  currentMtm: number;
+  mtmByBroker: Record<string, number>;
 }
 
 // Draft stores numbers as strings so mid-typing states (e.g. "-", "1.") don't get clobbered.
@@ -31,13 +31,13 @@ interface Draft {
 const toStr = (n: number) => String(n);
 const fromStr = (s: string) => Number(s);
 
-export function ProfitProtectionPanel({ open, onClose, currentMtm }: ProfitProtectionPanelProps) {
+export function ProfitProtectionPanel({ open, onClose, mtmByBroker }: ProfitProtectionPanelProps) {
   const connectedBrokers = useBrokerStore(useShallow((s) => BROKERS.filter((b) => s.isAuthenticated(b.id))));
   const multipleConnected = connectedBrokers.length > 1;
 
-  const [activeBroker, setActiveBroker] = useState<string>(
-    connectedBrokers[0]?.id ?? "upstox"
-  );
+  // Default to first connected broker; kept in sync when dialog opens.
+  const defaultBroker = connectedBrokers[0]?.id ?? "upstox";
+  const [activeBroker, setActiveBroker] = useState<string>(defaultBroker);
 
   // Hooks must be called unconditionally — one per known broker in BROKERS.
   // When adding a new broker (e.g. "dhan"), add one line here and to the record below.
@@ -54,25 +54,36 @@ export function ProfitProtectionPanel({ open, onClose, currentMtm }: ProfitProte
 
   const pp = useProfitProtectionStore((s) => s.getConfig(activeBroker));
 
-  const storeAsDraft = (): Draft => ({
-    mtmTarget:          toStr(pp.mtmTarget),
-    mtmSl:              toStr(pp.mtmSl),
-    trailingEnabled:    pp.trailingEnabled,
-    trailingActivateAt: toStr(pp.trailingActivateAt),
-    lockProfitAt:       toStr(pp.lockProfitAt),
-    increaseBy:         toStr(pp.increaseBy),
-    trailBy:            toStr(pp.trailBy),
-  });
+  const makeDraft = (broker: string): Draft => {
+    const brokerPp = useProfitProtectionStore.getState().getConfig(broker);
+    return {
+      mtmTarget:          toStr(brokerPp.mtmTarget),
+      mtmSl:              toStr(brokerPp.mtmSl),
+      trailingEnabled:    brokerPp.trailingEnabled,
+      trailingActivateAt: toStr(brokerPp.trailingActivateAt),
+      lockProfitAt:       toStr(brokerPp.lockProfitAt),
+      increaseBy:         toStr(brokerPp.increaseBy),
+      trailBy:            toStr(brokerPp.trailBy),
+    };
+  };
 
-  const [draft, setDraft] = useState<Draft>(storeAsDraft);
+  const [draft, setDraft] = useState<Draft>(() => makeDraft(defaultBroker));
+
+  // Sync draft from store every time the dialog opens (open prop: false → true).
+  // handleOpen / onOpenChange on Dialog does NOT fire when `open` is set programmatically
+  // from outside, so we need a useEffect to catch that transition.
+  useEffect(() => {
+    if (!open) return;
+    const broker = connectedBrokers[0]?.id ?? "upstox";
+    setActiveBroker(broker);
+    setDraft(makeDraft(broker));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const setStr = (key: keyof Draft, value: string | boolean) =>
     setDraft((d) => ({ ...d, [key]: value }));
 
-  const handleOpen = (isOpen: boolean) => {
-    if (isOpen) setDraft(storeAsDraft());
-    else onClose();
-  };
+  const handleOpen = (isOpen: boolean) => { if (!isOpen) onClose(); };
 
   // Reset draft when switching broker tabs
   const handleBrokerSwitch = (broker: string) => {
@@ -94,6 +105,7 @@ export function ProfitProtectionPanel({ open, onClose, currentMtm }: ProfitProte
   const activateAtVal      = fromStr(draft.trailingActivateAt);
   const lockProfitAtVal    = fromStr(draft.lockProfitAt);
   const hasInvalidNumbers  = isNaN(targetVal) || isNaN(slVal) || isNaN(activateAtVal) || isNaN(lockProfitAtVal);
+  const currentMtm         = mtmByBroker[activeBroker] ?? 0;
   const targetWarning      = !isNaN(targetVal) && targetVal <= currentMtm;
   const slWarning          = !isNaN(slVal) && slVal >= currentMtm;
   const activateAtWarning  = draft.trailingEnabled && !isNaN(activateAtVal) && !isNaN(targetVal) && activateAtVal >= targetVal;

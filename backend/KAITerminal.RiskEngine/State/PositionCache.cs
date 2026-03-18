@@ -41,9 +41,14 @@ public sealed class PositionCache : IPositionCache
         decimal total = 0m;
         foreach (var p in e.Positions)
         {
-            var ltp = e.Ltp.TryGetValue(p.InstrumentToken, out var v) ? v : p.LastPrice;
-            var avgPrice = p.Quantity < 0 ? p.SellPrice : p.BuyPrice;
-            total += p.Quantity * (ltp - avgPrice) + p.Realised;
+            // Use Upstox's authoritative Pnl as baseline, then adjust for live LTP movement
+            // since the last REST position fetch.  This is more accurate than recomputing
+            // from buy/sell prices because Upstox accounts for overnight carry, partial exits,
+            // and other edge cases in its own Pnl field.
+            if (e.Ltp.TryGetValue(p.InstrumentToken, out var ltp))
+                total += p.Pnl + p.Quantity * (ltp - p.LastPrice);
+            else
+                total += p.Pnl;
         }
         return total;
     }

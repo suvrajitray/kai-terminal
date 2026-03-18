@@ -4,7 +4,13 @@ import type { Position, Order, OptionContract, OptionChainEntry } from "@/types"
 export async function fetchPositions(exchanges?: string[]): Promise<Position[]> {
   const params = exchanges?.length ? { exchange: exchanges.join(",") } : undefined;
   const res = await apiClient.get<Position[]>("/api/upstox/positions", { params });
-  return res.data;
+  return res.data.map((p) => ({ ...p, broker: "upstox" }));
+}
+
+export async function fetchZerodhaPositions(exchanges?: string[]): Promise<Position[]> {
+  const params = exchanges?.length ? { exchange: exchanges.join(",") } : undefined;
+  const res = await apiClient.get<Position[]>("/api/zerodha/positions", { params });
+  return res.data.map((p) => ({ ...p, broker: "zerodha" }));
 }
 
 export async function exitAllPositions(exchanges = ["NFO", "BFO"]): Promise<void> {
