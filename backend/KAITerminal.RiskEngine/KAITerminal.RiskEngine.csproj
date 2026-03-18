@@ -15,6 +15,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- IBrokerClientFactory, IBrokerClient — also transitively pulls in KAITerminal.Upstox -->
+    <ProjectReference Include="..\KAITerminal.Broker\KAITerminal.Broker.csproj" />
+    <!-- Explicit reference for FeedMode, IMarketDataStreamer, IPortfolioStreamer -->
     <ProjectReference Include="..\KAITerminal.Upstox\KAITerminal.Upstox.csproj" />
   </ItemGroup>
 

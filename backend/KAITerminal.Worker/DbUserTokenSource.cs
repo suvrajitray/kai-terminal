@@ -8,7 +8,8 @@ namespace KAITerminal.Worker;
 
 /// <summary>
 /// Reads enabled users and their risk configs from the database on every call.
-/// Automatically picks up changes without a Worker restart.
+/// Joins on (Username, BrokerType) so one user can have independent risk sessions per broker.
+/// Automatically picks up DB changes without a Worker restart.
 /// </summary>
 public sealed class DbUserTokenSource(IServiceScopeFactory scopeFactory) : IUserTokenSource
 {
@@ -17,12 +18,13 @@ public sealed class DbUserTokenSource(IServiceScopeFactory scopeFactory) : IUser
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
+        // Join UserRiskConfigs with BrokerCredentials on (Username, BrokerType = BrokerName)
         var configs = await db.UserRiskConfigs
             .Where(r => r.Enabled)
             .Join(
                 db.BrokerCredentials,
-                r => r.Username,
-                c => c.Username,
+                r => new { r.Username, BrokerName = r.BrokerType },
+                c => new { c.Username, c.BrokerName },
                 (r, c) => new { r, c })
             .Where(x => x.c.AccessToken != null && x.c.AccessToken != "" && x.c.AccessToken != "NA")
             .ToListAsync(ct);
@@ -30,15 +32,17 @@ public sealed class DbUserTokenSource(IServiceScopeFactory scopeFactory) : IUser
         return configs
             .Select(x => new UserConfig
             {
-                UserId               = x.r.Username,
-                AccessToken          = x.c.AccessToken,
-                MtmTarget            = x.r.MtmTarget,
-                MtmSl                = x.r.MtmSl,
-                TrailingEnabled      = x.r.TrailingEnabled,
-                TrailingActivateAt   = x.r.TrailingActivateAt,
-                LockProfitAt         = x.r.LockProfitAt,
+                UserId                = x.r.Username,
+                BrokerType            = x.r.BrokerType,
+                AccessToken           = x.c.AccessToken,
+                ApiKey                = x.c.ApiKey,
+                MtmTarget             = x.r.MtmTarget,
+                MtmSl                 = x.r.MtmSl,
+                TrailingEnabled       = x.r.TrailingEnabled,
+                TrailingActivateAt    = x.r.TrailingActivateAt,
+                LockProfitAt          = x.r.LockProfitAt,
                 WhenProfitIncreasesBy = x.r.IncreaseBy,
-                IncreaseTrailingBy   = x.r.TrailBy,
+                IncreaseTrailingBy    = x.r.TrailBy,
             })
             .ToList()
             .AsReadOnly();

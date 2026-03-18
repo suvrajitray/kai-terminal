@@ -116,6 +116,27 @@ export async function fetchMargin(
   return res.data;
 }
 
+export interface FundsData {
+  availableMargin: number | null;
+  usedMargin: number | null;
+  payinAmount: number | null;
+}
+
+export async function fetchFunds(): Promise<FundsData> {
+  const res = await apiClient.get<FundsData>("/api/upstox/funds");
+  return res.data;
+}
+
+export async function fetchZerodhaFunds(apiKey: string, accessToken: string): Promise<FundsData> {
+  const res = await apiClient.get<FundsData>("/api/zerodha/funds", {
+    headers: {
+      "X-Zerodha-Api-Key":      apiKey,
+      "X-Zerodha-Access-Token": accessToken,
+    },
+  });
+  return res.data;
+}
+
 export async function placeMarketOrder(
   instrumentToken: string,
   quantity: number,

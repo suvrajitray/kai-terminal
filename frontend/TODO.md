@@ -45,3 +45,7 @@
 - [x] Index ticker — 5-index toggle popover (SlidersHorizontal), persisted to localStorage; vertical OHL layout
 - [x] FINNIFTY + BANKEX — fully supported throughout frontend and backend
 - [x] AI Signals page (`/ai-signals`) — 4-model parallel AI analysis, 15-min auto-refresh with countdown
+- [x] Multi-broker funds in stats bar — `U ₹X · Z ₹Y` format when both brokers connected (`useFunds` hook, `stats-bar.tsx`)
+- [x] Broker status chips in header — green/muted dot per connected broker, popover with margin + Disconnect (`broker-status-chips.tsx`)
+- [x] Quick Trade broker selector — "Route via: Upstox / Zerodha" pill selector shown when both brokers connected; Zerodha shows info toast (pending backend endpoint)
+- [x] Zerodha OAuth redirect handling — `BrokerRedirectPage` reads `request_token` for Zerodha, `code` for Upstox

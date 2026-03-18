@@ -1,5 +1,6 @@
 using KAITerminal.Api.Models;
 using KAITerminal.Upstox;
+using KAITerminal.Upstox.Exceptions;
 using KAITerminal.Upstox.Models.Requests;
 using KAITerminal.Upstox.Models.Responses;
 using Microsoft.AspNetCore.Mvc;
@@ -173,6 +174,28 @@ public static class UpstoxEndpoints
             [FromBody] PlaceOrderByStrikeRequest request,
             UpstoxClient upstox) =>
             Results.Ok(await upstox.PlaceOrderByStrikeV3Async(request)));
+
+        // ── Funds ─────────────────────────────────────────────────────────────
+
+        group.MapGet("/funds", async (UpstoxClient upstox, CancellationToken ct) =>
+        {
+            try
+            {
+                var funds = await upstox.GetFundsAsync(ct);
+                return Results.Ok(new
+                {
+                    availableMargin = funds.AvailableMargin,
+                    usedMargin      = funds.UsedMargin,
+                    payinAmount     = funds.PayinAmount,
+                });
+            }
+            catch (UpstoxException)
+            {
+                // Funds API is unavailable outside 05:30–00:00 IST — return null so the
+                // frontend shows "—" rather than crashing.
+                return Results.Ok(new { availableMargin = (decimal?)null, usedMargin = (decimal?)null, payinAmount = (decimal?)null });
+            }
+        });
 
         // ── Margin ────────────────────────────────────────────────────────────
 

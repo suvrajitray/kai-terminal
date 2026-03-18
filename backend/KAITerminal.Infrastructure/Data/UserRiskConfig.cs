@@ -3,7 +3,9 @@ namespace KAITerminal.Infrastructure.Data;
 public class UserRiskConfig
 {
     public int Id { get; set; }
-    public string Username { get; set; } = "";       // user email — unique
+    public string Username { get; set; } = "";       // user email
+    /// <summary>Broker this risk config applies to — "upstox" | "zerodha". Unique with Username.</summary>
+    public string BrokerType { get; set; } = "upstox";
     public bool Enabled { get; set; } = false;
     public decimal MtmTarget { get; set; } = 25_000m;
     public decimal MtmSl { get; set; } = -25_000m;

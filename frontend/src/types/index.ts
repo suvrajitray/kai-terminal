@@ -26,6 +26,8 @@ export interface BrokerCredentials {
 export interface Position {
   exchange: string;
   instrument_token: string;
+  /** Which broker this position belongs to — "upstox" | "zerodha". Set client-side. */
+  broker?: string;
   trading_symbol: string;
   product: string;
   quantity: number;

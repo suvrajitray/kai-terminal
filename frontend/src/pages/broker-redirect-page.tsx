@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { BROKERS } from "@/lib/constants";
 import { useBrokerStore } from "@/stores/broker-store";
 import { useUserTradingSettingsStore } from "@/stores/user-trading-settings-store";
-import { exchangeAccessToken, updateBrokerAccessToken } from "@/services/broker-api";
+import { exchangeAccessToken, exchangeZerodhaToken, updateBrokerAccessToken } from "@/services/broker-api";
 import { fetchUserTradingSettings } from "@/services/user-settings-api";
 import { fetchOptionContracts } from "@/services/trading-api";
 import { useOptionContractsStore } from "@/stores/option-contracts-store";
@@ -42,10 +42,19 @@ export function BrokerRedirectPage() {
     if (calledRef.current) return;
     calledRef.current = true;
 
-    const code = searchParams.get("code");
-    if (!code || !brokerId) {
+    // Zerodha sends `request_token`; Upstox sends `code`
+    const isZerodha     = brokerId === "zerodha";
+    const code          = searchParams.get("code");
+    const requestToken  = searchParams.get("request_token");
+    const authParam     = isZerodha ? requestToken : code;
+
+    if (!authParam || !brokerId) {
       setStatus("error");
-      setError("Authorization code not found in redirect URL.");
+      setError(
+        isZerodha
+          ? "request_token not found in redirect URL."
+          : "Authorization code not found in redirect URL.",
+      );
       return;
     }
 
@@ -58,8 +67,10 @@ export function BrokerRedirectPage() {
 
     (async () => {
       try {
-        // Step 1 — exchange code for token
-        const accessToken = await exchangeAccessToken(creds.apiKey, creds.apiSecret, creds.redirectUrl, code);
+        // Step 1 — exchange auth param for access token
+        const accessToken = isZerodha
+          ? await exchangeZerodhaToken(creds.apiKey, creds.apiSecret, authParam)
+          : await exchangeAccessToken(creds.apiKey, creds.apiSecret, creds.redirectUrl, authParam);
         setAccessToken(brokerId, accessToken);
         addStep("Broker authentication complete");
 

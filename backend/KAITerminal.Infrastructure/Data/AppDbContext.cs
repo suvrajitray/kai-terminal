@@ -23,8 +23,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .HasIndex(x => x.Email)
             .IsUnique();
 
+        // Unique per (username, broker) so one user can have independent risk configs per broker.
+        // NOTE: If upgrading an existing DB, run manually:
+        //   DROP INDEX IF EXISTS "ix_userriskconfigs_username";
+        //   CREATE UNIQUE INDEX "ix_userriskconfigs_username_broker" ON "UserRiskConfigs" ("Username", "BrokerType");
         modelBuilder.Entity<UserRiskConfig>()
-            .HasIndex(x => x.Username)
+            .HasIndex(x => new { x.Username, x.BrokerType })
             .IsUnique();
     }
 }

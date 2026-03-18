@@ -7,6 +7,7 @@ import { UserMenu } from "./user-menu";
 import { IndexTicker } from "./index-ticker";
 import { QuickTradeButton } from "./quick-trade-button";
 import { MarketStatus } from "./market-status";
+import { BrokerStatusChips } from "./broker-status-chips";
 import { useBrokerStore } from "@/stores/broker-store";
 
 const NAV_ICONS: Record<string, LucideIcon> = {
@@ -18,7 +19,9 @@ const NAV_ICONS: Record<string, LucideIcon> = {
 
 export function Header() {
   const { pathname } = useLocation();
-  const brokerAuthenticated = useBrokerStore((s) => s.isAuthenticated("upstox"));
+  const isUpstoxAuthed  = useBrokerStore((s) => s.isAuthenticated("upstox"));
+  const isZerodhaAuthed = useBrokerStore((s) => s.isAuthenticated("zerodha"));
+  const brokerAuthenticated = isUpstoxAuthed || isZerodhaAuthed;
 
   return (
     <motion.header
@@ -65,6 +68,7 @@ export function Header() {
         <div className="flex items-center gap-4">
           <MarketStatus />
           {brokerAuthenticated && <IndexTicker />}
+          <BrokerStatusChips />
           {brokerAuthenticated && <QuickTradeButton />}
           <UserMenu />
         </div>

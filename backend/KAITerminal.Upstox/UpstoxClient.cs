@@ -19,6 +19,7 @@ public sealed class UpstoxClient
     private readonly IMarketQuoteService _quotes;
     private readonly IChartDataService _charts;
     private readonly IMarginService _margin;
+    private readonly IFundsService _funds;
     private readonly Func<IMarketDataStreamer> _marketDataStreamerFactory;
     private readonly Func<IPortfolioStreamer> _portfolioStreamerFactory;
 
@@ -30,6 +31,7 @@ public sealed class UpstoxClient
         IMarketQuoteService quotes,
         IChartDataService charts,
         IMarginService margin,
+        IFundsService funds,
         Func<IMarketDataStreamer> marketDataStreamerFactory,
         Func<IPortfolioStreamer> portfolioStreamerFactory)
     {
@@ -40,6 +42,7 @@ public sealed class UpstoxClient
         ArgumentNullException.ThrowIfNull(quotes);
         ArgumentNullException.ThrowIfNull(charts);
         ArgumentNullException.ThrowIfNull(margin);
+        ArgumentNullException.ThrowIfNull(funds);
         ArgumentNullException.ThrowIfNull(marketDataStreamerFactory);
         ArgumentNullException.ThrowIfNull(portfolioStreamerFactory);
 
@@ -50,6 +53,7 @@ public sealed class UpstoxClient
         _quotes = quotes;
         _charts = charts;
         _margin = margin;
+        _funds  = funds;
         _marketDataStreamerFactory = marketDataStreamerFactory;
         _portfolioStreamerFactory = portfolioStreamerFactory;
     }
@@ -264,6 +268,16 @@ public sealed class UpstoxClient
     public Task<MarginResponse> GetRequiredMarginAsync(
         IEnumerable<MarginOrderItem> items, CancellationToken cancellationToken = default)
         => _margin.GetRequiredMarginAsync(items, cancellationToken);
+
+    // ═══════════════════════════════════════════════════════
+    // Funds
+    // ═══════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Returns available margin, used margin, and payin amount for the equity/F&amp;O segment.
+    /// </summary>
+    public Task<FundsResponse> GetFundsAsync(CancellationToken cancellationToken = default)
+        => _funds.GetFundsAsync(cancellationToken);
 
     // ═══════════════════════════════════════════════════════
     // WebSocket streaming — streamer factories

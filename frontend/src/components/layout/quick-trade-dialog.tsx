@@ -19,6 +19,7 @@ import { UNDERLYING_KEYS } from "@/lib/shift-config";
 import { getLotSize } from "@/lib/lot-sizes";
 import { placeOrderByOptionPrice } from "@/services/trading-api";
 import { useOptionContractsStore } from "@/stores/option-contracts-store";
+import { useBrokerStore } from "@/stores/broker-store";
 
 const UNDERLYINGS = Object.keys(UNDERLYING_KEYS);
 
@@ -39,6 +40,13 @@ interface Props {
 }
 
 export function QuickTradeDialog({ onTabChange }: Props) {
+  const isUpstoxAuthed  = useBrokerStore((s) => s.isAuthenticated("upstox"));
+  const isZerodhaAuthed = useBrokerStore((s) => s.isAuthenticated("zerodha"));
+  const bothConnected   = isUpstoxAuthed && isZerodhaAuthed;
+
+  const [broker, setBroker]         = useState<"upstox" | "zerodha">(() =>
+    isUpstoxAuthed ? "upstox" : "zerodha",
+  );
   const [underlying, setUnderlying] = useState("NIFTY");
   const [expiry, setExpiry]         = useState("");
   const [qtyValue, setQtyValue]     = useState("");
@@ -78,6 +86,29 @@ export function QuickTradeDialog({ onTabChange }: Props) {
   // Shared controls rendered inside each tab
   const sharedControls = (
     <div className="space-y-4">
+      {/* Broker selector — only shown when both brokers are connected */}
+      {bothConnected && (
+        <div className="space-y-2">
+          <Label className="text-xs text-muted-foreground uppercase tracking-wider">Route via</Label>
+          <div className="flex gap-1.5">
+            {(["upstox", "zerodha"] as const).map((b) => (
+              <button
+                key={b}
+                onClick={() => setBroker(b)}
+                className={cn(
+                  "rounded px-3 py-1 text-xs font-semibold transition-colors border capitalize",
+                  broker === b
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-muted/30 text-muted-foreground border-border/40 hover:bg-muted/60 hover:text-foreground",
+                )}
+              >
+                {b === "upstox" ? "Upstox" : "Zerodha"}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Underlying */}
       <div className="space-y-2">
         <Label className="text-xs text-muted-foreground uppercase tracking-wider">Underlying</Label>
@@ -156,6 +187,7 @@ export function QuickTradeDialog({ onTabChange }: Props) {
       {/* ── By Price ─────────────────────────────────────────────────── */}
       <TabsContent value="price" className="mt-0">
         <ByPriceContent
+          broker={broker}
           underlying={underlying}
           expiry={expiry}
           product={product}
@@ -173,24 +205,18 @@ export function QuickTradeDialog({ onTabChange }: Props) {
       <TabsContent value="chain" className="mt-0 space-y-4">
         {sharedControls}
 
-        {/* Qty row */}
-        <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground uppercase tracking-wider">Quantity</Label>
-          <QuickTradeQtyInput
-            value={qtyValue}
-            mode={qtyMode}
-            lotSize={lotSize}
-            onChange={setQtyValue}
-            onToggleMode={toggleQtyMode}
-          />
-        </div>
-
         <ByChainTab
+          broker={broker}
           underlying={underlying}
           expiry={expiry}
           product={product}
           quantity={quantity}
           isActive={activeTab === "chain"}
+          qtyValue={qtyValue}
+          qtyMode={qtyMode}
+          lotSize={lotSize}
+          onQtyChange={setQtyValue}
+          onToggleMode={toggleQtyMode}
         />
       </TabsContent>
     </Tabs>
@@ -200,6 +226,7 @@ export function QuickTradeDialog({ onTabChange }: Props) {
 // ── By Price tab — full self-contained layout ────────────────────────────────
 
 interface ByPriceContentProps {
+  broker: "upstox" | "zerodha";
   underlying: string;
   expiry: string;
   product: "I" | "D";
@@ -213,7 +240,7 @@ interface ByPriceContentProps {
 }
 
 function ByPriceContent({
-  underlying, expiry, product, quantity,
+  broker, underlying, expiry, product, quantity,
   qtyValue, qtyMode, lotSize, onQtyChange, onToggleQtyMode,
   sharedControls,
 }: ByPriceContentProps) {
@@ -224,6 +251,8 @@ function ByPriceContent({
   const isBuy = direction === "Buy";
 
   async function execute(action: ActionType) {
+    if (broker === "zerodha") { toast.info("Zerodha option-price orders coming soon"); return; }
+
     const targetPremium = parseFloat(price);
     if (!targetPremium || targetPremium <= 0) { toast.error("Enter a valid target premium"); return; }
     if (!expiry) { toast.error("Select an expiry"); return; }
@@ -252,8 +281,8 @@ function ByPriceContent({
     <div className="space-y-5">
       {sharedControls}
 
-      {/* Target Premium + Quantity */}
-      <div className="grid grid-cols-2 gap-4">
+      {/* Target Premium + Quantity + Buy/Sell */}
+      <div className="grid gap-3" style={{ gridTemplateColumns: "1fr 1fr auto" }}>
         <div className="space-y-2">
           <Label className="text-xs text-muted-foreground uppercase tracking-wider">Target Premium</Label>
           <div className="relative">
@@ -279,30 +308,27 @@ function ByPriceContent({
             onToggleMode={onToggleQtyMode}
           />
         </div>
-      </div>
-
-      <div className="h-px bg-border/40" />
-
-      {/* Buy / Sell toggle */}
-      <div className="flex items-center gap-2 rounded-lg border border-border/40 bg-muted/20 p-1">
-        <button
-          onClick={() => setDir("Buy")}
-          className={cn(
-            "flex-1 rounded-md py-2 text-sm font-semibold transition-all",
-            isBuy ? "bg-green-600 text-white shadow-sm" : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          Buy
-        </button>
-        <button
-          onClick={() => setDir("Sell")}
-          className={cn(
-            "flex-1 rounded-md py-2 text-sm font-semibold transition-all",
-            !isBuy ? "bg-red-600 text-white shadow-sm" : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          Sell
-        </button>
+        <div className="space-y-2">
+          <Label className="text-xs text-muted-foreground uppercase tracking-wider">Direction</Label>
+          <div className="flex h-9 w-24 items-center gap-1 rounded-lg border border-border/40 bg-muted/20 p-1">
+            {(["Buy", "Sell"] as Direction[]).map((d) => (
+              <button
+                key={d}
+                onClick={() => setDir(d)}
+                className={cn(
+                  "flex-1 h-full rounded-md text-xs font-semibold transition-all",
+                  direction === d
+                    ? d === "Buy"
+                      ? "bg-green-600 text-white shadow-sm"
+                      : "bg-red-600 text-white shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {d}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Action buttons */}
@@ -325,7 +351,7 @@ function ByPriceContent({
               {acting === action ? (
                 <><Zap className="size-3.5 animate-pulse" />Placing…</>
               ) : (
-                <><Icon className="size-4" />{action === "BOTH" ? "Both" : action}</>
+                <><Icon className="size-4" />{action === "BOTH" ? "CE + PE" : action}</>
               )}
             </Button>
           );

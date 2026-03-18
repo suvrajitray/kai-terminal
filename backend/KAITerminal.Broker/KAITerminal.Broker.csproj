@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>KAITerminal.Broker</RootNamespace>
+    <AssemblyName>KAITerminal.Broker</AssemblyName>
+    <Version>1.0.0</Version>
+    <Description>Broker abstraction layer — broker-agnostic interfaces for the KAI Terminal</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Position, IMarketDataStreamer, IPortfolioStreamer live in Upstox for now -->
+    <ProjectReference Include="..\KAITerminal.Upstox\KAITerminal.Upstox.csproj" />
+  </ItemGroup>
+
+</Project>

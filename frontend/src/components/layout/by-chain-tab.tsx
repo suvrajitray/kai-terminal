@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { UNDERLYING_KEYS } from "@/lib/shift-config";
 import { fetchOptionChain, placeMarketOrder, type MarginInstrument } from "@/services/trading-api";
 import { useDirectMarginEstimate } from "./use-margin-estimate";
+import { QuickTradeQtyInput, type QtyMode } from "./quick-trade-qty-input";
 import type { OptionChainEntry } from "@/types";
 
 const INR = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
@@ -84,14 +85,20 @@ function buildRows(
 // ── Component ────────────────────────────────────────────────────────────────
 
 interface Props {
+  broker: "upstox" | "zerodha";
   underlying: string;
   expiry: string;
   product: "I" | "D";
   quantity: number;
   isActive: boolean;
+  qtyValue: string;
+  qtyMode: QtyMode;
+  lotSize: number;
+  onQtyChange: (v: string) => void;
+  onToggleMode: () => void;
 }
 
-export function ByChainTab({ underlying, expiry, product, quantity, isActive }: Props) {
+export function ByChainTab({ broker, underlying, expiry, product, quantity, isActive, qtyValue, qtyMode, lotSize, onQtyChange, onToggleMode }: Props) {
   const [chain, setChain]               = useState<OptionChainEntry[]>([]);
   const [loading, setLoading]           = useState(false);
   const [mode, setMode]                 = useState<StrategyMode>("strangle");
@@ -153,6 +160,7 @@ export function ByChainTab({ underlying, expiry, product, quantity, isActive }: 
   const { margin, loading: marginLoading } = useDirectMarginEstimate(marginInstruments);
 
   async function execute(action: ActionType) {
+    if (broker === "zerodha") { toast.info("Zerodha chain orders coming soon"); return; }
     if (!selected) { toast.error("Select a row first"); return; }
 
     const { ceKey, peKey } = selected;
@@ -187,7 +195,7 @@ export function ByChainTab({ underlying, expiry, product, quantity, isActive }: 
   return (
     <div className="space-y-4">
       {/* Strategy toggle + ATM info */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1 rounded-lg border border-border/40 bg-muted/20 p-1">
           {(["strangle", "straddle"] as StrategyMode[]).map((m) => (
             <button
@@ -205,7 +213,7 @@ export function ByChainTab({ underlying, expiry, product, quantity, isActive }: 
           ))}
         </div>
 
-        <div className="flex items-center gap-3 text-[11px]">
+        <div className="flex flex-1 items-center justify-end gap-3 text-[11px]">
           {spotPrice > 0 && (
             <span className="text-muted-foreground">
               Spot <span className="font-semibold text-foreground tabular-nums">{spotPrice.toFixed(2)}</span>
@@ -394,36 +402,45 @@ export function ByChainTab({ underlying, expiry, product, quantity, isActive }: 
         </div>
       )}
 
-      {/* Buy / Sell toggle */}
-      <div className="flex items-center gap-2 rounded-lg border border-border/40 bg-muted/20 p-1">
-        {(["Buy", "Sell"] as Direction[]).map((d) => (
-          <button
-            key={d}
-            onClick={() => setDirection(d)}
-            className={cn(
-              "flex-1 rounded-md py-2 text-sm font-semibold transition-all",
-              direction === d
-                ? d === "Buy"
-                  ? "bg-green-600 text-white shadow-sm"
-                  : "bg-red-600 text-white shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {d}
-          </button>
-        ))}
-      </div>
+      {/* Buy/Sell + Qty + Margin row */}
+      <div className="grid gap-3" style={{ gridTemplateColumns: "1fr auto auto" }}>
+        {/* Buy / Sell rectangular pill */}
+        <QuickTradeQtyInput
+          value={qtyValue}
+          mode={qtyMode}
+          lotSize={lotSize}
+          onChange={onQtyChange}
+          onToggleMode={onToggleMode}
+        />
 
-      {/* Required margin */}
-      <div className="flex items-center justify-between rounded-lg border border-border/30 bg-muted/10 px-3 py-2 text-xs">
-        <span className="text-muted-foreground">Req. Margin</span>
-        {marginLoading ? (
-          <span className="animate-pulse text-muted-foreground/60 tabular-nums">Computing…</span>
-        ) : margin != null ? (
-          <span className="font-semibold tabular-nums">₹{INR.format(margin)}</span>
-        ) : (
-          <span className="text-muted-foreground/40">—</span>
-        )}
+        <div className="flex h-9 w-24 items-center gap-1 rounded-lg border border-border/40 bg-muted/20 p-1">
+          {(["Buy", "Sell"] as Direction[]).map((d) => (
+            <button
+              key={d}
+              onClick={() => setDirection(d)}
+              className={cn(
+                "flex-1 h-full rounded-md text-xs font-semibold transition-all",
+                direction === d
+                  ? d === "Buy"
+                    ? "bg-green-600 text-white shadow-sm"
+                    : "bg-red-600 text-white shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {d}
+            </button>
+          ))}
+        </div>
+        <div className="flex h-9 w-38 items-center justify-between rounded-lg border border-border/30 bg-muted/10 px-3 text-xs">
+          <span className="text-muted-foreground">Margin</span>
+          {marginLoading ? (
+            <span className="animate-pulse text-muted-foreground/60 tabular-nums">…</span>
+          ) : margin != null ? (
+            <span className="font-semibold tabular-nums">₹{INR.format(margin)}</span>
+          ) : (
+            <span className="text-muted-foreground/40">—</span>
+          )}
+        </div>
       </div>
 
       {/* Action buttons */}
@@ -442,7 +459,7 @@ export function ByChainTab({ underlying, expiry, product, quantity, isActive }: 
               disabled={acting !== null || !selected}
               onClick={() => execute(action)}
               className={cn(
-                "h-11 font-semibold text-sm gap-1.5",
+                "h-9 font-semibold text-sm gap-1.5",
                 isBuy
                   ? "bg-green-600 hover:bg-green-700 text-white"
                   : "bg-red-600 hover:bg-red-700 text-white",
@@ -456,7 +473,7 @@ export function ByChainTab({ underlying, expiry, product, quantity, isActive }: 
               ) : (
                 <>
                   <Icon className="size-4" />
-                  {action === "BOTH" ? "Both" : action}
+                  {action === "BOTH" ? "CE + PE" : action}
                 </>
               )}
             </Button>

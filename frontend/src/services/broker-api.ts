@@ -41,3 +41,16 @@ export async function exchangeAccessToken(
   });
   return res.data.accessToken;
 }
+
+export async function exchangeZerodhaToken(
+  apiKey: string,
+  apiSecret: string,
+  requestToken: string,
+): Promise<string> {
+  const res = await apiClient.post<{ accessToken: string }>("/api/zerodha/access-token", {
+    apiKey,
+    apiSecret,
+    requestToken,
+  });
+  return res.data.accessToken;
+}

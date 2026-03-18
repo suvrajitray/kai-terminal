@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { RefreshCw, LogOut, Wifi, WifiOff, ShieldCheck } from "lucide-react";
+import { RefreshCw, LogOut, Wifi, WifiOff, ShieldCheck, Wallet, Eye, EyeOff } from "lucide-react";
+import { useFunds } from "@/hooks/use-funds";
 import { SessionTimer } from "./session-timer";
 import { MtmDisplay } from "./mtm-display";
 import { PositionCountBadges } from "./position-count-badges";
@@ -38,6 +39,10 @@ export function StatsBar({
 }: StatsBarProps) {
   const { enabled } = useProfitProtectionStore();
   const { setEnabled } = useRiskConfig();
+  const { funds, allFunds, loading: fundsLoading } = useFunds();
+  const [fundsVisible, setFundsVisible] = useState(
+    () => localStorage.getItem("kai-terminal-funds-visible") !== "false"
+  );
 
   const openCount = positions.filter((p) => p.quantity !== 0).length;
   const closedCount = positions.filter((p) => p.quantity === 0).length;
@@ -125,7 +130,51 @@ export function StatsBar({
         </>
       )}
 
-      <div className="ml-auto flex items-center gap-2">
+      {/* Available Margin — shows per-broker when both connected */}
+      <div className="ml-auto flex items-center gap-1 rounded px-2 py-1 text-xs">
+        <Wallet className="size-3.5 text-muted-foreground" />
+        <span className="text-muted-foreground">Avail</span>
+        {fundsLoading ? (
+          <span className="animate-pulse tabular-nums text-muted-foreground/60 ml-1">…</span>
+        ) : !fundsVisible ? (
+          <span className="font-semibold tabular-nums text-muted-foreground/40 ml-1 tracking-widest">••••••</span>
+        ) : allFunds.upstox?.availableMargin != null && allFunds.zerodha?.availableMargin != null ? (
+          // Both brokers connected — show labelled breakdown
+          <span className="flex items-center gap-2 ml-1">
+            <span className="flex items-center gap-0.5">
+              <span className="text-muted-foreground/60 text-[10px]">U</span>
+              <span className="font-semibold tabular-nums text-foreground">
+                ₹{allFunds.upstox.availableMargin.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+              </span>
+            </span>
+            <span className="text-muted-foreground/40">·</span>
+            <span className="flex items-center gap-0.5">
+              <span className="text-muted-foreground/60 text-[10px]">Z</span>
+              <span className="font-semibold tabular-nums text-foreground">
+                ₹{allFunds.zerodha.availableMargin.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+              </span>
+            </span>
+          </span>
+        ) : funds?.availableMargin != null ? (
+          <span className="font-semibold tabular-nums text-foreground ml-1">
+            ₹{funds.availableMargin.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+          </span>
+        ) : (
+          <span className="text-muted-foreground/40 ml-1">—</span>
+        )}
+        <button
+          onClick={() => setFundsVisible((v) => {
+            localStorage.setItem("kai-terminal-funds-visible", String(!v));
+            return !v;
+          })}
+          title={fundsVisible ? "Hide balance" : "Show balance"}
+          className="ml-0.5 rounded p-0.5 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+        >
+          {fundsVisible ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
+        </button>
+      </div>
+
+      <div className="flex items-center gap-2">
         {/* Profit Protection */}
         <button
           onClick={onOpenProfitProtection}

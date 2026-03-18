@@ -7,6 +7,7 @@ using KAITerminal.Infrastructure.Extensions;
 using KAITerminal.Auth.Endpoints;
 using KAITerminal.Auth.Extensions;
 using KAITerminal.Upstox;
+using KAITerminal.Zerodha;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -70,6 +71,15 @@ app.UseWhen(ctx => ctx.Request.Path.StartsWithSegments("/api/upstox"),
             await next(ctx);
     }));
 
+app.UseWhen(ctx => ctx.Request.Path.StartsWithSegments("/api/zerodha"),
+    zerodha => zerodha.Use(async (ctx, next) =>
+    {
+        var apiKey = ctx.Request.Headers["X-Zerodha-Api-Key"].FirstOrDefault();
+        var token  = ctx.Request.Headers["X-Zerodha-Access-Token"].FirstOrDefault();
+        using (ZerodhaTokenContext.Use(apiKey ?? "", token ?? ""))
+            await next(ctx);
+    }));
+
 if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 
@@ -77,6 +87,7 @@ app.UseHttpsRedirection();
 
 app.MapAuthEndpoints();
 app.MapUpstoxEndpoints();
+app.MapZerodhaEndpoints();
 app.MapChartEndpoints();
 app.MapBrokerCredentialsEndpoints();
 app.MapUserSettingsEndpoints();

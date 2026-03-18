@@ -4,7 +4,11 @@ namespace KAITerminal.RiskEngine.Models;
 public sealed record UserConfig
 {
     public string UserId { get; init; } = "";
+    /// <summary>Broker type — "upstox" | "zerodha". Used by IBrokerClientFactory.</summary>
+    public string BrokerType { get; init; } = "upstox";
     public string AccessToken { get; init; } = "";
+    /// <summary>API key — required for Zerodha (used in auth header and token exchange).</summary>
+    public string? ApiKey { get; init; }
 
     // Per-user risk thresholds (defaults match frontend defaults)
     public decimal MtmTarget { get; init; } = 25_000m;

@@ -1,7 +1,7 @@
+using KAITerminal.Broker;
 using KAITerminal.RiskEngine.Abstractions;
 using KAITerminal.RiskEngine.Configuration;
 using KAITerminal.RiskEngine.Models;
-using KAITerminal.Upstox;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -9,34 +9,37 @@ namespace KAITerminal.RiskEngine.Services;
 
 /// <summary>
 /// Evaluates portfolio-level risk for a single user.
-/// Call <see cref="EvaluateAsync"/> inside a <c>UpstoxTokenContext.Use(token)</c> scope.
+/// Call <see cref="EvaluateAsync(string,decimal,UserConfig,IBrokerClient,CancellationToken)"/>
+/// with a pre-computed MTM from the position cache, or the REST-fetching overload for
+/// out-of-band checks.
 /// </summary>
 public sealed class RiskEvaluator
 {
-    private readonly UpstoxClient _upstox;
     private readonly IRiskRepository _repo;
     private readonly RiskEngineConfig _cfg;
     private readonly ILogger<RiskEvaluator> _logger;
 
     public RiskEvaluator(
-        UpstoxClient upstox,
         IRiskRepository repo,
         IOptions<RiskEngineConfig> cfg,
         ILogger<RiskEvaluator> logger)
     {
-        _upstox = upstox;
-        _repo = repo;
-        _cfg = cfg.Value;
+        _repo   = repo;
+        _cfg    = cfg.Value;
         _logger = logger;
     }
 
-    /// <summary>Fetches MTM via REST then evaluates risk using per-user config.</summary>
-    public async Task EvaluateAsync(string userId, UserConfig config, CancellationToken ct = default)
+    /// <summary>
+    /// Fetches positions via REST, computes MTM, then evaluates risk.
+    /// Call inside an appropriate token context scope.
+    /// </summary>
+    public async Task EvaluateAsync(
+        string userId, UserConfig config, IBrokerClient broker, CancellationToken ct = default)
     {
         decimal mtm;
         try
         {
-            var positions = await _upstox.GetAllPositionsAsync(ct);
+            var positions = await broker.GetAllPositionsAsync(ct);
             mtm = _cfg.FilterPositions(positions).Sum(p => p.Pnl);
         }
         catch (Exception ex)
@@ -45,11 +48,12 @@ public sealed class RiskEvaluator
             return;
         }
 
-        await EvaluateAsync(userId, mtm, config, ct);
+        await EvaluateAsync(userId, mtm, config, broker, ct);
     }
 
     /// <summary>Evaluates risk using a pre-computed MTM value and per-user config.</summary>
-    public async Task EvaluateAsync(string userId, decimal mtm, UserConfig config, CancellationToken ct = default)
+    public async Task EvaluateAsync(
+        string userId, decimal mtm, UserConfig config, IBrokerClient broker, CancellationToken ct = default)
     {
         var state = _repo.GetOrCreate(userId);
 
@@ -67,7 +71,7 @@ public sealed class RiskEvaluator
             _logger.LogWarning(
                 "Hard SL hit for userId={UserId}  MTM={Mtm:+0;-0}  SL={Sl:+0;-0} — exiting all positions",
                 userId, mtm, config.MtmSl);
-            await SquareOffAsync(userId, state, ct);
+            await SquareOffAsync(userId, state, broker, ct);
             return;
         }
 
@@ -77,7 +81,7 @@ public sealed class RiskEvaluator
             _logger.LogInformation(
                 "Target hit for userId={UserId}  MTM={Mtm:+0;-0}  Target={Target:+0} — exiting all positions",
                 userId, mtm, config.MtmTarget);
-            await SquareOffAsync(userId, state, ct);
+            await SquareOffAsync(userId, state, broker, ct);
             return;
         }
 
@@ -89,7 +93,7 @@ public sealed class RiskEvaluator
             if (mtm >= config.TrailingActivateAt)
             {
                 state.TrailingActive      = true;
-                state.TrailingStop        = config.LockProfitAt;   // fixed floor, not relative to MTM
+                state.TrailingStop        = config.LockProfitAt;
                 state.TrailingLastTrigger = mtm;
                 _repo.Update(userId, state);
                 _logger.LogInformation(
@@ -116,7 +120,7 @@ public sealed class RiskEvaluator
                 _logger.LogWarning(
                     "Trailing SL hit for userId={UserId}  MTM={Mtm:+0;-0}  stop={Stop:+0;-0} — exiting all positions",
                     userId, mtm, state.TrailingStop);
-                await SquareOffAsync(userId, state, ct);
+                await SquareOffAsync(userId, state, broker, ct);
             }
         }
     }
@@ -137,20 +141,18 @@ public sealed class RiskEvaluator
         }
     }
 
-    private async Task SquareOffAsync(string userId, UserRiskState state, CancellationToken ct)
+    private async Task SquareOffAsync(
+        string userId, UserRiskState state, IBrokerClient broker, CancellationToken ct)
     {
         try
         {
-            await _upstox.ExitAllPositionsAsync(cancellationToken: ct);
+            await broker.ExitAllPositionsAsync(ct: ct);
             state.IsSquaredOff = true;
             _repo.Update(userId, state);
             _logger.LogWarning("Square-off complete for userId={UserId} — all positions exited", userId);
         }
         catch (Exception ex)
         {
-            // Mark as squared-off even on failure so the risk engine does not repeatedly
-            // attempt to exit on every subsequent evaluation cycle. The exit order may have
-            // been partially or fully filled; the operator must verify manually.
             state.IsSquaredOff = true;
             _repo.Update(userId, state);
             _logger.LogError(ex,

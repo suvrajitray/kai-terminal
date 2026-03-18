@@ -18,24 +18,62 @@
 
 ## Broker Integration
 
+### Multi-broker Architecture
+
+KAI Terminal supports multiple simultaneous broker connections via a broker-agnostic abstraction layer (`KAITerminal.Broker`).
+
+**`IBrokerClient`** — unified interface implemented by every broker adapter:
+- `GetAllPositionsAsync()` — fetch open positions
+- `GetTotalMtmAsync()` — total mark-to-market P&L
+- `ExitAllPositionsAsync()` — square off all positions
+- `ExitPositionAsync()` — exit a single position
+- `PlaceOrderAsync()` — place an order
+- `GetFundsAsync()` — fetch available and used margin
+- `CreateMarketDataStreamer()` / `CreatePortfolioStreamer()` — live streaming
+
+**`IBrokerClientFactory`** — resolves the correct adapter by broker type string (`"upstox"` | `"zerodha"`). Registered in both the API and Worker hosts.
+
+**Broker adapters:**
+- `UpstoxBrokerClient` — wraps `UpstoxClient`; uses `UpstoxTokenContext` (AsyncLocal) per call.
+- `ZerodhaBrokerClient` — wraps `ZerodhaClient`; uses `ZerodhaTokenContext` (AsyncLocal, stores `(ApiKey, AccessToken)` tuple) per call.
+
 ### Connect Upstox
 - Users save their Upstox API Key and Secret via the Connect Brokers page.
 - Credentials are stored per user (by email) in PostgreSQL (Neon).
 
+### Connect Zerodha (Kite Connect)
+- Users save their Zerodha API Key and Secret via the Connect Brokers page.
+- `GET /api/zerodha/auth-url?apiKey=` returns the Kite Connect login URL.
+- After Kite OAuth redirect (delivers `request_token`), the frontend calls `POST /api/zerodha/access-token` with `{apiKey, apiSecret, requestToken}` to exchange for an `access_token` via SHA-256 checksum handshake.
+- The token is persisted and stored in the browser Zustand broker store.
+- `GET /api/zerodha/funds` returns available and used margin (`Authorization: token {api_key}:{access_token}`).
+- **Zerodha streaming** — stubs exist for `KiteTickerStreamer` (IMarketDataStreamer) and `ZerodhaPortfolioStreamer` (IPortfolioStreamer); full KiteTicker WebSocket implementation is pending.
+
 ### OAuth Token Exchange
-- One-click broker login initiates Upstox OAuth.
-- After redirect, the auth code is automatically exchanged for an access token via `POST /api/upstox/access-token`.
-- The access token is persisted to the `BrokerCredentials` table via `PUT /api/broker-credentials/{brokerName}/access-token`.
-- Access token is also stored in the browser's Zustand broker store for immediate use.
+- Upstox: auth code exchanged via `POST /api/upstox/access-token`.
+- Zerodha: request token exchanged via `POST /api/zerodha/access-token` (SHA-256 checksum required).
+- All tokens persisted to `BrokerCredentials` table via `PUT /api/broker-credentials/{brokerName}/access-token`.
+- Tokens stored in browser Zustand broker store for immediate use.
+- `BrokerRedirectPage` (`/redirect/:brokerId`) handles both brokers: reads `code` for Upstox, `request_token` for Zerodha.
 
 ### Per-broker Credential Storage
-- `BrokerCredentials` table stores: `Username`, `BrokerName`, `ApiKey`, `ApiSecret`, `AccessToken`, `CreatedAt`, `UpdatedAt`.
+- `BrokerCredentials` table: `Username`, `BrokerName`, `ApiKey`, `ApiSecret`, `AccessToken`, `CreatedAt`, `UpdatedAt`.
+- Unique key on `(Username, BrokerName)` — one record per user per broker.
 - `AccessToken` defaults to `"NA"` when not yet set.
 - Credentials are upserted — re-saving updates existing records.
 - Credentials can be deleted per broker.
 
 ### Multi-user Token Scoping
-- `UpstoxTokenContext` (AsyncLocal) scopes all broker API calls to the requesting user's token per HTTP request — no cross-user token leakage.
+- `UpstoxTokenContext` (AsyncLocal) scopes all Upstox API calls to the requesting user's token per HTTP request.
+- `ZerodhaTokenContext` (AsyncLocal) scopes all Zerodha API calls — stores `(ApiKey, AccessToken)` tuple, both required for the Kite `Authorization` header.
+- Middleware in `Program.cs` sets the correct context per request path (`/api/upstox/*` or `/api/zerodha/*`).
+
+### Broker Status Chips (Header)
+- A chip is shown in the header for every broker that has credentials saved.
+- **Green dot** = valid access token present (authenticated).
+- **Muted dot** = credentials saved but no token (not yet logged in).
+- Clicking a chip opens a popover showing available margin and a Disconnect button.
+- `IndexTicker` and Quick Trade button are shown when any broker is authenticated.
 
 ---
 
@@ -89,10 +127,13 @@ The risk engine runs as a background service (Worker or Console host) and autono
 - Re-entries are capped at `MaxReentries` (default 2) per symbol per session.
 - Can be disabled entirely with `EnableStrikeWorker: false`.
 
-### Multi-user Support
+### Multi-user, Multi-broker Support
 - `IUserTokenSource` decouples token supply from the engine.
-- `ConfigTokenSource` (Worker) reads a `Users[]` list from config — runs the engine for all configured users concurrently.
-- `SingleUserTokenSource` (Console) runs for a single developer token.
+- `DbUserTokenSource` (Worker) reads `UserRiskConfigs WHERE Enabled=true` joined with `BrokerCredentials` on `(Username, BrokerType)` every tick — auto-picks up DB changes without restart.
+- `SingleUserTokenSource` (Console) runs for a single developer token (Upstox only).
+- `StreamingRiskWorker` uses `IBrokerClientFactory` to create the correct broker adapter per user session based on `UserConfig.BrokerType`.
+- `RiskEvaluator` accepts `IBrokerClient` as a parameter — fully broker-agnostic; all position fetches and square-offs go through the interface.
+- `UserRiskConfigs` table has a `BrokerType` column (default `"upstox"`) allowing separate risk configs per user per broker.
 
 ### Streaming Mode
 - `EnableStreamingMode: true` switches from interval-based polling to event-driven evaluation triggered by Upstox WebSocket LTP ticks.
@@ -170,7 +211,7 @@ All thresholds are in `appsettings.json` under `RiskEngine` — no code changes 
 | Dashboard | `/dashboard` | Overview page |
 | Terminal | `/terminal` | Live trading terminal — positions, orders, profit protection |
 | Connect Brokers | `/connect-brokers` | Add/remove broker credentials, initiate broker OAuth |
-| Broker Redirect | `/redirect/:brokerId` | Handles OAuth redirect, exchanges code for access token |
+| Broker Redirect | `/redirect/:brokerId` | Handles OAuth redirect for Upstox (`code`) and Zerodha (`request_token`) |
 
 All pages except `/login` and `/auth/callback` are protected — unauthenticated users are redirected to `/login`.
 
@@ -178,9 +219,15 @@ All pages except `/login` and `/auth/callback` are protected — unauthenticated
 - Live positions panel with real-time LTP and P&L updates.
 - Orders panel showing today's orders — auto-refreshes on every order event.
 - Toast notifications for order rejections (with rejection reason) and fills.
-- Stats bar showing portfolio-level MTM.
+- Stats bar showing portfolio-level MTM, session extremes (Peak/Trough), and available margin.
+- **Multi-broker margin display** — stats bar shows `U ₹X · Z ₹Y` when both Upstox and Zerodha are authenticated; falls back to single-broker display when only one is connected.
 - Profit Protection panel for configuring risk thresholds.
 - Broker auth required guard — prompts user to connect a broker if not yet authenticated.
+
+### Quick Trade
+- Broker selector shown at the top of the Quick Trade dialog when more than one broker is connected — "Route via: Upstox / Zerodha".
+- Defaults to Upstox if authenticated; falls back to Zerodha.
+- By Price and By Chain tabs disabled for Zerodha selection (option-price order routing via Zerodha is pending).
 
 ### Profit Protection Panel (Frontend)
 A client-side risk configuration UI that mirrors the backend risk engine settings:
@@ -203,6 +250,12 @@ A client-side risk configuration UI that mirrors the backend risk engine setting
 ## Database
 
 - PostgreSQL hosted on [Neon](https://neon.tech).
-- `BrokerCredentials` table created automatically on first API startup via `EnsureCreatedAsync()` — no manual migrations needed.
-- Unique index on `(Username, BrokerName)` — one credential record per user per broker.
+- Tables are created automatically on first startup via `EnsureCreatedAsync()`. New columns/indexes require manual SQL — see `TODO.md`.
 - Connection string configured via `ConnectionStrings:DefaultConnection` (stored in `dotnet user-secrets` for local dev).
+
+| Table | Key | Notes |
+|---|---|---|
+| `BrokerCredentials` | `(Username, BrokerName)` unique | One credential record per user per broker |
+| `UserRiskConfigs` | `(Username, BrokerType)` unique | One risk config per user per broker; `BrokerType` column requires manual `ALTER TABLE` on existing DB |
+| `UserTradingSettings` | `Username` unique | Per-user expiry/underlying preferences |
+| `AppUsers` | `Email` unique | User registry; `IsActive` gates JWT issuance |
