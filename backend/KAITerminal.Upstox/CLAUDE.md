@@ -24,7 +24,7 @@ Consumer (ASP.NET Core / Worker Service)
 UpstoxClient         (Facade — single public entry point, delegates to services)
     ↓
 Services             (IAuthService, IPositionService, IOrderService, IOptionService,
-                      IMarketDataStreamer, IPortfolioStreamer)
+                      MarketDataStreamer, PortfolioStreamer — implement Contracts.Streaming interfaces)
     ↓
 UpstoxHttpClient     (Internal HTTP layer — REST calls, JSON, error handling)
     ↓
@@ -70,8 +70,8 @@ Throw `UpstoxException` when no strike satisfies the constraint (e.g. no strike 
 
 ### WebSocket Streamers
 
-- **`MarketDataStreamer`** — Protobuf binary feed (V3). 4 feed modes: `Ltpc`, `Full`, `OptionGreeks`, `FullD30`.
-- **`PortfolioStreamer`** — JSON text frames (V2). Emits typed events for orders, positions, holdings, GTT orders.
+- **`MarketDataStreamer`** — Protobuf binary feed (V3). Implements `Contracts.Streaming.IMarketDataStreamer`. Has its own internal `FeedMode` enum (4 values: Ltpc, Full, OptionGreeks, FullD30) aliased as `UpstoxFeedMode` to avoid conflict with `Contracts.Streaming.FeedMode` (2 values). `FeedReceived` fires `LtpUpdate` with extracted LTP values.
+- **`PortfolioStreamer`** — JSON text frames (V2). Implements `Contracts.Streaming.IPortfolioStreamer`. `ConnectAsync(ct)` subscribes to `[Order, Position]` internally. `UpdateReceived` fires `PortfolioUpdate` mapped from Upstox's internal `PortfolioStreamUpdate`.
 
 Both implement `IAsyncDisposable`, support auto-reconnect with configurable backoff, and are registered as **Transient** (each instance owns its own WebSocket connection). All other services are **Singleton**.
 

@@ -23,7 +23,7 @@ PositionsHub  (ASP.NET Core SignalR)
 
 Each browser connection gets its own pair of Upstox WebSocket connections. They are created in `OnConnectedAsync` and disposed in `OnDisconnectedAsync` via `PositionStreamManager`.
 
-> **Portfolio stream subscription** — `ConnectAsync` is called with `[UpdateType.Order, UpdateType.Position]`. Upstox requires explicit `update_types` query params on the authorize endpoint; omitting them results in no events being delivered.
+> **Portfolio stream subscription** — `IPortfolioStreamer.ConnectAsync(ct)` takes no parameters. The Upstox implementation subscribes to `[Order, Position]` internally. Upstox requires explicit `update_types` query params on the authorize endpoint — this is encapsulated inside `PortfolioStreamer`.
 
 ---
 
