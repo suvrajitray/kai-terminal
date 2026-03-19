@@ -88,6 +88,26 @@ Adding a new broker (e.g. Dhan): create `KAITerminal.Dhan`, implement `IBrokerCl
 - **Portfolio stream** — `IPortfolioStreamer.ConnectAsync(ct)` takes no update-type parameters; the Upstox implementation subscribes to `[Order, Position]` internally. Upstox requires explicit `update_types` query params on the authorize endpoint (omitting them delivers no events) — this is encapsulated inside `PortfolioStreamer.ConnectAsync`. The Upstox portfolio stream JSON frame uses `update_type` (not `type`) at the root — mapped to `PortfolioUpdate.UpdateType` at the SDK boundary.
 - **Order update notifications** — `ReceiveOrderUpdate` is pushed to the frontend on every `update_type=order` event. Frontend shows `toast.error` for `rejected` status and `toast.success` for `complete`; the Orders panel auto-refreshes on every order event.
 - **Exchange filter** — `GET /api/upstox/positions?exchange=NFO,BFO` and `GET /api/upstox/mtm?exchange=NFO,BFO` accept a comma-separated exchange list; the `PositionsHub` also accepts `?exchange=` on the WebSocket URL. Filtering is applied server-side; omit the param to receive all exchanges. See `docs/live-positions-websocket.md` for full protocol details.
+- **API documentation** — Scalar UI served at `https://localhost:5001/scalar/v1` in development (DeepSpace theme). OpenAPI spec at `/openapi/v1.json`.
+
+### API Contract Layer (`KAITerminal.Api/Contracts/` + `Mapping/`)
+
+All `/api/{broker}/positions` and `/api/{broker}/orders` responses use unified camelCase DTOs — never broker-specific types. The broker is identified by the URL path, never in request or response bodies.
+
+**Response DTOs** (`Contracts/Responses/`):
+- `PositionResponse` — camelCase; fields: `exchange`, `instrumentToken`, `tradingSymbol`, `product` (`ProductType`), `quantity`, `buyQuantity`, `sellQuantity`, `averagePrice`, `ltp`, `pnl`, `unrealised`, `realised`, `buyPrice`, `sellPrice`, `buyValue`, `sellValue`, `broker` (string `"upstox"`/`"zerodha"`), `isOpen`
+- `OrderResponse` — camelCase; fields: `orderId`, `exchangeOrderId`, `exchange`, `tradingSymbol`, `product` (`ProductType`), `orderType` (`TradeOrderType`), `transactionType` (`OrderSide`), `validity` (`OrderValidity`), `status`, `statusMessage`, `price`, `averagePrice`, `quantity`, `filledQuantity`, `pendingQuantity`, `tag`, `orderTimestamp`
+
+**API Enums** (`Contracts/Enums/`) — all carry `[JsonConverter(typeof(JsonStringEnumConverter))]` so they always serialise as strings, never numbers:
+
+| Enum | Values |
+|---|---|
+| `ProductType` | `Intraday`, `Delivery`, `Mtf`, `CoverOrder` |
+| `OrderSide` | `Buy`, `Sell` |
+| `TradeOrderType` | `Market`, `Limit`, `StopLoss`, `StopLossMarket` |
+| `OrderValidity` | `Day`, `IOC` |
+
+**`Mapping/PositionMapper.cs`** — static extension class (`internal`); `ToResponse()` overloads for both `Upstox.Models.Responses.Position` and `Contracts.Domain.Position`, plus `ToResponse()` for `Upstox.Models.Responses.Order`. Private parsers normalise broker-specific raw strings: `"I"/"MIS"/"NRML"` → `Intraday`, `"D"/"CNC"` → `Delivery`, `"BUY"` → `Buy`, `"SL-M"` → `StopLossMarket`, etc. Never import `KAITerminal.Upstox.Models.Enums` into `PositionMapper` — use only the API contract enums.
 
 ### Contracts (`KAITerminal.Contracts`)
 
