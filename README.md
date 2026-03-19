@@ -179,7 +179,7 @@ Open `http://localhost:3000` and sign in with Google.
 
 ---
 
-## Connecting a broker
+## Connecting a Broker
 
 ### Upstox
 
@@ -199,6 +199,246 @@ Open `http://localhost:3000` and sign in with Google.
 
 ---
 
+## Architecture
+
+```
+KAITerminal.Contracts   ← leaf node — all shared domain + notification types
+        ↑
+KAITerminal.Broker      ← IBrokerClient, IBrokerClientFactory
+        ↑
+KAITerminal.Upstox      ← Upstox SDK (full implementation)
+KAITerminal.Zerodha     ← Zerodha SDK (streaming stubbed)
+        ↑
+KAITerminal.RiskEngine  ← risk logic; zero broker deps
+KAITerminal.Api         ← REST API + SignalR hubs (PositionsHub, IndexHub, RiskHub)
+KAITerminal.Worker      ── RiskEngine + Infrastructure (multi-user host)
+KAITerminal.Console     ── RiskEngine (single-user host)
+```
+
+**Adding a new broker** (e.g. Dhan): create `KAITerminal.Dhan`, implement `IBrokerClient` + `IOptionContractProvider`, register in `BrokerExtensions`. Zero changes to RiskEngine, Contracts, or Infrastructure.
+
+---
+
+## API Reference
+
+Interactive docs at `https://localhost:5001/scalar/v1` in development. OpenAPI spec at `/openapi/v1.json`.
+
+### Authentication
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/auth/google` | — | Start Google OAuth flow |
+| `GET` | `/auth/google/callback` | — | OAuth callback; issues JWT, redirects to frontend |
+| `GET` | `/api/profile` | JWT | Returns `{ name, email }` from JWT claims |
+
+All endpoints below require `Authorization: Bearer <jwt>`.
+
+### Upstox — Auth
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/upstox/access-token` | Exchange OAuth code for Upstox access token |
+
+Request body: `{ "ApiKey", "ApiSecret", "RedirectUri", "Code" }` → Response: `{ "AccessToken" }`
+
+All Upstox endpoints below also require the `X-Upstox-AccessToken` header (your daily Upstox token).
+
+### Upstox — Positions
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/upstox/positions` | All positions for the day (`?exchange=NFO,BFO` optional filter) |
+| `GET` | `/api/upstox/mtm` | Total MTM P&L `{ "Mtm": decimal }` (`?exchange=` supported) |
+| `POST` | `/api/upstox/positions/exit-all` | Exit all open positions |
+| `POST` | `/api/upstox/positions/{instrumentToken}/exit` | Exit a single position |
+| `POST` | `/api/upstox/positions/{instrumentToken}/convert` | Convert position between Intraday and Delivery |
+
+Exit endpoints accept optional query params: `orderType` (Market/Limit/SL/SLM) and `product` (Intraday/Delivery/MTF/CoverOrder).
+
+### Upstox — Orders
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/upstox/orders` | All orders for the day |
+| `POST` | `/api/upstox/orders` | Place order (v2, returns `{ OrderId }`) |
+| `POST` | `/api/upstox/orders/v3` | Place order (HFT v3, returns `{ OrderIds[], Latency }`) |
+| `POST` | `/api/upstox/orders/cancel-all` | Cancel all pending orders |
+| `DELETE` | `/api/upstox/orders/{orderId}` | Cancel a specific order |
+| `DELETE` | `/api/upstox/orders/{orderId}/v3` | Cancel a specific order (HFT, returns latency) |
+
+Place order request body:
+```json
+{
+  "InstrumentToken": "NSE_FO|57352",
+  "Quantity": 50,
+  "TransactionType": "Buy | Sell",
+  "OrderType": "Market | Limit | SL | SLM",
+  "Product": "Intraday | Delivery | MTF | CoverOrder",
+  "Validity": "Day | IOC",
+  "Price": 0,
+  "TriggerPrice": 0,
+  "IsAmo": false,
+  "Tag": null,
+  "Slice": false
+}
+```
+
+### Upstox — Options
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/upstox/options/chain` | Full option chain with live prices (`?underlyingKey=&expiryDate=`) |
+| `GET` | `/api/upstox/options/contracts` | Option contract metadata — no live prices |
+| `GET` | `/api/upstox/orders/by-option-price/resolve` | Resolve strike by target premium — no order placed |
+| `POST` | `/api/upstox/orders/by-option-price` | Place order at strike nearest to target premium |
+| `POST` | `/api/upstox/orders/by-option-price/v3` | Same, HFT v3 |
+| `GET` | `/api/upstox/orders/by-strike/resolve` | Resolve strike by type (ATM/OTM/ITM) — no order placed |
+| `POST` | `/api/upstox/orders/by-strike` | Place order at a named strike type |
+| `POST` | `/api/upstox/orders/by-strike/v3` | Same, HFT v3 |
+| `POST` | `/api/upstox/margin` | Get required margin for a list of positions |
+
+Place-by-price request: `{ UnderlyingKey, ExpiryDate, OptionType (CE/PE), TargetPremium, PriceSearchMode (Nearest/GreaterThan/LessThan), Quantity, TransactionType, ... }`
+
+Place-by-strike request: `{ UnderlyingKey, ExpiryDate, OptionType, StrikeType (ATM/OTM1–5/ITM1–5), Quantity, TransactionType, ... }`
+
+Strike resolution rules:
+
+| StrikeType | CE | PE |
+|---|---|---|
+| `ATM` | Closest strike to spot | Closest strike to spot |
+| `OTM1`–`OTM5` | n strikes **above** ATM | n strikes **below** ATM |
+| `ITM1`–`ITM5` | n strikes **below** ATM | n strikes **above** ATM |
+
+### Zerodha
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/zerodha/auth-url` | Returns Kite Connect login URL (`?apiKey=`) |
+| `POST` | `/api/zerodha/access-token` | Exchange `request_token` for access token |
+| `GET` | `/api/zerodha/positions` | Zerodha open positions |
+| `GET` | `/api/zerodha/orders` | Zerodha today's orders |
+
+Zerodha endpoints require `X-Zerodha-Api-Key` and `X-Zerodha-Access-Token` headers.
+
+### Master Data
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/masterdata/contracts` | Merged option contracts from all connected brokers |
+
+Returns unified `ContractEntry` list with `UpstoxToken` and `ZerodhaToken` fields. Cached until 8:15 AM IST daily.
+
+### Risk Configuration
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/risk-config` | Load Profit Protection config for current user |
+| `PUT` | `/api/risk-config` | Save Profit Protection config for current user |
+
+### AI Signals
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/ai/market-sentiment` | AI market signals from all 4 models in parallel |
+
+Requires `X-Upstox-Access-Token` header. Fans out to GPT-4o, Grok, Gemini, and Claude (30s timeout each). Returns direction / confidence / reasons / support / resistance / watch_for per model.
+
+### Internal (Worker → API)
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/internal/risk-event` | Worker posts risk events here; relayed to browser via RiskHub |
+
+Requires `X-Internal-Key` header matching `Api:InternalKey` secret. Returns 503 if key is not configured.
+
+### WebSocket Hubs
+
+| Hub | Path | Auth | Description |
+|---|---|---|---|
+| `PositionsHub` | `/hubs/positions` | `?upstoxToken=` | Live positions + LTP (Upstox-only) |
+| `IndexHub` | `/hubs/indices` | `?upstoxToken=` | Live index quotes (REST polling, no WS slot used) |
+| `RiskHub` | `/hubs/risk` | JWT Bearer via `?access_token=` | Risk event alerts — browser toasts |
+
+### Diagnostics
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/debug/claims` | JWT | Lists all claims in the current JWT (`Development` only) |
+
+---
+
+## Live Positions WebSocket
+
+Real-time position data is delivered through the `PositionsHub` SignalR hub backed by two Upstox WebSocket streams per connected client.
+
+### Architecture
+
+```
+Frontend (React)
+  │  @microsoft/signalr
+  │  WSS /hubs/positions?upstoxToken=...
+  ▼
+PositionsHub  (ASP.NET Core SignalR)
+  ├── UpstoxClient.GetAllPositionsAsync()   ← initial load + re-fetch on portfolio events
+  ├── IPortfolioStreamer                     ← Upstox Portfolio Stream Feed V2 (JSON/WS)
+  │     update_type=order     →  re-fetch positions → push ReceivePositions
+  │                            →  push ReceiveOrderUpdate (status, message, symbol)
+  │     update_type=position  →  re-fetch positions → push ReceivePositions
+  └── IMarketDataStreamer                    ← Upstox Market Data Feed V3 (protobuf/WS)
+        LTP ticks  →  push ReceiveLtpBatch
+```
+
+Each browser connection gets its own pair of Upstox WebSocket connections. They are created in `OnConnectedAsync` and disposed in `OnDisconnectedAsync`.
+
+> **WebSocket slot limit:** Upstox allows **2 market data WebSocket connections** per normal-tier access token. `PositionsHub` uses slot 1, `StreamingRiskWorker` uses slot 2. Opening a second browser tab will hit the limit. `IndexHub` uses REST polling to avoid consuming a slot.
+
+### Connection URL
+
+```
+WSS https://<host>/hubs/positions?upstoxToken=<upstox_access_token>[&exchange=NFO,BFO]
+```
+
+| Query param | Required | Description |
+|---|---|---|
+| `upstoxToken` | Yes | Upstox daily access token. Hub aborts if missing. |
+| `exchange` | No | Comma-separated exchange filter (e.g. `NFO,BFO`). Omit to receive all exchanges. |
+
+### Server → Client Messages
+
+| Message | Payload | When sent |
+|---|---|---|
+| `ReceivePositions` | `Position[]` | On connect + after every order/position event |
+| `ReceiveLtpBatch` | `Array<{ instrumentToken, ltp }>` | On every market data tick |
+| `ReceiveOrderUpdate` | `{ orderId, status, statusMessage, tradingSymbol }` | On every order event |
+
+Frontend shows `toast.error` for `rejected` orders and `toast.success` for `complete`. The Orders panel auto-refreshes on every `ReceiveOrderUpdate`.
+
+### Live P&L Calculation
+
+When `ReceiveLtpBatch` arrives, the panel recomputes unrealised P&L locally without a REST round-trip:
+
+```ts
+const unrealised = position.quantity * (ltp - position.average_price);
+const pnl = unrealised + position.realised;
+```
+
+`quantity` is negative for short positions — the formula correctly yields a gain for shorts when price falls.
+
+### Exchange Filter
+
+All position and MTM APIs (REST + SignalR) support server-side exchange filtering:
+
+```
+GET /api/upstox/positions?exchange=NFO,BFO     ← NFO + BFO positions only
+GET /api/upstox/positions                       ← all exchanges
+
+WSS /hubs/positions?upstoxToken=<token>&exchange=NFO,BFO
+```
+
+Supported exchanges: `NSE`, `BSE`, `NFO`, `BFO`, `MCX`, `CDS`.
+
+---
+
 ## Profit Protection
 
 The Worker process monitors every enabled user's MTM and fires exit orders automatically. Configure per user in **Settings → Profit Protection** (saved to DB via `PUT /api/risk-config`).
@@ -215,7 +455,24 @@ The Worker process monitors every enabled user's MTM and fires exit orders autom
 
 Checks run in order: **Hard SL → Target → Trailing SL**. Once a user is squared off, no further evaluations run until the Worker restarts.
 
-### Risk event alerts
+### Trailing SL Example
+
+```
+MTM crosses TrailingActivateAt (+15,000)
+  → floor locked at LockProfitAt (+3,025) — guaranteed regardless of entry MTM
+
+MTM reaches +16,000 → gain=1,000 ≥ WhenProfitIncreasesBy
+  → floor raised by IncreaseTrailingBy → floor=+3,525
+
+MTM reaches +17,000 → gain=1,000
+  → floor raised → floor=+4,025
+
+MTM falls to +3,900 → 3,900 ≤ floor=+4,025 → TSL fires → exit all
+```
+
+The floor is set to `LockProfitAt` at activation — a fixed value, not relative to MTM at that moment. This gives a predictable guaranteed minimum profit.
+
+### Risk Event Notifications
 
 Every time a risk event fires, a toast notification appears in the browser immediately:
 
@@ -242,11 +499,32 @@ Worker: StreamingRiskWorker
                       → browser useRiskFeed hook → sonner toast
 ```
 
-The `Api:InternalKey` user-secret must be set to the same value in both the Api and Worker processes. If the key is missing from the Api, the endpoint returns 503 and no alerts are delivered.
+The `Api:InternalKey` user-secret must be set to the same value in both the Api and Worker processes. If the key is missing from the Api, the endpoint returns 503 and no alerts are delivered. The `RiskHub` browser WebSocket is completely separate from Upstox broker WebSocket connections — it consumes no broker connection slots.
 
----
+### Risk Engine Configuration
 
-## Risk engine log messages
+The `RiskEngine` section in `appsettings.json` controls worker behaviour (not per-user thresholds — those are in the DB):
+
+```json
+{
+  "RiskEngine": {
+    "TradingWindowStart": "09:15:00",
+    "TradingWindowEnd":   "15:30:00",
+    "TradingTimeZone":    "India Standard Time",
+    "LtpEvalMinIntervalMs": 15000,
+    "Exchanges": ["NFO", "BFO"]
+  }
+}
+```
+
+| Key | Meaning |
+|---|---|
+| `TradingWindowStart` / `TradingWindowEnd` | Risk evaluation only runs within this window |
+| `TradingTimeZone` | IANA or Windows timezone ID |
+| `LtpEvalMinIntervalMs` | Minimum ms between LTP-tick-triggered evaluations (default 15,000) |
+| `Exchanges` | Only positions from these exchanges are included in MTM |
+
+### Risk Engine Log Messages
 
 All risk engine logs follow the format `{UserId} ({Broker})` and format monetary values as `₹+#,##0` / `₹-#,##0`.
 
@@ -270,6 +548,133 @@ All risk engine logs follow the format `{UserId} ({Broker})` and format monetary
 
 ---
 
+## Upstox SDK
+
+`KAITerminal.Upstox` is a .NET 10 class library that wraps the Upstox REST API v2/v3 and real-time WebSocket feeds into a DI-friendly trading SDK.
+
+### Registration
+
+```csharp
+// Single-user (static token in config)
+builder.Services.AddUpstoxSdk(builder.Configuration);
+
+// Multi-user (per-call token via UpstoxTokenContext)
+builder.Services.AddUpstoxSdk(cfg => { cfg.AutoReconnect = false; });
+```
+
+```json
+{
+  "Upstox": {
+    "AccessToken": "daily_oauth_token",
+    "AutoReconnect": true,
+    "ReconnectIntervalSeconds": 3,
+    "MaxReconnectAttempts": 5
+  }
+}
+```
+
+### Token Generation (OAuth 2.0)
+
+```csharp
+// Step 1: redirect user to Upstox login
+// https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id=...&redirect_uri=...
+
+// Step 2: exchange the code returned in the redirect callback
+TokenResponse token = await upstoxClient.GenerateTokenAsync(
+    clientId:          "api_key",
+    clientSecret:      "api_secret",
+    redirectUri:       "https://your-app/callback",
+    authorizationCode: "code_from_redirect");
+
+// Step 3: use token.AccessToken for all subsequent API calls
+```
+
+### Per-call Token (Multi-user)
+
+```csharp
+// Token flows through all awaits via AsyncLocal
+using (UpstoxTokenContext.Use(currentUser.UpstoxToken))
+{
+    var positions = await upstoxClient.GetAllPositionsAsync();
+    var orders    = await upstoxClient.GetAllOrdersAsync();
+}
+
+// WebSocket — token captured at connect time, reused on reconnects
+using (UpstoxTokenContext.Use(currentUser.UpstoxToken))
+    await streamer.ConnectAsync();
+```
+
+### Market Data Streamer
+
+Streams tick data in protobuf binary over WebSocket.
+
+| FeedMode | Data included |
+|---|---|
+| `Ltpc` | Last traded price, time, quantity, close price |
+| `Full` | LTPC + 5-level depth + OHLC + ATP, VTT, OI, IV + greeks |
+| `OptionGreeks` | LTPC + 1-level depth + greeks + VTT, OI, IV |
+| `FullD30` | Same as Full but 30-level depth |
+
+```csharp
+await using var streamer = client.CreateMarketDataStreamer();
+
+streamer.FeedReceived += (_, msg) =>
+{
+    foreach (var (key, feed) in msg.Instruments)
+        if (feed.Ltpc is { } ltpc)
+            Console.WriteLine($"{key}  LTP={ltpc.Ltp}");
+};
+
+await streamer.ConnectAsync();
+await streamer.SubscribeAsync(["NSE_INDEX|Nifty 50"], FeedMode.Ltpc);
+```
+
+### Portfolio Streamer
+
+Streams order and position updates as JSON text frames.
+
+```csharp
+await using var portfolio = client.CreatePortfolioStreamer();
+
+portfolio.UpdateReceived += (_, update) =>
+{
+    if (update.Type == "order_update" && update.Data.HasValue)
+    {
+        var orderId = update.Data.Value.GetProperty("order_id").GetString();
+        var status  = update.Data.Value.GetProperty("status").GetString();
+    }
+};
+
+// Subscribes to [Order, Position] internally
+await portfolio.ConnectAsync();
+```
+
+### Error Handling
+
+All REST methods throw `UpstoxException` on API or network errors. WebSocket errors surface through the `Disconnected` event.
+
+```csharp
+try
+{
+    var result = await client.PlaceOrderAsync(request);
+}
+catch (UpstoxException ex)
+{
+    Console.WriteLine($"HTTP {ex.HttpStatusCode}  Code={ex.ErrorCode}  {ex.Message}");
+}
+```
+
+### Protobuf / Apple Silicon Note
+
+`Protos/MarketDataFeedV3.cs` is pre-generated because `Grpc.Tools` does not ship a native `macosx_arm64` binary. If the `.proto` is modified, regenerate with:
+
+```bash
+brew install protobuf
+protoc --csharp_out=Protos --proto_path=Protos Protos/MarketDataFeedV3.proto
+```
+
+---
+
 ## AI Signals
 
 The `/ai-signals` page polls `GET /api/ai/market-sentiment` every 15 minutes (manual refresh also available). The endpoint:
@@ -282,51 +687,6 @@ Requires `X-Upstox-Access-Token` header and AI API keys set via `dotnet user-sec
 
 ---
 
-## Architecture
-
-```
-KAITerminal.Contracts   ← leaf node — all shared domain + notification types
-        ↑
-KAITerminal.Broker      ← IBrokerClient, IBrokerClientFactory
-        ↑
-KAITerminal.Upstox      ← Upstox SDK (full implementation)
-KAITerminal.Zerodha     ← Zerodha SDK (streaming stubbed)
-        ↑
-KAITerminal.RiskEngine  ← risk logic; zero broker deps
-KAITerminal.Api         ← REST API + SignalR hubs (PositionsHub, IndexHub, RiskHub)
-KAITerminal.Worker      ── RiskEngine + Infrastructure (multi-user host)
-KAITerminal.Console     ── RiskEngine (single-user host)
-```
-
-**Adding a new broker** (e.g. Dhan): create `KAITerminal.Dhan`, implement `IBrokerClient` + `IOptionContractProvider`, register in `BrokerExtensions`. Zero changes to RiskEngine, Contracts, or Infrastructure.
-
----
-
-## API reference
-
-Full interactive docs at `https://localhost:5001/scalar/v1` in development (DeepSpace theme). OpenAPI spec at `/openapi/v1.json`.
-
-Key endpoints:
-
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/auth/google` | Start Google OAuth flow |
-| `GET` | `/auth/google/callback` | OAuth callback; issues JWT |
-| `GET` | `/api/upstox/positions` | Open positions (`?exchange=NFO,BFO` optional) |
-| `GET` | `/api/upstox/orders` | Today's orders |
-| `GET` | `/api/upstox/mtm` | Portfolio MTM P&L |
-| `GET` | `/api/zerodha/positions` | Zerodha open positions |
-| `GET` | `/api/masterdata/contracts` | Merged option contracts (all connected brokers) |
-| `GET` | `/api/risk-config` | Load PP config for current user |
-| `PUT` | `/api/risk-config` | Save PP config for current user |
-| `GET` | `/api/ai/market-sentiment` | AI market signals (all 4 models) |
-| `POST` | `/api/internal/risk-event` | Internal — Worker → Api risk event relay |
-| `WS` | `/hubs/positions` | Live positions + LTP (Upstox-only; `?upstoxToken=`) |
-| `WS` | `/hubs/indices` | Live index quotes (`?upstoxToken=`) |
-| `WS` | `/hubs/risk` | Risk event alerts (JWT Bearer via `?access_token=`) |
-
----
-
 ## Database
 
 PostgreSQL via [Neon](https://neon.tech). Tables are created automatically on first startup via `EnsureCreatedAsync()` — no migrations needed. New tables/columns require manual SQL on Neon.
@@ -334,13 +694,188 @@ PostgreSQL via [Neon](https://neon.tech). Tables are created automatically on fi
 | Table | Purpose |
 |---|---|
 | `AppUsers` | User registry — `Email`, `IsActive`, `IsAdmin` |
-| `BrokerCredentials` | Per-user broker API key + secret + access token |
+| `BrokerCredentials` | Per-user broker API key + secret + access token (unique on `Username, BrokerName`) |
 | `UserTradingSettings` | Per-user trading preferences (underlying, expiry, etc.) |
-| `UserRiskConfigs` | Per-user profit protection config + `Enabled` flag |
+| `UserRiskConfigs` | Per-user profit protection config + `Enabled` flag (unique on `Username, BrokerType`) |
 
 ---
 
-## Configuration reference
+## Logging & Observability
+
+All backend logging uses `Microsoft.Extensions.Logging`. When `ApplicationInsights:ConnectionString` is set, logs are forwarded to Azure Application Insights. When unset, all logs go to console only — no configuration required for local development.
+
+### Setting Up App Insights
+
+```bash
+# Set in each project that sends telemetry
+dotnet user-secrets set "ApplicationInsights:ConnectionString" "InstrumentationKey=...;IngestionEndpoint=..."
+```
+
+App Insights registration is guarded by a connection string check — the SDK is only registered when the value is non-empty.
+
+### How ILogger Maps to App Insights
+
+| `ILogger` call | App Insights telemetry type |
+|---|---|
+| `LogDebug` / `LogInformation` / `LogWarning` | **Trace** (with corresponding severity level) |
+| `LogError` / `LogCritical` | **Exception** (includes full stack trace) |
+
+All structured log properties (e.g. `{UserId}`, `{Mtm}`) are promoted to custom dimensions — filterable in Log Analytics.
+
+### Log Levels
+
+**Worker / Console** (`appsettings.json`):
+```json
+"Logging": {
+  "LogLevel": {
+    "Default": "Information",
+    "KAITerminal.RiskEngine": "Information",
+    "KAITerminal.Upstox": "Warning"
+  },
+  "ApplicationInsights": {
+    "LogLevel": {
+      "Default": "Warning",
+      "KAITerminal.RiskEngine": "Information",
+      "KAITerminal.Upstox": "Warning"
+    }
+  }
+}
+```
+
+App Insights receives all `KAITerminal.RiskEngine` logs at `Information+` — this captures the 15-second heartbeat, enabling **Azure Monitor availability alerts** (e.g. "alert if no heartbeat for 20+ minutes during market hours").
+
+**API** (`appsettings.json`):
+```json
+"ApplicationInsights": {
+  "LogLevel": { "Default": "Warning" }
+}
+```
+
+### Log Catalog
+
+**`StreamingRiskWorker`** — `KAITerminal.RiskEngine.Workers.StreamingRiskWorker`
+
+| Level | Message | Meaning |
+|---|---|---|
+| `Information` | `RiskWorker started — trading window {Start}–{End} {Tz}, LTP eval every {IntervalMs}ms` | Worker started; confirms config. |
+| `Warning` | `No users configured — nothing to monitor` | No enabled rows in `UserRiskConfigs`. |
+| `Information` | `Starting {Count} risk session(s)` | Number of users loaded from DB. |
+| `Information` | `Starting session — {UserId} ({Broker})` | Streams about to connect. |
+| `Information` | `Streams live — {UserId} ({Broker})  watching {Count} open instrument(s)` | Both WebSocket streams are live. |
+| `Warning` | `Portfolio stream reconnecting — {UserId} ({Broker})` | Portfolio WebSocket auto-reconnecting. |
+| `Warning` | `Market data stream reconnecting — {UserId} ({Broker})` | Market data WebSocket auto-reconnecting. |
+| `Error` | `Session crashed — {UserId} ({Broker})` | Unhandled exception; restart wrapper will retry. |
+| `Warning` | `Restarting session — {UserId} ({Broker}) in {Delay}s` | Crashed session will restart after delay (30s → 300s cap). |
+| `Information` | `Market open — risk engine active ({Start}–{End} {Tz})` | First evaluation after market open. |
+| `Information` | `Market closed — risk engine paused until {Start} {Tz}` | Market closed or engine started outside hours. |
+| `Debug` | `LTP eval rate-limited — {UserId} ({Broker})` | Minimum interval not yet elapsed. Expected and frequent. |
+| `Debug` | `Evaluation in progress — skipping for {UserId} ({Broker})` | Concurrent evaluation running; tick dropped. |
+
+**`RiskEvaluator`** — `KAITerminal.RiskEngine.Services.RiskEvaluator`
+
+| Level | Message | Meaning |
+|---|---|---|
+| `Information` | `{UserId} ({Broker})  PnL ₹{Mtm}  \|  SL ₹{Sl}  \|  Target ₹{Target}  \|  TSL off — activates at ₹{Threshold}` | Normal heartbeat, TSL inactive. |
+| `Information` | `{UserId} ({Broker})  PnL ₹{Mtm}  \|  Target ₹{Target}  \|  TSL ₹{Stop}` | Normal heartbeat, TSL active. |
+| `Warning` | `HARD SL HIT — {UserId} ({Broker})  PnL ₹{Mtm}  ≤  SL ₹{Sl} — exiting all` | Hard SL fired. |
+| `Information` | `TARGET HIT — {UserId} ({Broker})  PnL ₹{Mtm}  ≥  Target ₹{Target} — exiting all` | Profit target reached. |
+| `Information` | `TSL ACTIVATED — {UserId} ({Broker})  floor locked at ₹{Stop}` | Trailing SL armed. |
+| `Information` | `TSL RAISED — {UserId} ({Broker})  floor → ₹{Stop}` | Trailing floor stepped up. |
+| `Warning` | `TSL HIT — {UserId} ({Broker})  PnL ₹{Mtm}  ≤  floor ₹{Stop} — exiting all` | Trailing SL fired. |
+| `Warning` | `Square-off complete — {UserId} ({Broker}) — all positions exited` | Exit succeeded. |
+| `Error` | `Square-off FAILED — {UserId} ({Broker}) — marked as squared-off; manual verification required` | Exit failed. **Manual intervention required.** |
+| `Warning` | `Portfolio fetch failed — {UserId} ({Broker})` | REST call failed; evaluation cycle skipped. |
+
+**`PortfolioStreamer`** — `KAITerminal.Upstox.Services.PortfolioStreamer`
+
+| Level | Message | Meaning |
+|---|---|---|
+| `Warning` | `Portfolio stream reconnect attempt {Attempt}/{Max} failed` | Reconnect failed; will retry. |
+| `Error` | `Portfolio stream failed to reconnect after {Max} attempt(s) — stream permanently disconnected` | All retries exhausted. Restart required. |
+| `Warning` | `Failed to parse portfolio stream message ({Length} bytes)` | JSON frame deserialization failed. |
+
+**`MasterDataService`**, **`PositionsHub`**, **`IndexHub`**, **`GlobalExceptionHandler`** log similarly — search by namespace in App Insights.
+
+### Suggested Azure Monitor Alerts
+
+| Alert | Condition |
+|---|---|
+| Risk engine down during market hours | No `"Market open"` trace in 20-min window |
+| Square-off failure | Any `"Square-off FAILED"` trace |
+| Stream permanently disconnected | Any `"permanently disconnected"` trace |
+| Session crash loop | More than 3 `"Restarting session"` traces in 10 min |
+| High API error rate | More than 10 Upstox exceptions in 5 min |
+
+### Troubleshooting
+
+**Risk engine not evaluating despite open positions:**
+1. Check for `Market closed` — `TradingWindowStart/End` or `TradingTimeZone` may be wrong.
+2. Check for `No users configured` — `UserRiskConfigs.Enabled` may be `false`.
+3. Check for `Market data stream failed to reconnect` — LTP ticks stopped; restart the Worker.
+4. Check for `already squared off` at Debug level — state resets only on Worker restart.
+
+**Square-off did not happen / positions still open:**
+1. Find `HARD SL HIT` / `TARGET HIT` / `TSL HIT` — confirms the trigger fired.
+2. Check immediately after for `Square-off complete` or `Square-off FAILED`.
+3. If `Square-off FAILED` — exit API call failed. **Manually close positions via the broker.** Engine will not retry.
+
+**WebSocket streams keep disconnecting:**
+1. Check for `reconnect attempt N/M failed` warnings, then `stream permanently disconnected`.
+2. Check if the Upstox access token expired (daily rotation requires Worker restart).
+3. Upstox allows **2 market data WebSocket connections** per normal token — a second browser tab on `PositionsHub` will fail.
+
+**Trailing SL not activating:**
+1. Confirm `TrailingEnabled: true` in `UserRiskConfigs`.
+2. Watch heartbeat: `TSL off — activates at ₹{Threshold}` — `TrailingActivateAt` not reached yet.
+
+---
+
+## Hosting & Deployment
+
+### Self-hosted (VPS / Docker)
+
+No special configuration needed. Kestrel supports WebSockets natively.
+
+#### Nginx reverse proxy
+
+WebSocket upgrade headers are required:
+
+```nginx
+location / {
+    proxy_pass         http://localhost:5001;
+    proxy_http_version 1.1;
+    proxy_set_header   Upgrade $http_upgrade;
+    proxy_set_header   Connection "upgrade";
+    proxy_set_header   Host $host;
+    proxy_cache_bypass $http_upgrade;
+}
+```
+
+Without `proxy_http_version 1.1` and the `Upgrade`/`Connection` headers, Nginx will close the WebSocket handshake with a 400 or silently downgrade to long-polling.
+
+#### Caddy
+
+Caddy proxies WebSockets automatically — no extra configuration required.
+
+### Azure App Service
+
+WebSockets are **disabled by default** on Azure App Service. Enable before deploying:
+
+**Portal:** Web App → Configuration → General settings → **Web sockets: On** → Save
+
+**Azure CLI:**
+```bash
+az webapp config set \
+  --name <app-name> \
+  --resource-group <resource-group> \
+  --web-sockets-enabled true
+```
+
+**Scaling out:** ARR Affinity (enabled by default on App Service) provides sticky sessions automatically — no code changes needed for up to ~5 instances. For more instances, add Azure SignalR Service with a one-line change: `builder.Services.AddSignalR().AddAzureSignalR()`.
+
+---
+
+## Configuration Reference
 
 | File | Key settings |
 |---|---|
@@ -353,7 +888,7 @@ PostgreSQL via [Neon](https://neon.tech). Tables are created automatically on fi
 
 ---
 
-## Development commands
+## Development Commands
 
 ```bash
 # Backend
