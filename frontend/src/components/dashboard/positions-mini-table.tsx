@@ -58,13 +58,13 @@ export function PositionsMiniTable({ positions, loading }: PositionsMiniTablePro
                 </thead>
                 <tbody>
                   {open.map((p) => {
-                    const avg = p.quantity < 0 ? p.sell_price : p.buy_price;
-                    const lookup = getByInstrumentKey(p.instrument_token);
+                    const avg = p.quantity < 0 ? p.sellPrice : p.buyPrice;
+                    const lookup = getByInstrumentKey(p.instrumentToken);
                     const contract = lookup?.contract;
                     const index = lookup?.index;
                     return (
                       <tr
-                        key={p.instrument_token}
+                        key={p.instrumentToken}
                         className="border-b border-border/30 hover:bg-muted/20 transition-colors"
                       >
                         <td className="px-4 py-1.5">
@@ -80,7 +80,7 @@ export function PositionsMiniTable({ positions, loading }: PositionsMiniTablePro
                             </>
                           ) : (
                             <>
-                              <div className="font-medium">{p.trading_symbol}</div>
+                              <div className="font-medium">{p.tradingSymbol}</div>
                               <div className="text-[10px] text-muted-foreground">{p.exchange}</div>
                             </>
                           )}
@@ -97,7 +97,7 @@ export function PositionsMiniTable({ positions, loading }: PositionsMiniTablePro
                           ₹{INR.format(avg)}
                         </td>
                         <td className="px-3 py-1.5 text-right tabular-nums">
-                          ₹{INR.format(p.last_price)}
+                          ₹{INR.format(p.ltp)}
                         </td>
                         <td className="px-4 py-1.5 text-right">
                           <PnlCell value={p.pnl} />

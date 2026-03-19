@@ -1,3 +1,4 @@
+using KAITerminal.Api.Mapping;
 using KAITerminal.Api.Models;
 using KAITerminal.Api.Services;
 using KAITerminal.Zerodha;
@@ -81,7 +82,7 @@ public static class ZerodhaEndpoints
                     .Where(p => exchanges.Contains(p.Exchange.ToUpperInvariant()))
                     .ToList();
             }
-            return Results.Ok(positions);
+            return Results.Ok(positions.Select(p => p.ToResponse()));
         });
 
         // ── Funds ─────────────────────────────────────────────────────────────

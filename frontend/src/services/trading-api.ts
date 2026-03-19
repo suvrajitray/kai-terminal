@@ -4,13 +4,13 @@ import type { Position, Order, IndexContracts, OptionChainEntry } from "@/types"
 export async function fetchPositions(exchanges?: string[]): Promise<Position[]> {
   const params = exchanges?.length ? { exchange: exchanges.join(",") } : undefined;
   const res = await apiClient.get<Position[]>("/api/upstox/positions", { params });
-  return res.data.map((p) => ({ ...p, broker: "upstox" }));
+  return res.data;
 }
 
 export async function fetchZerodhaPositions(exchanges?: string[]): Promise<Position[]> {
   const params = exchanges?.length ? { exchange: exchanges.join(",") } : undefined;
   const res = await apiClient.get<Position[]>("/api/zerodha/positions", { params });
-  return res.data.map((p) => ({ ...p, broker: "zerodha" }));
+  return res.data;
 }
 
 export async function exitAllPositions(exchanges = ["NFO", "BFO"]): Promise<void> {
@@ -21,7 +21,7 @@ export async function exitAllPositions(exchanges = ["NFO", "BFO"]): Promise<void
 
 export async function exitPosition(instrumentToken: string, product: string): Promise<void> {
   await apiClient.post(`/api/upstox/positions/${encodeURIComponent(instrumentToken)}/exit`, null, {
-    params: { product },
+    params: { product: productToUpstoxStr(product) },
   });
 }
 
@@ -31,7 +31,7 @@ export async function convertPosition(
   quantity: number,
 ): Promise<void> {
   await apiClient.post(`/api/upstox/positions/${encodeURIComponent(instrumentToken)}/convert`, {
-    oldProduct,
+    oldProduct: productToUpstoxStr(oldProduct),
     quantity,
   });
 }
@@ -49,14 +49,25 @@ export async function cancelOrder(orderId: string): Promise<void> {
   await apiClient.delete(`/api/upstox/orders/${encodeURIComponent(orderId)}/v3`);
 }
 
-// TransactionType: Buy = 0, Sell = 1  (matches backend enum order)
-// Product: I=0, D=1, MTF=2, CO=3
+// Maps ProductType enum strings (or legacy "I"/"D") to Upstox numeric enum for order placement
+// Upstox Product enum: Intraday=0, Delivery=1, MTF=2, CoverOrder=3
 function productToEnum(product: string): number {
-  switch (product.toUpperCase()) {
-    case "D": return 1;
-    case "MTF": return 2;
-    case "CO": return 3;
-    default: return 0;
+  switch (product) {
+    case "Delivery": case "D": return 1;
+    case "Mtf":      case "MTF": return 2;
+    case "CoverOrder": case "CO": return 3;
+    default: return 0;  // "Intraday", "I", anything else
+  }
+}
+
+// Maps ProductType enum strings back to Upstox raw string values for broker-specific endpoints
+// (exit position, convert position) that pass the product directly to the Upstox API
+function productToUpstoxStr(product: string): string {
+  switch (product) {
+    case "Delivery": return "D";
+    case "Mtf":      return "MTF";
+    case "CoverOrder": return "CO";
+    default: return "I";  // "Intraday"
   }
 }
 

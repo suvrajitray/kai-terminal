@@ -54,10 +54,9 @@ export function usePositionsFeed(onOrderUpdate?: () => void) {
 
     // ReceivePositions is Upstox-only — preserve any existing Zerodha positions
     conn.on("ReceivePositions", (incoming: Position[]) => {
-      const tagged = incoming.map((p) => ({ ...p, broker: "upstox" as const }));
       setPositions((prev) => {
         const zerodha = prev.filter((p) => p.broker === "zerodha");
-        return [...tagged, ...zerodha];
+        return [...incoming, ...zerodha];
       });
       setLoading(false);
     });
@@ -67,11 +66,11 @@ export function usePositionsFeed(onOrderUpdate?: () => void) {
         if (prev.length === 0) return prev;
         const map = new Map(updates.map((u) => [u.instrumentToken, u.ltp]));
         return prev.map((p) => {
-          const ltp = map.get(p.instrument_token);
+          const ltp = map.get(p.instrumentToken);
           if (ltp === undefined) return p;
-          const avgPrice = p.quantity < 0 ? p.sell_price : p.buy_price;
+          const avgPrice = p.quantity < 0 ? p.sellPrice : p.buyPrice;
           const unrealised = p.quantity * (ltp - avgPrice);
-          return { ...p, last_price: ltp, unrealised, pnl: unrealised + p.realised };
+          return { ...p, ltp, unrealised, pnl: unrealised + p.realised };
         });
       });
     });

@@ -14,7 +14,7 @@ import type { Order } from "@/types";
 const TERMINAL_STATUSES = new Set(["complete", "rejected", "cancelled"]);
 
 const PRODUCT_LABEL: Record<string, string> = {
-  I: "Intraday", D: "Delivery", MTF: "MTF", CO: "Cover", OCO: "OCO",
+  Intraday: "Intraday", Delivery: "Delivery", Mtf: "MTF", CoverOrder: "Cover Order",
 };
 function productLabel(p: string) { return PRODUCT_LABEL[p] ?? p; }
 
@@ -153,7 +153,7 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
     }
   };
 
-  const orderKey = useCallback((o: Order) => o.order_id, []);
+  const orderKey = useCallback((o: Order) => o.orderId, []);
   const newOrderKeys = useNewRows(orders, orderKey);
 
   const openOrders = orders.filter((o) => !TERMINAL_STATUSES.has(o.status.toLowerCase()));
@@ -270,19 +270,19 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
                 const isCancellable = !TERMINAL_STATUSES.has(s) && !s.includes("cancel") && !s.includes("rejected");
                 return (
                   <tr
-                    key={o.order_id}
+                    key={o.orderId}
                     className={cn(
                       "border-b border-border/50 transition-colors hover:bg-muted/30",
                       !isCancellable && "opacity-60",
-                      newOrderKeys.has(o.order_id) && "animate-row-enter",
+                      newOrderKeys.has(o.orderId) && "animate-row-enter",
                     )}
                   >
                     <td className="px-3 py-1.5 tabular-nums text-muted-foreground">
-                      {formatTime(o.order_timestamp)}
+                      {formatTime(o.orderTimestamp)}
                     </td>
                     <td className="px-3 py-1.5">
                       {(() => {
-                        const parsed = parseOptionSymbol(o.trading_symbol);
+                        const parsed = parseOptionSymbol(o.tradingSymbol);
                         return parsed ? (
                           <>
                             <div className="flex items-center gap-1.5 font-medium">
@@ -295,26 +295,26 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
                           </>
                         ) : (
                           <>
-                            <div className="font-medium">{o.trading_symbol}</div>
+                            <div className="font-medium">{o.tradingSymbol}</div>
                             <div className="text-[11px] text-muted-foreground">{o.exchange} · {productLabel(o.product)}</div>
                           </>
                         );
                       })()}
                     </td>
-                    <td className="px-3 py-1.5 text-muted-foreground">{o.order_type}</td>
+                    <td className="px-3 py-1.5 text-muted-foreground">{o.orderType}</td>
                     <td className="px-3 py-1.5">
                       <span className={cn(
                         "inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold",
-                        o.transaction_type === "BUY" ? "bg-green-500/15 text-green-500" : "bg-red-500/15 text-red-500"
+                        o.transactionType === "Buy" ? "bg-green-500/15 text-green-500" : "bg-red-500/15 text-red-500"
                       )}>
-                        {o.transaction_type}
+                        {o.transactionType}
                       </span>
                     </td>
                     <td className="px-3 py-1.5 text-right tabular-nums">
-                      {o.filled_quantity}/{o.quantity}
+                      {o.filledQuantity}/{o.quantity}
                     </td>
                     <td className="px-3 py-1.5 text-right tabular-nums">
-                      {o.average_price > 0 ? `₹${fmt(o.average_price)}` : o.price > 0 ? `₹${fmt(o.price)}` : "MKT"}
+                      {o.averagePrice > 0 ? `₹${fmt(o.averagePrice)}` : o.price > 0 ? `₹${fmt(o.price)}` : "MKT"}
                     </td>
                     <td className="px-3 py-1.5">
                       <StatusBadge status={o.status} />
@@ -325,8 +325,8 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
                           size="sm"
                           variant="ghost"
                           className="h-6 px-2 text-xs text-destructive hover:text-destructive"
-                          onClick={() => handleCancel(o.order_id)}
-                          disabled={cancelling === o.order_id}
+                          onClick={() => handleCancel(o.orderId)}
+                          disabled={cancelling === o.orderId}
                         >
                           Cancel
                         </Button>

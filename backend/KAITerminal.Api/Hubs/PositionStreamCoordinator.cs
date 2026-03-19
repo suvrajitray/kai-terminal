@@ -1,3 +1,4 @@
+using KAITerminal.Api.Mapping;
 using KAITerminal.Contracts.Streaming;
 using KAITerminal.Upstox;
 using KAITerminal.Upstox.Models.Responses;
@@ -74,7 +75,8 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
                 fresh = await _upstox.GetAllPositionsAsync();
 
             fresh = ApplyFilter(fresh);
-            await _hubContext.Clients.Client(_connectionId).SendAsync("ReceivePositions", fresh);
+            await _hubContext.Clients.Client(_connectionId)
+                .SendAsync("ReceivePositions", fresh.Select(p => p.ToResponse()).ToList());
 
             if (update.UpdateType == "order")
             {

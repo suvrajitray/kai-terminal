@@ -17,12 +17,10 @@ import type { Position } from "@/types";
 const INR = new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 });
 
 const PRODUCT_LABEL: Record<string, string> = {
-  I: "Intraday",
-  D: "Delivery",
-  NRML: "Delivery",
-  MIS: "Intraday",
-  MTF: "MTF",
-  CO: "Cover",
+  Intraday:   "Intraday",
+  Delivery:   "Delivery",
+  Mtf:        "MTF",
+  CoverOrder: "Cover Order",
 };
 
 export function PnlCell({ value, pct }: { value: number; pct?: number }) {
@@ -78,15 +76,15 @@ export function PositionRow({
 }: PositionRowProps) {
   const [dialog, setDialog] = useState<DialogType>(null);
 
-  const avgPrice = p.quantity < 0 ? p.sell_price : p.buy_price;
+  const avgPrice = p.quantity < 0 ? p.sellPrice : p.buyPrice;
   const costBasis = Math.abs(p.quantity) * avgPrice;
   const toPct = (val: number) => costBasis > 0 ? (val / costBasis) * 100 : undefined;
 
-  const lot = getLotSize(p.trading_symbol);
+  const lot = getLotSize(p.tradingSymbol);
   const num = parseInt(qtyValue, 10);
   const actualQty = isNaN(num) || num <= 0 ? 0 : qtyMode === "lot" ? num * lot : num;
   const getByInstrumentKey = useOptionContractsStore((s) => s.getByInstrumentKey);
-  const lookup = getByInstrumentKey(p.instrument_token);
+  const lookup = getByInstrumentKey(p.instrumentToken);
   const contract = lookup?.contract;
   const index = lookup?.index;
 
@@ -117,7 +115,7 @@ export function PositionRow({
             </>
           ) : (
             <>
-              <div className="font-medium">{p.trading_symbol}</div>
+              <div className="font-medium">{p.tradingSymbol}</div>
               <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
                 <BrokerBadge brokerId={p.broker ?? "upstox"} size={12} />
                 {p.exchange}
@@ -126,7 +124,7 @@ export function PositionRow({
           )}
         </td>
         <td className="px-3 py-1.5 text-sm text-muted-foreground">
-          {PRODUCT_LABEL[p.product.toUpperCase()] ?? p.product}
+          {PRODUCT_LABEL[p.product] ?? p.product}
         </td>
         <td
           className={cn(
@@ -138,9 +136,9 @@ export function PositionRow({
           {p.quantity}
         </td>
         <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">
-          ₹{INR.format(p.quantity < 0 ? p.sell_price : p.buy_price)}
+          ₹{INR.format(p.quantity < 0 ? p.sellPrice : p.buyPrice)}
         </td>
-        <td className="px-3 py-1.5 text-right tabular-nums">₹{INR.format(p.last_price)}</td>
+        <td className="px-3 py-1.5 text-right tabular-nums">₹{INR.format(p.ltp)}</td>
         <td className="px-3 py-1.5 text-right">
           <PnlCell value={p.pnl} pct={toPct(p.pnl)} />
         </td>

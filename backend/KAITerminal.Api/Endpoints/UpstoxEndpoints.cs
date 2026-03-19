@@ -1,3 +1,4 @@
+using KAITerminal.Api.Mapping;
 using KAITerminal.Api.Models;
 using KAITerminal.Upstox;
 using KAITerminal.Upstox.Exceptions;
@@ -31,7 +32,7 @@ public static class UpstoxEndpoints
             [FromQuery] string? exchange = null) =>
         {
             var positions = await upstox.GetAllPositionsAsync();
-            return Results.Ok(FilterByExchange(positions, exchange));
+            return Results.Ok(FilterByExchange(positions, exchange).Select(p => p.ToResponse()));
         });
 
         group.MapGet("/mtm", async (
@@ -77,7 +78,7 @@ public static class UpstoxEndpoints
         // ── Orders ────────────────────────────────────────────────────────────
 
         group.MapGet("/orders", async (UpstoxClient upstox) =>
-            Results.Ok(await upstox.GetAllOrdersAsync()));
+            Results.Ok((await upstox.GetAllOrdersAsync()).Select(o => o.ToResponse())));
 
         group.MapPost("/orders/v3", async (
             [FromBody] PlaceOrderRequest request,

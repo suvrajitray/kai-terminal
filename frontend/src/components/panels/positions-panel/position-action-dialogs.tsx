@@ -26,8 +26,7 @@ type OrderMode = "market" | "limit";
 const INR = new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 });
 
 function isIntraday(product: string) {
-  const p = product.toUpperCase();
-  return p === "I" || p === "MIS";
+  return product === "Intraday";
 }
 
 function productLabel(product: string) {
@@ -70,7 +69,7 @@ function useQtyState(initialQty: number, open: boolean, lotSize: number) {
 
 function SymbolChip({ position }: { position: Position }) {
   const getByInstrumentKey = useOptionContractsStore((s) => s.getByInstrumentKey);
-  const lookup = getByInstrumentKey(position.instrument_token);
+  const lookup = getByInstrumentKey(position.instrumentToken);
   const contract = lookup?.contract;
   const index = lookup?.index;
 
@@ -87,11 +86,11 @@ function SymbolChip({ position }: { position: Position }) {
               <OptionTypeBadge type={contract.instrumentType} />
             </>
           ) : (
-            <span className="font-semibold text-sm truncate">{position.trading_symbol}</span>
+            <span className="font-semibold text-sm truncate">{position.tradingSymbol}</span>
           )}
         </div>
         <div className="text-right shrink-0">
-          <div className="text-sm font-bold tabular-nums">₹{INR.format(position.last_price)}</div>
+          <div className="text-sm font-bold tabular-nums">₹{INR.format(position.ltp)}</div>
           <div className="text-[10px] text-muted-foreground uppercase tracking-wide">LTP</div>
         </div>
       </div>
@@ -194,7 +193,7 @@ export function ExitPositionDialog({
   position,
   onConfirm,
 }: ExitDialogProps) {
-  const lotSize = getLotSize(position.trading_symbol);
+  const lotSize = getLotSize(position.tradingSymbol);
   const { qtyValue, setQtyValue, qtyMode, toggleQtyMode, qty } = useQtyState(
     Math.abs(position.quantity),
     open,
@@ -276,7 +275,7 @@ interface MoreDialogProps {
 
 export function SellBuyMoreDialog({ open, onOpenChange, position }: MoreDialogProps) {
   const isSell  = position.quantity < 0;
-  const lotSize = getLotSize(position.trading_symbol);
+  const lotSize = getLotSize(position.tradingSymbol);
   const { qtyValue, setQtyValue, qtyMode, toggleQtyMode, qty } = useQtyState(
     Math.abs(position.quantity),
     open,
@@ -304,7 +303,7 @@ export function SellBuyMoreDialog({ open, onOpenChange, position }: MoreDialogPr
     try {
       const txn = isSell ? "Sell" : "Buy";
       await placeOrder(
-        position.instrument_token,
+        position.instrumentToken,
         qty,
         txn,
         position.product,
@@ -380,7 +379,7 @@ interface ConvertDialogProps {
 }
 
 export function ConvertPositionDialog({ open, onOpenChange, position }: ConvertDialogProps) {
-  const lotSize   = getLotSize(position.trading_symbol);
+  const lotSize   = getLotSize(position.tradingSymbol);
   const fromLabel = productLabel(position.product);
   const toLabel   = isIntraday(position.product) ? "Delivery" : "Intraday";
 
@@ -395,7 +394,7 @@ export function ConvertPositionDialog({ open, onOpenChange, position }: ConvertD
   async function handleConfirm() {
     setConverting(true);
     try {
-      await convertPosition(position.instrument_token, position.product, qty);
+      await convertPosition(position.instrumentToken, position.product, qty);
       toast.success(`Converted ${qty} units to ${toLabel}`);
       onOpenChange(false);
     } catch (e) {

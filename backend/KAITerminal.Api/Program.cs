@@ -8,6 +8,7 @@ using KAITerminal.Auth.Endpoints;
 using KAITerminal.Auth.Extensions;
 using KAITerminal.Upstox;
 using KAITerminal.Zerodha;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,7 +18,16 @@ builder.Services.ConfigureHttpJsonOptions(o =>
 builder.Services
     .AddAuthServices(builder.Configuration)
     .AddAuthorization()
-    .AddOpenApi()
+    .AddOpenApi(options =>
+    {
+        options.AddDocumentTransformer((doc, _, _) =>
+        {
+            doc.Info.Title       = "KAI Terminal API";
+            doc.Info.Version     = "v1";
+            doc.Info.Description = "Broker-agnostic trading terminal API — positions, orders, funds, options, and risk config.";
+            return Task.CompletedTask;
+        });
+    })
     .AddMemoryCache()
     .AddDatabase(builder.Configuration)
     .AddBrokerServices(builder.Configuration)
@@ -83,7 +93,15 @@ app.UseWhen(ctx => ctx.Request.Path.StartsWithSegments("/api/zerodha"),
     }));
 
 if (app.Environment.IsDevelopment())
+{
     app.MapOpenApi();
+    app.MapScalarApiReference(options =>
+    {
+        options.Title           = "KAI Terminal API";
+        options.Theme           = ScalarTheme.DeepSpace;
+        options.DefaultHttpClient = new(ScalarTarget.JavaScript, ScalarClient.Fetch);
+    });
+}
 
 app.UseHttpsRedirection();
 

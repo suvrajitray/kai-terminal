@@ -1,3 +1,4 @@
+using KAITerminal.Api.Mapping;
 using KAITerminal.Api.Services;
 using KAITerminal.Upstox;
 using KAITerminal.Upstox.Models.Responses;
@@ -42,7 +43,7 @@ public sealed class PositionsHub : Hub
             positions = await _upstox.GetAllPositionsAsync();
 
         positions = ApplyFilter(positions, exchangeFilter);
-        await Clients.Caller.SendAsync("ReceivePositions", positions);
+        await Clients.Caller.SendAsync("ReceivePositions", positions.Select(p => p.ToResponse()).ToList());
 
         var coordinator = new PositionStreamCoordinator(
             _upstox, _hubContext, _logger, connectionId, token, exchangeFilter);

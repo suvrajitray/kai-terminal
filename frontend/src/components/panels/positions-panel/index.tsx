@@ -23,7 +23,7 @@ interface PositionsPanelProps {
   load: () => void;
 }
 
-const selKey = (p: Position) => `${p.instrument_token}|${p.product}`;
+const selKey = (p: Position) => `${p.instrumentToken}|${p.product}`;
 
 export function PositionsPanel({ positions, loading, load }: PositionsPanelProps) {
   const [acting, setActing] = useState<string | null>(null);
@@ -42,10 +42,10 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
     setQtys((prev) => {
       const next: Record<string, string> = {};
       for (const p of positions) {
-        const lot = getLotSize(p.trading_symbol);
-        const raw = parseInt(prev[p.instrument_token] ?? "", 10);
-        if (isNaN(raw) || raw <= 0) { next[p.instrument_token] = ""; continue; }
-        next[p.instrument_token] =
+        const lot = getLotSize(p.tradingSymbol);
+        const raw = parseInt(prev[p.instrumentToken] ?? "", 10);
+        if (isNaN(raw) || raw <= 0) { next[p.instrumentToken] = ""; continue; }
+        next[p.instrumentToken] =
           newMode === "lot"
             ? String(Math.max(1, Math.round(raw / lot)))
             : String(raw * lot);
@@ -74,7 +74,7 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
     const lot = getLotSize(tradingSymbol);
     const num = parseInt(qtys[token] ?? "", 10);
     const qty = isNaN(num) || num <= 0 ? 0 : qtyMode === "lot" ? num * lot : num;
-    const position = positions.find((p) => p.instrument_token === token && p.product === product)!;
+    const position = positions.find((p) => p.instrumentToken === token && p.product === product)!;
     const txn = position.quantity >= 0 ? "Buy" : "Sell";
     return withActing(token + ":add", () => placeMarketOrder(token, qty, txn, product));
   };
@@ -94,11 +94,11 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
     const qty = isNaN(num) || num <= 0 ? 0 : qtyMode === "lot" ? num * lot : num;
     if (qty === 0) return;
 
-    const position = positions.find((p) => p.instrument_token === token && p.product === product)!;
+    const position = positions.find((p) => p.instrumentToken === token && p.product === product)!;
     const closeTxn = position.quantity < 0 ? "Buy" : "Sell";
     const openTxn  = position.quantity < 0 ? "Sell" : "Buy";
     const offset = getShiftOffset(index);
-    const targetPremium = position.last_price + (direction === "up" ? offset : -offset);
+    const targetPremium = position.ltp + (direction === "up" ? offset : -offset);
     const priceSearchMode = direction === "up" ? "GreaterThan" : "LessThan";
     const underlyingKey = UNDERLYING_KEYS[index];
 
@@ -121,12 +121,12 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
     const lot = getLotSize(tradingSymbol);
     const num = parseInt(qtys[token] ?? "", 10);
     const qty = isNaN(num) || num <= 0 ? 0 : qtyMode === "lot" ? num * lot : num;
-    const position = positions.find((p) => p.instrument_token === token && p.product === product)!;
+    const position = positions.find((p) => p.instrumentToken === token && p.product === product)!;
     const txn = position.quantity >= 0 ? "Sell" : "Buy";
     return withActing(token + ":reduce", () => placeMarketOrder(token, qty, txn, product));
   };
 
-  const posKey = useCallback((p: Position) => p.instrument_token + p.product, []);
+  const posKey = useCallback((p: Position) => p.instrumentToken + p.product, []);
   const newPositionKeys = useNewRows(positions, posKey);
 
   // Unique brokers present in positions — drives filter pills
@@ -165,7 +165,7 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
     const toExit = openPositions.filter((p) => selected.has(selKey(p)));
     setActing("selected");
     try {
-      await Promise.all(toExit.map((p) => exitPosition(p.instrument_token, p.product)));
+      await Promise.all(toExit.map((p) => exitPosition(p.instrumentToken, p.product)));
       setSelected(new Set());
       await load();
     } catch (e) {
@@ -215,21 +215,21 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
 
   const renderRow = (p: Position) => (
     <PositionRow
-      key={p.instrument_token + p.product}
+      key={p.instrumentToken + p.product}
       position={p}
-      isNew={newPositionKeys.has(p.instrument_token + p.product)}
-      qtyValue={qtys[p.instrument_token] ?? ""}
+      isNew={newPositionKeys.has(p.instrumentToken + p.product)}
+      qtyValue={qtys[p.instrumentToken] ?? ""}
       qtyMode={qtyMode}
       acting={acting}
       selected={selected.has(selKey(p))}
       onToggleSelect={() => toggleSelect(p)}
-      onQtyChange={(v) => setQty(p.instrument_token, v)}
+      onQtyChange={(v) => setQty(p.instrumentToken, v)}
       onToggleMode={toggleMode}
-      onAdd={() => handleAdd(p.instrument_token, p.trading_symbol, p.product)}
-      onReduce={() => handleReduce(p.instrument_token, p.trading_symbol, p.product)}
-      onExit={() => handleExit(p.instrument_token, p.product)}
-      onShiftUp={() => handleShift(p.instrument_token, p.trading_symbol, p.product, "up")}
-      onShiftDown={() => handleShift(p.instrument_token, p.trading_symbol, p.product, "down")}
+      onAdd={() => handleAdd(p.instrumentToken, p.tradingSymbol, p.product)}
+      onReduce={() => handleReduce(p.instrumentToken, p.tradingSymbol, p.product)}
+      onExit={() => handleExit(p.instrumentToken, p.product)}
+      onShiftUp={() => handleShift(p.instrumentToken, p.tradingSymbol, p.product, "up")}
+      onShiftDown={() => handleShift(p.instrumentToken, p.tradingSymbol, p.product, "down")}
     />
   );
 

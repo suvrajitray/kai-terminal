@@ -22,25 +22,32 @@ export interface BrokerCredentials {
   accessToken?: string;
 }
 
-// Snake_case matches Upstox JSON property names from the backend
+export type ProductType = "Intraday" | "Delivery" | "Mtf" | "CoverOrder";
+export type OrderSide = "Buy" | "Sell";
+export type TradeOrderType = "Market" | "Limit" | "StopLoss" | "StopLossMarket";
+export type OrderValidity = "Day" | "IOC";
+
+// CamelCase matches the unified KAI Terminal PositionResponse DTO from the backend
 export interface Position {
   exchange: string;
-  instrument_token: string;
-  /** Which broker this position belongs to — "upstox" | "zerodha". Set client-side. */
-  broker?: string;
-  trading_symbol: string;
-  product: string;
+  instrumentToken: string;
+  tradingSymbol: string;
+  product: ProductType;
   quantity: number;
-  multiplier: number;
-  average_price: number;
-  last_price: number;
+  buyQuantity: number;
+  sellQuantity: number;
+  averagePrice: number;
+  ltp: number;
   pnl: number;
   unrealised: number;
   realised: number;
-  buy_price: number;
-  sell_price: number;
-  day_buy_quantity: number;
-  day_sell_quantity: number;
+  buyPrice: number;
+  sellPrice: number;
+  buyValue: number;
+  sellValue: number;
+  /** Which broker this position belongs to — "upstox" | "zerodha". Set by backend. */
+  broker: string;
+  isOpen: boolean;
 }
 
 export interface OptionMarketData {
@@ -84,23 +91,23 @@ export interface IndexContracts {
   contracts: ContractEntry[];
 }
 
+// CamelCase matches the unified KAI Terminal OrderResponse DTO from the backend
 export interface Order {
-  order_id: string;
-  exchange_order_id: string;
+  orderId: string;
+  exchangeOrderId: string;
   exchange: string;
-  trading_symbol: string;
-  product: string;
-  order_type: string;
-  transaction_type: string;
-  validity: string;
+  tradingSymbol: string;
+  product: ProductType;
+  orderType: TradeOrderType;
+  transactionType: OrderSide;
+  validity: OrderValidity;
   status: string;
-  status_message: string;
+  statusMessage: string;
   price: number;
-  trigger_price: number;
+  averagePrice: number;
   quantity: number;
-  filled_quantity: number;
-  pending_quantity: number;
-  average_price: number;
+  filledQuantity: number;
+  pendingQuantity: number;
   tag: string | null;
-  order_timestamp: string | null;
+  orderTimestamp: string | null;
 }
