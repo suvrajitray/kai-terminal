@@ -11,7 +11,15 @@ createRoot(document.getElementById("root")!).render(
     <ErrorBoundary>
       <BrowserRouter>
         <App />
-        <Toaster position="top-right" richColors />
+        <Toaster
+          position="bottom-right"
+          richColors
+          expand
+          closeButton
+          visibleToasts={8}
+          duration={8000}
+          gap={8}
+        />
       </BrowserRouter>
     </ErrorBoundary>
   </StrictMode>,

@@ -42,7 +42,7 @@ public static class AuthEndpoints
             if (!user.IsActive)
                 return Results.Redirect($"{config["Frontend:Url"]}/auth/inactive");
 
-            var token = jwtService.GenerateToken(sub, name, email, isActive: true, isAdmin: user.IsAdmin);
+            var token = jwtService.GenerateToken(email, name, email, isActive: true, isAdmin: user.IsAdmin);
 
             return Results.Redirect(
                 $"{config["Frontend:Url"]}/auth/callback?token={token}"

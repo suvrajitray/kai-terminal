@@ -12,6 +12,13 @@ const Toaster = ({ ...props }: ToasterProps) => {
   const { theme = "system" } = useTheme()
 
   return (
+    <>
+      <style>{`
+        [data-sonner-toast] [data-close-button] {
+          left: auto !important;
+          right: 0 !important;
+        }
+      `}</style>
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
@@ -32,6 +39,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       }
       {...props}
     />
+    </>
   )
 }
 
