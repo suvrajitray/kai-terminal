@@ -149,6 +149,22 @@ Layered: `UpstoxClient` (facade) → `IPositionService` / `IOrderService` / `IOp
 - **`PortfolioStreamer`** implements `Contracts.Streaming.IPortfolioStreamer`. `ConnectAsync(ct)` subscribes to `[Order, Position]` internally and fires `PortfolioUpdate` events.
 - **`UpstoxOptionContractProvider`** (`Options/`) — implements `IOptionContractProvider`; fetches option contracts via `UpstoxClient.GetOptionContractsAsync` and maps to `Contracts.Options.IndexContracts`.
 
+**Key internal files** (useful when modifying the SDK):
+- `UpstoxClient.cs` — facade; all public entry points delegate here
+- `Http/UpstoxHttpClient.cs` — wraps all REST calls; handles JSON, errors, envelope unwrapping; token exchange endpoint bypasses the envelope handler (raw JSON response)
+- `Http/UpstoxAuthHandler.cs` — `DelegatingHandler`; injects `Authorization: Bearer` per request; reads `UpstoxTokenContext.Current` first, falls back to `UpstoxConfig.AccessToken`
+- `Extensions/ServiceCollectionExtensions.cs` — `AddUpstoxSdk()` wires all services and named HttpClients
+- `Protos/MarketDataFeedV3.cs` — pre-generated protobuf file; do not delete
+
+**SDK design rules** (apply whenever modifying `KAITerminal.Upstox`):
+- All public methods are `async Task<T>` and accept `CancellationToken`
+- All API errors surface as `UpstoxException`; network errors propagate naturally; WebSocket errors go through the `Disconnected` event, never thrown
+- Internal DTOs (e.g. `PlaceOrderDto`, `UpstoxEnvelope<T>`) live inside `UpstoxHttpClient.cs` as private nested classes — serialisation-only, never part of the public API
+- `UpstoxTokenContext` is the **only** mechanism for per-call token injection — never add `accessToken` parameters to service or facade methods
+- OAuth credentials (`clientId`, `clientSecret`, `redirectUri`) are **never** stored in `UpstoxConfig` — always passed as method parameters to `GenerateTokenAsync`
+- Concurrent bulk operations use `Task.WhenAll()`
+- `UpstoxHttpClient` is `internal` — expose new functionality via a public interface registered in DI
+
 ### Zerodha SDK (`KAITerminal.Zerodha`)
 
 Layered: `ZerodhaClient` (facade) → `IZerodhaAuthService` / `IZerodhaPositionService` / `IZerodhaOrderService` / `IZerodhaFundsService` / `IZerodhaInstrumentService` → `ZerodhaHttpClient` → Kite Connect REST API.

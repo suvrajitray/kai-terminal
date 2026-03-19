@@ -3,6 +3,7 @@ import * as signalR from "@microsoft/signalr";
 import { toast } from "sonner";
 import { API_BASE_URL } from "@/lib/constants";
 import { useAuthStore } from "@/stores/auth-store";
+import { useRiskStateStore } from "@/stores/risk-state-store";
 import type { RiskEvent } from "@/types";
 
 function formatRupee(value: number): string {
@@ -47,8 +48,18 @@ export function useRiskFeed(): void {
       .build();
 
     conn.on("ReceiveRiskEvent", (event: RiskEvent) => {
-      const message = buildToastMessage(event);
+      const store = useRiskStateStore.getState();
 
+      // Update TSL display state
+      if (event.type === "TslActivated" && event.tslFloor != null)
+        store.setTslActivated(event.broker, event.tslFloor);
+      else if (event.type === "TslRaised" && event.tslFloor != null)
+        store.setTslRaised(event.broker, event.tslFloor);
+      else if (event.type === "TslHit" || event.type === "HardSlHit" || event.type === "TargetHit" || event.type === "SquareOffComplete")
+        store.resetTsl(event.broker);
+
+      // Toast notifications
+      const message = buildToastMessage(event);
       switch (event.type) {
         case "HardSlHit":
         case "TslHit":

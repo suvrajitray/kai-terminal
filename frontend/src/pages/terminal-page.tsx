@@ -85,9 +85,9 @@ function TerminalPageInner() {
   useRiskConfig("upstox");
   useRiskConfig("zerodha");
   useRiskConfig("dhan");
-  const { currentSl: upstoxSl }  = useProfitProtection(positions, "upstox");
-  const { currentSl: zerodhasl } = useProfitProtection(positions, "zerodha");
-  const { currentSl: dhanSl }    = useProfitProtection(positions, "dhan");
+  const { currentSl: upstoxSl }  = useProfitProtection("upstox");
+  const { currentSl: zerodhasl } = useProfitProtection("zerodha");
+  const { currentSl: dhanSl }    = useProfitProtection("dhan");
   const upstoxPp  = useProfitProtectionStore((s) => s.getConfig("upstox"));
   const zerodhaP  = useProfitProtectionStore((s) => s.getConfig("zerodha"));
   const dhanPp    = useProfitProtectionStore((s) => s.getConfig("dhan"));
