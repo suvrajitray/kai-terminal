@@ -1,224 +1,340 @@
 # KAI Terminal
 
-An algorithmic trading platform for Indian equity derivatives (NFO). Connects to Upstox, monitors positions in real time, and autonomously executes risk management actions.
+A full-stack options trading terminal built for **options sellers** in Indian equity derivatives (NFO/BFO). Live positions, real-time P&L, automated profit protection, AI market signals, and instant risk event alerts pushed to the browser the moment they fire.
 
 ## Tech Stack
 
 | Layer | Technology |
 |---|---|
-| Backend | .NET 10, ASP.NET Core, EF Core, PostgreSQL (Neon) |
+| Backend | .NET 10, ASP.NET Core minimal API, SignalR, EF Core |
+| Database | PostgreSQL (Neon) |
 | Auth | Google OAuth 2.0, JWT (HS256) |
-| Broker SDK | Upstox REST API v2/v3, HFT order endpoint |
+| Brokers | Upstox (full), Zerodha (REST; streaming stub) |
 | Frontend | React 19, TypeScript, Vite |
-| UI | TailwindCSS, shadcn/ui, Framer Motion |
+| UI | Tailwind CSS, shadcn/ui |
 | State | Zustand (persisted to localStorage) |
+
+---
+
+## Features
+
+- **Live positions** — WebSocket-driven LTP + P&L updates via SignalR; live Wifi/WifiOff indicator
+- **Profit Protection** — backend Worker monitors MTM per user and fires exits on hard SL, target, or trailing SL
+- **Risk event alerts** — every risk trigger (SL hit, target hit, TSL activated/raised/fired, square-off) delivered as a browser toast in real time via a dedicated SignalR hub
+- **Quick Trade** — place options orders by premium or by chain (straddle/strangle), with live margin preview
+- **AI Signals** — GPT-4o, Grok, Gemini, and Claude analyse the market in parallel every 15 minutes
+- **Multi-broker** — unified position/order DTOs regardless of broker; add a new broker by implementing two interfaces
+- **Option contracts** — live merged contract list from all connected brokers; cached daily until 8:15 AM IST
+- **Index ticker** — live NIFTY, SENSEX, BANKNIFTY, FINNIFTY, BANKEX with O/H/L
 
 ---
 
 ## Repository Layout
 
 ```
-KAITerminal/
-├── backend/          # .NET 10 solution (KAITerminal.slnx)
-└── frontend/         # React 19 + Vite SPA
+kai-terminal/
+├── backend/
+│   ├── KAITerminal.Api/           REST API + SignalR hubs
+│   │   ├── Endpoints/             Minimal API route groups
+│   │   ├── Hubs/                  PositionsHub, IndexHub, RiskHub
+│   │   └── Notifications/         SignalRRiskEventNotifier
+│   ├── KAITerminal.Worker/        Multi-user risk engine host
+│   │   └── Notifications/         HttpRiskEventNotifier
+│   ├── KAITerminal.Console/       Single-user risk engine host
+│   ├── KAITerminal.RiskEngine/    Risk logic library
+│   │   ├── Services/              RiskEvaluator
+│   │   ├── Workers/               StreamingRiskWorker
+│   │   └── Notifications/         NullRiskEventNotifier (no-op default)
+│   ├── KAITerminal.Contracts/     Shared domain types — leaf node, no deps
+│   │   ├── Domain/                Position, BrokerFunds, BrokerOrderRequest
+│   │   ├── Streaming/             IMarketDataStreamer, IPortfolioStreamer
+│   │   ├── Options/               IndexContracts, ContractEntry
+│   │   ├── Broker/                IOptionContractProvider
+│   │   └── Notifications/         IRiskEventNotifier, RiskNotification
+│   ├── KAITerminal.Broker/        IBrokerClient, IBrokerClientFactory
+│   ├── KAITerminal.Upstox/        Upstox SDK (full)
+│   ├── KAITerminal.Zerodha/       Zerodha SDK (streaming stubbed)
+│   ├── KAITerminal.Infrastructure/ EF Core + PostgreSQL
+│   └── KAITerminal.Auth/          OAuth + JWT helpers
+└── frontend/
+    └── src/
+        ├── components/            UI components (shadcn/ui based)
+        ├── hooks/                 useRiskFeed, useIndicesFeed, useRiskConfig, …
+        ├── pages/                 Route-level page components
+        ├── stores/                Zustand stores (auth, broker, profit-protection)
+        ├── services/              API client helpers
+        ├── types/                 TypeScript interfaces matching backend DTOs
+        └── lib/                   Utilities, constants, logout
 ```
-
-### Backend Projects
-
-| Project | Role |
-|---|---|
-| `KAITerminal.Api` | ASP.NET Core REST API — auth, credentials, Upstox proxy endpoints |
-| `KAITerminal.RiskEngine` | Risk engine library — portfolio + strike workers, all risk logic |
-| `KAITerminal.Worker` | Multi-user worker host — runs the risk engine for configured users |
-| `KAITerminal.Console` | Single-user console host — developer's own Upstox token |
-| `KAITerminal.Upstox` | Upstox SDK — HTTP client, WebSocket streamers, order/position services |
-| `KAITerminal.Infrastructure` | EF Core DbContext, database initialisation, PostgreSQL integration |
-| `KAITerminal.Auth` | OAuth/JWT service registration helpers |
-| `KAITerminal.Types` | Shared types across projects |
-| `KAITerminal.Util` | Shared utility helpers |
 
 ---
 
 ## Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
-- [Node.js 20+](https://nodejs.org/) with npm
-- A [Neon](https://neon.tech) PostgreSQL database (free tier is sufficient)
+- [Node.js 20+](https://nodejs.org/)
+- PostgreSQL database ([Neon](https://neon.tech) free tier works)
+- Upstox developer account with an app (API key + secret)
+- Google Cloud OAuth 2.0 app (Client ID + secret)
+- *(optional)* Zerodha Kite Connect app
+- *(optional)* AI API keys for the AI Signals feature
 
 ---
 
 ## Getting Started
 
-### 1. Configure the API
-
-Populate secrets via `dotnet user-secrets` or directly in `appsettings.json`:
+### 1. Clone
 
 ```bash
-cd backend/KAITerminal.Api
-
-dotnet user-secrets set "Jwt:Key" "<a-long-random-secret>"
-dotnet user-secrets set "GoogleAuth:ClientId" "<your-google-client-id>"
-dotnet user-secrets set "GoogleAuth:ClientSecret" "<your-google-client-secret>"
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=...;Database=...;Username=...;Password=...;SSL Mode=Require"
+git clone <repo-url>
+cd kai-terminal
 ```
 
-Set the Google OAuth redirect URI in the Google Cloud Console to:
+### 2. Backend secrets
+
+Use `dotnet user-secrets` — never commit real credentials.
+
+```bash
+# API
+cd backend/KAITerminal.Api
+dotnet user-secrets set "Jwt:Key"                    "<256-bit random string>"
+dotnet user-secrets set "Jwt:Issuer"                 "KAITerminal"
+dotnet user-secrets set "Jwt:Audience"               "KAITerminal"
+dotnet user-secrets set "Jwt:ExpiryMinutes"          "480"
+dotnet user-secrets set "GoogleAuth:ClientId"        "<google-client-id>"
+dotnet user-secrets set "GoogleAuth:ClientSecret"    "<google-client-secret>"
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" \
+  "Host=...;Database=...;Username=...;Password=...;SSL Mode=Require"
+
+# Risk event notifications — same UUID in both Api and Worker
+dotnet user-secrets set "Api:InternalKey"  "<uuid>"
+
+# AI Signals (optional — omit to disable)
+dotnet user-secrets set "AiSentiment:OpenAiApiKey"   "sk-..."
+dotnet user-secrets set "AiSentiment:GrokApiKey"     "xai-..."
+dotnet user-secrets set "AiSentiment:GeminiApiKey"   "AIza..."
+dotnet user-secrets set "AiSentiment:ClaudeApiKey"   "sk-ant-..."
+
+# Application Insights (optional)
+dotnet user-secrets set "ApplicationInsights:ConnectionString" "InstrumentationKey=...;IngestionEndpoint=..."
+```
+
+```bash
+# Worker
+cd ../KAITerminal.Worker
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" \
+  "Host=...;Database=...;Username=...;Password=...;SSL Mode=Require"
+dotnet user-secrets set "Api:InternalKey"  "<same-uuid-as-above>"
+dotnet user-secrets set "Api:BaseUrl"      "https://localhost:5001"
+dotnet user-secrets set "ApplicationInsights:ConnectionString" "..."
+```
+
+```bash
+# Console (single-user alternative to Worker — optional)
+cd ../KAITerminal.Console
+dotnet user-secrets set "Upstox:AccessToken" "<your-daily-upstox-token>"
+```
+
+### 3. Google OAuth
+
+In your Google Cloud Console add this redirect URI:
 
 ```
 https://localhost:5001/auth/google/callback
 ```
 
-### 2. Run the Backend
-
-```bash
-cd backend
-
-# Build the entire solution
-dotnet build
-
-# REST API (HTTPS on :5001)
-dotnet run --project KAITerminal.Api
-
-# Risk engine — multi-user (tokens in appsettings or user-secrets)
-dotnet run --project KAITerminal.Worker
-
-# Risk engine — single user (your own Upstox token)
-dotnet run --project KAITerminal.Console
-```
-
-### 3. Run the Frontend
+### 4. Frontend
 
 ```bash
 cd frontend
-
 npm install
-npm run dev        # Dev server on :3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Optionally create `frontend/.env.local` (gitignored) to override the default API URL:
+
+```env
+VITE_API_URL=https://localhost:5001
+```
 
 ---
 
-## Features
+## Running
 
-### Authentication
-
-- **Google OAuth 2.0** — Sign in with Google; no separate account creation required.
-- **JWT Sessions** — Backend issues a JWT after login, used for all subsequent API calls.
-- **Persistent Sessions** — Auth state stored in `localStorage` across browser refreshes.
-
-### Broker Integration
-
-- **Upstox SDK** — Full REST v2/v3 + WebSocket integration via `KAITerminal.Upstox`.
-- **Per-user Credentials** — API Key, Secret, and Access Token stored per user in PostgreSQL.
-- **OAuth Token Exchange** — One-click flow to exchange an Upstox auth code for an access token; token is automatically persisted to the database.
-- **Multi-user Token Scoping** — `UpstoxTokenContext.Use(token)` scopes API calls per user without thread contention.
-- **Real-time Order Notifications** — Rejection and fill toasts delivered via the Upstox Portfolio Stream WebSocket; Orders panel auto-refreshes on every order event.
-
-### Risk Engine
-
-See [backend/KAITerminal.RiskEngine/README.md](backend/KAITerminal.RiskEngine/README.md) for full details.
-
-**Portfolio-level risk** (60-second loop):
-
-| Rule | Default Threshold | Action |
-|---|---|---|
-| Overall Stop Loss | MTM ≤ −₹25,000 | Square off all positions |
-| Profit Target | MTM ≥ +₹25,000 | Square off all positions |
-| Trailing Stop Loss | Activates at +₹5,000 (`TrailingActivateAt`) | Stop locked at ₹2,000 (`LockProfitAt`); raises ₹500 (`IncreaseTrailingBy`) every ₹1,000 gain (`WhenProfitIncreasesBy`). Disable with `EnableTrailingStopLoss: false` |
-
-**Per-strike risk** (5-second loop):
-
-| Option | Threshold | Action |
-|---|---|---|
-| CE | Loss > 20% | Exit; re-enter OTM1 (max 2 re-entries) |
-| PE | Loss > 30% | Exit; re-enter OTM1 (max 2 re-entries) |
-
-Disable the strike worker entirely with `EnableStrikeWorker: false`.
-
-All thresholds live in `appsettings.json` under `RiskEngine` — no code changes needed to tune them.
-
----
-
-## Configuration Reference
-
-| File | Purpose |
-|---|---|
-| `backend/KAITerminal.Api/appsettings.json` | API secrets — JWT key, Google OAuth, Neon connection string |
-| `backend/KAITerminal.Worker/appsettings.json` | Multi-user risk engine — Upstox base URLs, thresholds, `Users[]` list |
-| `backend/KAITerminal.Console/appsettings.json` | Single-user risk engine — `Upstox:AccessToken`, thresholds |
-| `frontend/.env` | `VITE_API_URL` — backend API base URL |
-
-`Frontend:Url` in the API config must match the frontend origin (`http://localhost:3000`) for CORS and OAuth redirects to work.
-
-### Frontend Environment Variables
-
-`frontend/.env` is committed with safe defaults. All variables must be prefixed `VITE_` to be accessible in browser code via `import.meta.env`.
-
-| Variable | Default | Description |
-|---|---|---|
-| `VITE_API_URL` | `https://localhost:5001` | Base URL of the running `KAITerminal.Api` |
-
-To override locally without modifying the committed file, create `frontend/.env.local` (gitignored):
+Open three terminals:
 
 ```bash
-# frontend/.env.local
-VITE_API_URL=https://my-staging-server.example.com
+# Terminal 1 — API (HTTPS :5001)
+cd backend && dotnet run --project KAITerminal.Api
+
+# Terminal 2 — Risk engine Worker (profit protection for all enabled users)
+cd backend && dotnet run --project KAITerminal.Worker
+
+# Terminal 3 — Frontend (http://localhost:3000)
+cd frontend && npm run dev
 ```
 
-Vite loads env files in this order (highest precedence first):
+Open `http://localhost:3000` and sign in with Google.
 
-```
-.env.local          ← personal overrides, never committed
-.env.development    ← dev-only overrides (npm run dev)
-.env.production     ← production-only overrides (npm run build)
-.env                ← committed defaults
-```
+> **First login:** Your account is created with `IsActive=false`. The email `suvrajit.ray@gmail.com` is auto-activated as admin. All other users must be activated manually in the `AppUsers` table in the database.
 
 ---
 
-## API Endpoints
+## Connecting a broker
+
+### Upstox
+
+1. **Settings → Brokers → Upstox** → enter API key + secret → **Save**
+2. Click **Authenticate** → Upstox OAuth page opens → approve access
+3. You are redirected back to `/redirect/upstox` which exchanges the code, saves the token to DB, and navigates to `/terminal`
+
+> Upstox access tokens expire daily. Re-authenticate each morning before trading.
+
+### Zerodha
+
+1. **Settings → Brokers → Zerodha** → enter API key + secret → **Save**
+2. `GET /api/zerodha/auth-url?apiKey=<key>` returns the Kite Connect login URL
+3. After login you receive a `request_token` — exchange it: `POST /api/zerodha/access-token`
+
+> Zerodha real-time streaming is not yet implemented. Position updates require a manual refresh. Risk monitoring for Zerodha users will not fire exit orders until streaming is added.
+
+---
+
+## Profit Protection
+
+The Worker process monitors every enabled user's MTM and fires exit orders automatically. Configure per user in **Settings → Profit Protection** (saved to DB via `PUT /api/risk-config`).
+
+| Field | Description |
+|---|---|
+| MTM Stop Loss | Exit all if MTM ≤ this value (e.g. `−5000`) |
+| MTM Target | Exit all if MTM ≥ this value (e.g. `25000`) |
+| Trailing SL enabled | Turn on the trailing stop loss |
+| Activate at | TSL activates when MTM first reaches this level |
+| Lock profit at | Floor is set to this value when TSL first activates |
+| When profit increases by | Raise floor every time MTM gains this much from last step |
+| Increase trailing by | Raise the floor by this amount per step |
+
+Checks run in order: **Hard SL → Target → Trailing SL**. Once a user is squared off, no further evaluations run until the Worker restarts.
+
+### Risk event alerts
+
+Every time a risk event fires, a toast notification appears in the browser immediately:
+
+| Event | Toast colour |
+|---|---|
+| Hard SL hit / TSL hit / Square-off failed | Red |
+| Target hit / Square-off complete | Green |
+| TSL activated / TSL raised | Blue |
+
+**How it works:**
+
+```
+Worker: StreamingRiskWorker
+  → RiskEvaluator fires event
+      → HttpRiskEventNotifier
+          POST /api/internal/risk-event  [X-Internal-Key header]
+              → Api: SignalRRiskEventNotifier
+                  → RiskHub (JWT-authenticated SignalR hub)
+                      → browser useRiskFeed hook → sonner toast
+```
+
+The `Api:InternalKey` user-secret must be set to the same value in both the Api and Worker processes. If the key is missing from the Api, the endpoint returns 503 and no alerts are delivered.
+
+---
+
+## AI Signals
+
+The `/ai-signals` page polls `GET /api/ai/market-sentiment` every 15 minutes (manual refresh also available). The endpoint:
+
+1. Fetches live index quotes, NIFTY + BANKNIFTY option chains, and the last 30 × 1-min NIFTY candles
+2. Fans out to GPT-4o, Grok, Gemini, and Claude in parallel (30s timeout each)
+3. Each model returns: direction, confidence, reasons, support/resistance levels, what to watch for
+
+Requires `X-Upstox-Access-Token` header and AI API keys set via `dotnet user-secrets` in `KAITerminal.Api`.
+
+---
+
+## Architecture
+
+```
+KAITerminal.Contracts   ← leaf node — all shared domain + notification types
+        ↑
+KAITerminal.Broker      ← IBrokerClient, IBrokerClientFactory
+        ↑
+KAITerminal.Upstox      ← Upstox SDK (full implementation)
+KAITerminal.Zerodha     ← Zerodha SDK (streaming stubbed)
+        ↑
+KAITerminal.RiskEngine  ← risk logic; zero broker deps
+KAITerminal.Api         ← REST API + SignalR hubs (PositionsHub, IndexHub, RiskHub)
+KAITerminal.Worker      ── RiskEngine + Infrastructure (multi-user host)
+KAITerminal.Console     ── RiskEngine (single-user host)
+```
+
+**Adding a new broker** (e.g. Dhan): create `KAITerminal.Dhan`, implement `IBrokerClient` + `IOptionContractProvider`, register in `BrokerExtensions`. Zero changes to RiskEngine, Contracts, or Infrastructure.
+
+---
+
+## API reference
+
+Full interactive docs at `https://localhost:5001/scalar/v1` in development (DeepSpace theme). OpenAPI spec at `/openapi/v1.json`.
+
+Key endpoints:
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/auth/google` | Initiate Google OAuth flow |
+| `GET` | `/auth/google` | Start Google OAuth flow |
 | `GET` | `/auth/google/callback` | OAuth callback; issues JWT |
-| `GET` | `/api/upstox/positions` | Fetch open NFO positions |
+| `GET` | `/api/upstox/positions` | Open positions (`?exchange=NFO,BFO` optional) |
+| `GET` | `/api/upstox/orders` | Today's orders |
 | `GET` | `/api/upstox/mtm` | Portfolio MTM P&L |
-| `GET` | `/debug/claims` | Inspect JWT claims (dev only) |
-
-OpenAPI/Swagger docs: `https://localhost:5001/openapi` (development only).
-
----
-
-## Frontend Commands
-
-```bash
-npm run dev        # Dev server on :3000
-npm run build      # TypeScript check + Vite production build
-npm run lint       # ESLint
-npm run preview    # Preview production build
-```
-
-## Backend Commands
-
-```bash
-dotnet build                                   # Build entire solution
-dotnet run --project KAITerminal.Api           # REST API
-dotnet run --project KAITerminal.Worker        # Risk engine (multi-user)
-dotnet run --project KAITerminal.Console       # Risk engine (single user)
-dotnet watch --project KAITerminal.Api         # Hot-reload dev server
-```
+| `GET` | `/api/zerodha/positions` | Zerodha open positions |
+| `GET` | `/api/masterdata/contracts` | Merged option contracts (all connected brokers) |
+| `GET` | `/api/risk-config` | Load PP config for current user |
+| `PUT` | `/api/risk-config` | Save PP config for current user |
+| `GET` | `/api/ai/market-sentiment` | AI market signals (all 4 models) |
+| `POST` | `/api/internal/risk-event` | Internal — Worker → Api risk event relay |
+| `WS` | `/hubs/positions` | Live positions + LTP (Upstox-only; `?upstoxToken=`) |
+| `WS` | `/hubs/indices` | Live index quotes (`?upstoxToken=`) |
+| `WS` | `/hubs/risk` | Risk event alerts (JWT Bearer via `?access_token=`) |
 
 ---
 
 ## Database
 
-PostgreSQL hosted on [Neon](https://neon.tech). The `BrokerCredentials` table is created automatically on first API startup via `EnsureCreatedAsync()` — no manual migration needed.
+PostgreSQL via [Neon](https://neon.tech). Tables are created automatically on first startup via `EnsureCreatedAsync()` — no migrations needed. New tables/columns require manual SQL on Neon.
 
-Set the connection string via user-secrets before running the API:
+| Table | Purpose |
+|---|---|
+| `AppUsers` | User registry — `Email`, `IsActive`, `IsAdmin` |
+| `BrokerCredentials` | Per-user broker API key + secret + access token |
+| `UserTradingSettings` | Per-user trading preferences (underlying, expiry, etc.) |
+| `UserRiskConfigs` | Per-user profit protection config + `Enabled` flag |
+
+---
+
+## Configuration reference
+
+| File | Key settings |
+|---|---|
+| `backend/KAITerminal.Api/appsettings.json` | `Jwt:*`, `GoogleAuth:*`, `Frontend:Url`, `Upstox:ApiBaseUrl/HftBaseUrl`, `Api:BaseUrl/InternalKey`, `AiSentiment:*`, `ApplicationInsights:ConnectionString` |
+| `backend/KAITerminal.Worker/appsettings.json` | `Upstox:*`, `RiskEngine:*`, `Api:BaseUrl`, `Api:InternalKey`, `ConnectionStrings:DefaultConnection` |
+| `backend/KAITerminal.Console/appsettings.json` | `Upstox:AccessToken`, `RiskEngine:*` |
+| `frontend/.env` | `VITE_API_URL`, `VITE_PP_MTM_TARGET`, `VITE_PP_MTM_SL`, other PP defaults |
+
+`Frontend:Url` in the API config must match the frontend origin for CORS and OAuth redirects to work (default `http://localhost:3000`).
+
+---
+
+## Development commands
 
 ```bash
-cd backend/KAITerminal.Api
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=...;Database=...;Username=...;Password=...;SSL Mode=Require"
+# Backend
+cd backend
+dotnet build                              # Build entire solution
+dotnet watch --project KAITerminal.Api    # Hot-reload API
+
+# Frontend
+cd frontend
+npm run dev      # Dev server :3000
+npm run build    # TypeScript check + production build
+npm run lint     # ESLint
 ```

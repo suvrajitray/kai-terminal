@@ -33,22 +33,20 @@ public static class AuthExtensions
         .AddJwtBearer(options =>
         {
             options.UseSecurityTokenValidators = true;
-            /*
-            // uncomment for debugging JWT issues
+            // Allow SignalR WebSocket connections to pass the JWT via query string
             options.Events = new JwtBearerEvents
             {
-                OnAuthenticationFailed = ctx =>
+                OnMessageReceived = context =>
                 {
-                    Console.WriteLine($"JWT FAILED: {ctx.Exception.Message}");
-                    return Task.CompletedTask;
-                },
-                OnTokenValidated = ctx =>
-                {
-                    Console.WriteLine("JWT VALIDATED SUCCESSFULLY");
+                    var accessToken = context.Request.Query["access_token"];
+                    if (!string.IsNullOrEmpty(accessToken) &&
+                        context.HttpContext.Request.Path.StartsWithSegments("/hubs/risk"))
+                    {
+                        context.Token = accessToken;
+                    }
                     return Task.CompletedTask;
                 }
             };
-            */
             options.TokenValidationParameters = new TokenValidationParameters
             {
                 ValidateIssuer = true,

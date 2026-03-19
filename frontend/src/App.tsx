@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, Outlet } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AppLayout } from "@/components/layout/app-layout";
 import { LoginPage } from "@/pages/login-page";
@@ -11,6 +11,12 @@ import { ChartsPage } from "@/pages/charts-page";
 import { AiSignalsPage } from "@/pages/ai-signals-page";
 import { NotFoundPage } from "@/pages/not-found-page";
 import { InactivePage } from "@/pages/inactive-page";
+import { useRiskFeed } from "@/hooks/use-risk-feed";
+
+function RiskFeedMount() {
+  useRiskFeed();
+  return <Outlet />;
+}
 
 function App() {
   return (
@@ -19,6 +25,7 @@ function App() {
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route path="/auth/inactive" element={<InactivePage />} />
       <Route element={<ProtectedRoute />}>
+        <Route element={<RiskFeedMount />}>
         <Route element={<AppLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/terminal" element={<TerminalPage />} />
@@ -26,6 +33,7 @@ function App() {
           <Route path="/ai-signals" element={<AiSignalsPage />} />
           <Route path="/connect-brokers" element={<ConnectBrokersPage />} />
           <Route path="/redirect/:brokerId" element={<BrokerRedirectPage />} />
+        </Route>
         </Route>
       </Route>
       <Route path="/" element={<Navigate to="/connect-brokers" replace />} />

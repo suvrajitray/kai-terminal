@@ -2,7 +2,9 @@ using System.Text.Json.Serialization;
 using KAITerminal.Api.Endpoints;
 using KAITerminal.Api.Extensions;
 using KAITerminal.Api.Hubs;
+using KAITerminal.Api.Notifications;
 using KAITerminal.Api.Services;
+using KAITerminal.Contracts.Notifications;
 using KAITerminal.Infrastructure.Extensions;
 using KAITerminal.Auth.Endpoints;
 using KAITerminal.Auth.Extensions;
@@ -33,6 +35,7 @@ builder.Services
     .AddBrokerServices(builder.Configuration)
     .AddSignalR();
 
+builder.Services.AddSingleton<IRiskEventNotifier, SignalRRiskEventNotifier>();
 builder.Services.AddSingleton<PositionStreamManager>();
 builder.Services.AddSingleton<IndexStreamManager>();
 builder.Services.AddScoped<UserTradingSettingsService>();
@@ -114,8 +117,10 @@ app.MapUserSettingsEndpoints();
 app.MapAiSentimentEndpoints();
 app.MapRiskConfigEndpoints();
 app.MapMasterDataEndpoints();
+app.MapRiskNotificationEndpoints();
 app.MapHub<PositionsHub>("/hubs/positions");
 app.MapHub<IndexHub>("/hubs/indices");
+app.MapHub<RiskHub>("/hubs/risk");
 
 if (app.Environment.IsDevelopment())
     app.MapDiagnosticsEndpoints();

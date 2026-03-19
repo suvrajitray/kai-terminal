@@ -42,7 +42,7 @@ The frontend `@` alias resolves to `frontend/src/`.
 | `KAITerminal.Worker` | `Sdk.Worker` | Multi-user risk engine host — reads enabled users from `UserRiskConfigs` DB table |
 | `KAITerminal.Console` | `Sdk` | Single-user risk engine host — reads `Upstox:AccessToken` from config |
 | `KAITerminal.RiskEngine` | Library | Risk engine library — all risk logic, workers, state |
-| `KAITerminal.Contracts` | Library | Broker-agnostic domain types — `Position`, `BrokerFunds`, `BrokerOrderRequest`, streaming interfaces, option contract types |
+| `KAITerminal.Contracts` | Library | Broker-agnostic domain types — `Position`, `BrokerFunds`, `BrokerOrderRequest`, streaming interfaces, option contract types, `IRiskEventNotifier` + `RiskNotification` |
 | `KAITerminal.Broker` | Library | Broker abstraction — `IBrokerClient`, `IBrokerClientFactory` |
 | `KAITerminal.Upstox` | Library | Upstox SDK — HTTP client, WebSocket streamers, order/option services; `UpstoxBrokerClient` implements `IBrokerClient` |
 | `KAITerminal.Zerodha` | Library | Zerodha SDK — Kite Connect REST + streaming stubs; `ZerodhaBrokerClient` implements `IBrokerClient` |
@@ -85,6 +85,7 @@ Adding a new broker (e.g. Dhan): create `KAITerminal.Dhan`, implement `IBrokerCl
 - Credentials (`Jwt:Key`, `GoogleAuth:ClientId/Secret`, `ConnectionStrings:DefaultConnection`) and `Frontend:Url` must be set in `appsettings.json` or `dotnet user-secrets` before the API starts.
 - `Frontend:Url` (default `http://localhost:3000`) controls CORS allowed origins and the OAuth redirect.
 - **Live positions** — `PositionsHub` (`Hubs/PositionsHub.cs`) is a SignalR hub mounted at `/hubs/positions`. On connect it fetches initial positions, creates a `PositionStreamCoordinator` (`Hubs/PositionStreamCoordinator.cs`) for the connection, and pushes `ReceivePositions` / `ReceiveLtpBatch` / `ReceiveOrderUpdate` messages. The coordinator owns both WebSocket streamers, event wiring, and all push logic for its connection lifetime. `PositionStreamManager` (singleton) tracks coordinators by connection ID and disposes them on disconnect.
+- **Risk event notifications** — `RiskHub` (`Hubs/RiskHub.cs`) is a JWT-authenticated SignalR hub mounted at `/hubs/risk`. On connect the user (identified via `ClaimTypes.NameIdentifier` = email) is added to a SignalR group keyed by their email. `POST /api/internal/risk-event` (validated by `X-Internal-Key` header) accepts a `RiskNotification` from the Worker and pushes `ReceiveRiskEvent` to the user's group. `SignalRRiskEventNotifier` (`Notifications/`) implements `IRiskEventNotifier` for the Api process.
 - **Portfolio stream** — `IPortfolioStreamer.ConnectAsync(ct)` takes no update-type parameters; the Upstox implementation subscribes to `[Order, Position]` internally. Upstox requires explicit `update_types` query params on the authorize endpoint (omitting them delivers no events) — this is encapsulated inside `PortfolioStreamer.ConnectAsync`. The Upstox portfolio stream JSON frame uses `update_type` (not `type`) at the root — mapped to `PortfolioUpdate.UpdateType` at the SDK boundary.
 - **Order update notifications** — `ReceiveOrderUpdate` is pushed to the frontend on every `update_type=order` event. Frontend shows `toast.error` for `rejected` status and `toast.success` for `complete`; the Orders panel auto-refreshes on every order event.
 - **Exchange filter** — `GET /api/upstox/positions?exchange=NFO,BFO` and `GET /api/upstox/mtm?exchange=NFO,BFO` accept a comma-separated exchange list; the `PositionsHub` also accepts `?exchange=` on the WebSocket URL. Filtering is applied server-side; omit the param to receive all exchanges. See `docs/live-positions-websocket.md` for full protocol details.
@@ -117,6 +118,7 @@ Leaf-node library with no dependencies — defines all cross-project types:
 - **`Streaming/`** — `IMarketDataStreamer`, `IPortfolioStreamer`, `LtpUpdate(IReadOnlyDictionary<string,decimal> Ltps)`, `PortfolioUpdate(UpdateType, OrderId?, Status?, StatusMessage?, TradingSymbol?)`, `FeedMode` enum (Ltpc, Full)
 - **`Options/`** — `IndexContracts`, `ContractEntry` (unified option contract format with `UpstoxToken` + `ZerodhaToken` fields)
 - **`Broker/`** — `IOptionContractProvider` (pluggable contract fetcher: `BrokerType` + `GetContractsAsync(accessToken, apiKey?, ct)`)
+- **`Notifications/`** — `IRiskEventNotifier` (single method `NotifyAsync(RiskNotification, ct)`), `RiskNotification` record (`UserId`, `Broker`, `Type`, `Mtm`, `Target?`, `Sl?`, `TslFloor?`, `Timestamp`), `RiskNotificationType` enum (`HardSlHit`, `TargetHit`, `TslActivated`, `TslRaised`, `TslHit`, `SquareOffComplete`, `SquareOffFailed`). Lives in Contracts so both RiskEngine and Api can reference it without new project dependencies.
 
 ### Broker Abstraction (`KAITerminal.Broker`)
 
@@ -194,6 +196,8 @@ A library; consumed by Worker and Console via `services.AddRiskEngine<TTokenSour
 | Session crash/restart | Warn | `Restarting session — user@email (upstox) in 30s` |
 | Market open/closed | Info | `Market open — risk engine active (09:15–15:30 India Standard Time)` |
 
+**`IRiskEventNotifier`** — injected into `RiskEvaluator`; fires `NotifyAsync` at every risk trigger. `NullRiskEventNotifier` (no-op) is registered via `TryAddSingleton` in `AddRiskEngine` — hosts override it before calling `AddRiskEngine`. Worker registers `HttpRiskEventNotifier`; Api registers `SignalRRiskEventNotifier`.
+
 **`IUserTokenSource`** (async) decouples user/token supply from the engine:
 - `DbUserTokenSource` (Worker) — queries `UserRiskConfigs WHERE Enabled=true` joined with `BrokerCredentials` on every tick; auto-picks up DB changes without restart
 - `SingleUserTokenSource` (Console) — reads `Upstox:AccessToken` from config
@@ -243,6 +247,7 @@ Services: `BrokerCredentialService`, `UserService` (`IUserService`), `RiskConfig
 - **AI Signals page** (`/ai-signals`) — `GET /api/ai/market-sentiment` assembles a market snapshot (index quotes, NIFTY+BANKNIFTY option chains, last 30 × 1-min NIFTY candles) and fans out to GPT-4o, Grok, Gemini, Claude in parallel (30s timeout each). Each model returns direction / confidence / reasons / support / resistance / watch_for as JSON. Frontend polls every 15 minutes with a countdown timer; manual refresh button. Page shows a `MarketContextBar` and 4 `SentimentCard` components. API keys configured via `AiSentiment` config section; add with `dotnet user-secrets`. Requires `X-Upstox-Access-Token` header (same as other Upstox endpoints, but endpoint is at `/api/ai/` so the token context is set manually inside the handler).
 - **Profit Protection** — config is DB-backed. `useRiskConfig` hook loads from `GET /api/risk-config` on mount and saves via `PUT /api/risk-config`. The PP toggle uses an optimistic update (flips instantly, API call in background, reverts on failure). `useProfitProtection` hook is **display-only** — computes `currentSl` for the stats bar from live positions feed; exit orders are fired by the backend Worker, not the frontend. PP store (`profit-protection-store.ts`) is not persisted to localStorage.
 - **Profit Protection env defaults** — PP store initial defaults can be overridden via `frontend/.env` variables: `VITE_PP_MTM_TARGET`, `VITE_PP_MTM_SL`, `VITE_PP_TRAILING_ENABLED`, `VITE_PP_TRAILING_ACTIVATE_AT`, `VITE_PP_LOCK_PROFIT_AT`, `VITE_PP_INCREASE_BY`, `VITE_PP_TRAIL_BY`. These are only used before the API config loads.
+- **Risk event feed** — `useRiskFeed` hook (`hooks/use-risk-feed.ts`) connects to `WSS /hubs/risk` with JWT `accessTokenFactory`. Mounted app-wide via `RiskFeedMount` in `App.tsx` (wraps `ProtectedRoute` outlet). Listens for `ReceiveRiskEvent` and shows `sonner` toasts: red for `HardSlHit`/`TslHit`/`SquareOffFailed`, green for `TargetHit`/`SquareOffComplete`, blue info for `TslActivated`/`TslRaised`. Frontend types: `RiskNotificationType` union + `RiskEvent` interface in `types/index.ts`.
 
 ---
 
@@ -251,7 +256,7 @@ Services: `BrokerCredentialService`, `UserService` (`IUserService`), `RiskConfig
 | File | Purpose |
 |---|---|
 | `backend/KAITerminal.Api/appsettings.json` | `Jwt:*`, `GoogleAuth:*`, `Frontend:Url`, `Upstox:ApiBaseUrl/HftBaseUrl`, `ConnectionStrings:DefaultConnection`, `AiSentiment:*`, `ApplicationInsights:ConnectionString` |
-| `backend/KAITerminal.Worker/appsettings.json` | `Upstox:*`, `RiskEngine:*`, `ConnectionStrings:DefaultConnection`, `ApplicationInsights:ConnectionString` |
+| `backend/KAITerminal.Worker/appsettings.json` | `Upstox:*`, `RiskEngine:*`, `Api:BaseUrl`, `Api:InternalKey`, `ConnectionStrings:DefaultConnection`, `ApplicationInsights:ConnectionString` |
 | `backend/KAITerminal.Console/appsettings.json` | `Upstox:AccessToken`, `RiskEngine:*`, `ApplicationInsights:ConnectionString` |
 | `frontend/.env` | `VITE_API_URL` (optional), `VITE_PP_MTM_TARGET`, `VITE_PP_MTM_SL`, and other PP defaults |
 
@@ -269,6 +274,14 @@ dotnet user-secrets set "Upstox:AccessToken" "<daily_token>"
 
 cd ../KAITerminal.Worker
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=...;Database=...;Username=...;Password=...;SSL Mode=Require"
+
+# Risk event notifications — must match in both Api and Worker
+cd ../KAITerminal.Api
+dotnet user-secrets set "Api:InternalKey" "<uuid>"
+
+cd ../KAITerminal.Worker
+dotnet user-secrets set "Api:InternalKey" "<same-uuid>"
+dotnet user-secrets set "Api:BaseUrl" "https://localhost:5001"
 
 # AI Signals (KAITerminal.Api)
 cd ../KAITerminal.Api

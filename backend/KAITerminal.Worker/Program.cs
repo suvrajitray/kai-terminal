@@ -1,10 +1,12 @@
 using KAITerminal.Broker;
 using KAITerminal.Broker.Adapters;
+using KAITerminal.Contracts.Notifications;
 using KAITerminal.Infrastructure.Extensions;
 using KAITerminal.RiskEngine.Extensions;
 using KAITerminal.Upstox;
 using KAITerminal.Upstox.Extensions;
 using KAITerminal.Worker;
+using KAITerminal.Worker.Notifications;
 using KAITerminal.Zerodha;
 using KAITerminal.Zerodha.Extensions;
 
@@ -13,6 +15,17 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddUpstoxSdk(builder.Configuration);
 builder.Services.AddZerodhaSdk(builder.Configuration);
 builder.Services.AddDatabase(builder.Configuration);
+
+// Register HttpRiskEventNotifier before AddRiskEngine so TryAddSingleton doesn't override it
+builder.Services.AddHttpClient("RiskNotify", (sp, client) =>
+{
+    var cfg = sp.GetRequiredService<IConfiguration>();
+    var baseUrl = cfg["Api:BaseUrl"] ?? "https://localhost:5001";
+    var internalKey = cfg["Api:InternalKey"] ?? "";
+    client.BaseAddress = new Uri(baseUrl);
+    client.DefaultRequestHeaders.Add("X-Internal-Key", internalKey);
+});
+builder.Services.AddSingleton<IRiskEventNotifier, HttpRiskEventNotifier>();
 
 // Register IBrokerClientFactory — same pattern as KAITerminal.Api
 builder.Services.AddSingleton<IBrokerClientFactory>(sp =>

@@ -1,4 +1,5 @@
 using KAITerminal.Broker;
+using KAITerminal.Contracts.Notifications;
 using KAITerminal.RiskEngine.Abstractions;
 using KAITerminal.RiskEngine.Configuration;
 using KAITerminal.RiskEngine.Models;
@@ -15,18 +16,21 @@ namespace KAITerminal.RiskEngine.Services;
 /// </summary>
 public sealed class RiskEvaluator
 {
-    private readonly IRiskRepository _repo;
-    private readonly RiskEngineConfig _cfg;
+    private readonly IRiskRepository     _repo;
+    private readonly IRiskEventNotifier  _notifier;
+    private readonly RiskEngineConfig    _cfg;
     private readonly ILogger<RiskEvaluator> _logger;
 
     public RiskEvaluator(
         IRiskRepository repo,
+        IRiskEventNotifier notifier,
         IOptions<RiskEngineConfig> cfg,
         ILogger<RiskEvaluator> logger)
     {
-        _repo   = repo;
-        _cfg    = cfg.Value;
-        _logger = logger;
+        _repo     = repo;
+        _notifier = notifier;
+        _cfg      = cfg.Value;
+        _logger   = logger;
     }
 
     /// <summary>
@@ -75,7 +79,10 @@ public sealed class RiskEvaluator
             _logger.LogWarning(
                 "HARD SL HIT — {UserId} ({Broker})  PnL ₹{Mtm:+#,##0;-#,##0}  ≤  SL ₹{Sl:+#,##0;-#,##0} — exiting all",
                 userId, config.BrokerType, mtm, config.MtmSl);
-            await SquareOffAsync(userId, config.BrokerType, state, broker, ct);
+            await _notifier.NotifyAsync(new RiskNotification(
+                userId, config.BrokerType, RiskNotificationType.HardSlHit,
+                mtm, Sl: config.MtmSl, Timestamp: DateTimeOffset.UtcNow), ct);
+            await SquareOffAsync(userId, config.BrokerType, mtm, state, broker, ct);
             return;
         }
 
@@ -85,7 +92,10 @@ public sealed class RiskEvaluator
             _logger.LogInformation(
                 "TARGET HIT — {UserId} ({Broker})  PnL ₹{Mtm:+#,##0;-#,##0}  ≥  Target ₹{Target:+#,##0} — exiting all",
                 userId, config.BrokerType, mtm, config.MtmTarget);
-            await SquareOffAsync(userId, config.BrokerType, state, broker, ct);
+            await _notifier.NotifyAsync(new RiskNotification(
+                userId, config.BrokerType, RiskNotificationType.TargetHit,
+                mtm, Target: config.MtmTarget, Timestamp: DateTimeOffset.UtcNow), ct);
+            await SquareOffAsync(userId, config.BrokerType, mtm, state, broker, ct);
             return;
         }
 
@@ -103,6 +113,9 @@ public sealed class RiskEvaluator
                 _logger.LogInformation(
                     "TSL ACTIVATED — {UserId} ({Broker})  floor locked at ₹{Stop:+#,##0;-#,##0}",
                     userId, config.BrokerType, state.TrailingStop);
+                await _notifier.NotifyAsync(new RiskNotification(
+                    userId, config.BrokerType, RiskNotificationType.TslActivated,
+                    mtm, TslFloor: state.TrailingStop, Timestamp: DateTimeOffset.UtcNow), ct);
             }
         }
         else
@@ -117,6 +130,9 @@ public sealed class RiskEvaluator
                 _logger.LogInformation(
                     "TSL RAISED — {UserId} ({Broker})  floor → ₹{Stop:+#,##0;-#,##0}",
                     userId, config.BrokerType, state.TrailingStop);
+                await _notifier.NotifyAsync(new RiskNotification(
+                    userId, config.BrokerType, RiskNotificationType.TslRaised,
+                    mtm, TslFloor: state.TrailingStop, Timestamp: DateTimeOffset.UtcNow), ct);
             }
 
             if (mtm <= state.TrailingStop)
@@ -124,7 +140,10 @@ public sealed class RiskEvaluator
                 _logger.LogWarning(
                     "TSL HIT — {UserId} ({Broker})  PnL ₹{Mtm:+#,##0;-#,##0}  ≤  floor ₹{Stop:+#,##0;-#,##0} — exiting all",
                     userId, config.BrokerType, mtm, state.TrailingStop);
-                await SquareOffAsync(userId, config.BrokerType, state, broker, ct);
+                await _notifier.NotifyAsync(new RiskNotification(
+                    userId, config.BrokerType, RiskNotificationType.TslHit,
+                    mtm, TslFloor: state.TrailingStop, Timestamp: DateTimeOffset.UtcNow), ct);
+                await SquareOffAsync(userId, config.BrokerType, mtm, state, broker, ct);
             }
         }
     }
@@ -146,7 +165,7 @@ public sealed class RiskEvaluator
     }
 
     private async Task SquareOffAsync(
-        string userId, string brokerType, UserRiskState state, IBrokerClient broker, CancellationToken ct)
+        string userId, string brokerType, decimal mtm, UserRiskState state, IBrokerClient broker, CancellationToken ct)
     {
         try
         {
@@ -156,6 +175,9 @@ public sealed class RiskEvaluator
             _logger.LogWarning(
                 "Square-off complete — {UserId} ({Broker}) — all positions exited",
                 userId, brokerType);
+            await _notifier.NotifyAsync(new RiskNotification(
+                userId, brokerType, RiskNotificationType.SquareOffComplete,
+                mtm, Timestamp: DateTimeOffset.UtcNow), ct);
         }
         catch (Exception ex)
         {
@@ -164,6 +186,9 @@ public sealed class RiskEvaluator
             _logger.LogError(ex,
                 "Square-off FAILED — {UserId} ({Broker}) — marked as squared-off; manual verification required",
                 userId, brokerType);
+            await _notifier.NotifyAsync(new RiskNotification(
+                userId, brokerType, RiskNotificationType.SquareOffFailed,
+                mtm, Timestamp: DateTimeOffset.UtcNow), ct);
         }
     }
 }

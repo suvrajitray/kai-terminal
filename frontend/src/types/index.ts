@@ -91,6 +91,26 @@ export interface IndexContracts {
   contracts: ContractEntry[];
 }
 
+export type RiskNotificationType =
+  | "HardSlHit"
+  | "TargetHit"
+  | "TslActivated"
+  | "TslRaised"
+  | "TslHit"
+  | "SquareOffComplete"
+  | "SquareOffFailed";
+
+export interface RiskEvent {
+  userId:    string;
+  broker:    string;
+  type:      RiskNotificationType;
+  mtm:       number;
+  target:    number | null;
+  sl:        number | null;
+  tslFloor:  number | null;
+  timestamp: string;
+}
+
 // CamelCase matches the unified KAI Terminal OrderResponse DTO from the backend
 export interface Order {
   orderId: string;
