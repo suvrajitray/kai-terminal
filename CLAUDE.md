@@ -316,6 +316,16 @@ This terminal is built **primarily for options sellers** (short options traders)
 
 ---
 
+## Git Workflow
+
+**Never run any git operation without explicit user instruction.**
+
+- Do not run `git add`, `git commit`, `git push`, or any other git command unless the user explicitly asks.
+- When the user says "commit", propose the list of files to stage and the commit message first — do not execute until they confirm.
+- Do not suggest committing after completing changes. Stop at the code, wait for the user.
+
+---
+
 ## React Component Philosophy
 
 - **Small, focused components** — every component should do one thing. If a component is growing large, extract logical pieces into their own files.
