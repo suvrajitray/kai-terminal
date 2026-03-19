@@ -12,14 +12,16 @@ public sealed record RiskNotification(
     string               Broker,
     RiskNotificationType Type,
     decimal              Mtm,
-    decimal?             Target   = null,
-    decimal?             Sl       = null,
-    decimal?             TslFloor = null,
-    DateTimeOffset       Timestamp = default);
+    decimal?             Target           = null,
+    decimal?             Sl               = null,
+    decimal?             TslFloor         = null,
+    int?                 OpenPositionCount = null,
+    DateTimeOffset       Timestamp        = default);
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum RiskNotificationType
 {
+    SessionStarted,
     HardSlHit,
     TargetHit,
     TslActivated,

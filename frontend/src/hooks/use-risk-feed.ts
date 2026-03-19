@@ -13,6 +13,8 @@ function formatRupee(value: number): string {
 
 function buildToastMessage(event: RiskEvent): string {
   switch (event.type) {
+    case "SessionStarted":
+      return `Risk engine active — watching ${event.openPositionCount} open position(s) (PnL ${formatRupee(event.mtm)})`;
     case "HardSlHit":
       return `Hard SL Hit — PnL ${formatRupee(event.mtm)}${event.sl != null ? ` ≤ SL ${formatRupee(event.sl)}` : ""}`;
     case "TargetHit":
@@ -57,6 +59,7 @@ export function useRiskFeed(): void {
         case "SquareOffComplete":
           toast.success(message, { duration: 10000 });
           break;
+        case "SessionStarted":
         case "TslActivated":
         case "TslRaised":
           toast.info(message, { duration: 8000 });

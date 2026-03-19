@@ -219,11 +219,16 @@ Checks run in order: **Hard SL → Target → Trailing SL**. Once a user is squa
 
 Every time a risk event fires, a toast notification appears in the browser immediately:
 
-| Event | Toast colour |
-|---|---|
-| Hard SL hit / TSL hit / Square-off failed | Red |
-| Target hit / Square-off complete | Green |
-| TSL activated / TSL raised | Blue |
+| Event | Toast colour | When |
+|---|---|---|
+| Session started | Blue | Streams go live and user has open positions |
+| TSL activated | Blue | MTM crosses the TSL activation threshold |
+| TSL raised | Blue | TSL floor moves up |
+| Target hit | Green | MTM reaches the profit target |
+| Square-off complete | Green | All positions successfully exited |
+| Hard SL hit | Red | MTM hits the hard stop loss |
+| TSL hit | Red | MTM falls to or below the trailing floor |
+| Square-off failed | Red | Exit order failed — manual action required |
 
 **How it works:**
 
@@ -238,6 +243,30 @@ Worker: StreamingRiskWorker
 ```
 
 The `Api:InternalKey` user-secret must be set to the same value in both the Api and Worker processes. If the key is missing from the Api, the endpoint returns 503 and no alerts are delivered.
+
+---
+
+## Risk engine log messages
+
+All risk engine logs follow the format `{UserId} ({Broker})` and format monetary values as `₹+#,##0` / `₹-#,##0`.
+
+| Event | Level | Sample log message |
+|---|---|---|
+| Worker startup | Info | `RiskWorker started — trading window 09:15–15:30 Asia/Kolkata, LTP eval every 15000ms` |
+| Session starting | Info | `Starting session — user@email (upstox)` |
+| Streams live | Info | `Streams live — user@email (upstox)  watching 5 open instrument(s)` |
+| Heartbeat (TSL off) | Info | `user@email (upstox)  PnL ₹+11,353  \|  SL ₹-5,000  \|  Target ₹+25,000  \|  TSL off — activates at ₹+15,000` |
+| Heartbeat (TSL on) | Info | `user@email (upstox)  PnL ₹+11,353  \|  Target ₹+25,000  \|  TSL ₹+3,025` |
+| Market open | Info | `Market open — risk engine active (09:15–15:30 Asia/Kolkata)` |
+| Market closed | Info | `Market closed — risk engine paused until 09:15 Asia/Kolkata` |
+| TSL activated | Info | `TSL ACTIVATED — user@email (upstox)  floor locked at ₹+3,025` |
+| TSL raised | Info | `TSL RAISED — user@email (upstox)  floor → ₹+5,025` |
+| Target hit | Info | `TARGET HIT — user@email (upstox)  PnL ₹+25,000  ≥  Target ₹+25,000 — exiting all` |
+| Hard SL hit | Warn | `HARD SL HIT — user@email (upstox)  PnL ₹-5,000  ≤  SL ₹-5,000 — exiting all` |
+| TSL hit | Warn | `TSL HIT — user@email (upstox)  PnL ₹+3,000  ≤  floor ₹+3,025 — exiting all` |
+| Square-off complete | Warn | `Square-off complete — user@email (upstox) — all positions exited` |
+| Square-off failed | Error | `Square-off FAILED — user@email (upstox) — marked as squared-off; manual verification required` |
+| Session crash + restart | Warn | `Restarting session — user@email (upstox) in 30s` |
 
 ---
 

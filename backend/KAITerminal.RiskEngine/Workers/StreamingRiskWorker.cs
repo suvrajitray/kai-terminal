@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using KAITerminal.Broker;
+using KAITerminal.Contracts.Notifications;
 using KAITerminal.Contracts.Streaming;
 using KAITerminal.RiskEngine.Abstractions;
 using KAITerminal.RiskEngine.Configuration;
@@ -28,6 +29,7 @@ public sealed class StreamingRiskWorker : BackgroundService
     private readonly IBrokerClientFactory _brokerFactory;
     private readonly IPositionCache      _cache;
     private readonly RiskEvaluator       _evaluator;
+    private readonly IRiskEventNotifier  _notifier;
     private readonly RiskEngineConfig    _cfg;
     private readonly ILogger<StreamingRiskWorker> _logger;
     private readonly TimeZoneInfo        _tradingTz;
@@ -47,6 +49,7 @@ public sealed class StreamingRiskWorker : BackgroundService
         IBrokerClientFactory brokerFactory,
         IPositionCache       cache,
         RiskEvaluator        evaluator,
+        IRiskEventNotifier   notifier,
         IOptions<RiskEngineConfig> cfg,
         ILogger<StreamingRiskWorker> logger)
     {
@@ -54,6 +57,7 @@ public sealed class StreamingRiskWorker : BackgroundService
         _brokerFactory = brokerFactory;
         _cache         = cache;
         _evaluator     = evaluator;
+        _notifier      = notifier;
         _cfg           = cfg.Value;
         _logger        = logger;
         _tradingTz     = TimeZoneInfo.FindSystemTimeZoneById(_cfg.TradingTimeZone);
@@ -118,9 +122,19 @@ public sealed class StreamingRiskWorker : BackgroundService
                 }
             }
 
+            var openCount = _cache.GetOpenInstrumentTokens(user.UserId).Count;
             _logger.LogInformation(
                 "Streams live — {UserId} ({Broker})  watching {Count} open instrument(s)",
-                user.UserId, user.BrokerType, _cache.GetOpenInstrumentTokens(user.UserId).Count);
+                user.UserId, user.BrokerType, openCount);
+
+            if (openCount > 0)
+            {
+                await _notifier.NotifyAsync(new RiskNotification(
+                    user.UserId, user.BrokerType, RiskNotificationType.SessionStarted,
+                    _cache.GetMtm(user.UserId),
+                    OpenPositionCount: openCount,
+                    Timestamp: DateTimeOffset.UtcNow), ct);
+            }
 
             // ── Event handlers ───────────────────────────────────────────────
             portfolioStreamer.UpdateReceived += (_, update) =>
