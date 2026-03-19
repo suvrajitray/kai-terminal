@@ -85,10 +85,21 @@ App Insights receives `Warning+` from the API — Upstox API errors, hub errors,
 | Alert | Query | Threshold |
 |---|---|---|
 | Risk engine down during market hours | `traces \| where message contains "Market open"` missing for 20 min | 0 results in 20 min window |
-| Square-off failure | `traces \| where severityLevel >= 3 and message contains "Failed to exit"` | Any occurrence |
+| Square-off failure | `traces \| where severityLevel >= 3 and message contains "Square-off FAILED"` | Any occurrence |
 | Stream permanently disconnected | `traces \| where message contains "permanently disconnected"` | Any occurrence |
-| Session crash loop | `traces \| where message contains "Restarting streaming session"` | > 3 in 10 min |
+| Session crash loop | `traces \| where message contains "Restarting session"` | > 3 in 10 min |
 | High API error rate | `exceptions \| where outerMessage contains "Upstox"` | > 10 in 5 min |
+
+---
+
+## Log Format
+
+All risk engine logs use `{UserId} ({Broker})` as a leading identifier and format monetary values as `₹+#,##0` / `₹-#,##0` with thousands separators. Example:
+
+```
+suvrajit.ray@gmail.com (upstox)  PnL ₹+11,353  |  Target ₹+25,000  |  TSL ₹+3,025
+HARD SL HIT — suvrajit.ray@gmail.com (upstox)  PnL ₹-5,000  ≤  SL ₹-5,000 — exiting all
+```
 
 ---
 
@@ -145,47 +156,47 @@ Logging__LogLevel__KAITerminal__Upstox=Debug
 
 | Level | Message | Meaning |
 |---|---|---|
-| `Information` | `StreamingRiskWorker started — LTP eval interval={IntervalMs}ms trading window={Start}–{End} {Tz}` | Worker host started. Confirms configured trading window and evaluation rate. |
-| `Warning` | `StreamingRiskWorker: no users configured — nothing to monitor` | No enabled rows in `UserRiskConfigs`. Worker exits immediately. Check DB. |
-| `Information` | `Starting risk sessions for {Count} user(s)` | Number of users loaded from DB. One task is launched per user. |
-| `Information` | `StreamingRiskWorker stopped` | Host shutdown complete. |
+| `Information` | `RiskWorker started — trading window {Start}–{End} {Tz}, LTP eval every {IntervalMs}ms` | Worker host started. Confirms configured trading window and evaluation rate. |
+| `Warning` | `No users configured — nothing to monitor` | No enabled rows in `UserRiskConfigs`. Worker exits immediately. Check DB. |
+| `Information` | `Starting {Count} risk session(s)` | Number of users loaded from DB. One task is launched per user. |
+| `Information` | `RiskWorker stopped` | Host shutdown complete. |
 
 #### Per-user session lifecycle
 
 | Level | Message | Meaning |
 |---|---|---|
-| `Information` | `Starting streaming risk session for userId={UserId} broker={Broker}` | Streams are about to connect for this user. |
-| `Information` | `Subscribing market data for {Count} instrument(s) — userId={UserId} broker={Broker}` | Initial market data subscription after fetching open positions. |
-| `Information` | `Streams connected for userId={UserId} broker={Broker}; monitoring {Count} open instrument(s)` | Both WebSocket streams are live. Risk engine is active for this user. |
-| `Warning` | `Portfolio stream reconnecting for userId={UserId} broker={Broker}` | Upstox portfolio WebSocket disconnected; auto-reconnect in progress. |
-| `Warning` | `Market data stream reconnecting for userId={UserId} broker={Broker}` | Upstox market data WebSocket disconnected; auto-reconnect in progress. |
-| `Error` | `Streaming session failed for userId={UserId} broker={Broker}` | Unhandled exception in the session. The restart wrapper will retry. |
-| `Warning` | `Restarting streaming session for userId={UserId} broker={Broker} in {Delay}s` | Session crashed and will restart after the given delay (30s → 60s → 120s → ... → 300s cap). |
+| `Information` | `Starting session — {UserId} ({Broker})` | Streams are about to connect for this user. |
+| `Information` | `Subscribing {Count} instrument(s) — {UserId} ({Broker})` | Initial market data subscription after fetching open positions. |
+| `Information` | `Streams live — {UserId} ({Broker})  watching {Count} open instrument(s)` | Both WebSocket streams are live. Risk engine is active for this user. |
+| `Warning` | `Portfolio stream reconnecting — {UserId} ({Broker})` | Upstox portfolio WebSocket disconnected; auto-reconnect in progress. |
+| `Warning` | `Market data stream reconnecting — {UserId} ({Broker})` | Upstox market data WebSocket disconnected; auto-reconnect in progress. |
+| `Error` | `Session crashed — {UserId} ({Broker})` | Unhandled exception in the session. The restart wrapper will retry. |
+| `Warning` | `Restarting session — {UserId} ({Broker}) in {Delay}s` | Session crashed and will restart after the given delay (30s → 60s → 120s → … → 300s cap). |
 
 #### Trading window
 
 | Level | Message | Meaning |
 |---|---|---|
-| `Information` | `Market open — risk engine active (window: {Start}–{End} {Tz})` | First evaluation after market open. Logged **once** per open event. |
+| `Information` | `Market open — risk engine active ({Start}–{End} {Tz})` | First evaluation after market open. Logged **once** per open event. |
 | `Information` | `Market closed — risk engine paused until {Start} {Tz}` | Market closed or engine started outside hours. Logged **once** per close event. |
 
 #### Portfolio updates
 
 | Level | Message | Meaning |
 |---|---|---|
-| `Debug` | `Portfolio event received: {EventType} for userId={UserId} broker={Broker}` | Raw event type from Upstox (`order_update` / `position_update`). Visible only at Debug level. |
-| `Debug` | `Re-fetching positions after portfolio event for userId={UserId} broker={Broker}` | REST call about to be made to refresh position cache. |
-| `Debug` | `Re-subscribing market data for {Count} instrument(s) — userId={UserId} broker={Broker}` | Market data subscription updated after position refresh. |
-| `Error` | `Error handling portfolio update for userId={UserId} broker={Broker}` | Position re-fetch or subscription failed. Includes exception. |
+| `Debug` | `Portfolio event [{EventType}] — {UserId} ({Broker})` | Raw event type from Upstox (`order_update` / `position_update`). Visible only at Debug level. |
+| `Debug` | `Re-fetching positions after portfolio event — {UserId} ({Broker})` | REST call about to be made to refresh position cache. |
+| `Debug` | `Re-subscribing {Count} instrument(s) after portfolio event — {UserId} ({Broker})` | Market data subscription updated after position refresh. |
+| `Error` | `Error handling portfolio event — {UserId} ({Broker})` | Position re-fetch or subscription failed. Includes exception. |
 
 #### LTP tick evaluation
 
 | Level | Message | Meaning |
 |---|---|---|
-| `Debug` | `LTP eval rate-limited for userId={UserId} broker={Broker} — skipping` | Tick arrived but the minimum interval (`LtpEvalMinIntervalMs`) has not elapsed since last evaluation. Expected and frequent. |
-| `Debug` | `Evaluation already in progress for userId={UserId} broker={Broker} — skipping` | A concurrent evaluation is running; this tick is dropped to avoid double-evaluation. |
-| `Debug` | `Skipping evaluation for userId={UserId} broker={Broker} — outside trading hours` | Evaluation requested but the current time is outside the configured trading window. |
-| `Error` | `Error during LTP-triggered evaluation for userId={UserId} broker={Broker}` | Evaluation threw unexpectedly. Includes exception. |
+| `Debug` | `LTP eval rate-limited — {UserId} ({Broker})` | Tick arrived but the minimum interval (`LtpEvalMinIntervalMs`) has not elapsed since last evaluation. Expected and frequent. |
+| `Debug` | `Evaluation in progress — skipping for {UserId} ({Broker})` | A concurrent evaluation is running; this tick is dropped to avoid double-evaluation. |
+| `Debug` | `Outside trading hours — skipping evaluation for {UserId} ({Broker})` | Evaluation requested but the current time is outside the configured trading window. |
+| `Error` | `Error in LTP evaluation — {UserId} ({Broker})` | Evaluation threw unexpectedly. Includes exception. |
 
 ---
 
@@ -196,27 +207,27 @@ Logging__LogLevel__KAITerminal__Upstox=Debug
 
 | Level | Message | Meaning |
 |---|---|---|
-| `Information` | `[{UserId}] [{Broker}]  PnL={Mtm}  SL={Sl}  Target={Target}  TSL=inactive (activates at {Threshold})` | Normal status line. Trailing SL not yet active. Emitted every evaluation cycle. |
-| `Information` | `[{UserId}] [{Broker}]  PnL={Mtm}  Target={Target}  TSL={Stop}` | Normal status line. Trailing SL is active; shows current stop floor. |
-| `Debug` | `Portfolio check skipped for userId={UserId} broker={Broker}: already squared off` | User is already exited; no further checks needed. |
+| `Information` | `{UserId} ({Broker})  PnL ₹{Mtm}  \|  SL ₹{Sl}  \|  Target ₹{Target}  \|  TSL off — activates at ₹{Threshold}` | Normal status line. Trailing SL not yet active. Emitted every evaluation cycle. |
+| `Information` | `{UserId} ({Broker})  PnL ₹{Mtm}  \|  Target ₹{Target}  \|  TSL ₹{Stop}` | Normal status line. Trailing SL is active; shows current stop floor. |
+| `Debug` | `Skipping — {UserId} ({Broker}) is already squared off` | User is already exited; no further checks needed. |
+| `Warning` | `Portfolio fetch failed — {UserId} ({Broker})` | REST call to get positions failed. This evaluation cycle is skipped entirely; risk checks do not run. Includes exception. |
 
 #### Risk triggers
 
 | Level | Message | Meaning |
 |---|---|---|
-| `Warning` | `Hard SL hit for userId={UserId} broker={Broker}  MTM={Mtm}  SL={Sl} — exiting all positions` | MTM fell to or below the hard stop loss. Exit sequence initiated. |
-| `Information` | `Target hit for userId={UserId} broker={Broker}  MTM={Mtm}  Target={Target} — exiting all positions` | MTM reached the profit target. Exit sequence initiated. |
-| `Information` | `Trailing SL activated for userId={UserId} broker={Broker}  stop locked at={Stop}` | MTM crossed `TrailingActivateAt`; trailing floor is now live. |
-| `Information` | `Trailing SL raised for userId={UserId} broker={Broker}  stop={Stop}` | MTM advanced by `WhenProfitIncreasesBy`; trailing floor stepped up. |
-| `Warning` | `Trailing SL hit for userId={UserId} broker={Broker}  MTM={Mtm}  stop={Stop} — exiting all positions` | MTM fell back to the trailing floor. Exit sequence initiated. |
+| `Warning` | `HARD SL HIT — {UserId} ({Broker})  PnL ₹{Mtm}  ≤  SL ₹{Sl} — exiting all` | MTM fell to or below the hard stop loss. Exit sequence initiated. |
+| `Information` | `TARGET HIT — {UserId} ({Broker})  PnL ₹{Mtm}  ≥  Target ₹{Target} — exiting all` | MTM reached the profit target. Exit sequence initiated. |
+| `Information` | `TSL ACTIVATED — {UserId} ({Broker})  floor locked at ₹{Stop}` | MTM crossed `TrailingActivateAt`; trailing floor is now live. |
+| `Information` | `TSL RAISED — {UserId} ({Broker})  floor → ₹{Stop}` | MTM advanced by `WhenProfitIncreasesBy`; trailing floor stepped up. |
+| `Warning` | `TSL HIT — {UserId} ({Broker})  PnL ₹{Mtm}  ≤  floor ₹{Stop} — exiting all` | MTM fell back to the trailing floor. Exit sequence initiated. |
 
 #### Square-off
 
 | Level | Message | Meaning |
 |---|---|---|
-| `Warning` | `Square-off complete for userId={UserId} broker={Broker} — all positions exited` | `ExitAllPositionsAsync` succeeded. All positions should be closed. |
-| `Error` | `Failed to exit all positions for userId={UserId} broker={Broker} — marked as squared-off to prevent retry loops; manual verification required` | Exit order call failed. The user is **marked as squared-off** to prevent infinite retries. **Operator must verify manually** — positions may be partially or fully open. |
-| `Warning` | `Portfolio check: failed to fetch MTM for userId={UserId} broker={Broker}` | REST call to get positions failed. This evaluation cycle is skipped entirely; risk checks do not run. |
+| `Warning` | `Square-off complete — {UserId} ({Broker}) — all positions exited` | `ExitAllPositionsAsync` succeeded. All positions should be closed. |
+| `Error` | `Square-off FAILED — {UserId} ({Broker}) — marked as squared-off; manual verification required` | Exit order call failed. The user is **marked as squared-off** to prevent infinite retries. **Operator must verify manually** — positions may be partially or fully open. Includes exception. |
 
 ---
 
@@ -287,16 +298,16 @@ Logging__LogLevel__KAITerminal__Upstox=Debug
 ### Risk engine is not evaluating despite positions being open
 
 1. Check for `Market closed — risk engine paused` — the trading window (`TradingWindowStart`/`TradingWindowEnd`) may be wrong or the timezone (`TradingTimeZone`) is incorrect.
-2. Check for `StreamingRiskWorker: no users configured` — the user's `UserRiskConfigs.Enabled` flag may be `false` in the DB.
+2. Check for `No users configured` — the user's `UserRiskConfigs.Enabled` flag may be `false` in the DB.
 3. Check for `Market data stream failed to reconnect` — LTP ticks have stopped, so rate-limited evaluations won't fire. Restart the Worker.
 4. Check for `already squared off` at Debug level — the user was squared off earlier in the session; state resets only on Worker restart.
 
 ### Square-off did not happen / positions still open
 
-1. Find `Hard SL hit` / `Target hit` / `Trailing SL hit` — confirms the trigger fired.
-2. Check immediately after for `Square-off complete` or `Failed to exit all positions`.
-3. If `Failed to exit all positions` is present — the exit API call failed. **Manually close positions via Upstox.** The engine will not retry (by design — prevents order spam).
-4. If neither message appears — the evaluation cycle may not have run. Check for `Market closed` or `no users configured`.
+1. Find `HARD SL HIT` / `TARGET HIT` / `TSL HIT` — confirms the trigger fired.
+2. Check immediately after for `Square-off complete` or `Square-off FAILED`.
+3. If `Square-off FAILED` is present — the exit API call failed. **Manually close positions via the broker.** The engine will not retry (by design — prevents order spam).
+4. If neither message appears — the evaluation cycle may not have run. Check for `Market closed` or `No users configured`.
 
 ### Stale index prices in the UI
 
@@ -319,8 +330,8 @@ Logging__LogLevel__KAITerminal__Upstox=Debug
 ### Trailing SL not activating
 
 1. Confirm `TrailingEnabled: true` is set in the user's `UserRiskConfigs` row.
-2. Watch the heartbeat log: `TSL=inactive (activates at {Threshold})` — the activation threshold (`TrailingActivateAt`) may not have been reached yet.
-3. `Trailing SL activated` will appear exactly once when the threshold is crossed.
+2. Watch the heartbeat log: `TSL off — activates at ₹{Threshold}` — the activation threshold (`TrailingActivateAt`) may not have been reached yet.
+3. `TSL ACTIVATED` will appear exactly once when the threshold is crossed.
 
 ### Parse errors on portfolio or market data streams
 

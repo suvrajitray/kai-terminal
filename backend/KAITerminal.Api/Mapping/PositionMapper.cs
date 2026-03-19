@@ -83,10 +83,10 @@ internal static class PositionMapper
 
     private static ProductType ParseProduct(string raw) => raw.ToUpperInvariant() switch
     {
-        "D" or "CNC"  => ProductType.Delivery,
-        "MTF"         => ProductType.Mtf,
-        "CO"          => ProductType.CoverOrder,
-        _             => ProductType.Intraday,   // "I", "MIS", "NRML"
+        "D" or "CNC" or "NRML" => ProductType.Delivery,
+        "MTF"                  => ProductType.Mtf,
+        "CO"                   => ProductType.CoverOrder,
+        _                      => ProductType.Intraday,   // "I", "MIS"
     };
 
     private static TradeOrderType ParseOrderType(string raw) => raw.ToUpperInvariant() switch

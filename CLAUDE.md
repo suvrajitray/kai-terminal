@@ -156,7 +156,7 @@ Layered: `ZerodhaClient` (facade) → `IZerodhaAuthService` / `IZerodhaPositionS
 - Register with `services.AddZerodhaSdk(configuration)`.
 - `IZerodhaInstrumentService` downloads option contracts from public endpoints `api.kite.trade/instruments/{NFO,BFO}` — no auth required. Filters to CE/PE for the 5 supported underlyings. Instruments have a `Weekly` flag (true = not last Thursday of month).
 - **OAuth flow**: `GET /api/zerodha/auth-url?apiKey={key}` → Kite Connect login → callback with `request_token` → `POST /api/zerodha/access-token` exchanges token and persists to `BrokerCredentials` DB table.
-- **Position token format**: `{Exchange}|{InstrumentToken}` (e.g. `NFO|15942914`). Product codes mapped to unified values: MIS → I (intraday), CNC → D (delivery), NRML → I.
+- **Position token format**: raw numeric string as returned by Kite Connect (e.g. `15942914`) — no `{Exchange}|` prefix. Product codes mapped to unified values in `ZerodhaHttpClient.MapProduct`: MIS → `"I"` (intraday), CNC → `"D"` (delivery), NRML → `"NRML"` (preserved so `PositionMapper.ParseProduct` maps it to `ProductType.Delivery` and `ZerodhaPositionService.MapProductBack` sends `"NRML"` back to Kite on exit — not `"CNC"`).
 - **Streaming is stubbed** — `KiteTickerStreamer` (implements `IMarketDataStreamer`) and `ZerodhaPortfolioStreamer` (implements `IPortfolioStreamer`) log a warning and never fire events. LTP-driven and portfolio-event-driven risk evaluation are unavailable for Zerodha positions until streaming is implemented (planned via Kite postback webhooks).
 - **`ZerodhaOptionContractProvider`** (`Options/`) — implements `IOptionContractProvider`; fetches option contracts via `ZerodhaClient.GetOptionContractsAsync` and maps to `Contracts.Options.IndexContracts`.
 
@@ -176,6 +176,23 @@ A library; consumed by Worker and Console via `services.AddRiskEngine<TTokenSour
    - Fires (exit all) when MTM falls to or below the trailing stop
 
 **State:** `InMemoryRiskRepository` (`ConcurrentDictionary<string, UserRiskState>`) holds trailing SL state and squared-off flag per `userId`. State resets on host restart.
+
+**Log format** — all risk engine logs use `{UserId} ({Broker})` as a leading prefix and format monetary values as `₹+#,##0` / `₹-#,##0` with commas. Examples:
+
+| Event | Level | Sample |
+|---|---|---|
+| Heartbeat (TSL active) | Info | `user@email (upstox)  PnL ₹+11,353  \|  Target ₹+25,000  \|  TSL ₹+3,025` |
+| Heartbeat (TSL inactive) | Info | `user@email (upstox)  PnL ₹+11,353  \|  SL ₹-5,000  \|  Target ₹+25,000  \|  TSL off — activates at ₹+15,000` |
+| Hard SL hit | Warn | `HARD SL HIT — user@email (upstox)  PnL ₹-5,000  ≤  SL ₹-5,000 — exiting all` |
+| Target hit | Info | `TARGET HIT — user@email (upstox)  PnL ₹+25,000  ≥  Target ₹+25,000 — exiting all` |
+| TSL activated | Info | `TSL ACTIVATED — user@email (upstox)  floor locked at ₹+3,025` |
+| TSL raised | Info | `TSL RAISED — user@email (upstox)  floor → ₹+5,025` |
+| TSL hit | Warn | `TSL HIT — user@email (upstox)  PnL ₹+3,000  ≤  floor ₹+3,025 — exiting all` |
+| Square-off done | Warn | `Square-off complete — user@email (upstox) — all positions exited` |
+| Square-off failed | Error | `Square-off FAILED — user@email (upstox) — marked as squared-off; manual verification required` |
+| Streams live | Info | `Streams live — user@email (upstox)  watching 5 open instrument(s)` |
+| Session crash/restart | Warn | `Restarting session — user@email (upstox) in 30s` |
+| Market open/closed | Info | `Market open — risk engine active (09:15–15:30 India Standard Time)` |
 
 **`IUserTokenSource`** (async) decouples user/token supply from the engine:
 - `DbUserTokenSource` (Worker) — queries `UserRiskConfigs WHERE Enabled=true` joined with `BrokerCredentials` on every tick; auto-picks up DB changes without restart

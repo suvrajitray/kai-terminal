@@ -61,10 +61,9 @@ public sealed class ZerodhaPositionService : IZerodhaPositionService
     /// <summary>Map unified product codes back to Kite product codes for order placement.</summary>
     private static string MapProductBack(string product) => product.ToUpperInvariant() switch
     {
-        "I"   => "MIS",
-        "D"   => "CNC",
-        "MIS" => "MIS",
-        "CNC" => "CNC",
-        _     => "NRML",
+        "I" or "MIS" or "INTRADAY"       => "MIS",
+        "D" or "CNC" or "DELIVERY"       => "CNC",
+        "NRML"                           => "NRML",
+        _                                => "NRML",
     };
 }

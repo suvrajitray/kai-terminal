@@ -45,7 +45,7 @@ public sealed class RiskEvaluator
         catch (Exception ex)
         {
             _logger.LogWarning(ex,
-                "Portfolio check: failed to fetch MTM for userId={UserId} broker={Broker}",
+                "Portfolio fetch failed — {UserId} ({Broker})",
                 userId, config.BrokerType);
             return;
         }
@@ -62,7 +62,7 @@ public sealed class RiskEvaluator
         if (state.IsSquaredOff)
         {
             _logger.LogDebug(
-                "Portfolio check skipped for userId={UserId} broker={Broker}: already squared off",
+                "Skipping — {UserId} ({Broker}) is already squared off",
                 userId, config.BrokerType);
             return;
         }
@@ -73,7 +73,7 @@ public sealed class RiskEvaluator
         if (mtm <= config.MtmSl)
         {
             _logger.LogWarning(
-                "Hard SL hit for userId={UserId} broker={Broker}  MTM={Mtm:+0;-0}  SL={Sl:+0;-0} — exiting all positions",
+                "HARD SL HIT — {UserId} ({Broker})  PnL ₹{Mtm:+#,##0;-#,##0}  ≤  SL ₹{Sl:+#,##0;-#,##0} — exiting all",
                 userId, config.BrokerType, mtm, config.MtmSl);
             await SquareOffAsync(userId, config.BrokerType, state, broker, ct);
             return;
@@ -83,7 +83,7 @@ public sealed class RiskEvaluator
         if (mtm >= config.MtmTarget)
         {
             _logger.LogInformation(
-                "Target hit for userId={UserId} broker={Broker}  MTM={Mtm:+0;-0}  Target={Target:+0} — exiting all positions",
+                "TARGET HIT — {UserId} ({Broker})  PnL ₹{Mtm:+#,##0;-#,##0}  ≥  Target ₹{Target:+#,##0} — exiting all",
                 userId, config.BrokerType, mtm, config.MtmTarget);
             await SquareOffAsync(userId, config.BrokerType, state, broker, ct);
             return;
@@ -101,7 +101,7 @@ public sealed class RiskEvaluator
                 state.TrailingLastTrigger = mtm;
                 _repo.Update(userId, state);
                 _logger.LogInformation(
-                    "Trailing SL activated for userId={UserId} broker={Broker}  stop locked at={Stop:+0;-0}",
+                    "TSL ACTIVATED — {UserId} ({Broker})  floor locked at ₹{Stop:+#,##0;-#,##0}",
                     userId, config.BrokerType, state.TrailingStop);
             }
         }
@@ -115,14 +115,14 @@ public sealed class RiskEvaluator
                 state.TrailingLastTrigger += steps * config.WhenProfitIncreasesBy;
                 _repo.Update(userId, state);
                 _logger.LogInformation(
-                    "Trailing SL raised for userId={UserId} broker={Broker}  stop={Stop:+0;-0}",
+                    "TSL RAISED — {UserId} ({Broker})  floor → ₹{Stop:+#,##0;-#,##0}",
                     userId, config.BrokerType, state.TrailingStop);
             }
 
             if (mtm <= state.TrailingStop)
             {
                 _logger.LogWarning(
-                    "Trailing SL hit for userId={UserId} broker={Broker}  MTM={Mtm:+0;-0}  stop={Stop:+0;-0} — exiting all positions",
+                    "TSL HIT — {UserId} ({Broker})  PnL ₹{Mtm:+#,##0;-#,##0}  ≤  floor ₹{Stop:+#,##0;-#,##0} — exiting all",
                     userId, config.BrokerType, mtm, state.TrailingStop);
                 await SquareOffAsync(userId, config.BrokerType, state, broker, ct);
             }
@@ -134,13 +134,13 @@ public sealed class RiskEvaluator
         if (state.TrailingActive)
         {
             _logger.LogInformation(
-                "[{UserId}] [{Broker}]  PnL={Mtm:+0;-0}  Target={Target:+0}  TSL={Stop:+0;-0}",
+                "{UserId} ({Broker})  PnL ₹{Mtm:+#,##0;-#,##0}  |  Target ₹{Target:+#,##0}  |  TSL ₹{Stop:+#,##0;-#,##0}",
                 userId, config.BrokerType, mtm, config.MtmTarget, state.TrailingStop);
         }
         else
         {
             _logger.LogInformation(
-                "[{UserId}] [{Broker}]  PnL={Mtm:+0;-0}  SL={Sl:0}  Target={Target:+0}  TSL=inactive (activates at {Threshold:+0})",
+                "{UserId} ({Broker})  PnL ₹{Mtm:+#,##0;-#,##0}  |  SL ₹{Sl:+#,##0;-#,##0}  |  Target ₹{Target:+#,##0}  |  TSL off — activates at ₹{Threshold:+#,##0}",
                 userId, config.BrokerType, mtm, config.MtmSl, config.MtmTarget, config.TrailingActivateAt);
         }
     }
@@ -154,7 +154,7 @@ public sealed class RiskEvaluator
             state.IsSquaredOff = true;
             _repo.Update(userId, state);
             _logger.LogWarning(
-                "Square-off complete for userId={UserId} broker={Broker} — all positions exited",
+                "Square-off complete — {UserId} ({Broker}) — all positions exited",
                 userId, brokerType);
         }
         catch (Exception ex)
@@ -162,7 +162,7 @@ public sealed class RiskEvaluator
             state.IsSquaredOff = true;
             _repo.Update(userId, state);
             _logger.LogError(ex,
-                "Failed to exit all positions for userId={UserId} broker={Broker} — marked as squared-off to prevent retry loops; manual verification required",
+                "Square-off FAILED — {UserId} ({Broker}) — marked as squared-off; manual verification required",
                 userId, brokerType);
         }
     }

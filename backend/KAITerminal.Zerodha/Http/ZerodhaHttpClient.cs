@@ -143,7 +143,7 @@ public sealed class ZerodhaHttpClient
     private static Position MapPosition(KiteNetPosition p) => new()
     {
         Exchange        = p.Exchange ?? "",
-        InstrumentToken = $"{p.Exchange}|{p.InstrumentToken}",
+        InstrumentToken = p.InstrumentToken.ToString(),
         TradingSymbol   = p.TradingSymbol ?? "",
         Product         = MapProduct(p.Product),
         Quantity        = p.Quantity,
@@ -164,7 +164,7 @@ public sealed class ZerodhaHttpClient
     {
         "MIS"  => "I",
         "CNC"  => "D",
-        "NRML" => "I",  // treat as intraday for risk purposes
+        "NRML" => "NRML",
         _      => zerodhaProduct ?? "",
     };
 
