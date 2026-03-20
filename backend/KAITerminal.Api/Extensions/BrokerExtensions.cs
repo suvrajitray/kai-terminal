@@ -2,6 +2,7 @@ using KAITerminal.Api.Services;
 using KAITerminal.Broker;
 using KAITerminal.Broker.Adapters;
 using KAITerminal.Contracts.Broker;
+using KAITerminal.Contracts.Streaming;
 using KAITerminal.Upstox;
 using KAITerminal.Upstox.Extensions;
 using KAITerminal.Upstox.Options;
@@ -38,6 +39,11 @@ public static class BrokerExtensions
         // Register broker-agnostic option contract providers
         services.AddSingleton<IOptionContractProvider, UpstoxOptionContractProvider>();
         services.AddSingleton<IOptionContractProvider, ZerodhaOptionContractProvider>();
+
+        // AdminMarketDataService: shared market data feed using admin credentials from DB + Redis fan-out
+        services.AddSingleton<AdminMarketDataService>();
+        services.AddSingleton<ISharedMarketDataService>(sp => sp.GetRequiredService<AdminMarketDataService>());
+        services.AddHostedService(sp => sp.GetRequiredService<AdminMarketDataService>());
 
         services.AddScoped<BrokerCredentialService>();
         services.AddScoped<IAiSentimentService, AiSentimentService>();

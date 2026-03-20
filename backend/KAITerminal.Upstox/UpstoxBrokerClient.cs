@@ -1,6 +1,5 @@
 using KAITerminal.Broker;
 using KAITerminal.Contracts.Domain;
-using KAITerminal.Contracts.Streaming;
 using KAITerminal.Upstox;
 using KAITerminal.Upstox.Models.Enums;
 using KAITerminal.Upstox.Models.Requests;
@@ -54,6 +53,19 @@ public sealed class UpstoxBrokerClient : IBrokerClient
         await _upstox.ExitPositionAsync(instrumentToken, product, ct);
     }
 
+    public async Task<IReadOnlyList<BrokerOrder>> GetAllOrdersAsync(CancellationToken ct = default)
+    {
+        using var _ = UseToken();
+        var orders = await _upstox.GetAllOrdersAsync(ct);
+        return orders.Select(o => new BrokerOrder
+        {
+            OrderId       = o.OrderId,
+            TradingSymbol = o.TradingSymbol,
+            Status        = o.Status,
+            StatusMessage = o.StatusMessage,
+        }).ToList().AsReadOnly();
+    }
+
     public async Task PlaceOrderAsync(BrokerOrderRequest request, CancellationToken ct = default)
     {
         using var _ = UseToken();
@@ -90,9 +102,6 @@ public sealed class UpstoxBrokerClient : IBrokerClient
         var funds = await _upstox.GetFundsAsync(ct);
         return new BrokerFunds(funds.AvailableMargin, funds.UsedMargin, funds.PayinAmount);
     }
-
-    public IMarketDataStreamer CreateMarketDataStreamer() => _upstox.CreateMarketDataStreamer();
-    public IPortfolioStreamer  CreatePortfolioStreamer()  => _upstox.CreatePortfolioStreamer();
 
     // ── Position mapping ─────────────────────────────────────────────────────
 

@@ -70,12 +70,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IMarginService, MarginService>();
         services.AddSingleton<IFundsService, FundsService>();
 
-        // Streamers implement Contracts.Streaming interfaces — Transient so each caller gets
-        // its own independent WebSocket connection.
+        // MarketDataStreamer — Transient so each caller gets its own independent WebSocket connection.
         services.AddTransient<IMarketDataStreamer, MarketDataStreamer>();
-        services.AddTransient<IPortfolioStreamer, PortfolioStreamer>();
+        services.AddTransient<MarketDataStreamer>();
         services.AddSingleton<Func<IMarketDataStreamer>>(sp => () => sp.GetRequiredService<IMarketDataStreamer>());
-        services.AddSingleton<Func<IPortfolioStreamer>>(sp => () => sp.GetRequiredService<IPortfolioStreamer>());
+        // AdminMarketDataService is registered in KAITerminal.Api (needs AppDbContext from Infrastructure)
 
         services.AddSingleton<UpstoxClient>();
 

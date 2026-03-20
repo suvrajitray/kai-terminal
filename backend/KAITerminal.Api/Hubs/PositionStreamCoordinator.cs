@@ -1,141 +1,160 @@
 using KAITerminal.Api.Mapping;
+using KAITerminal.Broker;
 using KAITerminal.Contracts.Streaming;
-using KAITerminal.Upstox;
-using KAITerminal.Upstox.Models.Responses;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.Extensions.Logging;
 
 namespace KAITerminal.Api.Hubs;
 
 /// <summary>
-/// Manages the portfolio + market-data WebSocket streams for a single SignalR connection.
-/// Created per-connection by <see cref="PositionsHub"/> and disposed on disconnect.
+/// Per-connection coordinator for a SignalR client connected to <see cref="PositionsHub"/>.
+/// Subscribes to <see cref="ISharedMarketDataService"/> for LTP ticks and polls positions
+/// via REST every <see cref="PositionPollIntervalMs"/> milliseconds.
+/// Replaces the previous design that opened per-user broker WebSocket streams.
 /// </summary>
 internal sealed class PositionStreamCoordinator : IAsyncDisposable
 {
-    private readonly UpstoxClient _upstox;
-    private readonly IHubContext<PositionsHub> _hubContext;
-    private readonly ILogger _logger;
-    private readonly string _connectionId;
-    private readonly string _token;
-    private readonly HashSet<string>? _exchangeFilter;
+    private readonly IHubContext<PositionsHub> _hub;
+    private readonly IBrokerClient             _broker;
+    private readonly ISharedMarketDataService  _sharedMarketData;
+    private readonly string                    _connectionId;
+    private readonly HashSet<string>?          _exchangeFilter;
+    private readonly ILogger                   _logger;
 
-    private IPortfolioStreamer? _portfolio;
-    private IMarketDataStreamer? _marketData;
+    private const int PositionPollIntervalMs = 10_000;
 
-    internal PositionStreamCoordinator(
-        UpstoxClient upstox,
-        IHubContext<PositionsHub> hubContext,
-        ILogger logger,
-        string connectionId,
-        string token,
-        HashSet<string>? exchangeFilter)
+    private readonly CancellationTokenSource _cts = new();
+    private Task _pollLoop = Task.CompletedTask;
+
+    // Tracks instruments this coordinator has subscribed to
+    private List<string> _subscribedTokens = [];
+
+    // Last known order statuses for change detection
+    private Dictionary<string, string> _lastOrderStatuses = new(StringComparer.Ordinal);
+
+    private readonly EventHandler<LtpUpdate> _feedHandler;
+
+    public PositionStreamCoordinator(
+        IHubContext<PositionsHub> hub,
+        IBrokerClient             broker,
+        ISharedMarketDataService  sharedMarketData,
+        string                    connectionId,
+        HashSet<string>?          exchangeFilter,
+        ILogger                   logger)
     {
-        _upstox = upstox;
-        _hubContext = hubContext;
-        _logger = logger;
-        _connectionId = connectionId;
-        _token = token;
-        _exchangeFilter = exchangeFilter;
+        _hub              = hub;
+        _broker           = broker;
+        _sharedMarketData = sharedMarketData;
+        _connectionId     = connectionId;
+        _exchangeFilter   = exchangeFilter;
+        _logger           = logger;
+        _feedHandler      = OnFeedReceived;
     }
 
-    internal async Task StartAsync(IReadOnlyList<Position> initialPositions, CancellationToken ct = default)
+    internal async Task StartAsync(IReadOnlyList<KAITerminal.Contracts.Domain.Position> initialPositions, CancellationToken ct = default)
     {
-        using (UpstoxTokenContext.Use(_token))
+        // Subscribe to shared market data for open instruments
+        _subscribedTokens = initialPositions
+            .Where(p => p.IsOpen && !string.IsNullOrEmpty(p.InstrumentToken))
+            .Select(p => p.InstrumentToken)
+            .ToList();
+
+        if (_subscribedTokens.Count > 0)
+            await _sharedMarketData.SubscribeAsync(_subscribedTokens, FeedMode.Ltpc, _cts.Token);
+
+        _sharedMarketData.FeedReceived += _feedHandler;
+
+        // Start position poll loop
+        _pollLoop = RunPollLoopAsync(_cts.Token);
+    }
+
+    private async Task RunPollLoopAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
         {
-            _portfolio = _upstox.CreatePortfolioStreamer();
-            _marketData = _upstox.CreateMarketDataStreamer();
-            await _portfolio.ConnectAsync(ct);
-            await _marketData.ConnectAsync(ct);
-        }
-
-        var instrumentKeys = GetInstrumentKeys(initialPositions);
-        if (instrumentKeys.Count > 0)
-            using (UpstoxTokenContext.Use(_token))
-                await _marketData.SubscribeAsync(instrumentKeys, FeedMode.Ltpc);
-
-        _portfolio.UpdateReceived += OnPortfolioUpdate;
-        _marketData.FeedReceived += OnFeedReceived;
-    }
-
-    // ── Event handlers ─────────────────────────────────────────────────────
-
-    private void OnPortfolioUpdate(object? sender, PortfolioUpdate update)
-    {
-        if (update.UpdateType is not ("order" or "position")) return;
-        _ = Task.Run(() => HandlePortfolioUpdateAsync(update));
-    }
-
-    private async Task HandlePortfolioUpdateAsync(PortfolioUpdate update)
-    {
-        try
-        {
-            IReadOnlyList<Position> fresh;
-            using (UpstoxTokenContext.Use(_token))
-                fresh = await _upstox.GetAllPositionsAsync();
-
-            fresh = ApplyFilter(fresh);
-            await _hubContext.Clients.Client(_connectionId)
-                .SendAsync("ReceivePositions", fresh.Select(p => p.ToResponse()).ToList());
-
-            if (update.UpdateType == "order")
+            try
             {
-                _logger.LogInformation(
-                    "Sending ReceiveOrderUpdate: orderId={OrderId} status={Status} symbol={Symbol}",
-                    update.OrderId, update.Status, update.TradingSymbol);
-                await _hubContext.Clients.Client(_connectionId).SendAsync("ReceiveOrderUpdate", new
-                {
-                    orderId       = update.OrderId,
-                    status        = update.Status,
-                    statusMessage = update.StatusMessage,
-                    tradingSymbol = update.TradingSymbol,
-                });
+                await Task.Delay(PositionPollIntervalMs, ct);
+
+                // Fetch fresh positions
+                using var _ = _broker.UseToken();
+                var allPositions = await _broker.GetAllPositionsAsync(ct);
+                var filtered = ApplyFilter(allPositions);
+                await _hub.Clients.Client(_connectionId)
+                    .SendAsync("ReceivePositions", filtered.Select(p => p.ToResponse()).ToList(), ct);
+
+                // Poll orders and push ReceiveOrderUpdate on status transitions
+                await PollOrdersAsync(ct);
+
+                // Update subscriptions based on current open instruments
+                var currentTokens = allPositions
+                    .Where(p => p.IsOpen && !string.IsNullOrEmpty(p.InstrumentToken))
+                    .Select(p => p.InstrumentToken)
+                    .ToList();
+
+                var added = currentTokens.Except(_subscribedTokens).ToList();
+                // Note: don't unsubscribe removed — other users may still need them
+
+                if (added.Count > 0)
+                    await _sharedMarketData.SubscribeAsync(added, FeedMode.Ltpc, ct);
+
+                _subscribedTokens = currentTokens;
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in position poll loop for connection {ConnectionId}", _connectionId);
+            }
+        }
+    }
+
+    private async Task PollOrdersAsync(CancellationToken ct)
+    {
+        var orders = await _broker.GetAllOrdersAsync(ct);
+        foreach (var order in orders)
+        {
+            var status = order.Status;
+            if (!_lastOrderStatuses.TryGetValue(order.OrderId, out var prev) || prev == status)
+            {
+                _lastOrderStatuses[order.OrderId] = status;
+                continue;
             }
 
-            var freshKeys = GetInstrumentKeys(fresh);
-            if (freshKeys.Count > 0)
-                using (UpstoxTokenContext.Use(_token))
-                    await _marketData!.SubscribeAsync(freshKeys, FeedMode.Ltpc);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error processing portfolio update");
+            _lastOrderStatuses[order.OrderId] = status;
+
+            // Only notify on terminal transitions the user cares about
+            if (!status.Equals("complete", StringComparison.OrdinalIgnoreCase) &&
+                !status.Equals("rejected", StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            await _hub.Clients.Client(_connectionId).SendAsync("ReceiveOrderUpdate", new
+            {
+                orderId       = order.OrderId,
+                status        = order.Status,
+                statusMessage = order.StatusMessage,
+                tradingSymbol = order.TradingSymbol,
+            }, ct);
         }
     }
 
     private void OnFeedReceived(object? sender, LtpUpdate update)
     {
-        _ = Task.Run(() => HandleFeedAsync(update));
-    }
-
-    private async Task HandleFeedAsync(LtpUpdate update)
-    {
-        try
-        {
-            var updates = update.Ltps
-                .Select(kvp => new { instrumentToken = kvp.Key, ltp = kvp.Value })
-                .ToList();
-
-            if (updates.Count > 0)
-                await _hubContext.Clients.Client(_connectionId).SendAsync("ReceiveLtpBatch", updates);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex,
-                "LTP push failed for connection {ConnectionId} — client likely disconnected", _connectionId);
-        }
-    }
-
-    // ── Helpers ────────────────────────────────────────────────────────────
-
-    private static IReadOnlyList<string> GetInstrumentKeys(IReadOnlyList<Position> positions)
-        => positions
-            .Where(p => !string.IsNullOrEmpty(p.InstrumentToken))
-            .Select(p => p.InstrumentToken)
-            .Distinct()
+        // Filter to only this connection's open instruments
+        var relevant = update.Ltps
+            .Where(kv => _subscribedTokens.Contains(kv.Key))
+            .Select(kv => new { instrumentToken = kv.Key, ltp = kv.Value })
             .ToList();
 
-    private IReadOnlyList<Position> ApplyFilter(IReadOnlyList<Position> positions)
+        if (relevant.Count == 0) return;
+
+        _ = _hub.Clients.Client(_connectionId)
+            .SendAsync("ReceiveLtpBatch", relevant);
+    }
+
+    private IReadOnlyList<KAITerminal.Contracts.Domain.Position> ApplyFilter(
+        IReadOnlyList<KAITerminal.Contracts.Domain.Position> positions)
     {
         if (_exchangeFilter is null) return positions;
         return positions
@@ -144,20 +163,11 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
             .AsReadOnly();
     }
 
-    // ── Dispose ────────────────────────────────────────────────────────────
-
     public async ValueTask DisposeAsync()
     {
-        if (_portfolio is not null)
-        {
-            _portfolio.UpdateReceived -= OnPortfolioUpdate;
-            await _portfolio.DisposeAsync();
-        }
-
-        if (_marketData is not null)
-        {
-            _marketData.FeedReceived -= OnFeedReceived;
-            await _marketData.DisposeAsync();
-        }
+        _sharedMarketData.FeedReceived -= _feedHandler;
+        _cts.Cancel();
+        try { await _pollLoop; } catch { /* ignore */ }
+        _cts.Dispose();
     }
 }

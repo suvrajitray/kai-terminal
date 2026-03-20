@@ -14,8 +14,10 @@
     <PackageReference Include="Google.Protobuf" Version="3.29.3" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.0" />
+    <PackageReference Include="StackExchange.Redis" Version="2.8.16" />
   </ItemGroup>
 
   <ItemGroup>

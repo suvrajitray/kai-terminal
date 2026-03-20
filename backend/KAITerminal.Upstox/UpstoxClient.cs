@@ -22,7 +22,6 @@ public sealed class UpstoxClient
     private readonly IMarginService _margin;
     private readonly IFundsService _funds;
     private readonly Func<IMarketDataStreamer>  _marketDataStreamerFactory;
-    private readonly Func<IPortfolioStreamer>   _portfolioStreamerFactory;
 
     public UpstoxClient(
         IAuthService auth,
@@ -33,8 +32,7 @@ public sealed class UpstoxClient
         IChartDataService charts,
         IMarginService margin,
         IFundsService funds,
-        Func<IMarketDataStreamer>  marketDataStreamerFactory,
-        Func<IPortfolioStreamer>   portfolioStreamerFactory)
+        Func<IMarketDataStreamer>  marketDataStreamerFactory)
     {
         ArgumentNullException.ThrowIfNull(auth);
         ArgumentNullException.ThrowIfNull(positions);
@@ -45,7 +43,6 @@ public sealed class UpstoxClient
         ArgumentNullException.ThrowIfNull(margin);
         ArgumentNullException.ThrowIfNull(funds);
         ArgumentNullException.ThrowIfNull(marketDataStreamerFactory);
-        ArgumentNullException.ThrowIfNull(portfolioStreamerFactory);
 
         _auth = auth;
         _positions = positions;
@@ -56,7 +53,6 @@ public sealed class UpstoxClient
         _margin = margin;
         _funds  = funds;
         _marketDataStreamerFactory = marketDataStreamerFactory;
-        _portfolioStreamerFactory = portfolioStreamerFactory;
     }
 
     // ═══════════════════════════════════════════════════════
@@ -291,12 +287,4 @@ public sealed class UpstoxClient
     /// Dispose the streamer when done.
     /// </summary>
     public IMarketDataStreamer CreateMarketDataStreamer() => _marketDataStreamerFactory();
-
-    /// <summary>
-    /// Create a new <see cref="IPortfolioStreamer"/> instance.
-    /// Each call returns an independent connection — call <see cref="IPortfolioStreamer.ConnectAsync"/>
-    /// on the returned instance to open the WebSocket.
-    /// Dispose the streamer when done.
-    /// </summary>
-    public IPortfolioStreamer CreatePortfolioStreamer() => _portfolioStreamerFactory();
 }

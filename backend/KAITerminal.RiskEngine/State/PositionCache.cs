@@ -19,7 +19,11 @@ public sealed class PositionCache : IPositionCache
     private Entry GetOrAdd(string userId) => _data.GetOrAdd(userId, _ => new Entry());
 
     public void UpdatePositions(string userId, IReadOnlyList<Position> positions)
-        => GetOrAdd(userId).Positions = positions;
+    {
+        var entry = GetOrAdd(userId);
+        entry.Ltp.Clear();   // clear stale LTP values before replacing positions
+        entry.Positions = positions;
+    }
 
     public void UpdateLtp(string userId, string instrumentToken, decimal ltp)
         => GetOrAdd(userId).Ltp[instrumentToken] = ltp;

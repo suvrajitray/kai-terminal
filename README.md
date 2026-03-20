@@ -8,6 +8,7 @@ A full-stack options trading terminal built for **options sellers** in Indian eq
 |---|---|
 | Backend | .NET 10, ASP.NET Core minimal API, SignalR, EF Core |
 | Database | PostgreSQL (Neon) |
+| Cache / Pub-Sub | Redis (StackExchange.Redis) |
 | Auth | Google OAuth 2.0, JWT (HS256) |
 | Brokers | Upstox (full), Zerodha (REST; streaming stub) |
 | Frontend | React 19, TypeScript, Vite |
@@ -37,17 +38,19 @@ kai-terminal/
 │   ├── KAITerminal.Api/           REST API + SignalR hubs
 │   │   ├── Endpoints/             Minimal API route groups
 │   │   ├── Hubs/                  PositionsHub, IndexHub, RiskHub
+│   │   ├── Services/              AdminMarketDataService, MasterDataService, …
 │   │   └── Notifications/         SignalRRiskEventNotifier
 │   ├── KAITerminal.Worker/        Multi-user risk engine host
 │   │   └── Notifications/         HttpRiskEventNotifier
 │   ├── KAITerminal.Console/       Single-user risk engine host
 │   ├── KAITerminal.RiskEngine/    Risk logic library
-│   │   ├── Services/              RiskEvaluator
+│   │   ├── Services/              RiskEvaluator, RedisLtpRelay
+│   │   ├── State/                 PositionCache, RedisRiskRepository
 │   │   ├── Workers/               StreamingRiskWorker
 │   │   └── Notifications/         NullRiskEventNotifier (no-op default)
 │   ├── KAITerminal.Contracts/     Shared domain types — leaf node, no deps
-│   │   ├── Domain/                Position, BrokerFunds, BrokerOrderRequest
-│   │   ├── Streaming/             IMarketDataStreamer, IPortfolioStreamer
+│   │   ├── Domain/                Position, BrokerFunds, BrokerOrderRequest, BrokerOrder
+│   │   ├── Streaming/             IMarketDataStreamer, ISharedMarketDataService, LtpUpdate, FeedMode
 │   │   ├── Options/               IndexContracts, ContractEntry
 │   │   ├── Broker/                IOptionContractProvider
 │   │   └── Notifications/         IRiskEventNotifier, RiskNotification
@@ -74,6 +77,7 @@ kai-terminal/
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
 - [Node.js 20+](https://nodejs.org/)
 - PostgreSQL database ([Neon](https://neon.tech) free tier works)
+- Redis (`redis-server` locally, or any managed Redis)
 - Upstox developer account with an app (API key + secret)
 - Google Cloud OAuth 2.0 app (Client ID + secret)
 - *(optional)* Zerodha Kite Connect app
@@ -105,6 +109,7 @@ dotnet user-secrets set "GoogleAuth:ClientId"        "<google-client-id>"
 dotnet user-secrets set "GoogleAuth:ClientSecret"    "<google-client-secret>"
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" \
   "Host=...;Database=...;Username=...;Password=...;SSL Mode=Require"
+dotnet user-secrets set "ConnectionStrings:Redis"    "localhost:6379"
 
 # Risk event notifications — same UUID in both Api and Worker
 dotnet user-secrets set "Api:InternalKey"  "<uuid>"
@@ -124,6 +129,7 @@ dotnet user-secrets set "ApplicationInsights:ConnectionString" "InstrumentationK
 cd ../KAITerminal.Worker
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" \
   "Host=...;Database=...;Username=...;Password=...;SSL Mode=Require"
+dotnet user-secrets set "ConnectionStrings:Redis"    "localhost:6379"
 dotnet user-secrets set "Api:InternalKey"  "<same-uuid-as-above>"
 dotnet user-secrets set "Api:BaseUrl"      "https://localhost:5001"
 dotnet user-secrets set "ApplicationInsights:ConnectionString" "..."
@@ -134,6 +140,8 @@ dotnet user-secrets set "ApplicationInsights:ConnectionString" "..."
 cd ../KAITerminal.Console
 dotnet user-secrets set "Upstox:AccessToken" "<your-daily-upstox-token>"
 ```
+
+> **Admin broker account:** The API uses one shared Upstox connection for all market data. Set `AdminBroker:BrokerType` in `KAITerminal.Api/appsettings.json` (default `"upstox"`). The access token is read automatically from the `BrokerCredentials` DB table — whichever admin user authenticated with that broker most recently is used. No separate secret is needed.
 
 ### 3. Google OAuth
 
@@ -160,16 +168,19 @@ VITE_API_URL=https://localhost:5001
 
 ## Running
 
-Open three terminals:
+Open four terminals:
 
 ```bash
-# Terminal 1 — API (HTTPS :5001)
+# Terminal 1 — Redis
+redis-server
+
+# Terminal 2 — API (HTTPS :5001)
 cd backend && dotnet run --project KAITerminal.Api
 
-# Terminal 2 — Risk engine Worker (profit protection for all enabled users)
+# Terminal 3 — Risk engine Worker (profit protection for all enabled users)
 cd backend && dotnet run --project KAITerminal.Worker
 
-# Terminal 3 — Frontend (http://localhost:3000)
+# Terminal 4 — Frontend (http://localhost:3000)
 cd frontend && npm run dev
 ```
 
@@ -187,7 +198,7 @@ Open `http://localhost:3000` and sign in with Google.
 2. Click **Authenticate** → Upstox OAuth page opens → approve access
 3. You are redirected back to `/redirect/upstox` which exchanges the code, saves the token to DB, and navigates to `/terminal`
 
-> Upstox access tokens expire daily. Re-authenticate each morning before trading.
+> Upstox access tokens expire daily. Re-authenticate each morning before trading. The risk engine Worker automatically detects stale tokens (credentials not updated today) and excludes those users.
 
 ### Zerodha
 
@@ -216,6 +227,24 @@ KAITerminal.Console     ── RiskEngine (single-user host)
 ```
 
 **Adding a new broker** (e.g. Dhan): create `KAITerminal.Dhan`, implement `IBrokerClient` + `IOptionContractProvider`, register in `BrokerExtensions`. Zero changes to RiskEngine, Contracts, or Infrastructure.
+
+### Shared Market Data (Admin Account + Redis)
+
+All LTP ticks flow through a single shared connection owned by an admin broker account — not per-user connections. This eliminates WebSocket slot exhaustion regardless of how many browser tabs or risk users are active.
+
+```
+Admin broker account (Upstox)
+  └── AdminMarketDataService  (IHostedService, KAITerminal.Api)
+        └── MarketDataStreamer  (single WebSocket)
+              LTP ticks
+               ├── FeedReceived event  ──→  PositionStreamCoordinator (per browser tab)
+               └── Redis pub/sub "ltp:feed"  ──→  Worker process
+                                                     └── RedisLtpRelay (IHostedService)
+                                                           └── FeedReceived event
+                                                                 └── StreamingRiskWorker
+```
+
+The `ISharedMarketDataService` interface (defined in `KAITerminal.Contracts`) decouples all consumers from the underlying WebSocket implementation. Swapping to TrueData or an NSE direct feed requires only a new `ISharedMarketDataService` implementation — zero changes to the risk engine, hubs, or any consumer.
 
 ---
 
@@ -355,7 +384,7 @@ Requires `X-Internal-Key` header matching `Api:InternalKey` secret. Returns 503 
 
 | Hub | Path | Auth | Description |
 |---|---|---|---|
-| `PositionsHub` | `/hubs/positions` | `?upstoxToken=` | Live positions + LTP (Upstox-only) |
+| `PositionsHub` | `/hubs/positions` | `?upstoxToken=` | Live positions + LTP |
 | `IndexHub` | `/hubs/indices` | `?upstoxToken=` | Live index quotes (REST polling, no WS slot used) |
 | `RiskHub` | `/hubs/risk` | JWT Bearer via `?access_token=` | Risk event alerts — browser toasts |
 
@@ -369,7 +398,7 @@ Requires `X-Internal-Key` header matching `Api:InternalKey` secret. Returns 503 
 
 ## Live Positions WebSocket
 
-Real-time position data is delivered through the `PositionsHub` SignalR hub backed by two Upstox WebSocket streams per connected client.
+Real-time position data is delivered through the `PositionsHub` SignalR hub. All LTP ticks come from the single shared admin market data connection — no per-user broker WebSockets are opened.
 
 ### Architecture
 
@@ -379,18 +408,14 @@ Frontend (React)
   │  WSS /hubs/positions?upstoxToken=...
   ▼
 PositionsHub  (ASP.NET Core SignalR)
-  ├── UpstoxClient.GetAllPositionsAsync()   ← initial load + re-fetch on portfolio events
-  ├── IPortfolioStreamer                     ← Upstox Portfolio Stream Feed V2 (JSON/WS)
-  │     update_type=order     →  re-fetch positions → push ReceivePositions
-  │                            →  push ReceiveOrderUpdate (status, message, symbol)
-  │     update_type=position  →  re-fetch positions → push ReceivePositions
-  └── IMarketDataStreamer                    ← Upstox Market Data Feed V3 (protobuf/WS)
-        LTP ticks  →  push ReceiveLtpBatch
+  └── PositionStreamCoordinator  (one per browser connection)
+        ├── IBrokerClient.GetAllPositionsAsync()   ← REST poll every 10s → ReceivePositions
+        ├── IBrokerClient.GetAllOrdersAsync()       ← REST poll every 10s → ReceiveOrderUpdate
+        └── ISharedMarketDataService.FeedReceived   ← shared admin WebSocket fan-out
+              filter to this connection's open instruments → ReceiveLtpBatch
 ```
 
-Each browser connection gets its own pair of Upstox WebSocket connections. They are created in `OnConnectedAsync` and disposed in `OnDisconnectedAsync`.
-
-> **WebSocket slot limit:** Upstox allows **2 market data WebSocket connections** per normal-tier access token. `PositionsHub` uses slot 1, `StreamingRiskWorker` uses slot 2. Opening a second browser tab will hit the limit. `IndexHub` uses REST polling to avoid consuming a slot.
+Multiple browser tabs share the same underlying admin WebSocket — there is no per-tab broker connection and no WebSocket slot limit.
 
 ### Connection URL
 
@@ -400,16 +425,16 @@ WSS https://<host>/hubs/positions?upstoxToken=<upstox_access_token>[&exchange=NF
 
 | Query param | Required | Description |
 |---|---|---|
-| `upstoxToken` | Yes | Upstox daily access token. Hub aborts if missing. |
+| `upstoxToken` | Yes | Upstox daily access token used for REST position/order calls. |
 | `exchange` | No | Comma-separated exchange filter (e.g. `NFO,BFO`). Omit to receive all exchanges. |
 
 ### Server → Client Messages
 
 | Message | Payload | When sent |
 |---|---|---|
-| `ReceivePositions` | `Position[]` | On connect + after every order/position event |
-| `ReceiveLtpBatch` | `Array<{ instrumentToken, ltp }>` | On every market data tick |
-| `ReceiveOrderUpdate` | `{ orderId, status, statusMessage, tradingSymbol }` | On every order event |
+| `ReceivePositions` | `Position[]` | On connect + every 10s REST poll |
+| `ReceiveLtpBatch` | `Array<{ instrumentToken, ltp }>` | On every market data tick for open instruments |
+| `ReceiveOrderUpdate` | `{ orderId, status, statusMessage, tradingSymbol }` | When an order transitions to `complete` or `rejected` |
 
 Frontend shows `toast.error` for `rejected` orders and `toast.success` for `complete`. The Orders panel auto-refreshes on every `ReceiveOrderUpdate`.
 
@@ -453,7 +478,7 @@ The Worker process monitors every enabled user's MTM and fires exit orders autom
 | When profit increases by | Raise floor every time MTM gains this much from last step |
 | Increase trailing by | Raise the floor by this amount per step |
 
-Checks run in order: **Hard SL → Target → Trailing SL**. Once a user is squared off, no further evaluations run until the Worker restarts.
+Checks run in order: **Hard SL → Target → Trailing SL**.
 
 ### Trailing SL Example
 
@@ -470,7 +495,29 @@ MTM reaches +17,000 → gain=1,000
 MTM falls to +3,900 → 3,900 ≤ floor=+4,025 → TSL fires → exit all
 ```
 
-The floor is set to `LockProfitAt` at activation — a fixed value, not relative to MTM at that moment. This gives a predictable guaranteed minimum profit.
+The floor is set to `LockProfitAt` at activation — a fixed value, not relative to MTM at that moment.
+
+### Risk State Persistence (Redis)
+
+Trailing SL floor and squared-off flag are stored in Redis (`risk-state:{userId}`). This means:
+
+- **Worker crash / restart** — TSL floor and `IsSquaredOff` survive. The session resumes with the same floor; no false re-entries.
+- **New trading day** — state is reset automatically at session start if the stored date differs from today (IST). Each day begins clean.
+- **Config change** — when Profit Protection settings are saved mid-session, the Worker detects the change within `UserRefreshIntervalMs` (default 60s), cancels the session, **resets the Redis state**, and restarts with the new thresholds. TSL floor from the old config does not carry over.
+
+### Supervisor — Dynamic User Management
+
+The Worker supervisor re-queries the DB every `UserRefreshIntervalMs` (default 60s):
+
+| Scenario | Behaviour |
+|---|---|
+| New user added to `UserRiskConfigs` | Session starts automatically within 60s |
+| User re-authenticates (fresh token today) | Session starts or resumes within 60s |
+| Risk config changed (SL, target, trailing, etc.) | Session restarts with new config; Redis state cleared |
+| Access token rotated (new `UpdatedAt`) | Session restarts with new token |
+| User disabled or `UpdatedAt` is not today (IST) | Session stopped; no restart |
+
+> **Token freshness:** Only credentials where `BrokerCredentials.UpdatedAt` falls on or after today's midnight IST are considered valid. A token from a previous day is treated as absent — re-authenticate to resume.
 
 ### Risk Event Notifications
 
@@ -499,30 +546,36 @@ Worker: StreamingRiskWorker
                       → browser useRiskFeed hook → sonner toast
 ```
 
-The `Api:InternalKey` user-secret must be set to the same value in both the Api and Worker processes. If the key is missing from the Api, the endpoint returns 503 and no alerts are delivered. The `RiskHub` browser WebSocket is completely separate from Upstox broker WebSocket connections — it consumes no broker connection slots.
+The `Api:InternalKey` user-secret must be set to the same value in both the Api and Worker processes. The `RiskHub` browser WebSocket consumes no broker connection slots.
 
 ### Risk Engine Configuration
 
-The `RiskEngine` section in `appsettings.json` controls worker behaviour (not per-user thresholds — those are in the DB):
+The `RiskEngine` section in `KAITerminal.Worker/appsettings.json` controls worker behaviour (not per-user thresholds — those are in the DB):
 
 ```json
 {
   "RiskEngine": {
-    "TradingWindowStart": "09:15:00",
-    "TradingWindowEnd":   "15:30:00",
-    "TradingTimeZone":    "India Standard Time",
+    "TradingWindowStart":   "09:15:00",
+    "TradingWindowEnd":     "15:30:00",
+    "TradingTimeZone":      "Asia/Kolkata",
     "LtpEvalMinIntervalMs": 15000,
+    "PositionPollIntervalMs": 30000,
+    "UserRefreshIntervalMs":  60000,
     "Exchanges": ["NFO", "BFO"]
   }
 }
 ```
 
-| Key | Meaning |
-|---|---|
-| `TradingWindowStart` / `TradingWindowEnd` | Risk evaluation only runs within this window |
-| `TradingTimeZone` | IANA or Windows timezone ID |
-| `LtpEvalMinIntervalMs` | Minimum ms between LTP-tick-triggered evaluations (default 15,000) |
-| `Exchanges` | Only positions from these exchanges are included in MTM |
+| Key | Default | Meaning |
+|---|---|---|
+| `TradingWindowStart` / `TradingWindowEnd` | 09:15 / 15:30 | Risk evaluation only runs within this window |
+| `TradingTimeZone` | `Asia/Kolkata` | IANA or Windows timezone ID |
+| `LtpEvalMinIntervalMs` | 15,000 | Min ms between LTP-tick-triggered evaluations |
+| `PositionPollIntervalMs` | 30,000 | How often positions are re-fetched via REST |
+| `UserRefreshIntervalMs` | 60,000 | How often the supervisor re-queries DB for user/config changes |
+| `Exchanges` | `["NFO","BFO"]` | Only positions from these exchanges are included in MTM |
+
+The `AdminBroker:BrokerType` key in `KAITerminal.Api/appsettings.json` sets which broker's admin account owns the shared market data connection (default `"upstox"`).
 
 ### Risk Engine Log Messages
 
@@ -530,9 +583,12 @@ All risk engine logs follow the format `{UserId} ({Broker})` and format monetary
 
 | Event | Level | Sample log message |
 |---|---|---|
-| Worker startup | Info | `RiskWorker started — trading window 09:15–15:30 Asia/Kolkata, LTP eval every 15000ms` |
+| Worker startup | Info | `RiskWorker started — trading window 09:15–15:30 Asia/Kolkata, LTP eval every 15000ms, position poll every 30000ms, user refresh every 60000ms` |
 | Session starting | Info | `Starting session — user@email (upstox)` |
+| New trading day reset | Info | `New trading day — resetting risk state for user@email (upstox)` |
 | Streams live | Info | `Streams live — user@email (upstox)  watching 5 open instrument(s)` |
+| Config changed | Info | `Stopping session (config changed) — user@email (upstox)` |
+| User removed | Info | `Stopping session (disabled or token expired) — user@email (upstox)` |
 | Heartbeat (TSL off) | Info | `user@email (upstox)  PnL ₹+11,353  \|  SL ₹-5,000  \|  Target ₹+25,000  \|  TSL off — activates at ₹+15,000` |
 | Heartbeat (TSL on) | Info | `user@email (upstox)  PnL ₹+11,353  \|  Target ₹+25,000  \|  TSL ₹+3,025` |
 | Market open | Info | `Market open — risk engine active (09:15–15:30 Asia/Kolkata)` |
@@ -629,25 +685,7 @@ await streamer.ConnectAsync();
 await streamer.SubscribeAsync(["NSE_INDEX|Nifty 50"], FeedMode.Ltpc);
 ```
 
-### Portfolio Streamer
-
-Streams order and position updates as JSON text frames.
-
-```csharp
-await using var portfolio = client.CreatePortfolioStreamer();
-
-portfolio.UpdateReceived += (_, update) =>
-{
-    if (update.Type == "order_update" && update.Data.HasValue)
-    {
-        var orderId = update.Data.Value.GetProperty("order_id").GetString();
-        var status  = update.Data.Value.GetProperty("status").GetString();
-    }
-};
-
-// Subscribes to [Order, Position] internally
-await portfolio.ConnectAsync();
-```
+> In the application, market data is managed exclusively by `AdminMarketDataService` via the `ISharedMarketDataService` interface. Direct use of `IMarketDataStreamer` is only appropriate for standalone tools or tests.
 
 ### Error Handling
 
@@ -694,7 +732,7 @@ PostgreSQL via [Neon](https://neon.tech). Tables are created automatically on fi
 | Table | Purpose |
 |---|---|
 | `AppUsers` | User registry — `Email`, `IsActive`, `IsAdmin` |
-| `BrokerCredentials` | Per-user broker API key + secret + access token (unique on `Username, BrokerName`) |
+| `BrokerCredentials` | Per-user broker API key + secret + access token (unique on `Username, BrokerName`). `UpdatedAt` is set to UTC now on every token save — used to detect stale tokens. |
 | `UserTradingSettings` | Per-user trading preferences (underlying, expiry, etc.) |
 | `UserRiskConfigs` | Per-user profit protection config + `Enabled` flag (unique on `Username, BrokerType`) |
 
@@ -751,58 +789,12 @@ App Insights receives all `KAITerminal.RiskEngine` logs at `Information+` — th
 }
 ```
 
-### Log Catalog
-
-**`StreamingRiskWorker`** — `KAITerminal.RiskEngine.Workers.StreamingRiskWorker`
-
-| Level | Message | Meaning |
-|---|---|---|
-| `Information` | `RiskWorker started — trading window {Start}–{End} {Tz}, LTP eval every {IntervalMs}ms` | Worker started; confirms config. |
-| `Warning` | `No users configured — nothing to monitor` | No enabled rows in `UserRiskConfigs`. |
-| `Information` | `Starting {Count} risk session(s)` | Number of users loaded from DB. |
-| `Information` | `Starting session — {UserId} ({Broker})` | Streams about to connect. |
-| `Information` | `Streams live — {UserId} ({Broker})  watching {Count} open instrument(s)` | Both WebSocket streams are live. |
-| `Warning` | `Portfolio stream reconnecting — {UserId} ({Broker})` | Portfolio WebSocket auto-reconnecting. |
-| `Warning` | `Market data stream reconnecting — {UserId} ({Broker})` | Market data WebSocket auto-reconnecting. |
-| `Error` | `Session crashed — {UserId} ({Broker})` | Unhandled exception; restart wrapper will retry. |
-| `Warning` | `Restarting session — {UserId} ({Broker}) in {Delay}s` | Crashed session will restart after delay (30s → 300s cap). |
-| `Information` | `Market open — risk engine active ({Start}–{End} {Tz})` | First evaluation after market open. |
-| `Information` | `Market closed — risk engine paused until {Start} {Tz}` | Market closed or engine started outside hours. |
-| `Debug` | `LTP eval rate-limited — {UserId} ({Broker})` | Minimum interval not yet elapsed. Expected and frequent. |
-| `Debug` | `Evaluation in progress — skipping for {UserId} ({Broker})` | Concurrent evaluation running; tick dropped. |
-
-**`RiskEvaluator`** — `KAITerminal.RiskEngine.Services.RiskEvaluator`
-
-| Level | Message | Meaning |
-|---|---|---|
-| `Information` | `{UserId} ({Broker})  PnL ₹{Mtm}  \|  SL ₹{Sl}  \|  Target ₹{Target}  \|  TSL off — activates at ₹{Threshold}` | Normal heartbeat, TSL inactive. |
-| `Information` | `{UserId} ({Broker})  PnL ₹{Mtm}  \|  Target ₹{Target}  \|  TSL ₹{Stop}` | Normal heartbeat, TSL active. |
-| `Warning` | `HARD SL HIT — {UserId} ({Broker})  PnL ₹{Mtm}  ≤  SL ₹{Sl} — exiting all` | Hard SL fired. |
-| `Information` | `TARGET HIT — {UserId} ({Broker})  PnL ₹{Mtm}  ≥  Target ₹{Target} — exiting all` | Profit target reached. |
-| `Information` | `TSL ACTIVATED — {UserId} ({Broker})  floor locked at ₹{Stop}` | Trailing SL armed. |
-| `Information` | `TSL RAISED — {UserId} ({Broker})  floor → ₹{Stop}` | Trailing floor stepped up. |
-| `Warning` | `TSL HIT — {UserId} ({Broker})  PnL ₹{Mtm}  ≤  floor ₹{Stop} — exiting all` | Trailing SL fired. |
-| `Warning` | `Square-off complete — {UserId} ({Broker}) — all positions exited` | Exit succeeded. |
-| `Error` | `Square-off FAILED — {UserId} ({Broker}) — marked as squared-off; manual verification required` | Exit failed. **Manual intervention required.** |
-| `Warning` | `Portfolio fetch failed — {UserId} ({Broker})` | REST call failed; evaluation cycle skipped. |
-
-**`PortfolioStreamer`** — `KAITerminal.Upstox.Services.PortfolioStreamer`
-
-| Level | Message | Meaning |
-|---|---|---|
-| `Warning` | `Portfolio stream reconnect attempt {Attempt}/{Max} failed` | Reconnect failed; will retry. |
-| `Error` | `Portfolio stream failed to reconnect after {Max} attempt(s) — stream permanently disconnected` | All retries exhausted. Restart required. |
-| `Warning` | `Failed to parse portfolio stream message ({Length} bytes)` | JSON frame deserialization failed. |
-
-**`MasterDataService`**, **`PositionsHub`**, **`IndexHub`**, **`GlobalExceptionHandler`** log similarly — search by namespace in App Insights.
-
 ### Suggested Azure Monitor Alerts
 
 | Alert | Condition |
 |---|---|
 | Risk engine down during market hours | No `"Market open"` trace in 20-min window |
 | Square-off failure | Any `"Square-off FAILED"` trace |
-| Stream permanently disconnected | Any `"permanently disconnected"` trace |
 | Session crash loop | More than 3 `"Restarting session"` traces in 10 min |
 | High API error rate | More than 10 Upstox exceptions in 5 min |
 
@@ -810,23 +802,28 @@ App Insights receives all `KAITerminal.RiskEngine` logs at `Information+` — th
 
 **Risk engine not evaluating despite open positions:**
 1. Check for `Market closed` — `TradingWindowStart/End` or `TradingTimeZone` may be wrong.
-2. Check for `No users configured` — `UserRiskConfigs.Enabled` may be `false`.
-3. Check for `Market data stream failed to reconnect` — LTP ticks stopped; restart the Worker.
-4. Check for `already squared off` at Debug level — state resets only on Worker restart.
+2. Check for no active sessions — `UserRiskConfigs.Enabled` may be `false`, or the token `UpdatedAt` is not today (re-authenticate).
+3. Check `AdminMarketDataService` logs — if the admin LTP feed is disconnected, no ticks reach the evaluator.
+
+**User session not starting for a new user:**
+1. Confirm `UserRiskConfigs.Enabled = true` and the broker credential was updated today (IST).
+2. Sessions start within `UserRefreshIntervalMs` (default 60s) — wait and check logs.
+
+**Config change not taking effect:**
+1. Save the new config via **Settings → Profit Protection**.
+2. Within 60s the Worker logs `Stopping session (config changed)` then `Starting session`. The new thresholds are applied and risk state is cleared.
 
 **Square-off did not happen / positions still open:**
 1. Find `HARD SL HIT` / `TARGET HIT` / `TSL HIT` — confirms the trigger fired.
 2. Check immediately after for `Square-off complete` or `Square-off FAILED`.
 3. If `Square-off FAILED` — exit API call failed. **Manually close positions via the broker.** Engine will not retry.
 
-**WebSocket streams keep disconnecting:**
-1. Check for `reconnect attempt N/M failed` warnings, then `stream permanently disconnected`.
-2. Check if the Upstox access token expired (daily rotation requires Worker restart).
-3. Upstox allows **2 market data WebSocket connections** per normal token — a second browser tab on `PositionsHub` will fail.
-
 **Trailing SL not activating:**
 1. Confirm `TrailingEnabled: true` in `UserRiskConfigs`.
 2. Watch heartbeat: `TSL off — activates at ₹{Threshold}` — `TrailingActivateAt` not reached yet.
+
+**Yesterday's squared-off flag blocking today's session:**
+This is handled automatically — the Worker resets Redis risk state at the start of each new trading day. If you suspect stale state, check Redis: `redis-cli GET "risk-state:user@email.com"` and inspect `lastSessionDate`.
 
 ---
 
@@ -879,12 +876,14 @@ az webapp config set \
 
 | File | Key settings |
 |---|---|
-| `backend/KAITerminal.Api/appsettings.json` | `Jwt:*`, `GoogleAuth:*`, `Frontend:Url`, `Upstox:ApiBaseUrl/HftBaseUrl`, `Api:BaseUrl/InternalKey`, `AiSentiment:*`, `ApplicationInsights:ConnectionString` |
-| `backend/KAITerminal.Worker/appsettings.json` | `Upstox:*`, `RiskEngine:*`, `Api:BaseUrl`, `Api:InternalKey`, `ConnectionStrings:DefaultConnection` |
+| `backend/KAITerminal.Api/appsettings.json` | `Jwt:*`, `GoogleAuth:*`, `Frontend:Url`, `Upstox:ApiBaseUrl/HftBaseUrl`, `Api:BaseUrl/InternalKey`, `AdminBroker:BrokerType`, `AiSentiment:*`, `ApplicationInsights:ConnectionString` |
+| `backend/KAITerminal.Worker/appsettings.json` | `RiskEngine:*`, `Api:BaseUrl`, `Api:InternalKey`, `ConnectionStrings:DefaultConnection` |
 | `backend/KAITerminal.Console/appsettings.json` | `Upstox:AccessToken`, `RiskEngine:*` |
 | `frontend/.env` | `VITE_API_URL`, `VITE_PP_MTM_TARGET`, `VITE_PP_MTM_SL`, other PP defaults |
 
 `Frontend:Url` in the API config must match the frontend origin for CORS and OAuth redirects to work (default `http://localhost:3000`).
+
+`ConnectionStrings:Redis` must be set via user-secrets in both `KAITerminal.Api` and `KAITerminal.Worker`.
 
 ---
 

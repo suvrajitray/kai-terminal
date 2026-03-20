@@ -3,6 +3,7 @@ using KAITerminal.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using StackExchange.Redis;
 
 namespace KAITerminal.Infrastructure.Extensions;
 
@@ -15,6 +16,11 @@ public static class DatabaseExtensions
 
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IRiskConfigService, RiskConfigService>();
+
+        var redisConnectionString = config.GetConnectionString("Redis");
+        if (!string.IsNullOrWhiteSpace(redisConnectionString))
+            services.AddSingleton<IConnectionMultiplexer>(
+                ConnectionMultiplexer.Connect(redisConnectionString));
 
         return services;
     }

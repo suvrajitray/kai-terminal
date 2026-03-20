@@ -1,4 +1,3 @@
-using KAITerminal.Contracts.Streaming;
 using KAITerminal.Zerodha.Configuration;
 using KAITerminal.Zerodha.Http;
 using KAITerminal.Zerodha.Services;
@@ -62,11 +61,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IZerodhaFundsService,      ZerodhaFundsService>();
         services.AddSingleton<IZerodhaInstrumentService, ZerodhaInstrumentService>();
 
-        // Streamers are stateful — Transient gives each caller its own independent instance
+        // KiteTickerStreamer is stateful — Transient gives each caller its own independent instance
         services.AddTransient<KiteTickerStreamer>();
-        services.AddTransient<ZerodhaPortfolioStreamer>();
         services.AddSingleton<Func<KiteTickerStreamer>>(sp => () => sp.GetRequiredService<KiteTickerStreamer>());
-        services.AddSingleton<Func<ZerodhaPortfolioStreamer>>(sp => () => sp.GetRequiredService<ZerodhaPortfolioStreamer>());
 
         services.AddSingleton<ZerodhaClient>();
 

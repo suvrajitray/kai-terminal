@@ -1,6 +1,5 @@
 using KAITerminal.Broker;
 using KAITerminal.Contracts.Domain;
-using KAITerminal.Contracts.Streaming;
 using KAITerminal.Zerodha.Models;
 using KAITerminal.Zerodha.Services;
 using KAITerminal.Zerodha.Streaming;
@@ -18,8 +17,7 @@ public sealed class ZerodhaClient
     private readonly IZerodhaOrderService      _orders;
     private readonly IZerodhaFundsService      _funds;
     private readonly IZerodhaInstrumentService _instruments;
-    private readonly Func<KiteTickerStreamer>         _marketDataStreamerFactory;
-    private readonly Func<ZerodhaPortfolioStreamer>   _portfolioStreamerFactory;
+    private readonly Func<KiteTickerStreamer> _marketDataStreamerFactory;
 
     public ZerodhaClient(
         IZerodhaAuthService       auth,
@@ -27,8 +25,7 @@ public sealed class ZerodhaClient
         IZerodhaOrderService      orders,
         IZerodhaFundsService      funds,
         IZerodhaInstrumentService instruments,
-        Func<KiteTickerStreamer>         marketDataStreamerFactory,
-        Func<ZerodhaPortfolioStreamer>   portfolioStreamerFactory)
+        Func<KiteTickerStreamer>   marketDataStreamerFactory)
     {
         _auth                     = auth;
         _positions                = positions;
@@ -36,7 +33,6 @@ public sealed class ZerodhaClient
         _funds                    = funds;
         _instruments              = instruments;
         _marketDataStreamerFactory = marketDataStreamerFactory;
-        _portfolioStreamerFactory  = portfolioStreamerFactory;
     }
 
     // ── Auth ──────────────────────────────────────────────────────────────────
@@ -65,6 +61,9 @@ public sealed class ZerodhaClient
 
     // ── Orders ────────────────────────────────────────────────────────────────
 
+    public Task<IReadOnlyList<KAITerminal.Contracts.Domain.BrokerOrder>> GetAllOrdersAsync(CancellationToken ct = default)
+        => _orders.GetAllOrdersAsync(ct);
+
     public Task<string> PlaceOrderAsync(BrokerOrderRequest request, CancellationToken ct = default)
         => _orders.PlaceOrderAsync(request, ct);
 
@@ -79,8 +78,4 @@ public sealed class ZerodhaClient
         string underlyingSymbol, CancellationToken ct = default)
         => _instruments.GetCurrentYearContractsAsync(underlyingSymbol, ct);
 
-    // ── Streaming ─────────────────────────────────────────────────────────────
-
-    public IMarketDataStreamer CreateMarketDataStreamer() => _marketDataStreamerFactory();
-    public IPortfolioStreamer  CreatePortfolioStreamer()  => _portfolioStreamerFactory();
 }

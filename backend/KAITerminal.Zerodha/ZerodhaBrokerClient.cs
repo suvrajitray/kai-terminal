@@ -1,6 +1,5 @@
 using KAITerminal.Broker;
 using KAITerminal.Contracts.Domain;
-using KAITerminal.Contracts.Streaming;
 
 namespace KAITerminal.Zerodha;
 
@@ -52,6 +51,12 @@ public sealed class ZerodhaBrokerClient : IBrokerClient
         await _zerodha.ExitPositionAsync(instrumentToken, product, ct);
     }
 
+    public async Task<IReadOnlyList<BrokerOrder>> GetAllOrdersAsync(CancellationToken ct = default)
+    {
+        using var _ = UseToken();
+        return await _zerodha.GetAllOrdersAsync(ct);
+    }
+
     public async Task PlaceOrderAsync(BrokerOrderRequest request, CancellationToken ct = default)
     {
         using var _ = UseToken();
@@ -64,6 +69,4 @@ public sealed class ZerodhaBrokerClient : IBrokerClient
         return await _zerodha.GetFundsAsync(ct);
     }
 
-    public IMarketDataStreamer CreateMarketDataStreamer() => _zerodha.CreateMarketDataStreamer();
-    public IPortfolioStreamer  CreatePortfolioStreamer()  => _zerodha.CreatePortfolioStreamer();
 }

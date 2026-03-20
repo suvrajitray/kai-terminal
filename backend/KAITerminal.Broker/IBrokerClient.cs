@@ -1,5 +1,4 @@
 using KAITerminal.Contracts.Domain;
-using KAITerminal.Contracts.Streaming;
 
 namespace KAITerminal.Broker;
 
@@ -35,6 +34,9 @@ public interface IBrokerClient
 
     // ── Orders ───────────────────────────────────────────────────────────────
 
+    /// <summary>Fetch all orders placed during the current trading day.</summary>
+    Task<IReadOnlyList<BrokerOrder>> GetAllOrdersAsync(CancellationToken ct = default);
+
     /// <summary>Place an order using broker-agnostic request parameters.</summary>
     Task PlaceOrderAsync(BrokerOrderRequest request, CancellationToken ct = default);
 
@@ -43,11 +45,4 @@ public interface IBrokerClient
     /// <summary>Fetch available and used margin for the equity/F&amp;O segment.</summary>
     Task<BrokerFunds> GetFundsAsync(CancellationToken ct = default);
 
-    // ── Streaming ────────────────────────────────────────────────────────────
-
-    /// <summary>Create a new market data streaming connection (LTP ticks).</summary>
-    IMarketDataStreamer CreateMarketDataStreamer();
-
-    /// <summary>Create a new portfolio streaming connection (order/position events).</summary>
-    IPortfolioStreamer CreatePortfolioStreamer();
 }

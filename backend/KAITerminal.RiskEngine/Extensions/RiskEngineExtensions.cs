@@ -26,7 +26,7 @@ public static class RiskEngineExtensions
 
         services.TryAddSingleton<IRiskEventNotifier, NullRiskEventNotifier>();
 
-        services.AddSingleton<IRiskRepository, InMemoryRiskRepository>();
+        services.AddSingleton<IRiskRepository, RedisRiskRepository>();
         services.AddSingleton<IPositionCache, PositionCache>();
         services.AddSingleton<IUserTokenSource, TTokenSource>();
 

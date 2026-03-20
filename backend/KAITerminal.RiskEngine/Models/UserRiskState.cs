@@ -5,6 +5,11 @@ namespace KAITerminal.RiskEngine.Models;
 /// </summary>
 public sealed class UserRiskState
 {
+    // ── Session tracking ────────────────────────────────────────────────────
+    /// <summary>Calendar date (trading timezone) when this state was last initialised.
+    /// Used to detect a new trading day so stale state is discarded on Worker restart.</summary>
+    public DateOnly LastSessionDate { get; set; }
+
     // ── Portfolio ───────────────────────────────────────────────────────────
     /// <summary>True once a portfolio-level trigger fires and positions are squared off.</summary>
     public bool IsSquaredOff { get; set; }

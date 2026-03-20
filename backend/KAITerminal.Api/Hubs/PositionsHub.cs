@@ -1,28 +1,31 @@
 using KAITerminal.Api.Mapping;
 using KAITerminal.Api.Services;
-using KAITerminal.Upstox;
-using KAITerminal.Upstox.Models.Responses;
+using KAITerminal.Broker;
+using KAITerminal.Contracts.Streaming;
 using Microsoft.AspNetCore.SignalR;
 
 namespace KAITerminal.Api.Hubs;
 
 public sealed class PositionsHub : Hub
 {
-    private readonly UpstoxClient _upstox;
-    private readonly PositionStreamManager _manager;
+    private readonly IBrokerClientFactory     _brokerFactory;
+    private readonly ISharedMarketDataService _sharedMarketData;
+    private readonly PositionStreamManager    _manager;
     private readonly IHubContext<PositionsHub> _hubContext;
-    private readonly ILogger<PositionsHub> _logger;
+    private readonly ILogger<PositionsHub>    _logger;
 
     public PositionsHub(
-        UpstoxClient upstox,
-        PositionStreamManager manager,
+        IBrokerClientFactory     brokerFactory,
+        ISharedMarketDataService sharedMarketData,
+        PositionStreamManager    manager,
         IHubContext<PositionsHub> hubContext,
-        ILogger<PositionsHub> logger)
+        ILogger<PositionsHub>    logger)
     {
-        _upstox = upstox;
-        _manager = manager;
-        _hubContext = hubContext;
-        _logger = logger;
+        _brokerFactory    = brokerFactory;
+        _sharedMarketData = sharedMarketData;
+        _manager          = manager;
+        _hubContext       = hubContext;
+        _logger           = logger;
     }
 
     public override async Task OnConnectedAsync()
@@ -31,6 +34,7 @@ public sealed class PositionsHub : Hub
         var token = qs?["upstoxToken"].ToString();
         if (string.IsNullOrWhiteSpace(token))
         {
+            _logger.LogWarning("PositionsHub: connection {Id} rejected — no upstoxToken", Context.ConnectionId);
             Context.Abort();
             return;
         }
@@ -38,15 +42,19 @@ public sealed class PositionsHub : Hub
         var exchangeFilter = ParseExchanges(qs?["exchange"].ToString());
         var connectionId = Context.ConnectionId;
 
-        IReadOnlyList<Position> positions;
-        using (UpstoxTokenContext.Use(token))
-            positions = await _upstox.GetAllPositionsAsync();
+        var broker = _brokerFactory.Create("upstox", token);
 
-        positions = ApplyFilter(positions, exchangeFilter);
-        await Clients.Caller.SendAsync("ReceivePositions", positions.Select(p => p.ToResponse()).ToList());
+        IReadOnlyList<KAITerminal.Contracts.Domain.Position> positions;
+        using (broker.UseToken())
+            positions = await broker.GetAllPositionsAsync();
+
+        var filtered = ApplyFilter(positions, exchangeFilter);
+        await Clients.Caller.SendAsync("ReceivePositions", filtered.Select(p => p.ToResponse()).ToList());
 
         var coordinator = new PositionStreamCoordinator(
-            _upstox, _hubContext, _logger, connectionId, token, exchangeFilter);
+            _hubContext, broker, _sharedMarketData,
+            connectionId, exchangeFilter, _logger);
+
         await coordinator.StartAsync(positions);
         _manager.Add(connectionId, coordinator);
 
@@ -71,8 +79,8 @@ public sealed class PositionsHub : Hub
         return set.Count > 0 ? set : null;
     }
 
-    private static IReadOnlyList<Position> ApplyFilter(
-        IReadOnlyList<Position> positions, HashSet<string>? exchanges)
+    private static IReadOnlyList<KAITerminal.Contracts.Domain.Position> ApplyFilter(
+        IReadOnlyList<KAITerminal.Contracts.Domain.Position> positions, HashSet<string>? exchanges)
     {
         if (exchanges is null) return positions;
         return positions
