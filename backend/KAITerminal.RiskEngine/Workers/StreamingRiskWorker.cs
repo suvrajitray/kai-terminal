@@ -144,7 +144,7 @@ public sealed class StreamingRiskWorker : BackgroundService
             // Config change = intentional reconfiguration; wipe TSL floor and squared-off state
             // so the new session starts clean with the updated parameters.
             if (configChanged)
-                _repo.Reset(entry.Config.UserId);
+                await _repo.ResetAsync(entry.Config.UserId);
         }
 
         // Wait for stopped sessions to exit cleanly before restarting them
@@ -183,13 +183,13 @@ public sealed class StreamingRiskWorker : BackgroundService
         // Reset risk state at the start of each new trading day so stale TSL / squared-off
         // flags from yesterday do not carry over into today's session.
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, _tradingTz).DateTime);
-        var existingState = _repo.GetOrCreate(user.UserId);
+        var existingState = await _repo.GetOrCreateAsync(user.UserId);
         if (existingState.LastSessionDate < today)
         {
             _logger.LogInformation(
                 "New trading day — resetting risk state for {UserId} ({Broker})",
                 user.UserId, user.BrokerType);
-            _repo.Update(user.UserId, new UserRiskState { LastSessionDate = today });
+            await _repo.UpdateAsync(user.UserId, new UserRiskState { LastSessionDate = today });
         }
 
         var broker = _brokerFactory.Create(user.BrokerType, user.AccessToken, user.ApiKey);

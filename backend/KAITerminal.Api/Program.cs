@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using KAITerminal.Api.Endpoints;
+using StackExchange.Redis;
 using KAITerminal.Api.Extensions;
 using KAITerminal.Api.Hubs;
 using KAITerminal.Api.Notifications;
@@ -32,8 +33,12 @@ builder.Services
     })
     .AddMemoryCache()
     .AddDatabase(builder.Configuration)
-    .AddBrokerServices(builder.Configuration)
-    .AddSignalR();
+    .AddBrokerServices(builder.Configuration);
+
+var signalR = builder.Services.AddSignalR();
+var redisConnStr = builder.Configuration.GetConnectionString("Redis");
+if (!string.IsNullOrWhiteSpace(redisConnStr))
+    signalR.AddStackExchangeRedis(redisConnStr, o => o.Configuration.ChannelPrefix = RedisChannel.Literal("signalr"));
 
 builder.Services.AddSingleton<IRiskEventNotifier, SignalRRiskEventNotifier>();
 builder.Services.AddSingleton<PositionStreamManager>();

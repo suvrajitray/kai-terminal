@@ -7,12 +7,12 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
-namespace KAITerminal.Api.Services;
+namespace KAITerminal.Worker.Services;
 
 /// <summary>
 /// Owns a single Upstox market data WebSocket connection using admin credentials fetched from DB.
 /// Publishes LTP ticks to Redis pub/sub channel <c>ltp:feed</c> for cross-process fan-out
-/// and fires <see cref="FeedReceived"/> for in-process subscribers.
+/// and fires <see cref="FeedReceived"/> for in-process subscribers (e.g. <see cref="Workers.StreamingRiskWorker"/>).
 /// Registered as both <see cref="ISharedMarketDataService"/> and <see cref="IHostedService"/>.
 /// </summary>
 public sealed class AdminMarketDataService : ISharedMarketDataService, IHostedService, IAsyncDisposable
@@ -114,10 +114,10 @@ public sealed class AdminMarketDataService : ISharedMarketDataService, IHostedSe
 
     private void OnFeedReceived(object? sender, LtpUpdate update)
     {
-        // Fire in-process event
+        // Fire in-process event (picked up by StreamingRiskWorker)
         FeedReceived?.Invoke(this, update);
 
-        // Publish to Redis for cross-process consumers (Worker)
+        // Publish to Redis for cross-process consumers (Api / PositionStreamCoordinator)
         try
         {
             var pub     = _redis.GetSubscriber();

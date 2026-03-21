@@ -20,25 +20,25 @@ public sealed class RedisRiskRepository : IRiskRepository
         _redis = redis;
     }
 
-    public UserRiskState GetOrCreate(string userId)
+    public async Task<UserRiskState> GetOrCreateAsync(string userId)
     {
         var db = _redis.GetDatabase();
-        var value = db.StringGet(Key(userId));
+        var value = await db.StringGetAsync(Key(userId));
         if (!value.HasValue) return new UserRiskState();
         try { return JsonSerializer.Deserialize<UserRiskState>((string)value!, _json) ?? new UserRiskState(); }
         catch { return new UserRiskState(); }
     }
 
-    public void Update(string userId, UserRiskState state)
+    public async Task UpdateAsync(string userId, UserRiskState state)
     {
         var db = _redis.GetDatabase();
-        db.StringSet(Key(userId), JsonSerializer.Serialize(state, _json));
+        await db.StringSetAsync(Key(userId), JsonSerializer.Serialize(state, _json));
     }
 
-    public void Reset(string userId)
+    public async Task ResetAsync(string userId)
     {
         var db = _redis.GetDatabase();
-        db.KeyDelete(Key(userId));
+        await db.KeyDeleteAsync(Key(userId));
     }
 
     private static string Key(string userId) => $"risk-state:{userId}";

@@ -4,7 +4,7 @@ namespace KAITerminal.RiskEngine.Abstractions;
 
 public interface IRiskRepository
 {
-    UserRiskState GetOrCreate(string userId);
-    void Update(string userId, UserRiskState state);
-    void Reset(string userId);
+    Task<UserRiskState> GetOrCreateAsync(string userId);
+    Task UpdateAsync(string userId, UserRiskState state);
+    Task ResetAsync(string userId);
 }

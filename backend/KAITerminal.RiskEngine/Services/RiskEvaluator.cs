@@ -61,7 +61,7 @@ public sealed class RiskEvaluator
     public async Task EvaluateAsync(
         string userId, decimal mtm, UserConfig config, IBrokerClient broker, CancellationToken ct = default)
     {
-        var state = _repo.GetOrCreate(userId);
+        var state = await _repo.GetOrCreateAsync(userId);
 
         if (state.IsSquaredOff)
         {
@@ -109,7 +109,7 @@ public sealed class RiskEvaluator
                 state.TrailingActive      = true;
                 state.TrailingStop        = config.LockProfitAt;
                 state.TrailingLastTrigger = mtm;
-                _repo.Update(userId, state);
+                await _repo.UpdateAsync(userId, state);
                 _logger.LogInformation(
                     "TSL ACTIVATED — {UserId} ({Broker})  floor locked at ₹{Stop:+#,##0;-#,##0}",
                     userId, config.BrokerType, state.TrailingStop);
@@ -126,7 +126,7 @@ public sealed class RiskEvaluator
                 long steps = (long)(gain / config.WhenProfitIncreasesBy);
                 state.TrailingStop        += steps * config.IncreaseTrailingBy;
                 state.TrailingLastTrigger += steps * config.WhenProfitIncreasesBy;
-                _repo.Update(userId, state);
+                await _repo.UpdateAsync(userId, state);
                 _logger.LogInformation(
                     "TSL RAISED — {UserId} ({Broker})  floor → ₹{Stop:+#,##0;-#,##0}",
                     userId, config.BrokerType, state.TrailingStop);
@@ -171,7 +171,7 @@ public sealed class RiskEvaluator
         {
             await broker.ExitAllPositionsAsync(ct: ct);
             state.IsSquaredOff = true;
-            _repo.Update(userId, state);
+            await _repo.UpdateAsync(userId, state);
             _logger.LogWarning(
                 "Square-off complete — {UserId} ({Broker}) — all positions exited",
                 userId, brokerType);
@@ -182,7 +182,7 @@ public sealed class RiskEvaluator
         catch (Exception ex)
         {
             state.IsSquaredOff = true;
-            _repo.Update(userId, state);
+            await _repo.UpdateAsync(userId, state);
             _logger.LogError(ex,
                 "Square-off FAILED — {UserId} ({Broker}) — marked as squared-off; manual verification required",
                 userId, brokerType);

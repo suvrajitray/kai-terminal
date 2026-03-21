@@ -3,6 +3,7 @@ using KAITerminal.Broker;
 using KAITerminal.Broker.Adapters;
 using KAITerminal.Contracts.Broker;
 using KAITerminal.Contracts.Streaming;
+using KAITerminal.Infrastructure.Services;
 using KAITerminal.Upstox;
 using KAITerminal.Upstox.Extensions;
 using KAITerminal.Upstox.Options;
@@ -40,10 +41,11 @@ public static class BrokerExtensions
         services.AddSingleton<IOptionContractProvider, UpstoxOptionContractProvider>();
         services.AddSingleton<IOptionContractProvider, ZerodhaOptionContractProvider>();
 
-        // AdminMarketDataService: shared market data feed using admin credentials from DB + Redis fan-out
-        services.AddSingleton<AdminMarketDataService>();
-        services.AddSingleton<ISharedMarketDataService>(sp => sp.GetRequiredService<AdminMarketDataService>());
-        services.AddHostedService(sp => sp.GetRequiredService<AdminMarketDataService>());
+        // RedisLtpRelay: receives LTP ticks from Redis (published by AdminMarketDataService in the Worker)
+        // and fans them out in-process to PositionStreamCoordinator via ISharedMarketDataService.FeedReceived.
+        services.AddSingleton<RedisLtpRelay>();
+        services.AddSingleton<ISharedMarketDataService>(sp => sp.GetRequiredService<RedisLtpRelay>());
+        services.AddHostedService(sp => sp.GetRequiredService<RedisLtpRelay>());
 
         services.AddScoped<BrokerCredentialService>();
         services.AddScoped<IAiSentimentService, AiSentimentService>();
