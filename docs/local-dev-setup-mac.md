@@ -58,22 +58,12 @@ redis-cli ping   # should return PONG
 ### 5. Install PostgreSQL
 
 ```bash
-brew install postgresql@17
+brew install postgresql
 ```
 
 Start PostgreSQL (and auto-start on login):
 ```bash
-brew services start postgresql@17
-```
-
-Add the Postgres binaries to your PATH (add to `~/.zshrc`):
-```bash
-export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
-```
-
-Then reload:
-```bash
-source ~/.zshrc
+brew services start postgresql
 ```
 
 Create the database and user:
