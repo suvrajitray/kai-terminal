@@ -11,6 +11,7 @@ import { ChartsPage } from "@/pages/charts-page";
 import { AiSignalsPage } from "@/pages/ai-signals-page";
 import { NotFoundPage } from "@/pages/not-found-page";
 import { InactivePage } from "@/pages/inactive-page";
+import { AdminPage } from "@/pages/admin-page";
 import { useRiskFeed } from "@/hooks/use-risk-feed";
 
 function RiskFeedMount() {
@@ -33,6 +34,7 @@ function App() {
           <Route path="/ai-signals" element={<AiSignalsPage />} />
           <Route path="/connect-brokers" element={<ConnectBrokersPage />} />
           <Route path="/redirect/:brokerId" element={<BrokerRedirectPage />} />
+          <Route path="/admin" element={<AdminPage />} />
         </Route>
         </Route>
       </Route>

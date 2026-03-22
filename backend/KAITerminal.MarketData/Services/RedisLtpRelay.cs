@@ -4,12 +4,12 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
-namespace KAITerminal.Infrastructure.Services;
+namespace KAITerminal.MarketData.Services;
 
 /// <summary>
-/// Subscribes to the Redis <c>ltp:feed</c> channel published by <c>AdminMarketDataService</c>
-/// and re-fires <see cref="FeedReceived"/> for in-process consumers (e.g. <see cref="PositionStreamCoordinator"/>).
-/// Used in the Api process where <c>AdminMarketDataService</c> is not hosted.
+/// Subscribes to the Redis <c>ltp:feed</c> channel published by <see cref="MarketDataService"/>
+/// and re-fires <see cref="FeedReceived"/> for in-process consumers (e.g. PositionStreamCoordinator).
+/// Used in the Api process where <see cref="MarketDataService"/> is not hosted.
 /// </summary>
 public sealed class RedisLtpRelay : ISharedMarketDataService, IHostedService
 {
@@ -39,7 +39,7 @@ public sealed class RedisLtpRelay : ISharedMarketDataService, IHostedService
     }
 
     // SubscribeAsync / UnsubscribeAsync are no-ops — subscription management is done
-    // by AdminMarketDataService in the Worker process which owns the upstream connection.
+    // by MarketDataService in the Worker process which owns the upstream connection.
     public Task SubscribeAsync(IReadOnlyCollection<string> tokens, FeedMode mode = FeedMode.Ltpc, CancellationToken ct = default)
         => Task.CompletedTask;
 

@@ -1,55 +1,54 @@
 using System.Text.Json;
 using KAITerminal.Contracts.Streaming;
-using KAITerminal.Infrastructure.Data;
+using KAITerminal.Infrastructure.Services;
 using KAITerminal.Upstox;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
-namespace KAITerminal.Worker.Services;
+namespace KAITerminal.MarketData.Services;
 
 /// <summary>
-/// Owns a single Upstox market data WebSocket connection using admin credentials fetched from DB.
+/// Owns the single Upstox market data WebSocket connection using the long-lived analytics token
+/// stored in AppSettings (valid for 1 year — no daily rotation required).
 /// Publishes LTP ticks to Redis pub/sub channel <c>ltp:feed</c> for cross-process fan-out
-/// and fires <see cref="FeedReceived"/> for in-process subscribers (e.g. <see cref="Workers.StreamingRiskWorker"/>).
-/// Registered as both <see cref="ISharedMarketDataService"/> and <see cref="IHostedService"/>.
+/// and fires <see cref="FeedReceived"/> for in-process subscribers (e.g. StreamingRiskWorker).
 /// </summary>
-public sealed class AdminMarketDataService : ISharedMarketDataService, IHostedService, IAsyncDisposable
+public sealed class MarketDataService : ISharedMarketDataService, IHostedService, IAsyncDisposable
 {
-    private readonly IConnectionMultiplexer          _redis;
-    private readonly IServiceScopeFactory            _scopeFactory;
-    private readonly IConfiguration                  _config;
-    private readonly Func<IMarketDataStreamer>        _streamerFactory;
-    private readonly ILogger<AdminMarketDataService> _logger;
+    private readonly IConnectionMultiplexer     _redis;
+    private readonly IServiceScopeFactory       _scopeFactory;
+    private readonly Func<IMarketDataStreamer>   _streamerFactory;
+    private readonly ILogger<MarketDataService> _logger;
 
     private IMarketDataStreamer? _streamer;
-    private readonly SemaphoreSlim _subLock    = new(1, 1);
+    private readonly SemaphoreSlim   _subLock    = new(1, 1);
     private readonly HashSet<string> _subscribed = new(StringComparer.Ordinal);
     private bool _disposed;
 
     public event EventHandler<LtpUpdate>? FeedReceived;
 
-    public AdminMarketDataService(
-        IConnectionMultiplexer          redis,
-        IServiceScopeFactory            scopeFactory,
-        IConfiguration                  config,
-        Func<IMarketDataStreamer>        streamerFactory,
-        ILogger<AdminMarketDataService> logger)
+    public MarketDataService(
+        IConnectionMultiplexer     redis,
+        IServiceScopeFactory       scopeFactory,
+        Func<IMarketDataStreamer>   streamerFactory,
+        ILogger<MarketDataService> logger)
     {
         _redis           = redis;
         _scopeFactory    = scopeFactory;
-        _config          = config;
         _streamerFactory = streamerFactory;
         _logger          = logger;
     }
 
     public async Task StartAsync(CancellationToken ct)
     {
-        var token = await FetchAdminTokenAsync(ct);
+        var token = await FetchAnalyticsTokenAsync(ct);
         if (string.IsNullOrWhiteSpace(token))
         {
-            _logger.LogWarning("No admin broker credentials found in DB — shared market data service is inactive");
+            _logger.LogWarning(
+                "No analytics token configured — market data feed is inactive. " +
+                "Set the token via the Admin page.");
             return;
         }
 
@@ -59,7 +58,7 @@ public sealed class AdminMarketDataService : ISharedMarketDataService, IHostedSe
         using (UpstoxTokenContext.Use(token))
             await _streamer.ConnectAsync(ct);
 
-        _logger.LogInformation("AdminMarketDataService connected — shared market data feed active");
+        _logger.LogInformation("MarketDataService connected — shared market data feed active");
     }
 
     public async Task StopAsync(CancellationToken ct)
@@ -91,25 +90,17 @@ public sealed class AdminMarketDataService : ISharedMarketDataService, IHostedSe
         {
             foreach (var t in tokens)
                 _subscribed.Remove(t);
-            // Note: intentionally not sending unsubscribe to the WebSocket —
+            // Intentionally not sending unsubscribe to the WebSocket —
             // other users may still need those ticks; consumers filter locally.
         }
         finally { _subLock.Release(); }
     }
 
-    private async Task<string?> FetchAdminTokenAsync(CancellationToken ct)
+    private async Task<string?> FetchAnalyticsTokenAsync(CancellationToken ct)
     {
-        var brokerType = _config["AdminBroker:BrokerType"] ?? "upstox";
-
         using var scope = _scopeFactory.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        return await db.BrokerCredentials
-            .Join(db.Users, bc => bc.Username, u => u.Email, (bc, u) => bc)
-            .Where(bc => bc.BrokerName == brokerType)
-            .OrderByDescending(bc => bc.UpdatedAt)
-            .Select(bc => bc.AccessToken)
-            .FirstOrDefaultAsync(ct);
+        var svc = scope.ServiceProvider.GetRequiredService<IAppSettingService>();
+        return await svc.GetAsync(AppSettingKeys.UpstoxAnalyticsToken, ct);
     }
 
     private void OnFeedReceived(object? sender, LtpUpdate update)

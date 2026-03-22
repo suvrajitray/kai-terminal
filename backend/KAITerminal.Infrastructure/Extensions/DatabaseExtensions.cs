@@ -16,6 +16,7 @@ public static class DatabaseExtensions
 
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IRiskConfigService, RiskConfigService>();
+        services.AddScoped<IAppSettingService, AppSettingService>();
 
         var redisConnectionString = config.GetConnectionString("Redis");
         if (!string.IsNullOrWhiteSpace(redisConnectionString))

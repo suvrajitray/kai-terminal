@@ -1,35 +1,44 @@
 using KAITerminal.Contracts.Broker;
 using KAITerminal.Contracts.Options;
+using KAITerminal.Infrastructure.Services;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace KAITerminal.Api.Services;
 
 /// <summary>
 /// Provides unified, broker-agnostic option contract master data with in-memory caching (expires at 8:15 AM IST).
+/// Upstox contracts are fetched using the admin-configured analytics token (read-only, from DB).
+/// Zerodha contracts use per-user credentials from request headers.
 /// </summary>
 public sealed class MasterDataService(
     IMemoryCache cache,
     IEnumerable<IOptionContractProvider> providers,
+    IServiceScopeFactory scopeFactory,
     ILogger<MasterDataService> logger)
 {
     public async Task<IReadOnlyList<IndexContracts>> GetContractsAsync(
         HttpContext httpContext, CancellationToken ct)
     {
-        var upstoxToken   = httpContext.Request.Headers["X-Upstox-Access-Token"].FirstOrDefault();
         var zerodhaToken  = httpContext.Request.Headers["X-Zerodha-Access-Token"].FirstOrDefault();
         var zerodhaApiKey = httpContext.Request.Headers["X-Zerodha-Api-Key"].FirstOrDefault();
 
-        // Map broker type → (accessToken, apiKey) for whichever brokers are present
+        // Fetch the admin-configured analytics token for Upstox master data
+        string? upstoxAnalyticsToken;
+        using (var scope = scopeFactory.CreateScope())
+        {
+            var settingSvc = scope.ServiceProvider.GetRequiredService<IAppSettingService>();
+            upstoxAnalyticsToken = await settingSvc.GetAsync(AppSettingKeys.UpstoxAnalyticsToken, ct);
+        }
+
         var credsByBroker = new Dictionary<string, (string Token, string? ApiKey)>(StringComparer.OrdinalIgnoreCase);
-        if (!string.IsNullOrEmpty(upstoxToken))
-            credsByBroker["upstox"] = (upstoxToken, null);
+        if (!string.IsNullOrEmpty(upstoxAnalyticsToken))
+            credsByBroker["upstox"] = (upstoxAnalyticsToken, null);
         if (!string.IsNullOrEmpty(zerodhaToken))
             credsByBroker["zerodha"] = (zerodhaToken, zerodhaApiKey);
 
         if (credsByBroker.Count == 0)
             return [];
 
-        // Fetch from each provider that has credentials
         var fetchTasks = providers
             .Where(p => credsByBroker.ContainsKey(p.BrokerType))
             .Select(p =>
@@ -41,7 +50,6 @@ public sealed class MasterDataService(
 
         var results = await Task.WhenAll(fetchTasks);
 
-        // Merge all broker results into a unified list
         return results.Length switch
         {
             0 => [],
@@ -70,7 +78,6 @@ public sealed class MasterDataService(
 
     private static IReadOnlyList<IndexContracts> MergeAll(IReadOnlyList<IndexContracts>[] brokerResults)
     {
-        // Start with the first result and merge each subsequent one into it
         var merged = brokerResults[0].ToDictionary(ic => ic.Index);
 
         foreach (var brokerContracts in brokerResults.Skip(1))

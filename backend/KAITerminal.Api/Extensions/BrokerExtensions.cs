@@ -2,8 +2,7 @@ using KAITerminal.Api.Services;
 using KAITerminal.Broker;
 using KAITerminal.Broker.Adapters;
 using KAITerminal.Contracts.Broker;
-using KAITerminal.Contracts.Streaming;
-using KAITerminal.Infrastructure.Services;
+using KAITerminal.MarketData.Extensions;
 using KAITerminal.Upstox;
 using KAITerminal.Upstox.Extensions;
 using KAITerminal.Upstox.Options;
@@ -41,11 +40,8 @@ public static class BrokerExtensions
         services.AddSingleton<IOptionContractProvider, UpstoxOptionContractProvider>();
         services.AddSingleton<IOptionContractProvider, ZerodhaOptionContractProvider>();
 
-        // RedisLtpRelay: receives LTP ticks from Redis (published by AdminMarketDataService in the Worker)
-        // and fans them out in-process to PositionStreamCoordinator via ISharedMarketDataService.FeedReceived.
-        services.AddSingleton<RedisLtpRelay>();
-        services.AddSingleton<ISharedMarketDataService>(sp => sp.GetRequiredService<RedisLtpRelay>());
-        services.AddHostedService(sp => sp.GetRequiredService<RedisLtpRelay>());
+        // RedisLtpRelay: subscribes to Redis pub/sub, relays LTP ticks in-process to PositionStreamCoordinator.
+        services.AddMarketDataConsumer();
 
         services.AddScoped<BrokerCredentialService>();
         services.AddScoped<IAiSentimentService, AiSentimentService>();

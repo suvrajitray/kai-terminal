@@ -123,6 +123,7 @@ app.MapAiSentimentEndpoints();
 app.MapRiskConfigEndpoints();
 app.MapMasterDataEndpoints();
 app.MapRiskNotificationEndpoints();
+app.MapAdminEndpoints();
 app.MapHub<PositionsHub>("/hubs/positions");
 app.MapHub<IndexHub>("/hubs/indices");
 app.MapHub<RiskHub>("/hubs/risk");

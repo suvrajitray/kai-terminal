@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { LogOut, Settings2, User, Cable } from "lucide-react";
+import { LogOut, Settings2, User, Cable, ShieldCheck } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,6 +27,7 @@ function getInitials(name: string): string {
 
 export function UserMenu() {
   const user = useAuthStore((s) => s.user);
+  const isAdmin = useAuthStore((s) => s.isAdmin);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const navigate = useNavigate();
   const isAuthenticated = useBrokerStore((s) => s.isAuthenticated);
@@ -69,6 +70,15 @@ export function UserMenu() {
             </div>
             <span className={`size-2 rounded-full ${anyAuthenticated ? "bg-green-500" : anyConnected ? "bg-amber-500" : "bg-muted-foreground/40"}`} />
           </DropdownMenuItem>
+          {isAdmin && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => navigate("/admin")}>
+                <ShieldCheck className="mr-2 size-4" />
+                Admin
+              </DropdownMenuItem>
+            </>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={performLogout}>
             <LogOut className="mr-2 size-4" />

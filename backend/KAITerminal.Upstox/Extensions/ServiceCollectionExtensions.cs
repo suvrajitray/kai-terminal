@@ -74,7 +74,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IMarketDataStreamer, MarketDataStreamer>();
         services.AddTransient<MarketDataStreamer>();
         services.AddSingleton<Func<IMarketDataStreamer>>(sp => () => sp.GetRequiredService<IMarketDataStreamer>());
-        // AdminMarketDataService is registered in KAITerminal.Api (needs AppDbContext from Infrastructure)
+        // MarketDataService is registered in KAITerminal.Worker (uses analytics token from AppSettings via Redis)
 
         services.AddSingleton<UpstoxClient>();
 

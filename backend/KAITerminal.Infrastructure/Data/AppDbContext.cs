@@ -8,6 +8,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<UserTradingSettings> UserTradingSettings => Set<UserTradingSettings>();
     public DbSet<AppUser> Users => Set<AppUser>();
     public DbSet<UserRiskConfig> UserRiskConfigs => Set<UserRiskConfig>();
+    public DbSet<AppSetting> AppSettings => Set<AppSetting>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<BrokerCredential>()
@@ -29,6 +30,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<UserRiskConfig>()
             .HasIndex(x => new { x.Username, x.BrokerType })
             .IsUnique();
+
+        modelBuilder.Entity<AppSetting>()
+            .HasKey(x => x.Key);
 
     }
 }
