@@ -26,7 +26,7 @@ export const NAV_ITEMS = [
   { label: "Dashboard",   path: "/dashboard"   },
   { label: "Terminal",    path: "/terminal"    },
   { label: "Charts",      path: "/charts"      },
-  { label: "AI Signals",  path: "/ai-signals"  },
+  { label: "AI",          path: "/ai-signals"  },
 ] as const;
 
 export const BROKERS: BrokerInfo[] = [

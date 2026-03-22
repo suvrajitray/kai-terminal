@@ -170,6 +170,41 @@ CREATE UNIQUE INDEX IF NOT EXISTS "ix_userriskconfigs_username_broker"
 
 ---
 
+## GUI Tools
+
+### TablePlus — PostgreSQL (and Redis)
+
+TablePlus is the best macOS GUI for PostgreSQL. Clean, fast, native app. Also supports Redis, MySQL, and more.
+
+Download: [tableplus.com](https://tableplus.com) — free tier is sufficient for local dev (limited tabs, but fully functional).
+
+Connect to local PostgreSQL:
+- Host: `127.0.0.1`
+- Port: `5432`
+- User: `kaiuser`
+- Password: `kaipassword`
+- Database: `kaiterminal`
+
+> TablePlus can also connect to Neon — use the Neon connection string with SSL mode set to `Require`.
+
+### RedisInsight — Redis
+
+RedisInsight is the official Redis GUI from Redis Ltd. Browse keys, run CLI commands, inspect pub/sub, and monitor memory — all in one app.
+
+Download: [redis.io/insight](https://redis.io/insight) — free, no account required.
+
+Connect to local Redis:
+- Host: `127.0.0.1`
+- Port: `6379`
+- No password (default local setup)
+
+Useful views for this project:
+- **Browser** — inspect `appsetting:*` keys, `ltp:*`, SignalR backplane keys
+- **Pub/Sub** — subscribe to `ltp:feed` to watch live LTP ticks
+- **CLI** — run `KEYS appsetting:*`, `GET appsetting:upstox_analytics_token`, `FLUSHALL`
+
+---
+
 ## Running Locally
 
 Open three terminal tabs.
