@@ -24,7 +24,7 @@ public static class DatabaseExtensions
                 var redisDb = redis.GetDatabase();
                 var batch   = redisDb.CreateBatch();
                 var tasks   = settings.Select(s =>
-                    batch.StringSetAsync($"appsetting:{s.Key}", s.Value));
+                    batch.StringSetAsync($"appsetting:{s.Key}", s.Value)).ToList();
                 batch.Execute();
                 await Task.WhenAll(tasks);
 

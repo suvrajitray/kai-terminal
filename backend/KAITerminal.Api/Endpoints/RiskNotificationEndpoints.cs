@@ -23,7 +23,8 @@ public static class RiskNotificationEndpoints
 
             await notifier.NotifyAsync(notification, ct);
             return Results.Ok();
-        });
+        })
+        .ExcludeFromDescription();
 
         return app;
     }
