@@ -52,14 +52,23 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
 
     internal async Task StartAsync(IReadOnlyList<KAITerminal.Contracts.Domain.Position> initialPositions, CancellationToken ct = default)
     {
-        // Subscribe to shared market data for open instruments
         _subscribedTokens = initialPositions
             .Where(p => p.IsOpen && !string.IsNullOrEmpty(p.InstrumentToken))
             .Select(p => p.InstrumentToken)
             .ToList();
 
         if (_subscribedTokens.Count > 0)
+        {
+            _logger.LogInformation(
+                "PositionStreamCoordinator [{Id}]: requesting LTP subscription for {Count} open instrument(s) — {Tokens}",
+                _connectionId, _subscribedTokens.Count, string.Join(", ", _subscribedTokens));
             await _sharedMarketData.SubscribeAsync(_subscribedTokens, FeedMode.Ltpc, _cts.Token);
+        }
+        else
+        {
+            _logger.LogInformation(
+                "PositionStreamCoordinator [{Id}]: no open positions — no LTP subscriptions requested", _connectionId);
+        }
 
         _sharedMarketData.FeedReceived += _feedHandler;
 
@@ -95,7 +104,12 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
                 // Note: don't unsubscribe removed — other users may still need them
 
                 if (added.Count > 0)
+                {
+                    _logger.LogInformation(
+                        "PositionStreamCoordinator [{Id}]: new open instrument(s) detected — subscribing {Count} additional token(s): {Tokens}",
+                        _connectionId, added.Count, string.Join(", ", added));
                     await _sharedMarketData.SubscribeAsync(added, FeedMode.Ltpc, ct);
+                }
 
                 _subscribedTokens = currentTokens;
             }
@@ -149,6 +163,10 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
 
         if (relevant.Count == 0) return;
 
+        _logger.LogDebug(
+            "PositionStreamCoordinator [{Id}]: pushing ReceiveLtpBatch — {Count} instrument(s)",
+            _connectionId, relevant.Count);
+
         _ = _hub.Clients.Client(_connectionId)
             .SendAsync("ReceiveLtpBatch", relevant);
     }
@@ -165,6 +183,7 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        _logger.LogInformation("PositionStreamCoordinator [{Id}]: disposing — stopping poll loop and detaching from feed", _connectionId);
         _sharedMarketData.FeedReceived -= _feedHandler;
         _cts.Cancel();
         try { await _pollLoop; } catch { /* ignore */ }

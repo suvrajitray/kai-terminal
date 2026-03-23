@@ -26,22 +26,31 @@ public sealed class RedisLtpRelay : ISharedMarketDataService, IHostedService
 
     public Task StartAsync(CancellationToken ct)
     {
-        var sub = _redis.GetSubscriber();
-        sub.Subscribe(RedisChannel.Literal("ltp:feed"), OnMessage);
-        _logger.LogInformation("RedisLtpRelay subscribed to ltp:feed channel");
+        _redis.GetSubscriber().Subscribe(RedisChannel.Literal("ltp:feed"), OnMessage);
+        _logger.LogInformation("RedisLtpRelay: subscribed to Redis ltp:feed — will relay ticks to PositionStreamCoordinator");
         return Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken ct)
     {
+        _logger.LogInformation("RedisLtpRelay: unsubscribing from ltp:feed");
         _redis.GetSubscriber().Unsubscribe(RedisChannel.Literal("ltp:feed"));
         return Task.CompletedTask;
     }
 
-    // SubscribeAsync / UnsubscribeAsync are no-ops — subscription management is done
-    // by MarketDataService in the Worker process which owns the upstream connection.
+    // Forwards subscription requests to MarketDataService in the Worker via ltp:sub-req.
+    // MarketDataService listens on that channel and subscribes the tokens to the upstream WebSocket.
     public Task SubscribeAsync(IReadOnlyCollection<string> tokens, FeedMode mode = FeedMode.Ltpc, CancellationToken ct = default)
-        => Task.CompletedTask;
+    {
+        if (tokens.Count == 0) return Task.CompletedTask;
+        _logger.LogInformation(
+            "RedisLtpRelay: forwarding subscription request for {Count} instrument(s) to Worker via ltp:sub-req — {Tokens}",
+            tokens.Count, string.Join(", ", tokens));
+        var payload = JsonSerializer.Serialize(tokens);
+        _redis.GetSubscriber().Publish(
+            RedisChannel.Literal("ltp:sub-req"), payload, CommandFlags.FireAndForget);
+        return Task.CompletedTask;
+    }
 
     public Task UnsubscribeAsync(IReadOnlyCollection<string> tokens, CancellationToken ct = default)
         => Task.CompletedTask;
@@ -52,11 +61,12 @@ public sealed class RedisLtpRelay : ISharedMarketDataService, IHostedService
         {
             var ltps = JsonSerializer.Deserialize<Dictionary<string, decimal>>(value.ToString());
             if (ltps is null || ltps.Count == 0) return;
+            _logger.LogDebug("RedisLtpRelay: received tick from ltp:feed — {Count} instrument(s)", ltps.Count);
             FeedReceived?.Invoke(this, new LtpUpdate(ltps));
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to deserialize LTP tick from Redis");
+            _logger.LogWarning(ex, "RedisLtpRelay: failed to deserialize LTP tick from Redis ltp:feed");
         }
     }
 }

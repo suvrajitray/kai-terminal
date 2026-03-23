@@ -34,19 +34,27 @@ public sealed class PositionsHub : Hub
         var token = qs?["upstoxToken"].ToString();
         if (string.IsNullOrWhiteSpace(token))
         {
-            _logger.LogWarning("PositionsHub: connection {Id} rejected — no upstoxToken", Context.ConnectionId);
+            _logger.LogWarning("PositionsHub: connection {Id} rejected — no upstoxToken in query string", Context.ConnectionId);
             Context.Abort();
             return;
         }
 
         var exchangeFilter = ParseExchanges(qs?["exchange"].ToString());
         var connectionId = Context.ConnectionId;
+        var filterDesc = exchangeFilter is null ? "all exchanges" : string.Join(",", exchangeFilter);
+
+        _logger.LogInformation("PositionsHub: client {Id} connected (filter: {Filter}) — fetching initial positions", connectionId, filterDesc);
 
         var broker = _brokerFactory.Create("upstox", token);
 
         IReadOnlyList<KAITerminal.Contracts.Domain.Position> positions;
         using (broker.UseToken())
             positions = await broker.GetAllPositionsAsync();
+
+        var openCount = positions.Count(p => p.IsOpen);
+        _logger.LogInformation(
+            "PositionsHub: fetched {Total} position(s) for {Id} — {Open} open, {Closed} closed — sending ReceivePositions",
+            positions.Count, connectionId, openCount, positions.Count - openCount);
 
         var filtered = ApplyFilter(positions, exchangeFilter);
         await Clients.Caller.SendAsync("ReceivePositions", filtered.Select(p => p.ToResponse()).ToList());
@@ -58,11 +66,18 @@ public sealed class PositionsHub : Hub
         await coordinator.StartAsync(positions);
         _manager.Add(connectionId, coordinator);
 
+        _logger.LogInformation("PositionsHub: coordinator started for {Id} — live stream active", connectionId);
+
         await base.OnConnectedAsync();
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
+        if (exception is null)
+            _logger.LogInformation("PositionsHub: client {Id} disconnected", Context.ConnectionId);
+        else
+            _logger.LogWarning(exception, "PositionsHub: client {Id} disconnected with error", Context.ConnectionId);
+
         await _manager.RemoveAsync(Context.ConnectionId);
         await base.OnDisconnectedAsync(exception);
     }

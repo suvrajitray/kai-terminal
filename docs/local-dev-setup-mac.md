@@ -88,7 +88,46 @@ Local connection string (use this in user-secrets):
 Host=localhost;Database=kaiterminal;Username=kaiuser;Password=kaipassword
 ```
 
-> The app uses `EnsureCreatedAsync` on startup — tables are created automatically **except** for new tables added after the initial run. See [Manual DB Steps](#manual-db-steps) below.
+> The app uses `EnsureCreatedAsync` on startup — tables are created automatically on first run.
+
+---
+
+## GUI Tools
+
+### TablePlus — PostgreSQL (and Redis)
+
+TablePlus is the best macOS GUI for PostgreSQL. Clean, fast, native app. Also supports Redis, MySQL, and more.
+
+```bash
+brew install --cask tableplus
+```
+
+Connect to local PostgreSQL:
+- Host: `127.0.0.1`
+- Port: `5432`
+- User: `kaiuser`
+- Password: `kaipassword`
+- Database: `kaiterminal`
+
+> TablePlus can also connect to Neon — use the Neon connection string with SSL mode set to `Require`.
+
+### RedisInsight — Redis
+
+RedisInsight is the official Redis GUI from Redis Ltd. Browse keys, run CLI commands, inspect pub/sub, and monitor memory — all in one app.
+
+```bash
+brew install --cask redisinsight
+```
+
+Connect to local Redis:
+- Host: `127.0.0.1`
+- Port: `6379`
+- No password (default local setup)
+
+Useful views for this project:
+- **Browser** — inspect `appsetting:*` keys, SignalR backplane keys
+- **Pub/Sub** — subscribe to `ltp:feed` to watch live LTP ticks, or `ltp:sub-req` to watch subscription requests from the API
+- **CLI** — run `KEYS appsetting:*`, `GET appsetting:upstox_analytics_token`, `FLUSHALL`
 
 ---
 
@@ -112,7 +151,6 @@ dotnet user-secrets set "Jwt:Key" "<random-256-bit-secret>"
 dotnet user-secrets set "GoogleAuth:ClientId" "<google-oauth-client-id>"
 dotnet user-secrets set "GoogleAuth:ClientSecret" "<google-oauth-client-secret>"
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Database=kaiterminal;Username=kaiuser;Password=kaipassword"
-dotnet user-secrets set "ConnectionStrings:Redis" "localhost:6379"
 dotnet user-secrets set "Api:InternalKey" "<any-uuid>"
 ```
 
@@ -122,12 +160,13 @@ dotnet user-secrets set "Api:InternalKey" "<any-uuid>"
 cd backend/KAITerminal.Worker
 
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Database=kaiterminal;Username=kaiuser;Password=kaipassword"
-dotnet user-secrets set "ConnectionStrings:Redis" "localhost:6379"
 dotnet user-secrets set "Api:InternalKey" "<same-uuid-as-api>"
 dotnet user-secrets set "Api:BaseUrl" "https://localhost:5001"
 ```
 
 > `Api:InternalKey` must be **identical** in both Api and Worker — it authenticates the Worker→Api risk event webhook.
+>
+> `ConnectionStrings:Redis` defaults to `localhost:6379` in both `appsettings.json` files — no user-secret needed for local dev.
 
 #### Optional: AI Signals (KAITerminal.Api)
 
@@ -148,11 +187,7 @@ The `.env` file is already committed with safe defaults. No changes needed for l
 
 ## Manual DB Steps
 
-The app auto-creates tables on first run via `EnsureCreatedAsync`. However, tables added after the initial DB creation must be created manually on Neon.
-
-If this is a fresh Neon database, skip this section — everything is created automatically.
-
-If upgrading an existing database, run these as needed:
+The app auto-creates tables on first run via `EnsureCreatedAsync`. If you are upgrading an existing database that was created before a new table was added, run these manually:
 
 ```sql
 -- AppSettings table (analytics token storage)
@@ -168,40 +203,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS "ix_userriskconfigs_username_broker"
   ON "UserRiskConfigs" ("Username", "BrokerType");
 ```
 
----
-
-## GUI Tools
-
-### TablePlus — PostgreSQL (and Redis)
-
-TablePlus is the best macOS GUI for PostgreSQL. Clean, fast, native app. Also supports Redis, MySQL, and more.
-
-Download: [tableplus.com](https://tableplus.com) — free tier is sufficient for local dev (limited tabs, but fully functional).
-
-Connect to local PostgreSQL:
-- Host: `127.0.0.1`
-- Port: `5432`
-- User: `kaiuser`
-- Password: `kaipassword`
-- Database: `kaiterminal`
-
-> TablePlus can also connect to Neon — use the Neon connection string with SSL mode set to `Require`.
-
-### RedisInsight — Redis
-
-RedisInsight is the official Redis GUI from Redis Ltd. Browse keys, run CLI commands, inspect pub/sub, and monitor memory — all in one app.
-
-Download: [redis.io/insight](https://redis.io/insight) — free, no account required.
-
-Connect to local Redis:
-- Host: `127.0.0.1`
-- Port: `6379`
-- No password (default local setup)
-
-Useful views for this project:
-- **Browser** — inspect `appsetting:*` keys, `ltp:*`, SignalR backplane keys
-- **Pub/Sub** — subscribe to `ltp:feed` to watch live LTP ticks
-- **CLI** — run `KEYS appsetting:*`, `GET appsetting:upstox_analytics_token`, `FLUSHALL`
+> Fresh databases created by `EnsureCreatedAsync` get all tables automatically — skip this section.
 
 ---
 
@@ -224,7 +226,7 @@ Scalar docs at: `https://localhost:5001/scalar/v1`
 > dotnet dev-certs https --trust
 > ```
 
-### Tab 2 — Worker (Risk Engine)
+### Tab 2 — Worker (Risk Engine + Market Data)
 
 ```bash
 cd backend
@@ -264,11 +266,17 @@ Frontend available at: `http://localhost:3000`
 redis-cli keys "appsetting:*"
 redis-cli get "appsetting:upstox_analytics_token"
 
-# Watch Redis pub/sub (LTP ticks)
+# Watch live LTP ticks (published by Worker → MarketDataService)
 redis-cli subscribe ltp:feed
+
+# Watch instrument subscription requests (published by API → RedisLtpRelay)
+redis-cli subscribe ltp:sub-req
 
 # Clear all Redis data (dev reset)
 redis-cli flushall
+
+# Check which services are running
+brew services list
 
 # Hot-reload API (auto-restarts on file save)
 cd backend && dotnet watch --project KAITerminal.Api
@@ -289,5 +297,5 @@ cd frontend && npm run lint
 | KAITerminal.Api | 5001 (HTTPS) | REST API + SignalR hubs |
 | KAITerminal.Worker | — | Risk engine + market data WebSocket |
 | Frontend (Vite) | 3000 (HTTP) | React UI |
-| Redis | 6379 | LTP pub/sub + app settings cache + SignalR backplane |
-| PostgreSQL | 5432 (local) | Persistent storage |
+| Redis | 6379 | LTP pub/sub (`ltp:feed`, `ltp:sub-req`) + app settings cache + SignalR backplane |
+| PostgreSQL | 5432 | Persistent storage |
