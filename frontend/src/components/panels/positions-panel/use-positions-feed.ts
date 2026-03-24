@@ -47,8 +47,17 @@ export function usePositionsFeed(onOrderUpdate?: () => void) {
       return;
     }
 
+    const { getCredentials } = useBrokerStore.getState();
+    const zerodhaToken  = getCredentials("zerodha")?.accessToken;
+    const zerodhaApiKey = getCredentials("zerodha")?.apiKey;
+    const hasZerodha    = !isBrokerTokenExpired("zerodha", zerodhaToken) && !!zerodhaToken && !!zerodhaApiKey;
+
+    let wsUrl = `${API_BASE_URL}/hubs/positions?upstoxToken=${encodeURIComponent(upstoxToken)}&exchange=NFO,BFO`;
+    if (hasZerodha)
+      wsUrl += `&zerodhaToken=${encodeURIComponent(zerodhaToken!)}&zerodhaApiKey=${encodeURIComponent(zerodhaApiKey!)}`;
+
     const conn = new signalR.HubConnectionBuilder()
-      .withUrl(`${API_BASE_URL}/hubs/positions?upstoxToken=${encodeURIComponent(upstoxToken)}&exchange=NFO,BFO`)
+      .withUrl(wsUrl)
       .withAutomaticReconnect()
       .build();
 

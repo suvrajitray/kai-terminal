@@ -84,7 +84,7 @@ export function PositionRow({
   const num = parseInt(qtyValue, 10);
   const actualQty = isNaN(num) || num <= 0 ? 0 : qtyMode === "lot" ? num * lot : num;
   const getByInstrumentKey = useOptionContractsStore((s) => s.getByInstrumentKey);
-  const lookup = getByInstrumentKey(p.instrumentToken);
+  const lookup = getByInstrumentKey(p.instrumentToken, p.tradingSymbol);
   const contract = lookup?.contract;
   const index = lookup?.index;
 

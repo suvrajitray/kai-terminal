@@ -32,7 +32,7 @@ public sealed class ZerodhaOptionContractProvider : IOptionContractProvider
                         c.Expiry, c.ExchangeToken, c.LotSize,
                         c.InstrumentType,
                         UpstoxToken: "",
-                        ZerodhaToken: c.InstrumentToken,
+                        ZerodhaToken: c.TradingSymbol,
                         c.Strike))
                     .ToList();
 

@@ -9,7 +9,7 @@ public sealed record ContractEntry(
     string  ExchangeToken,
     decimal LotSize,
     string  InstrumentType,
-    string  UpstoxToken,    // e.g. "NSE_FO|37590"  — empty for Zerodha-only rows
-    string  ZerodhaToken,   // e.g. "13238786"       — empty for Upstox-only rows
+    string  UpstoxToken,    // e.g. "NSE_FO|37590"          — empty for Zerodha-only rows
+    string  ZerodhaToken,   // tradingsymbol for Zerodha orders, e.g. "NIFTY2641320700PE" — empty for Upstox-only rows
     decimal StrikePrice
 );

@@ -32,6 +32,7 @@ public sealed class StreamingRiskWorker : BackgroundService
     private readonly RiskEvaluator            _evaluator;
     private readonly IRiskEventNotifier       _notifier;
     private readonly ISharedMarketDataService _sharedMarketData;
+    private readonly ITokenMapper             _tokenMapper;
     private readonly RiskEngineConfig         _cfg;
     private readonly ILogger<StreamingRiskWorker> _logger;
     private readonly TimeZoneInfo             _tradingTz;
@@ -64,6 +65,7 @@ public sealed class StreamingRiskWorker : BackgroundService
         RiskEvaluator            evaluator,
         IRiskEventNotifier       notifier,
         ISharedMarketDataService sharedMarketData,
+        ITokenMapper             tokenMapper,
         IOptions<RiskEngineConfig> cfg,
         ILogger<StreamingRiskWorker> logger)
     {
@@ -74,6 +76,7 @@ public sealed class StreamingRiskWorker : BackgroundService
         _evaluator        = evaluator;
         _notifier         = notifier;
         _sharedMarketData = sharedMarketData;
+        _tokenMapper      = tokenMapper;
         _cfg              = cfg.Value;
         _logger           = logger;
         _tradingTz        = TimeZoneInfo.FindSystemTimeZoneById(_cfg.TradingTimeZone);
@@ -203,10 +206,12 @@ public sealed class StreamingRiskWorker : BackgroundService
         // ── Subscribe to shared market data ───────────────────────────────
         if (tokens.Count > 0)
         {
+            await _tokenMapper.EnsureReadyAsync(user.BrokerType, ct);
+            var feedTokens = _tokenMapper.ToFeedTokens(user.BrokerType, tokens);
             _logger.LogInformation(
                 "Subscribing {Count} instrument(s) — {UserId} ({Broker})",
-                tokens.Count, user.UserId, user.BrokerType);
-            await _sharedMarketData.SubscribeAsync(tokens, FeedMode.Ltpc, ct);
+                feedTokens.Count, user.UserId, user.BrokerType);
+            await _sharedMarketData.SubscribeAsync(feedTokens, FeedMode.Ltpc, ct);
         }
 
         var openCount = tokens.Count;
@@ -242,7 +247,11 @@ public sealed class StreamingRiskWorker : BackgroundService
             var currentTokens = _cache.GetOpenInstrumentTokens(user.UserId);
             if (currentTokens.Count > 0)
             {
-                try { await _sharedMarketData.UnsubscribeAsync(currentTokens); }
+                try
+                {
+                    var feedTokens = _tokenMapper.ToFeedTokens(user.BrokerType, currentTokens);
+                    await _sharedMarketData.UnsubscribeAsync(feedTokens);
+                }
                 catch { /* best-effort on shutdown */ }
             }
         }
@@ -299,7 +308,10 @@ public sealed class StreamingRiskWorker : BackgroundService
                 // Re-subscribe if open instruments changed
                 var newTokens = _cache.GetOpenInstrumentTokens(user.UserId);
                 if (newTokens.Count > 0)
-                    await _sharedMarketData.SubscribeAsync(newTokens, FeedMode.Ltpc, ct);
+                {
+                    var feedTokens = _tokenMapper.ToFeedTokens(user.BrokerType, newTokens);
+                    await _sharedMarketData.SubscribeAsync(feedTokens, FeedMode.Ltpc, ct);
+                }
 
                 await EvaluateAsync(user, broker, ct);
             }
@@ -319,13 +331,16 @@ public sealed class StreamingRiskWorker : BackgroundService
     private async Task HandleLtpTickAsync(
         UserConfig user, IBrokerClient broker, LtpUpdate update, CancellationToken ct)
     {
-        // Filter to only this user's open instruments
+        // Filter to only this user's open instruments.
+        // Feed tokens are in Upstox format (e.g. "NSE_FO|37590"); for Zerodha users
+        // we map them back to native position tokens (e.g. "226623237") before cache lookup.
         var userTokens = _cache.GetOpenInstrumentTokens(user.UserId);
         bool relevant = false;
-        foreach (var (token, ltp) in update.Ltps)
+        foreach (var (feedToken, ltp) in update.Ltps)
         {
-            if (!userTokens.Contains(token)) continue;
-            _cache.UpdateLtp(user.UserId, token, ltp);
+            var nativeToken = _tokenMapper.ToNativeToken(user.BrokerType, feedToken);
+            if (!userTokens.Contains(nativeToken)) continue;
+            _cache.UpdateLtp(user.UserId, nativeToken, ltp);
             relevant = true;
         }
 

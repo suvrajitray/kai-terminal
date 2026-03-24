@@ -13,19 +13,21 @@ namespace KAITerminal.Api.Hubs;
 /// </summary>
 internal sealed class PositionStreamCoordinator : IAsyncDisposable
 {
-    private readonly IHubContext<PositionsHub> _hub;
-    private readonly IBrokerClient             _broker;
-    private readonly ISharedMarketDataService  _sharedMarketData;
-    private readonly string                    _connectionId;
-    private readonly HashSet<string>?          _exchangeFilter;
-    private readonly ILogger                   _logger;
+    private readonly IHubContext<PositionsHub>        _hub;
+    private readonly IBrokerClient                    _broker;
+    private readonly ISharedMarketDataService         _sharedMarketData;
+    private readonly string                           _connectionId;
+    private readonly HashSet<string>?                 _exchangeFilter;
+    // Zerodha: feed token (NSE_FO|885247) → native instrument token (15942914)
+    private readonly Dictionary<string, string>?      _zerodhaFeedToNative;
+    private readonly ILogger                          _logger;
 
     private const int PositionPollIntervalMs = 10_000;
 
     private readonly CancellationTokenSource _cts = new();
     private Task _pollLoop = Task.CompletedTask;
 
-    // Tracks instruments this coordinator has subscribed to
+    // Tracks Upstox instruments this coordinator has subscribed to
     private List<string> _subscribedTokens = [];
 
     // Last known order statuses for change detection
@@ -34,20 +36,22 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
     private readonly EventHandler<LtpUpdate> _feedHandler;
 
     public PositionStreamCoordinator(
-        IHubContext<PositionsHub> hub,
-        IBrokerClient             broker,
-        ISharedMarketDataService  sharedMarketData,
-        string                    connectionId,
-        HashSet<string>?          exchangeFilter,
-        ILogger                   logger)
+        IHubContext<PositionsHub>    hub,
+        IBrokerClient                broker,
+        ISharedMarketDataService     sharedMarketData,
+        string                       connectionId,
+        HashSet<string>?             exchangeFilter,
+        Dictionary<string, string>?  zerodhaFeedToNative,
+        ILogger                      logger)
     {
-        _hub              = hub;
-        _broker           = broker;
-        _sharedMarketData = sharedMarketData;
-        _connectionId     = connectionId;
-        _exchangeFilter   = exchangeFilter;
-        _logger           = logger;
-        _feedHandler      = OnFeedReceived;
+        _hub                 = hub;
+        _broker              = broker;
+        _sharedMarketData    = sharedMarketData;
+        _connectionId        = connectionId;
+        _exchangeFilter      = exchangeFilter;
+        _zerodhaFeedToNative = zerodhaFeedToNative;
+        _logger              = logger;
+        _feedHandler         = OnFeedReceived;
     }
 
     internal async Task StartAsync(IReadOnlyList<KAITerminal.Contracts.Domain.Position> initialPositions, CancellationToken ct = default)
@@ -60,14 +64,23 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
         if (_subscribedTokens.Count > 0)
         {
             _logger.LogInformation(
-                "PositionStreamCoordinator [{Id}]: requesting LTP subscription for {Count} open instrument(s) — {Tokens}",
+                "PositionStreamCoordinator [{Id}]: requesting LTP subscription for {Count} Upstox instrument(s) — {Tokens}",
                 _connectionId, _subscribedTokens.Count, string.Join(", ", _subscribedTokens));
             await _sharedMarketData.SubscribeAsync(_subscribedTokens, FeedMode.Ltpc, _cts.Token);
         }
         else
         {
             _logger.LogInformation(
-                "PositionStreamCoordinator [{Id}]: no open positions — no LTP subscriptions requested", _connectionId);
+                "PositionStreamCoordinator [{Id}]: no open Upstox positions — no Upstox LTP subscriptions requested", _connectionId);
+        }
+
+        if (_zerodhaFeedToNative is { Count: > 0 })
+        {
+            var zerodhaFeedTokens = _zerodhaFeedToNative.Keys.ToList();
+            _logger.LogInformation(
+                "PositionStreamCoordinator [{Id}]: requesting LTP subscription for {Count} Zerodha instrument(s) — {Tokens}",
+                _connectionId, zerodhaFeedTokens.Count, string.Join(", ", zerodhaFeedTokens));
+            await _sharedMarketData.SubscribeAsync(zerodhaFeedTokens, FeedMode.Ltpc, _cts.Token);
         }
 
         _sharedMarketData.FeedReceived += _feedHandler;
@@ -155,11 +168,17 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
 
     private void OnFeedReceived(object? sender, LtpUpdate update)
     {
-        // Filter to only this connection's open instruments
-        var relevant = update.Ltps
-            .Where(kv => _subscribedTokens.Contains(kv.Key))
-            .Select(kv => new { instrumentToken = kv.Key, ltp = kv.Value })
-            .ToList();
+        // Filter to this connection's instruments.
+        // Upstox: feed token == instrument token → push as-is.
+        // Zerodha: feed token (NSE_FO|885247) → push with native numeric token so frontend can match.
+        var relevant = new List<object>(capacity: update.Ltps.Count);
+        foreach (var (feedToken, ltp) in update.Ltps)
+        {
+            if (_subscribedTokens.Contains(feedToken))
+                relevant.Add(new { instrumentToken = feedToken, ltp });
+            else if (_zerodhaFeedToNative?.TryGetValue(feedToken, out var native) == true)
+                relevant.Add(new { instrumentToken = native!, ltp });
+        }
 
         if (relevant.Count == 0) return;
 

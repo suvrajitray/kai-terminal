@@ -1,6 +1,8 @@
 using KAITerminal.Contracts.Notifications;
+using KAITerminal.Contracts.Streaming;
 using KAITerminal.RiskEngine.Abstractions;
 using KAITerminal.RiskEngine.Configuration;
+using KAITerminal.RiskEngine.Mapping;
 using KAITerminal.RiskEngine.Notifications;
 using KAITerminal.RiskEngine.Services;
 using KAITerminal.RiskEngine.State;
@@ -25,6 +27,7 @@ public static class RiskEngineExtensions
         services.Configure<RiskEngineConfig>(configuration.GetSection(RiskEngineConfig.SectionName));
 
         services.TryAddSingleton<IRiskEventNotifier, NullRiskEventNotifier>();
+        services.TryAddSingleton<ITokenMapper, IdentityTokenMapper>();
 
         services.AddSingleton<IRiskRepository, RedisRiskRepository>();
         services.AddSingleton<IPositionCache, PositionCache>();

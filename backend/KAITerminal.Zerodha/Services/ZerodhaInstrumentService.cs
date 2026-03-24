@@ -49,6 +49,32 @@ public sealed class ZerodhaInstrumentService : IZerodhaInstrumentService
         return filtered;
     }
 
+    public async Task<IReadOnlyList<ZerodhaOptionContract>> GetAllCurrentYearContractsAsync(
+        CancellationToken ct = default)
+    {
+        var year = DateTimeOffset.UtcNow.Year;
+
+        // Fetch NFO + BFO once in parallel — not once per underlying
+        var results = await Task.WhenAll(Exchanges.Select(ex => FetchContractsAsync(ex, ct)));
+
+        var filtered = results
+            .SelectMany(x => x)
+            .Where(c =>
+                AllowedUnderlyings.Contains(c.Name) &&
+                DateOnly.TryParse(c.Expiry, out var d) && d.Year == year)
+            .OrderBy(c => c.Name)
+            .ThenBy(c => c.Expiry)
+            .ThenBy(c => c.Strike)
+            .ToList()
+            .AsReadOnly();
+
+        _logger.LogInformation(
+            "GetAllCurrentYearContractsAsync(year={Year}): {Count} contracts across {Underlyings}",
+            year, filtered.Count, string.Join(", ", AllowedUnderlyings));
+
+        return filtered;
+    }
+
     private async Task<IReadOnlyList<ZerodhaOptionContract>> FetchContractsAsync(
         string exchange, CancellationToken ct)
     {

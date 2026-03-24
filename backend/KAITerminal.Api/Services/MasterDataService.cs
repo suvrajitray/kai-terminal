@@ -90,10 +90,14 @@ public sealed class MasterDataService(
                     continue;
                 }
 
-                var incomingLookup = incoming.Contracts.ToDictionary(c => (c.Expiry, c.ExchangeToken));
+                // Join key: ExchangeToken — the universal cross-broker instrument identifier.
+                // Both Upstox and Zerodha use the same exchange_token for the same instrument.
+                // Within one index (one exchange), exchange_token is unique.
+                var incomingLookup = incoming.Contracts
+                    .ToDictionary(c => c.ExchangeToken);
 
                 var mergedEntries = existing.Contracts.Select(ec =>
-                    incomingLookup.TryGetValue((ec.Expiry, ec.ExchangeToken), out var ic)
+                    incomingLookup.TryGetValue(ec.ExchangeToken, out var ic)
                         ? MergeEntry(ec, ic)
                         : ec
                 ).ToList();

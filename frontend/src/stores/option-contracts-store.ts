@@ -20,7 +20,7 @@ interface OptionContractsState {
   contracts: Record<string, ContractEntry[]>; // keyed by index name e.g. "NIFTY", "BANKNIFTY"
   setIndexContracts: (data: IndexContracts[]) => void;
   getContracts: (key: string) => ContractEntry[];
-  getByInstrumentKey: (instrumentToken: string) => ContractLookup | undefined;
+  getByInstrumentKey: (instrumentToken: string, tradingSymbol?: string) => ContractLookup | undefined;
   getExpiries: (key: string) => string[];
   clear: () => void;
 }
@@ -38,16 +38,13 @@ export const useOptionContractsStore = create<OptionContractsState>()(
 
       getContracts: (key) => get().contracts[key] ?? [],
 
-      getByInstrumentKey: (instrumentToken) => {
-        // Zerodha positions report instrument_token as "NFO|15942914"; strip exchange prefix for comparison
-        const numericPart = instrumentToken.includes("|")
-          ? instrumentToken.split("|")[1]
-          : instrumentToken;
-
+      getByInstrumentKey: (instrumentToken, tradingSymbol?) => {
+        // Upstox positions use "NSE_FO|37590" format; Zerodha positions use numeric instrument_token.
+        // zerodhaToken is now the trading symbol (e.g. "NIFTY2641320700PE") — match on tradingSymbol.
         for (const [key, contracts] of Object.entries(get().contracts)) {
           const found = contracts.find(
             (c) => c.upstoxToken === instrumentToken ||
-                   c.zerodhaToken === numericPart,
+                   (tradingSymbol !== undefined && c.zerodhaToken === tradingSymbol),
           );
           if (found) {
             return { contract: found, index: key };
