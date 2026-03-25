@@ -63,17 +63,5 @@ public static class AuthEndpoints
                 $"{config["Frontend:Url"]}/auth/callback?token={token}"
             );
         });
-
-        app.MapGet("/api/profile", (ClaimsPrincipal user) =>
-        {
-            return Results.Ok(new
-            {
-                name = string.IsNullOrWhiteSpace(user.FindFirstValue(ClaimTypes.Name))
-                    ? user.FindFirst("name")?.Value
-                    : user.FindFirstValue(ClaimTypes.Name),
-                email = user.FindFirstValue(ClaimTypes.Email) ?? user.FindFirst("email")?.Value
-            });
-        })
-        .RequireAuthorization();
     }
 }

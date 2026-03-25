@@ -40,15 +40,6 @@ public static class UpstoxEndpoints
             return Results.Ok(FilterByExchange(positions, exchange).Select(p => p.ToResponse()));
         });
 
-        group.MapGet("/mtm", async (
-            UpstoxClient upstox,
-            [FromQuery] string? exchange = null) =>
-        {
-            var positions = await upstox.GetAllPositionsAsync();
-            var filtered = FilterByExchange(positions, exchange);
-            return Results.Ok(new { Mtm = filtered.Sum(p => p.Pnl) });
-        });
-
         group.MapPost("/positions/exit-all", async (
             UpstoxClient upstox,
             ClaimsPrincipal user,
@@ -158,56 +149,10 @@ public static class UpstoxEndpoints
             return Results.Ok(await upstox.GetOptionChainAsync(underlyingKey, expiryDate));
         });
 
-        group.MapGet("/options/contracts", async (
-            [FromQuery] string? underlyingKey,
-            UpstoxClient upstox,
-            [FromQuery] string? expiryDate = null) =>
-        {
-            if (string.IsNullOrEmpty(underlyingKey))
-                return Results.BadRequest(new { error = "underlyingKey is required." });
-            return Results.Ok(await upstox.GetOptionContractsAsync(underlyingKey, expiryDate));
-        });
-
-        group.MapGet("/options/contracts/current-month", async (
-            [FromQuery] string? underlyingKey,
-            UpstoxClient upstox) =>
-        {
-            if (string.IsNullOrEmpty(underlyingKey))
-                return Results.BadRequest(new { error = "underlyingKey is required." });
-
-            var today = DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(5.5));
-            var contracts = await upstox.GetOptionContractsAsync(underlyingKey);
-            var currentMonth = contracts
-                .Where(c => DateOnly.TryParse(c.Expiry, out var expiry)
-                            && expiry.Year == today.Year
-                            && expiry.Month == today.Month)
-                .OrderBy(c => c.Expiry)
-                .ToList();
-
-            return Results.Ok(currentMonth);
-        });
-
-        group.MapGet("/orders/by-option-price/resolve", async (
-            [AsParameters] ResolveByOptionPriceQuery q,
-            UpstoxClient upstox) =>
-            Results.Ok(await upstox.GetOrderByOptionPriceAsync(
-                q.UnderlyingKey, q.ExpiryDate, q.OptionType, q.TargetPremium, q.PriceSearchMode)));
-
         group.MapPost("/orders/by-option-price/v3", async (
             [FromBody] PlaceOrderByOptionPriceRequest request,
             UpstoxClient upstox) =>
             Results.Ok(await upstox.PlaceOrderByOptionPriceV3Async(request)));
-
-        group.MapGet("/orders/by-strike/resolve", async (
-            [AsParameters] ResolveByStrikeQuery q,
-            UpstoxClient upstox) =>
-            Results.Ok(await upstox.GetOrderByStrikeAsync(
-                q.UnderlyingKey, q.ExpiryDate, q.OptionType, q.StrikeType)));
-
-        group.MapPost("/orders/by-strike/v3", async (
-            [FromBody] PlaceOrderByStrikeRequest request,
-            UpstoxClient upstox) =>
-            Results.Ok(await upstox.PlaceOrderByStrikeV3Async(request)));
 
         // ── Funds ─────────────────────────────────────────────────────────────
 
