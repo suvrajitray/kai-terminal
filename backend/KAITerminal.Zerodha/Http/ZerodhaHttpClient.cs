@@ -143,7 +143,7 @@ public sealed class ZerodhaHttpClient
     private static Position MapPosition(KiteNetPosition p) => new()
     {
         Exchange        = p.Exchange ?? "",
-        InstrumentToken = p.InstrumentToken.ToString(),
+        InstrumentToken = p.TradingSymbol ?? "",
         TradingSymbol   = p.TradingSymbol ?? "",
         Product         = MapProduct(p.Product),
         Quantity        = p.Quantity,

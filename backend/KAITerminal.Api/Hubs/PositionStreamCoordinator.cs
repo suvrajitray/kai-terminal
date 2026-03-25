@@ -170,7 +170,7 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
         try
         {
             var instruments = await _zerodhaInstruments.GetAllCurrentYearContractsAsync(ct);
-            var tokenLookup = instruments.ToDictionary(c => c.InstrumentToken, c => c.ExchangeToken);
+            var tokenLookup = instruments.ToDictionary(c => c.TradingSymbol, c => c.ExchangeToken);
 
             foreach (var pos in zerodhaPositions)
             {

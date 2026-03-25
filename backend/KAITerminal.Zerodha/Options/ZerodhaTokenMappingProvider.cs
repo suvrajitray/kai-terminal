@@ -27,7 +27,6 @@ public sealed class ZerodhaTokenMappingProvider : ITokenMappingProvider
 
         return all
             .Select(c => new NativeContractKey(
-                NativeToken:   c.InstrumentToken,
                 Segment:       c.Segment,
                 ExchangeToken: c.ExchangeToken,
                 TradingSymbol: c.TradingSymbol))

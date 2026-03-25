@@ -112,15 +112,15 @@ public sealed class CrossBrokerTokenMapper : ITokenMapper
                 if (prefix is null)
                 {
                     _logger.LogDebug(
-                        "CrossBrokerTokenMapper: unknown segment {Segment} for token {Token} — skipping",
-                        k.Segment, k.NativeToken);
+                        "CrossBrokerTokenMapper: unknown segment {Segment} for symbol {Symbol} — skipping",
+                        k.Segment, k.TradingSymbol);
                     skipped++;
                     continue;
                 }
 
                 var feedToken = $"{prefix}|{k.ExchangeToken}";
-                nativeToFeed[(provider.BrokerType, k.NativeToken)] = feedToken;
-                feedToNative[(provider.BrokerType, feedToken)]      = k.NativeToken;
+                nativeToFeed[(provider.BrokerType, k.TradingSymbol)] = feedToken;
+                feedToNative[(provider.BrokerType, feedToken)]        = k.TradingSymbol;
                 mapped++;
             }
 

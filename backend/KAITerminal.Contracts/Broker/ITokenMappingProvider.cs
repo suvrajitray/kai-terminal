@@ -31,8 +31,7 @@ public interface ITokenMappingProvider
 /// exchange-level token that directly maps to an Upstox feed token.
 /// </summary>
 public sealed record NativeContractKey(
-    string NativeToken,     // broker's numeric instrument_token for position LTP lookup, e.g. "16017410"
     string Segment,         // broker segment, e.g. "NFO-OPT" | "BFO-OPT" — maps to Upstox prefix
     string ExchangeToken,   // exchange-level token — same value across all brokers, e.g. "885247"
-    string TradingSymbol    // e.g. "NIFTY2641320700PE" — needed for order placement
+    string TradingSymbol    // trading symbol used as the native key, e.g. "NIFTY2641320700PE"
 );
