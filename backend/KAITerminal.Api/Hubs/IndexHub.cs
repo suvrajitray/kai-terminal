@@ -1,4 +1,5 @@
 using KAITerminal.Api.Services;
+using KAITerminal.Contracts.Streaming;
 using KAITerminal.Upstox;
 using Microsoft.AspNetCore.SignalR;
 
@@ -6,7 +7,7 @@ namespace KAITerminal.Api.Hubs;
 
 public sealed class IndexHub : Hub
 {
-    private static readonly List<string> IndexTokens =
+    private static readonly IReadOnlyList<string> IndexTokens =
     [
         "NSE_INDEX|Nifty 50",
         "NSE_INDEX|Nifty Bank",
@@ -15,89 +16,99 @@ public sealed class IndexHub : Hub
         "BSE_INDEX|BANKEX",
     ];
 
-    private const int PollIntervalMs = 3000;
+    private static readonly HashSet<string> IndexTokenSet =
+        IndexTokens.ToHashSet(StringComparer.Ordinal);
 
-    private readonly UpstoxClient _upstox;
-    private readonly IndexStreamManager _manager;
-    private readonly IHubContext<IndexHub> _hubContext;
-    private readonly ILogger<IndexHub> _logger;
+    private readonly UpstoxClient             _upstox;
+    private readonly ISharedMarketDataService _sharedMarketData;
+    private readonly IndexStreamManager       _manager;
+    private readonly IHubContext<IndexHub>    _hubContext;
+    private readonly ILogger<IndexHub>        _logger;
 
-    public IndexHub(UpstoxClient upstox, IndexStreamManager manager, IHubContext<IndexHub> hubContext, ILogger<IndexHub> logger)
+    public IndexHub(
+        UpstoxClient             upstox,
+        ISharedMarketDataService sharedMarketData,
+        IndexStreamManager       manager,
+        IHubContext<IndexHub>    hubContext,
+        ILogger<IndexHub>        logger)
     {
-        _upstox = upstox;
-        _manager = manager;
-        _hubContext = hubContext;
-        _logger = logger;
+        _upstox           = upstox;
+        _sharedMarketData = sharedMarketData;
+        _manager          = manager;
+        _hubContext       = hubContext;
+        _logger           = logger;
     }
 
-    public override Task OnConnectedAsync()
+    public override async Task OnConnectedAsync()
     {
         var qs = Context.GetHttpContext()?.Request.Query;
         var token = qs?["upstoxToken"].ToString();
         if (string.IsNullOrWhiteSpace(token))
         {
             Context.Abort();
-            return Task.CompletedTask;
+            return;
         }
 
         var connectionId = Context.ConnectionId;
-        var ct = _manager.Add(connectionId);
+        var ct           = Context.ConnectionAborted;
 
-        _ = Task.Run(() => PollLoopAsync(token, connectionId, _hubContext, ct), ct);
+        // One-time REST call — gives accurate OHLC + netChange for the initial snapshot
+        try
+        {
+            IReadOnlyDictionary<string, KAITerminal.Upstox.Models.Responses.MarketQuote> quotes;
+            using (UpstoxTokenContext.Use(token))
+                quotes = await _upstox.GetMarketQuotesAsync(IndexTokens, ct);
 
-        return base.OnConnectedAsync();
+            var normalised = quotes.ToDictionary(kv => kv.Key.Replace(':', '|'), kv => kv.Value);
+            var snapshot = IndexTokens
+                .Where(normalised.ContainsKey)
+                .Select(t => new
+                {
+                    instrumentToken = t,
+                    ltp       = normalised[t].LastPrice,
+                    open      = normalised[t].Ohlc?.Open,
+                    high      = normalised[t].Ohlc?.High,
+                    low       = normalised[t].Ohlc?.Low,
+                    netChange = normalised[t].NetChange,
+                })
+                .ToList();
+
+            if (snapshot.Count > 0)
+                await Clients.Caller.SendAsync("ReceiveIndexSnapshot", snapshot, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "IndexHub [{Id}]: failed to fetch initial snapshot", connectionId);
+        }
+
+        // Subscribe index tokens to the shared feed (idempotent across connections)
+        await _sharedMarketData.SubscribeAsync(IndexTokens.ToList(), FeedMode.Ltpc, ct);
+
+        // Per-connection feed handler — pushes LTP ticks to this client only
+        EventHandler<LtpUpdate> handler = (_, update) => OnFeedReceived(connectionId, update);
+        _sharedMarketData.FeedReceived += handler;
+        _manager.Add(connectionId, handler);
+
+        await base.OnConnectedAsync();
     }
 
     public override Task OnDisconnectedAsync(Exception? exception)
     {
-        _manager.Remove(Context.ConnectionId);
+        var handler = _manager.Remove(Context.ConnectionId);
+        if (handler is not null)
+            _sharedMarketData.FeedReceived -= handler;
         return base.OnDisconnectedAsync(exception);
     }
 
-    private async Task PollLoopAsync(
-        string token, string connectionId, IHubContext<IndexHub> hubContext, CancellationToken ct)
+    private void OnFeedReceived(string connectionId, LtpUpdate update)
     {
-        var first = true;
-        while (!ct.IsCancellationRequested)
-        {
-            try
-            {
-                IReadOnlyDictionary<string, KAITerminal.Upstox.Models.Responses.MarketQuote> quotes;
-                using (UpstoxTokenContext.Use(token))
-                    quotes = await _upstox.GetMarketQuotesAsync(IndexTokens, ct);
+        var relevant = update.Ltps
+            .Where(kv => IndexTokenSet.Contains(kv.Key))
+            .Select(kv => new { instrumentToken = kv.Key, ltp = kv.Value })
+            .ToList();
 
-                // Upstox quotes API uses ':' separator; instrument tokens use '|'
-                var normalised = quotes.ToDictionary(kv => kv.Key.Replace(':', '|'), kv => kv.Value);
+        if (relevant.Count == 0) return;
 
-                var updates = IndexTokens
-                    .Where(normalised.ContainsKey)
-                    .Select(t => new
-                    {
-                        instrumentToken = t,
-                        ltp       = normalised[t].LastPrice,
-                        open      = normalised[t].Ohlc?.Open,
-                        high      = normalised[t].Ohlc?.High,
-                        low       = normalised[t].Ohlc?.Low,
-                        netChange = normalised[t].NetChange,
-                    })
-                    .ToList();
-
-                if (updates.Count > 0)
-                {
-                    // First poll: send as snapshot (includes open/high); subsequent: batch (ltp only used by client)
-                    var method = first ? "ReceiveIndexSnapshot" : "ReceiveIndexBatch";
-                    await hubContext.Clients.Client(connectionId).SendAsync(method, updates, ct);
-                    first = false;
-                }
-            }
-            catch (OperationCanceledException) { return; }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Index quotes poll failed for connection {ConnectionId} — skipping tick", connectionId);
-            }
-
-            try { await Task.Delay(PollIntervalMs, ct); }
-            catch (OperationCanceledException) { return; }
-        }
+        _ = _hubContext.Clients.Client(connectionId).SendAsync("ReceiveIndexBatch", relevant);
     }
 }

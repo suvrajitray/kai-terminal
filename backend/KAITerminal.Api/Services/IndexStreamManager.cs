@@ -1,24 +1,18 @@
 using System.Collections.Concurrent;
+using KAITerminal.Contracts.Streaming;
 
 namespace KAITerminal.Api.Services;
 
 public sealed class IndexStreamManager
 {
-    private readonly ConcurrentDictionary<string, CancellationTokenSource> _connections = new();
+    private readonly ConcurrentDictionary<string, EventHandler<LtpUpdate>> _handlers = new();
 
-    public CancellationToken Add(string connectionId)
-    {
-        var cts = new CancellationTokenSource();
-        _connections[connectionId] = cts;
-        return cts.Token;
-    }
+    public void Add(string connectionId, EventHandler<LtpUpdate> handler)
+        => _handlers[connectionId] = handler;
 
-    public void Remove(string connectionId)
+    public EventHandler<LtpUpdate>? Remove(string connectionId)
     {
-        if (_connections.TryRemove(connectionId, out var cts))
-        {
-            cts.Cancel();
-            cts.Dispose();
-        }
+        _handlers.TryRemove(connectionId, out var handler);
+        return handler;
     }
 }
