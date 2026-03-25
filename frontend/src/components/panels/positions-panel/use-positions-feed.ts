@@ -7,32 +7,25 @@ import { API_BASE_URL } from "@/lib/constants";
 import { useBrokerStore } from "@/stores/broker-store";
 import type { Position } from "@/types";
 
-/** Returns Zerodha positions if the token is valid, otherwise empty array. Never throws. */
-async function loadZerodhaPositions(exchanges: string[]): Promise<Position[]> {
-  const { getCredentials } = useBrokerStore.getState();
-  const token = getCredentials("zerodha")?.accessToken;
-  if (isBrokerTokenExpired("zerodha", token)) return [];
-  try {
-    return await fetchZerodhaPositions(exchanges);
-  } catch {
-    return [];
-  }
-}
-
 export function usePositionsFeed(onOrderUpdate?: () => void) {
   const [positions, setPositions] = useState<Position[]>([]);
   const [loading, setLoading] = useState(false);
   const [isLive, setIsLive] = useState(false);
   const connectionRef = useRef<signalR.HubConnection | null>(null);
 
+  /** Fallback: REST fetch when SignalR is unavailable. */
   const load = useCallback(async (exchanges = ["NFO", "BFO"]) => {
     setLoading(true);
     try {
-      const upstoxToken = useBrokerStore.getState().getCredentials("upstox")?.accessToken;
+      const { getCredentials } = useBrokerStore.getState();
+      const upstoxToken = getCredentials("upstox")?.accessToken;
+      const zerodhaToken = getCredentials("zerodha")?.accessToken;
       const hasUpstox = !!upstoxToken && !isBrokerTokenExpired("upstox", upstoxToken);
+      const hasZerodha = !isBrokerTokenExpired("zerodha", zerodhaToken) && !!zerodhaToken;
+
       const [upstox, zerodha] = await Promise.all([
-        hasUpstox ? fetchPositions(exchanges) : Promise.resolve([] as Position[]),
-        loadZerodhaPositions(exchanges),
+        hasUpstox  ? fetchPositions(exchanges)        : Promise.resolve([] as Position[]),
+        hasZerodha ? fetchZerodhaPositions(exchanges) : Promise.resolve([] as Position[]),
       ]);
       setPositions([...upstox, ...zerodha]);
     } finally {
@@ -41,32 +34,33 @@ export function usePositionsFeed(onOrderUpdate?: () => void) {
   }, []);
 
   useEffect(() => {
-    const upstoxToken = useBrokerStore.getState().getCredentials("upstox")?.accessToken;
-    if (!upstoxToken) {
-      load(["NFO", "BFO"]).catch(() => {});
+    const { getCredentials } = useBrokerStore.getState();
+    const upstoxToken  = getCredentials("upstox")?.accessToken;
+    const zerodhaToken = getCredentials("zerodha")?.accessToken;
+    const zerodhaApiKey = getCredentials("zerodha")?.apiKey;
+
+    const hasUpstox  = !!upstoxToken  && !isBrokerTokenExpired("upstox",  upstoxToken);
+    const hasZerodha = !!zerodhaToken && !isBrokerTokenExpired("zerodha", zerodhaToken) && !!zerodhaApiKey;
+
+    if (!hasUpstox && !hasZerodha) {
+      // No broker available — nothing to connect
       return;
     }
 
-    const { getCredentials } = useBrokerStore.getState();
-    const zerodhaToken  = getCredentials("zerodha")?.accessToken;
-    const zerodhaApiKey = getCredentials("zerodha")?.apiKey;
-    const hasZerodha    = !isBrokerTokenExpired("zerodha", zerodhaToken) && !!zerodhaToken && !!zerodhaApiKey;
+    const params = new URLSearchParams({ exchange: "NFO,BFO" });
+    if (hasUpstox)  params.set("upstoxToken",  upstoxToken!);
+    if (hasZerodha) { params.set("zerodhaToken", zerodhaToken!); params.set("zerodhaApiKey", zerodhaApiKey!); }
 
-    let wsUrl = `${API_BASE_URL}/hubs/positions?upstoxToken=${encodeURIComponent(upstoxToken)}&exchange=NFO,BFO`;
-    if (hasZerodha)
-      wsUrl += `&zerodhaToken=${encodeURIComponent(zerodhaToken!)}&zerodhaApiKey=${encodeURIComponent(zerodhaApiKey!)}`;
+    const wsUrl = `${API_BASE_URL}/hubs/positions?${params.toString()}`;
 
     const conn = new signalR.HubConnectionBuilder()
       .withUrl(wsUrl)
       .withAutomaticReconnect()
       .build();
 
-    // ReceivePositions is Upstox-only — preserve any existing Zerodha positions
+    // Backend sends combined positions for all connected brokers
     conn.on("ReceivePositions", (incoming: Position[]) => {
-      setPositions((prev) => {
-        const zerodha = prev.filter((p) => p.broker === "zerodha");
-        return [...incoming, ...zerodha];
-      });
+      setPositions(incoming);
       setLoading(false);
     });
 
@@ -109,17 +103,7 @@ export function usePositionsFeed(onOrderUpdate?: () => void) {
 
     setLoading(true);
     conn.start()
-      .then(async () => {
-        setIsLive(true);
-        // SignalR only delivers Upstox positions — fetch Zerodha separately on connect
-        const zerodha = await loadZerodhaPositions(["NFO", "BFO"]);
-        if (zerodha.length > 0) {
-          setPositions((prev) => {
-            const upstox = prev.filter((p) => p.broker !== "zerodha");
-            return [...upstox, ...zerodha];
-          });
-        }
-      })
+      .then(() => setIsLive(true))
       .catch(() => {
         setIsLive(false);
         load(["NFO", "BFO"]).catch(() => {});

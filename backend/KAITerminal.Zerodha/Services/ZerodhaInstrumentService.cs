@@ -6,6 +6,10 @@ namespace KAITerminal.Zerodha.Services;
 /// <summary>
 /// Fetches and parses instrument master data from api.kite.trade/instruments/{exchange}.
 /// The endpoint is public (no auth required) and returns a CSV with one row per contract.
+///
+/// Results are cached in-process for the IST calendar day (invalidates at midnight IST).
+/// NFO + BFO CSVs are downloaded at most once per day regardless of how many callers
+/// invoke <see cref="GetAllCurrentYearContractsAsync"/> or <see cref="GetCurrentYearContractsAsync"/>.
 /// </summary>
 public sealed class ZerodhaInstrumentService : IZerodhaInstrumentService
 {
@@ -16,6 +20,11 @@ public sealed class ZerodhaInstrumentService : IZerodhaInstrumentService
 
     private readonly IHttpClientFactory _httpFactory;
     private readonly ILogger<ZerodhaInstrumentService> _logger;
+
+    // In-process daily cache — safe because this class is registered as Singleton
+    private IReadOnlyList<ZerodhaOptionContract>? _cache;
+    private DateOnly _cachedDate;
+    private readonly SemaphoreSlim _lock = new(1, 1);
 
     public ZerodhaInstrumentService(
         IHttpClientFactory httpFactory,
@@ -28,23 +37,16 @@ public sealed class ZerodhaInstrumentService : IZerodhaInstrumentService
     public async Task<IReadOnlyList<ZerodhaOptionContract>> GetCurrentYearContractsAsync(
         string underlyingSymbol, CancellationToken ct = default)
     {
-        var year = DateTimeOffset.UtcNow.Year;
+        var all = await GetAllCurrentYearContractsAsync(ct);
 
-        var results = await Task.WhenAll(Exchanges.Select(ex => FetchContractsAsync(ex, ct)));
-
-        var filtered = results
-            .SelectMany(x => x)
-            .Where(c =>
-                c.Name.Equals(underlyingSymbol, StringComparison.OrdinalIgnoreCase) &&
-                DateOnly.TryParse(c.Expiry, out var d) && d.Year == year)
-            .OrderBy(c => c.Expiry)
-            .ThenBy(c => c.Strike)
+        var filtered = all
+            .Where(c => c.Name.Equals(underlyingSymbol, StringComparison.OrdinalIgnoreCase))
             .ToList()
             .AsReadOnly();
 
         _logger.LogInformation(
-            "GetCurrentYearContractsAsync({Symbol}, year={Year}): {Count} contracts",
-            underlyingSymbol, year, filtered.Count);
+            "GetCurrentYearContractsAsync({Symbol}): {Count} contracts (from cache)",
+            underlyingSymbol, filtered.Count);
 
         return filtered;
     }
@@ -52,9 +54,28 @@ public sealed class ZerodhaInstrumentService : IZerodhaInstrumentService
     public async Task<IReadOnlyList<ZerodhaOptionContract>> GetAllCurrentYearContractsAsync(
         CancellationToken ct = default)
     {
+        var today = IstToday();
+        if (_cachedDate == today && _cache is not null)
+            return _cache;
+
+        await _lock.WaitAsync(ct);
+        try
+        {
+            if (_cachedDate == today && _cache is not null)
+                return _cache;
+
+            _cache = await FetchAndFilterAsync(ct);
+            _cachedDate = today;
+            return _cache;
+        }
+        finally { _lock.Release(); }
+    }
+
+    private async Task<IReadOnlyList<ZerodhaOptionContract>> FetchAndFilterAsync(CancellationToken ct)
+    {
         var year = DateTimeOffset.UtcNow.Year;
 
-        // Fetch NFO + BFO once in parallel — not once per underlying
+        // Download NFO + BFO in parallel — 2 HTTP calls total, once per day
         var results = await Task.WhenAll(Exchanges.Select(ex => FetchContractsAsync(ex, ct)));
 
         var filtered = results
@@ -69,11 +90,14 @@ public sealed class ZerodhaInstrumentService : IZerodhaInstrumentService
             .AsReadOnly();
 
         _logger.LogInformation(
-            "GetAllCurrentYearContractsAsync(year={Year}): {Count} contracts across {Underlyings}",
-            year, filtered.Count, string.Join(", ", AllowedUnderlyings));
+            "ZerodhaInstrumentService: fetched {Count} contracts (year={Year}) across {Underlyings} — cached until midnight IST",
+            filtered.Count, year, string.Join(", ", AllowedUnderlyings));
 
         return filtered;
     }
+
+    private static DateOnly IstToday() =>
+        DateOnly.FromDateTime(DateTime.UtcNow.AddHours(5.5));
 
     private async Task<IReadOnlyList<ZerodhaOptionContract>> FetchContractsAsync(
         string exchange, CancellationToken ct)
