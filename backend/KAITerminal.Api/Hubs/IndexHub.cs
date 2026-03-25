@@ -1,5 +1,6 @@
 using KAITerminal.Api.Services;
 using KAITerminal.Contracts.Streaming;
+using KAITerminal.Infrastructure.Services;
 using KAITerminal.Upstox;
 using Microsoft.AspNetCore.SignalR;
 
@@ -23,6 +24,7 @@ public sealed class IndexHub : Hub
     private readonly ISharedMarketDataService _sharedMarketData;
     private readonly IndexStreamManager       _manager;
     private readonly IHubContext<IndexHub>    _hubContext;
+    private readonly IServiceScopeFactory     _scopeFactory;
     private readonly ILogger<IndexHub>        _logger;
 
     public IndexHub(
@@ -30,51 +32,61 @@ public sealed class IndexHub : Hub
         ISharedMarketDataService sharedMarketData,
         IndexStreamManager       manager,
         IHubContext<IndexHub>    hubContext,
+        IServiceScopeFactory     scopeFactory,
         ILogger<IndexHub>        logger)
     {
         _upstox           = upstox;
         _sharedMarketData = sharedMarketData;
         _manager          = manager;
         _hubContext       = hubContext;
+        _scopeFactory     = scopeFactory;
         _logger           = logger;
     }
 
     public override async Task OnConnectedAsync()
     {
-        var qs = Context.GetHttpContext()?.Request.Query;
-        var token = qs?["upstoxToken"].ToString();
-        if (string.IsNullOrWhiteSpace(token))
-        {
-            Context.Abort();
-            return;
-        }
-
         var connectionId = Context.ConnectionId;
         var ct           = Context.ConnectionAborted;
 
-        // One-time REST call — gives accurate OHLC + netChange for the initial snapshot
+        // One-time REST call — gives accurate OHLC + netChange for the initial snapshot.
+        // Uses the admin-configured analytics token so the feed works for all users
+        // regardless of which broker they are authenticated with.
         try
         {
-            IReadOnlyDictionary<string, KAITerminal.Upstox.Models.Responses.MarketQuote> quotes;
-            using (UpstoxTokenContext.Use(token))
-                quotes = await _upstox.GetMarketQuotesAsync(IndexTokens, ct);
+            string? analyticsToken;
+            using (var scope = _scopeFactory.CreateScope())
+            {
+                var settingSvc = scope.ServiceProvider.GetRequiredService<IAppSettingService>();
+                analyticsToken = await settingSvc.GetAsync(AppSettingKeys.UpstoxAnalyticsToken, ct);
+            }
 
-            var normalised = quotes.ToDictionary(kv => kv.Key.Replace(':', '|'), kv => kv.Value);
-            var snapshot = IndexTokens
-                .Where(normalised.ContainsKey)
-                .Select(t => new
-                {
-                    instrumentToken = t,
-                    ltp       = normalised[t].LastPrice,
-                    open      = normalised[t].Ohlc?.Open,
-                    high      = normalised[t].Ohlc?.High,
-                    low       = normalised[t].Ohlc?.Low,
-                    netChange = normalised[t].NetChange,
-                })
-                .ToList();
+            if (string.IsNullOrWhiteSpace(analyticsToken))
+            {
+                _logger.LogDebug("IndexHub [{Id}]: analytics token not configured — skipping initial snapshot", connectionId);
+            }
+            else
+            {
+                IReadOnlyDictionary<string, KAITerminal.Upstox.Models.Responses.MarketQuote> quotes;
+                using (UpstoxTokenContext.Use(analyticsToken))
+                    quotes = await _upstox.GetMarketQuotesAsync(IndexTokens, ct);
 
-            if (snapshot.Count > 0)
-                await Clients.Caller.SendAsync("ReceiveIndexSnapshot", snapshot, ct);
+                var normalised = quotes.ToDictionary(kv => kv.Key.Replace(':', '|'), kv => kv.Value);
+                var snapshot = IndexTokens
+                    .Where(normalised.ContainsKey)
+                    .Select(t => new
+                    {
+                        instrumentToken = t,
+                        ltp       = normalised[t].LastPrice,
+                        open      = normalised[t].Ohlc?.Open,
+                        high      = normalised[t].Ohlc?.High,
+                        low       = normalised[t].Ohlc?.Low,
+                        netChange = normalised[t].NetChange,
+                    })
+                    .ToList();
+
+                if (snapshot.Count > 0)
+                    await Clients.Caller.SendAsync("ReceiveIndexSnapshot", snapshot, ct);
+            }
         }
         catch (Exception ex)
         {

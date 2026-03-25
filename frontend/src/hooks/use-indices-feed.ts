@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as signalR from "@microsoft/signalr";
 import { API_BASE_URL } from "@/lib/constants";
-import { useBrokerStore } from "@/stores/broker-store";
 
 export interface IndexQuote {
   ltp: number | null;
@@ -39,11 +38,8 @@ export function useIndicesFeed(): IndexPrices {
   const prevCloseRef = useRef<Partial<Record<keyof IndexPrices, number>>>({});
 
   useEffect(() => {
-    const upstoxToken = useBrokerStore.getState().getCredentials("upstox")?.accessToken;
-    if (!upstoxToken) return;
-
     const conn = new signalR.HubConnectionBuilder()
-      .withUrl(`${API_BASE_URL}/hubs/indices?upstoxToken=${encodeURIComponent(upstoxToken)}`)
+      .withUrl(`${API_BASE_URL}/hubs/indices`)
       .withAutomaticReconnect()
       .build();
 
