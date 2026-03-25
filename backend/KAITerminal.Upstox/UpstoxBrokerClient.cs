@@ -114,7 +114,10 @@ public sealed class UpstoxBrokerClient : IBrokerClient
         Quantity        = p.Quantity,
         BuyQuantity     = p.DayBuyQuantity,
         SellQuantity    = p.DaySellQuantity,
-        AveragePrice    = p.AveragePrice,
+        // sell_price / buy_price are the actual weighted avg entry prices per trade direction.
+        AveragePrice    = p.Quantity < 0
+                            ? (p.SellPrice != 0 ? p.SellPrice : p.ClosePrice)
+                            : (p.BuyPrice  != 0 ? p.BuyPrice  : p.ClosePrice),
         BuyPrice        = p.BuyPrice,
         SellPrice       = p.SellPrice,
         Ltp             = p.LastPrice,

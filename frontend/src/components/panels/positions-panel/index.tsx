@@ -191,8 +191,6 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
       <th className="px-3 py-1.5 text-right font-medium">Avg</th>
       <th className="px-3 py-1.5 text-right font-medium">LTP</th>
       <th className="px-3 py-1.5 text-right font-medium">P&amp;L</th>
-      <th className="px-3 py-1.5 text-right font-medium">Unrealised</th>
-      <th className="px-3 py-1.5 text-right font-medium">Realised</th>
       <th className="px-3 py-1.5 text-right">
         {selectedCount > 0 && (
           <div className="flex items-center justify-end gap-2">

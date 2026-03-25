@@ -76,9 +76,9 @@ export function PositionRow({
 }: PositionRowProps) {
   const [dialog, setDialog] = useState<DialogType>(null);
 
-  const avgPrice = p.quantity < 0 ? p.sellPrice : p.buyPrice;
-  const costBasis = Math.abs(p.quantity) * avgPrice;
+  const costBasis = Math.abs(p.quantity) * p.averagePrice;
   const toPct = (val: number) => costBasis > 0 ? (val / costBasis) * 100 : undefined;
+
 
   const lot = getLotSize(p.tradingSymbol);
   const num = parseInt(qtyValue, 10);
@@ -136,17 +136,11 @@ export function PositionRow({
           {p.quantity}
         </td>
         <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">
-          ₹{INR.format(p.quantity < 0 ? p.sellPrice : p.buyPrice)}
+          ₹{INR.format(p.averagePrice)}
         </td>
         <td className="px-3 py-1.5 text-right tabular-nums">₹{INR.format(p.ltp)}</td>
         <td className="px-3 py-1.5 text-right">
           <PnlCell value={p.pnl} pct={toPct(p.pnl)} />
-        </td>
-        <td className="px-3 py-1.5 text-right">
-          <PnlCell value={p.unrealised} pct={toPct(p.unrealised)} />
-        </td>
-        <td className="px-3 py-1.5 text-right">
-          <PnlCell value={p.realised} pct={toPct(p.realised)} />
         </td>
         <td className="px-3 py-1.5 text-right">
           <PositionActions

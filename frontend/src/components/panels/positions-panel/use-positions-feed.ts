@@ -70,10 +70,9 @@ export function usePositionsFeed(onOrderUpdate?: () => void) {
         const map = new Map(updates.map((u) => [u.instrumentToken, u.ltp]));
         return prev.map((p) => {
           const ltp = map.get(p.instrumentToken);
-          if (ltp === undefined) return p;
-          const avgPrice = p.quantity < 0 ? p.sellPrice : p.buyPrice;
-          const unrealised = p.quantity * (ltp - avgPrice);
-          return { ...p, ltp, unrealised, pnl: unrealised + p.realised };
+          if (ltp === undefined || p.ltp === 0) return p;
+          const pnl = p.pnl + p.quantity * (ltp - p.ltp);
+          return { ...p, ltp, pnl };
         });
       });
     });

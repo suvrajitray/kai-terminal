@@ -16,9 +16,7 @@ export function DashboardPage() {
 
   const hasPositions = positions.length > 0;
   const totalPnl        = hasPositions ? positions.reduce((s, p) => s + p.pnl, 0) : null;
-  const totalUnrealised = hasPositions ? positions.reduce((s, p) => s + p.unrealised, 0) : null;
-  const totalRealised   = hasPositions ? positions.reduce((s, p) => s + p.realised, 0) : null;
-  const openCount       = hasPositions ? positions.filter((p) => p.quantity !== 0).length : null;
+  const openCount = hasPositions ? positions.filter((p) => p.quantity !== 0).length : null;
 
   return (
     <div className="space-y-6 p-1">
@@ -33,10 +31,8 @@ export function DashboardPage() {
 
       {/* Row 1 — Stat Cards */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Today's MTM"    value={totalPnl}        index={0} colored flash prefix="₹" />
-        <StatCard label="Unrealised P&L" value={totalUnrealised} index={1} colored prefix="₹" />
-        <StatCard label="Realised P&L"   value={totalRealised}   index={2} colored prefix="₹" />
-        <CountCard label="Open Positions" value={openCount}       index={3} />
+        <StatCard label="Today's MTM"     value={totalPnl}  index={0} colored flash prefix="₹" />
+        <CountCard label="Open Positions" value={openCount} index={1} />
       </div>
 
       {/* Row 2 — Index Cards */}
