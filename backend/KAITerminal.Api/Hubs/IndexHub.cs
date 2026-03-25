@@ -85,7 +85,12 @@ public sealed class IndexHub : Hub
                     .ToList();
 
                 if (snapshot.Count > 0)
+                {
                     await Clients.Caller.SendAsync("ReceiveIndexSnapshot", snapshot, ct);
+                    _logger.LogInformation(
+                        "IndexHub [{Id}]: initial snapshot sent — {Count} index/indices",
+                        connectionId, snapshot.Count);
+                }
             }
         }
         catch (Exception ex)
@@ -95,6 +100,8 @@ public sealed class IndexHub : Hub
 
         // Subscribe index tokens to the shared feed (idempotent across connections)
         await _sharedMarketData.SubscribeAsync(IndexTokens.ToList(), FeedMode.Ltpc, ct);
+        _logger.LogInformation(
+            "IndexHub [{Id}]: subscribed {Count} index token(s) to shared feed", connectionId, IndexTokens.Count);
 
         // Per-connection feed handler — pushes LTP ticks to this client only
         EventHandler<LtpUpdate> handler = (_, update) => OnFeedReceived(connectionId, update);

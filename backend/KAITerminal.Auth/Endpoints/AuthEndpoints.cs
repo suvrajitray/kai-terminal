@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace KAITerminal.Auth.Endpoints;
 
@@ -27,10 +28,17 @@ public static class AuthEndpoints
             HttpContext ctx,
             JwtService jwtService,
             IUserService userService,
-            IConfiguration config) =>
+            IConfiguration config,
+            ILoggerFactory loggerFactory) =>
         {
+            var logger = loggerFactory.CreateLogger("KAITerminal.Auth.AuthEndpoints");
+
             var result = await ctx.AuthenticateAsync(GoogleDefaults.AuthenticationScheme);
-            if (!result.Succeeded) return Results.Unauthorized();
+            if (!result.Succeeded)
+            {
+                logger.LogWarning("Google OAuth callback failed — authentication result unsuccessful");
+                return Results.Unauthorized();
+            }
 
             var principal = result.Principal!;
             var email = principal.FindFirstValue(ClaimTypes.Email)!;
@@ -40,7 +48,14 @@ public static class AuthEndpoints
             var user = await userService.EnsureExistsAsync(email, name);
 
             if (!user.IsActive)
+            {
+                logger.LogWarning("OAuth login — {Email} is inactive, redirecting to /auth/inactive", email);
                 return Results.Redirect($"{config["Frontend:Url"]}/auth/inactive");
+            }
+
+            logger.LogInformation(
+                "OAuth login — {Email} ({Name}) authenticated — admin={IsAdmin}",
+                email, name, user.IsAdmin);
 
             var token = jwtService.GenerateToken(email, name, email, isActive: true, isAdmin: user.IsAdmin);
 

@@ -94,7 +94,7 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { return; }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in position poll loop for connection {ConnectionId}", _connectionId);
+                _logger.LogWarning(ex, "PositionStreamCoordinator [{Id}]: error in poll loop — will retry", _connectionId);
             }
         }
     }
@@ -225,6 +225,11 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
                         !status.Equals("rejected", StringComparison.OrdinalIgnoreCase))
                         continue;
 
+                    _logger.LogInformation(
+                        "PositionStreamCoordinator [{Id}]: order {Status} — {Broker} {OrderId} {Symbol} — {Message}",
+                        _connectionId, status.ToUpperInvariant(),
+                        broker.BrokerType, order.OrderId, order.TradingSymbol, order.StatusMessage);
+
                     await _hub.Clients.Client(_connectionId).SendAsync("ReceiveOrderUpdate", new
                     {
                         orderId       = order.OrderId,
@@ -237,8 +242,8 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { return; }
             catch (Exception ex)
             {
-                _logger.LogError(ex,
-                    "PositionStreamCoordinator [{Id}]: error polling orders for {Broker}",
+                _logger.LogWarning(ex,
+                    "PositionStreamCoordinator [{Id}]: error polling orders for {Broker} — will retry",
                     _connectionId, broker.BrokerType);
             }
         }

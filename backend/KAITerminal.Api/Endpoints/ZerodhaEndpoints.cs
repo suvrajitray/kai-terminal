@@ -33,6 +33,7 @@ public static class ZerodhaEndpoints
             ZerodhaClient zerodha,
             BrokerCredentialService credentials,
             HttpContext ctx,
+            ILoggerFactory lf,
             CancellationToken ct) =>
         {
             if (string.IsNullOrWhiteSpace(request.ApiKey)
@@ -60,6 +61,9 @@ public static class ZerodhaEndpoints
                     ApiSecret:   request.ApiSecret,
                     AccessToken: accessToken));
             }
+
+            lf.CreateLogger("ZerodhaEndpoints").LogInformation(
+                "Zerodha access token exchanged and persisted — {User}", userEmail);
 
             return Results.Ok(new { accessToken });
         });

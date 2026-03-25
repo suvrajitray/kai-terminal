@@ -22,12 +22,15 @@ public static class BrokerCredentialsEndpoints
         group.MapPost("/", async (
             SaveBrokerCredentialRequest request,
             ClaimsPrincipal user,
-            BrokerCredentialService svc) =>
+            BrokerCredentialService svc,
+            ILoggerFactory lf) =>
         {
             var username = GetEmail(user);
             if (username is null) return Results.Unauthorized();
 
             await svc.UpsertAsync(username, request);
+            lf.CreateLogger("BrokerCredentialsEndpoints").LogInformation(
+                "Broker credentials saved — {User} ({Broker})", username, request.BrokerName);
             return Results.Ok();
         });
 
@@ -35,24 +38,31 @@ public static class BrokerCredentialsEndpoints
             string brokerName,
             UpdateAccessTokenRequest request,
             ClaimsPrincipal user,
-            BrokerCredentialService svc) =>
+            BrokerCredentialService svc,
+            ILoggerFactory lf) =>
         {
             var username = GetEmail(user);
             if (username is null) return Results.Unauthorized();
 
             await svc.UpdateAccessTokenAsync(username, brokerName, request.AccessToken);
+            lf.CreateLogger("BrokerCredentialsEndpoints").LogInformation(
+                "Broker access token updated — {User} ({Broker})", username, brokerName);
             return Results.NoContent();
         });
 
         group.MapDelete("/{brokerName}", async (
             string brokerName,
             ClaimsPrincipal user,
-            BrokerCredentialService svc) =>
+            BrokerCredentialService svc,
+            ILoggerFactory lf) =>
         {
             var username = GetEmail(user);
             if (username is null) return Results.Unauthorized();
 
             var deleted = await svc.DeleteAsync(username, brokerName);
+            if (deleted)
+                lf.CreateLogger("BrokerCredentialsEndpoints").LogInformation(
+                    "Broker credentials deleted — {User} ({Broker})", username, brokerName);
             return deleted ? Results.NoContent() : Results.NotFound();
         });
     }

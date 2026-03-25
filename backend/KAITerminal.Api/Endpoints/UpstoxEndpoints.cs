@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using KAITerminal.Api.Mapping;
 using KAITerminal.Api.Models;
 using KAITerminal.Upstox;
@@ -18,10 +19,14 @@ public static class UpstoxEndpoints
 
         group.MapPost("/access-token", async (
             [FromBody] UpstoxTokenRequest request,
-            UpstoxClient upstox) =>
+            UpstoxClient upstox,
+            ClaimsPrincipal user,
+            ILoggerFactory lf) =>
         {
             var token = await upstox.GenerateTokenAsync(
                 request.ApiKey, request.ApiSecret, request.RedirectUri, request.Code);
+            lf.CreateLogger("UpstoxEndpoints").LogInformation(
+                "Upstox access token generated — {User}", user.FindFirstValue(ClaimTypes.Email) ?? "unknown");
             return Results.Ok(new { AccessToken = token.AccessToken });
         });
 
@@ -46,32 +51,53 @@ public static class UpstoxEndpoints
 
         group.MapPost("/positions/exit-all", async (
             UpstoxClient upstox,
+            ClaimsPrincipal user,
+            ILoggerFactory lf,
             [FromQuery] string? exchange = null) =>
         {
+            var logger = lf.CreateLogger("UpstoxEndpoints");
+            var email = user.FindFirstValue(ClaimTypes.Email) ?? "unknown";
+            var filterDesc = string.IsNullOrWhiteSpace(exchange) ? "all exchanges" : exchange;
+            logger.LogInformation("Exit all positions — {User} — filter: {Filter}", email, filterDesc);
+
             var exchanges = string.IsNullOrWhiteSpace(exchange)
                 ? null
                 : exchange.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                           .ToList()
                           .AsReadOnly();
             var ids = await upstox.ExitAllPositionsAsync(exchanges);
+
+            logger.LogInformation(
+                "Exit all complete — {User} — {Count} order(s) placed", email, ids.Count);
             return Results.Ok(new { OrderIds = ids });
         });
 
         group.MapPost("/positions/{instrumentToken}/exit", async (
             string instrumentToken,
             UpstoxClient upstox,
+            ClaimsPrincipal user,
+            ILoggerFactory lf,
             [FromQuery] string product = "I") =>
         {
             var id = await upstox.ExitPositionAsync(instrumentToken, product);
+            lf.CreateLogger("UpstoxEndpoints").LogInformation(
+                "Exit position — {User} — {Token} ({Product}) — order {OrderId}",
+                user.FindFirstValue(ClaimTypes.Email) ?? "unknown", instrumentToken, product, id);
             return Results.Ok(new { OrderId = id });
         });
 
         group.MapPost("/positions/{instrumentToken}/convert", async (
             string instrumentToken,
             [FromBody] ConvertPositionRequest request,
-            UpstoxClient upstox) =>
+            UpstoxClient upstox,
+            ClaimsPrincipal user,
+            ILoggerFactory lf) =>
         {
             await upstox.ConvertPositionAsync(instrumentToken, request.OldProduct, request.Quantity);
+            lf.CreateLogger("UpstoxEndpoints").LogInformation(
+                "Convert position — {User} — {Token} qty={Qty} from {OldProduct}",
+                user.FindFirstValue(ClaimTypes.Email) ?? "unknown",
+                instrumentToken, request.Quantity, request.OldProduct);
             return Results.Ok();
         });
 
@@ -82,17 +108,41 @@ public static class UpstoxEndpoints
 
         group.MapPost("/orders/v3", async (
             [FromBody] PlaceOrderRequest request,
-            UpstoxClient upstox) =>
-            Results.Ok(await upstox.PlaceOrderV3Async(request)));
+            UpstoxClient upstox,
+            ClaimsPrincipal user,
+            ILoggerFactory lf) =>
+        {
+            var result = await upstox.PlaceOrderV3Async(request);
+            lf.CreateLogger("UpstoxEndpoints").LogInformation(
+                "Order placed — {User} — qty={Qty} {Symbol} {Side} @ {Price} — ids=[{OrderIds}] latency={Latency}ms",
+                user.FindFirstValue(ClaimTypes.Email) ?? "unknown",
+                request.Quantity, request.InstrumentToken, request.TransactionType, request.Price,
+                string.Join(",", result.OrderIds), result.Latency);
+            return Results.Ok(result);
+        });
 
-        group.MapPost("/orders/cancel-all", async (UpstoxClient upstox) =>
-            Results.Ok(new { OrderIds = await upstox.CancelAllPendingOrdersAsync() }));
+        group.MapPost("/orders/cancel-all", async (
+            UpstoxClient upstox,
+            ClaimsPrincipal user,
+            ILoggerFactory lf) =>
+        {
+            var ids = await upstox.CancelAllPendingOrdersAsync();
+            lf.CreateLogger("UpstoxEndpoints").LogInformation(
+                "Cancel all pending orders — {User} — {Count} order(s) cancelled",
+                user.FindFirstValue(ClaimTypes.Email) ?? "unknown", ids.Count);
+            return Results.Ok(new { OrderIds = ids });
+        });
 
         group.MapDelete("/orders/{orderId}/v3", async (
             string orderId,
-            UpstoxClient upstox) =>
+            UpstoxClient upstox,
+            ClaimsPrincipal user,
+            ILoggerFactory lf) =>
         {
             var (id, latency) = await upstox.CancelOrderV3Async(orderId);
+            lf.CreateLogger("UpstoxEndpoints").LogInformation(
+                "Order cancelled — {User} — {OrderId} — latency {Latency}ms",
+                user.FindFirstValue(ClaimTypes.Email) ?? "unknown", id, latency);
             return Results.Ok(new { OrderId = id, Latency = latency });
         });
 

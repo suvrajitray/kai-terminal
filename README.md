@@ -384,8 +384,8 @@ Requires `X-Internal-Key` header matching `Api:InternalKey` secret. Returns 503 
 
 | Hub | Path | Auth | Description |
 |---|---|---|---|
-| `PositionsHub` | `/hubs/positions` | `?upstoxToken=` | Live positions + LTP |
-| `IndexHub` | `/hubs/indices` | `?upstoxToken=` | Live index quotes (REST polling, no WS slot used) |
+| `PositionsHub` | `/hubs/positions` | `?upstoxToken=` and/or `?zerodhaToken=&zerodhaApiKey=` | Live positions + LTP |
+| `IndexHub` | `/hubs/indices` | None (backend uses analytics token) | Live index quotes — works for all users regardless of broker |
 | `RiskHub` | `/hubs/risk` | JWT Bearer via `?access_token=` | Risk event alerts — browser toasts |
 
 ### Diagnostics
@@ -576,6 +576,34 @@ The `RiskEngine` section in `KAITerminal.Worker/appsettings.json` controls worke
 | `Exchanges` | `["NFO","BFO"]` | Only positions from these exchanges are included in MTM |
 
 The `AdminBroker:BrokerType` key in `KAITerminal.Api/appsettings.json` sets which broker's admin account owns the shared market data connection (default `"upstox"`).
+
+### API Log Messages
+
+Key operational events logged by the API process at `Information` level (categories: `UpstoxEndpoints`, `ZerodhaEndpoints`, `BrokerCredentialsEndpoints`, `KAITerminal.Auth.AuthEndpoints`, `KAITerminal.Api.Hubs`):
+
+| Event | Level | Sample log message |
+|---|---|---|
+| OAuth login success | Info | `OAuth login — user@email.com (Full Name) authenticated — admin=False` |
+| OAuth login — inactive user | Warn | `OAuth login — user@email.com is inactive, redirecting to /auth/inactive` |
+| OAuth callback failed | Warn | `Google OAuth callback failed — authentication result unsuccessful` |
+| Upstox token generated | Info | `Upstox access token generated — user@email.com` |
+| Zerodha token exchanged | Info | `Zerodha access token exchanged and persisted — user@email.com` |
+| Broker credentials saved | Info | `Broker credentials saved — user@email.com (upstox)` |
+| Broker token updated | Info | `Broker access token updated — user@email.com (zerodha)` |
+| Broker credentials deleted | Info | `Broker credentials deleted — user@email.com (upstox)` |
+| Order placed | Info | `Order placed — user@email.com — qty=50 NSE_FO|57352 Sell @ 120 — ids=[abc123] latency=4ms` |
+| Order cancelled | Info | `Order cancelled — user@email.com — abc123 — latency=3ms` |
+| Cancel all pending | Info | `Cancel all pending orders — user@email.com — 3 order(s) cancelled` |
+| Exit all positions | Info | `Exit all positions — user@email.com — filter: NFO,BFO` then `Exit all complete — user@email.com — 4 order(s) placed` |
+| Exit single position | Info | `Exit position — user@email.com — NSE_FO|57352 (I) — order abc123` |
+| Convert position | Info | `Convert position — user@email.com — NSE_FO|57352 qty=50 from I` |
+| Order COMPLETE/REJECTED | Info | `PositionStreamCoordinator [connId]: order COMPLETE — upstox abc123 NIFTY24... — ` |
+| RiskHub connected | Info | `RiskHub: user@email.com connected — connId` |
+| RiskHub disconnected | Info | `RiskHub: user@email.com disconnected — connId` |
+| RiskHub rejected (no JWT user) | Warn | `RiskHub: connection connId rejected — no user identifier in JWT` |
+| IndexHub snapshot sent | Info | `IndexHub [connId]: initial snapshot sent — 5 index/indices` |
+| IndexHub subscribed | Info | `IndexHub [connId]: subscribed 5 index token(s) to shared feed` |
+| IndexHub no analytics token | Debug | `IndexHub [connId]: analytics token not configured — skipping initial snapshot` |
 
 ### Risk Engine Log Messages
 
@@ -785,9 +813,18 @@ App Insights receives all `KAITerminal.RiskEngine` logs at `Information+` — th
 **API** (`appsettings.json`):
 ```json
 "ApplicationInsights": {
-  "LogLevel": { "Default": "Warning" }
+  "LogLevel": {
+    "Default": "Warning",
+    "UpstoxEndpoints": "Information",
+    "ZerodhaEndpoints": "Information",
+    "BrokerCredentialsEndpoints": "Information",
+    "KAITerminal.Auth.AuthEndpoints": "Information",
+    "KAITerminal.Api.Hubs": "Information"
+  }
 }
 ```
+
+This captures all order placement, exit, cancel, auth, and credential operations in App Insights while keeping noisy framework logs at `Warning`.
 
 ### Suggested Azure Monitor Alerts
 
@@ -797,6 +834,8 @@ App Insights receives all `KAITerminal.RiskEngine` logs at `Information+` — th
 | Square-off failure | Any `"Square-off FAILED"` trace |
 | Session crash loop | More than 3 `"Restarting session"` traces in 10 min |
 | High API error rate | More than 10 Upstox exceptions in 5 min |
+| Repeated order rejections | More than 3 `"Order placed"` traces where response contains rejected status in 5 min |
+| Auth failures | More than 5 `"Google OAuth callback failed"` traces in 10 min |
 
 ### Troubleshooting
 
