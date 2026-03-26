@@ -23,7 +23,7 @@ export function PanelWrapper({
 }: PanelWrapperProps) {
   return (
     <div className="flex h-full flex-col">
-      <div className="flex shrink-0 items-center justify-between border-b border-border bg-muted/40 px-3 py-2">
+      <div className="flex shrink-0 items-center justify-between border-b border-border border-l-2 border-l-primary/30 bg-muted/50 px-3 py-2">
         <div className="flex items-center gap-2">
           {icon}
           <span className="text-sm font-semibold tracking-tight">{title}</span>

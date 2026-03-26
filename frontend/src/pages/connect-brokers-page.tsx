@@ -55,7 +55,9 @@ export function ConnectBrokersPage() {
   const multipleConnected = connectedBrokers.length > 1;
 
   return (
-    <div className="space-y-6">
+    <div className="relative space-y-6">
+      {/* Ambient glow */}
+      <div className="pointer-events-none absolute -top-20 left-1/2 h-[400px] w-[800px] -translate-x-1/2 rounded-full bg-primary/5 blur-[120px]" />
       <div>
         <h1 className="text-2xl font-semibold">Connect Brokers</h1>
         <p className="mt-1 text-sm text-muted-foreground">

@@ -28,12 +28,14 @@ export function Header() {
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.3 }}
-      className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-sm"
+      className="relative sticky top-0 z-50 bg-background/80 backdrop-blur-sm"
     >
       <div className="flex h-14 items-center justify-between px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-6">
           <Link to="/dashboard" className="flex items-center gap-2 font-semibold">
-            <Activity className="size-5 text-primary" />
+            <div className="flex size-7 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
+              <Activity className="size-4 text-primary" />
+            </div>
             <span>{APP_NAME}</span>
           </Link>
           <nav className="flex items-center gap-0.5">
@@ -73,6 +75,7 @@ export function Header() {
           <UserMenu />
         </div>
       </div>
+      <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-border/60 to-transparent" />
     </motion.header>
   );
 }

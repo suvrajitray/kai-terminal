@@ -110,7 +110,7 @@ export function StatsBar({
                 const val = mtmByBroker[b.id] ?? 0;
                 return (
                   <span key={b.id} className="flex items-center gap-1">
-                    {i > 0 && <span className="text-muted-foreground/40">·</span>}
+                    {i > 0 && <span className="text-muted-foreground/60">·</span>}
                     <BrokerBadge brokerId={b.id} />
                     <span className={cn("tabular-nums font-medium", val >= 0 ? "text-green-500" : "text-red-500")}>
                       {val >= 0 ? "+" : "-"}₹{Math.abs(val).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
@@ -169,7 +169,7 @@ export function StatsBar({
             ) : (
               ppBrokers.map((b, i) => (
                 <span key={b.broker} className="flex items-center gap-1">
-                  {i > 0 && <span className="text-muted-foreground/40">·</span>}
+                  {i > 0 && <span className="text-muted-foreground/60">·</span>}
                   <BrokerBadge brokerId={b.broker} />
                   <span className="text-muted-foreground">TGT</span>
                   <span className="font-medium tabular-nums text-green-500">
@@ -201,7 +201,7 @@ export function StatsBar({
                 ₹{allFunds.upstox.availableMargin.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
               </span>
             </span>
-            <span className="text-muted-foreground/40">·</span>
+            <span className="text-muted-foreground/60">·</span>
             <span className="flex items-center gap-1">
               <BrokerBadge brokerId="zerodha" />
               <span className="font-semibold tabular-nums text-foreground">

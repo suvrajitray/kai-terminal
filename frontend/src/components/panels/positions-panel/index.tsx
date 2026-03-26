@@ -277,7 +277,7 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
           <EmptyState icon={LayoutList} message="No positions" />
         ) : (
           <table className="w-full text-xs">
-            <thead className="sticky top-0 bg-background z-10">{cols}</thead>
+            <thead className="sticky top-0 z-10 bg-muted/20 backdrop-blur-sm">{cols}</thead>
             <tbody>
               {openPositions.map(renderRow)}
               {closedPositions.length > 0 && openPositions.length > 0 && (

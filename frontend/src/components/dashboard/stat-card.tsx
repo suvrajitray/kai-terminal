@@ -44,7 +44,7 @@ export function StatCard({ label, value, index, colored = false, prefix = "", fl
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.07 }}
     >
-      <Card className="border-border/40 bg-muted/10">
+      <Card className="border-border/40 bg-muted/20">
         <CardContent className="pt-5 pb-5 px-5">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">{label}</p>
           {value === null ? (
@@ -78,7 +78,7 @@ export function CountCard({ label, value, index }: { label: string; value: numbe
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.07 }}
     >
-      <Card className="border-border/40 bg-muted/10">
+      <Card className="border-border/40 bg-muted/20">
         <CardContent className="pt-5 pb-5 px-5">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">{label}</p>
           {value === null ? (
