@@ -128,28 +128,23 @@ Connect to local PostgreSQL:
 
 Seq provides a searchable web UI for all structured logs from the Api and Worker. It runs as a Docker container — no separate install needed beyond Docker.
 
+Seq 2025+ requires either a password or explicit no-auth flag on first run. For local dev, disable auth:
+
 ```bash
 docker run -d --name seq \
-  -p 5341:5341 -p 5342:80 \
+  -p 5341:5341 -p 8080:80 \
   -e ACCEPT_EULA=Y \
+  -e SEQ_FIRSTRUN_NOAUTHENTICATION=true \
+  -v "$HOME/.seq-data:/data" \
   datalust/seq:latest
 ```
 
-Seq UI at: `http://localhost:5342`
+Seq UI at: `http://localhost:8080`
 
 To start/stop:
 ```bash
 docker start seq
 docker stop seq
-```
-
-To persist logs across restarts, add a volume mount:
-```bash
-docker run -d --name seq \
-  -p 5341:5341 -p 5342:80 \
-  -e ACCEPT_EULA=Y \
-  -v "$HOME/.seq-data:/data" \
-  datalust/seq:latest
 ```
 
 Both the Api and Worker send structured logs to `http://localhost:5341` automatically. If Seq is not running, they fall back to console-only logging without errors.
@@ -255,7 +250,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS "ix_userriskconfigs_username_broker"
 Open three terminal tabs. Start Seq first if you want structured log search:
 
 ```bash
-docker start seq   # http://localhost:5342
+docker start seq   # http://localhost:8080
 ```
 
 ### Tab 1 — API
@@ -346,4 +341,4 @@ cd frontend && npm run lint
 | Frontend (Vite) | 3000 (HTTP) | React UI |
 | Redis | 6379 | LTP pub/sub (`ltp:feed`, `ltp:sub-req`) + app settings cache + SignalR backplane |
 | PostgreSQL | 5432 | Persistent storage |
-| Seq (Docker) | 5341 (ingest) / 5342 (UI) | Structured log viewer — `http://localhost:5342` |
+| Seq (Docker) | 5341 (ingest) / 8080 (UI) | Structured log viewer — `http://localhost:8080` |
