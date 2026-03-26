@@ -13,7 +13,7 @@ This guide deploys KAI Terminal on a single Azure VM running Ubuntu 24.04 LTS.
 | Storage | Standard SSD |
 | Series | Bsas_v2 (burstable) |
 
-**Verdict: Good choice for personal/small-team use.** The app runs 4 processes (API + Worker + Redis + Nginx) which comfortably fit in 8 GB.
+**Verdict: Good choice for personal/small-team use.** The app runs 5 processes (API + Worker + Redis + PostgreSQL + Nginx) which comfortably fit in 8 GB.
 
 **One thing to watch:** The B-series VMs in Azure are *burstable* — they accumulate CPU credits during idle periods and spend them during spikes. During market hours (9:15–15:30 IST), the Worker runs continuously. If CPU credits drain, performance throttles to the baseline (20% of 1 vCPU). In practice the app's CPU load is very low, so this should not be an issue. Monitor the **CPU Credits Remaining** metric in Azure Monitor during the first few trading days. If credits regularly hit zero, consider upgrading to **D2as_v5** (non-burstable, similar cost).
 
@@ -31,8 +31,8 @@ Internet → Azure NSG → Nginx (443/80)
 localhost:5001  KAITerminal.Api    (systemd: kaiterminal-api)
 localhost:5341  KAITerminal.Worker (systemd: kaiterminal-worker)
 localhost:6379  Redis              (systemd: redis)
+localhost:5432  PostgreSQL         (systemd: postgresql)
 localhost:8080  Seq                (Docker container, optional)
-Neon (cloud)    PostgreSQL
 ```
 
 ---
@@ -78,20 +78,53 @@ Secure Redis — bind to localhost only (default on Ubuntu, verify):
 grep "^bind" /etc/redis/redis.conf   # should show: bind 127.0.0.1 -::1
 ```
 
-### 5. Install Nginx
+### 5. Install PostgreSQL
+
+```bash
+sudo apt install -y postgresql postgresql-contrib
+sudo systemctl enable postgresql
+sudo systemctl start postgresql
+```
+
+Create the database and user:
+```bash
+sudo -u postgres psql
+```
+
+```sql
+CREATE USER kaiuser WITH PASSWORD 'choose-a-strong-password';
+CREATE DATABASE kaiterminal OWNER kaiuser;
+GRANT ALL PRIVILEGES ON DATABASE kaiterminal TO kaiuser;
+\q
+```
+
+Verify the connection:
+```bash
+psql -U kaiuser -d kaiterminal -h localhost -c "SELECT version();"
+```
+
+PostgreSQL binds to localhost by default on Ubuntu — no extra hardening needed. Verify:
+```bash
+grep "^listen_addresses" /etc/postgresql/*/main/postgresql.conf
+# should show: listen_addresses = 'localhost'
+```
+
+> The app uses `EnsureCreatedAsync` on startup — tables are created automatically on first run.
+
+### 6. Install Nginx
 
 ```bash
 sudo apt install -y nginx
 sudo systemctl enable nginx
 ```
 
-### 6. Install Certbot (Let's Encrypt SSL)
+### 7. Install Certbot (Let's Encrypt SSL)
 
 ```bash
 sudo apt install -y certbot python3-certbot-nginx
 ```
 
-### 7. Install Docker (optional — for Seq log viewer)
+### 8. Install Docker (optional — for Seq log viewer)
 
 ```bash
 curl -fsSL https://get.docker.com | sudo sh
@@ -178,7 +211,7 @@ sudo nano /etc/kaiterminal/api.env
 ```
 
 ```env
-ConnectionStrings__DefaultConnection=Host=<neon-host>;Database=kaiterminal;Username=<user>;Password=<pass>;SslMode=Require
+ConnectionStrings__DefaultConnection=Host=localhost;Database=kaiterminal;Username=kaiuser;Password=<your-db-password>
 ConnectionStrings__Redis=localhost:6379
 Jwt__Key=<random-256-bit-secret>
 GoogleAuth__ClientId=<google-oauth-client-id>
@@ -200,7 +233,7 @@ sudo nano /etc/kaiterminal/worker.env
 ```
 
 ```env
-ConnectionStrings__DefaultConnection=Host=<neon-host>;Database=kaiterminal;Username=<user>;Password=<pass>;SslMode=Require
+ConnectionStrings__DefaultConnection=Host=localhost;Database=kaiterminal;Username=kaiuser;Password=<your-db-password>
 ConnectionStrings__Redis=localhost:6379
 Api__InternalKey=<same-uuid-as-api>
 Api__BaseUrl=http://localhost:5001
@@ -341,7 +374,8 @@ to **Authorized redirect URIs**. Without this, Google login will fail.
 
 - [ ] VM created, SSH key installed
 - [ ] DNS A record pointing to VM public IP
-- [ ] All dependencies installed (.NET, Node, Redis, Nginx, Certbot)
+- [ ] All dependencies installed (.NET, Node, Redis, PostgreSQL, Nginx, Certbot)
+- [ ] PostgreSQL `kaiuser` + `kaiterminal` database created
 - [ ] Repo cloned to `/opt/kaiterminal/repo`
 - [ ] Frontend built and copied to `/var/www/kaiterminal`
 - [ ] API and Worker published to `/opt/kaiterminal/api` and `/opt/kaiterminal/worker`
@@ -389,7 +423,7 @@ sudo systemctl restart kaiterminal-worker
 
 ```bash
 # Service status
-sudo systemctl status kaiterminal-api kaiterminal-worker redis nginx
+sudo systemctl status kaiterminal-api kaiterminal-worker redis postgresql nginx
 
 # Live API logs
 journalctl -u kaiterminal-api -f --since "1h ago"
@@ -400,7 +434,10 @@ journalctl -u kaiterminal-worker -f
 # Redis memory usage
 redis-cli info memory | grep used_memory_human
 
-# Disk space
+# PostgreSQL database size
+sudo -u postgres psql -c "SELECT pg_size_pretty(pg_database_size('kaiterminal'));"
+
+# Disk space (PostgreSQL data lives in /var/lib/postgresql)
 df -h /
 
 # CPU credit balance (check in Azure Monitor portal)
@@ -417,5 +454,5 @@ df -h /
 | KAITerminal.Api | 5001 (HTTP) | localhost only |
 | KAITerminal.Worker | — | localhost only |
 | Redis | 6379 | localhost only |
-| PostgreSQL (Neon) | 5432 | Neon cloud |
+| PostgreSQL | 5432 | localhost only |
 | Seq | 5341 (ingest), 8080 (UI) | localhost only — SSH tunnel to access |

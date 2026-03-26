@@ -1,7 +1,7 @@
 [Unit]
 Description=KAI Terminal Worker (Risk Engine + Market Data)
-After=network.target redis.service kaiterminal-api.service
-Wants=redis.service
+After=network.target redis.service postgresql.service kaiterminal-api.service
+Wants=redis.service postgresql.service
 
 [Service]
 Type=simple
