@@ -1,0 +1,28 @@
+[Unit]
+Description=KAI Terminal API
+After=network.target redis.service
+Wants=redis.service
+
+[Service]
+Type=simple
+User=kaiterm
+Group=kaiterm
+WorkingDirectory=/opt/kaiterminal/api
+ExecStart=/usr/bin/dotnet /opt/kaiterminal/api/KAITerminal.Api.dll
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=kaiterminal-api
+
+# ASP.NET Core — listen on HTTP internally; Nginx handles SSL termination
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://localhost:5001
+# Tells ASP.NET Core to trust X-Forwarded-Proto / X-Forwarded-For from Nginx
+Environment=ASPNETCORE_FORWARDEDHEADERS_ENABLED=true
+
+# Secrets — file created manually on the server, chmod 600, never committed
+EnvironmentFile=/etc/kaiterminal/api.env
+
+[Install]
+WantedBy=multi-user.target

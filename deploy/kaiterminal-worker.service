@@ -1,0 +1,24 @@
+[Unit]
+Description=KAI Terminal Worker (Risk Engine + Market Data)
+After=network.target redis.service kaiterminal-api.service
+Wants=redis.service
+
+[Service]
+Type=simple
+User=kaiterm
+Group=kaiterm
+WorkingDirectory=/opt/kaiterminal/worker
+ExecStart=/usr/bin/dotnet /opt/kaiterminal/worker/KAITerminal.Worker.dll
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=kaiterminal-worker
+
+Environment=DOTNET_ENVIRONMENT=Production
+
+# Secrets — file created manually on the server, chmod 600, never committed
+EnvironmentFile=/etc/kaiterminal/worker.env
+
+[Install]
+WantedBy=multi-user.target
