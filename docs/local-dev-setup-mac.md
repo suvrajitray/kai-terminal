@@ -35,7 +35,20 @@ node --version   # 20+
 npm --version
 ```
 
-### 4. Install Redis
+### 4. Install Docker
+
+Docker is required to run Seq (structured log viewer).
+
+```bash
+brew install --cask docker
+```
+
+Open the Docker app from Applications to start the Docker daemon. Verify:
+```bash
+docker --version
+```
+
+### 5. Install Redis
 
 ```bash
 brew install redis
@@ -55,7 +68,7 @@ redis-cli ping   # should return PONG
 
 ## Database
 
-### 5. Install PostgreSQL
+### 6. Install PostgreSQL
 
 ```bash
 brew install postgresql
@@ -110,6 +123,36 @@ Connect to local PostgreSQL:
 - Database: `kaiterminal`
 
 > TablePlus can also connect to Neon — use the Neon connection string with SSL mode set to `Require`.
+
+### Seq — Structured Log Viewer
+
+Seq provides a searchable web UI for all structured logs from the Api and Worker. It runs as a Docker container — no separate install needed beyond Docker.
+
+```bash
+docker run -d --name seq \
+  -p 5341:5341 -p 5342:80 \
+  -e ACCEPT_EULA=Y \
+  datalust/seq:latest
+```
+
+Seq UI at: `http://localhost:5342`
+
+To start/stop:
+```bash
+docker start seq
+docker stop seq
+```
+
+To persist logs across restarts, add a volume mount:
+```bash
+docker run -d --name seq \
+  -p 5341:5341 -p 5342:80 \
+  -e ACCEPT_EULA=Y \
+  -v "$HOME/.seq-data:/data" \
+  datalust/seq:latest
+```
+
+Both the Api and Worker send structured logs to `http://localhost:5341` automatically. If Seq is not running, they fall back to console-only logging without errors.
 
 ### RedisInsight — Redis
 
@@ -209,7 +252,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS "ix_userriskconfigs_username_broker"
 
 ## Running Locally
 
-Open three terminal tabs.
+Open three terminal tabs. Start Seq first if you want structured log search:
+
+```bash
+docker start seq   # http://localhost:5342
+```
 
 ### Tab 1 — API
 
@@ -299,3 +346,4 @@ cd frontend && npm run lint
 | Frontend (Vite) | 3000 (HTTP) | React UI |
 | Redis | 6379 | LTP pub/sub (`ltp:feed`, `ltp:sub-req`) + app settings cache + SignalR backplane |
 | PostgreSQL | 5432 | Persistent storage |
+| Seq (Docker) | 5341 (ingest) / 5342 (UI) | Structured log viewer — `http://localhost:5342` |
