@@ -1,42 +1,9 @@
-import { Navigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { motion } from "motion/react";
-import { Activity, TrendingUp, Shield, Zap, BarChart2, RefreshCw } from "lucide-react";
+import { Activity, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/stores/auth-store";
 import { APP_NAME, API_BASE_URL } from "@/lib/constants";
-
-const FEATURES = [
-  {
-    icon: Zap,
-    title: "Quick Trade",
-    desc: "Place CE/PE/Both orders by target premium in one click",
-  },
-  {
-    icon: TrendingUp,
-    title: "Live P&L",
-    desc: "Real-time positions with LTP updates via WebSocket",
-  },
-  {
-    icon: Shield,
-    title: "Risk Engine",
-    desc: "Auto exit on stop loss, profit target, and trailing SL",
-  },
-  {
-    icon: BarChart2,
-    title: "Index Ticker",
-    desc: "Live NIFTY, SENSEX, BANKNIFTY with change % always visible",
-  },
-  {
-    icon: RefreshCw,
-    title: "Shift Strikes",
-    desc: "Roll positions to higher/lower strikes with one action",
-  },
-  {
-    icon: Activity,
-    title: "Order Stream",
-    desc: "Real-time order updates and instant rejection alerts",
-  },
-];
 
 function GoogleIcon() {
   return (
@@ -61,120 +28,74 @@ export function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-svh overflow-hidden bg-background">
+    <div className="relative flex min-h-svh flex-col items-center justify-center overflow-hidden bg-background px-4">
 
-      {/* Ambient glows */}
+      {/* Ambient glow */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -top-60 left-1/2 h-[700px] w-[900px] -translate-x-1/2 rounded-full bg-primary/10 blur-[140px]" />
-        <div className="absolute bottom-20 right-0 h-[400px] w-[500px] rounded-full bg-primary/5 blur-[120px]" />
+        <div className="absolute -top-40 left-1/2 h-[600px] w-[800px] -translate-x-1/2 rounded-full bg-primary/8 blur-[140px]" />
       </div>
 
-      {/* Grid overlay */}
+      {/* Grid */}
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.025]"
+        className="pointer-events-none absolute inset-0 opacity-[0.02]"
         style={{
           backgroundImage:
             "linear-gradient(hsl(var(--foreground)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--foreground)) 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
+          backgroundSize: "56px 56px",
         }}
       />
 
-      {/* Top nav */}
-      <nav className="relative z-10 flex items-center justify-between px-6 py-5 sm:px-10">
-        <div className="flex items-center gap-2.5">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-primary/15">
-            <Activity className="size-4 text-primary" />
+      {/* Back to home */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+        className="absolute left-6 top-6 sm:left-10"
+      >
+        <Link
+          to="/"
+          className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <ArrowLeft className="size-3.5" />
+          Back to home
+        </Link>
+      </motion.div>
+
+      {/* Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45 }}
+        className="relative z-10 w-full max-w-sm rounded-2xl border border-border/50 bg-card/60 px-8 py-10 shadow-xl shadow-black/20 backdrop-blur-md"
+      >
+        {/* Logo */}
+        <div className="mb-8 flex flex-col items-center gap-3 text-center">
+          <div className="flex size-11 items-center justify-center rounded-xl bg-primary/15 ring-1 ring-primary/25">
+            <Activity className="size-5 text-primary" />
           </div>
-          <span className="font-semibold tracking-tight">{APP_NAME}</span>
+          <div>
+            <h1 className="text-lg font-semibold tracking-tight">{APP_NAME}</h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">Sign in to your account</p>
+          </div>
         </div>
-        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-          <Button variant="outline" size="sm" className="gap-2" onClick={handleLogin}>
+
+        {/* Google button */}
+        <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
+          <Button
+            size="lg"
+            variant="outline"
+            className="h-11 w-full gap-3 border-border/60 font-medium hover:bg-muted/40"
+            onClick={handleLogin}
+          >
             <GoogleIcon />
-            Sign in
+            Continue with Google
           </Button>
         </motion.div>
-      </nav>
 
-      {/* Hero */}
-      <div className="relative z-10 mx-auto max-w-4xl px-6 pb-20 pt-16 text-center sm:px-10 sm:pt-24">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3.5 py-1 text-xs font-medium text-primary">
-            <span className="size-1.5 rounded-full bg-primary animate-pulse" />
-            Built for Indian F&amp;O traders
-          </span>
-        </motion.div>
-
-        <motion.h1
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="mt-4 text-4xl font-bold tracking-tight sm:text-6xl"
-        >
-          Trade smarter.
-          <br />
-          <span className="text-primary">React faster.</span>
-        </motion.h1>
-
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="mx-auto mt-5 max-w-xl text-base text-muted-foreground sm:text-lg"
-        >
-          A professional trading terminal with real-time positions, one-click option orders,
-          and an automated risk engine — built for serious F&amp;O traders.
-        </motion.p>
-
-        {/* CTA */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-          className="mt-10 flex flex-col items-center gap-3"
-        >
-          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-            <Button
-              size="lg"
-              className="h-12 gap-3 px-8 text-base font-semibold shadow-lg shadow-primary/20"
-              onClick={handleLogin}
-            >
-              <GoogleIcon />
-              Continue with Google
-            </Button>
-          </motion.div>
-        </motion.div>
-      </div>
-
-      {/* Features grid */}
-      <div className="relative z-10 mx-auto max-w-4xl px-6 pb-24 sm:px-10">
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-          className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
-        >
-          {FEATURES.map(({ icon: Icon, title, desc }, i) => (
-            <motion.div
-              key={title}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: 0.45 + i * 0.06 }}
-              className="rounded-xl border border-border/40 bg-card/40 p-4 backdrop-blur-sm"
-            >
-              <div className="mb-3 flex size-8 items-center justify-center rounded-lg bg-primary/10">
-                <Icon className="size-4 text-primary" />
-              </div>
-              <p className="mb-1 text-sm font-semibold">{title}</p>
-              <p className="text-xs text-muted-foreground">{desc}</p>
-            </motion.div>
-          ))}
-        </motion.div>
-      </div>
-
+        <p className="mt-6 text-center text-[11px] leading-relaxed text-muted-foreground">
+          Access is invite-only. Your account will be reviewed before activation.
+        </p>
+      </motion.div>
     </div>
   );
 }

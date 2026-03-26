@@ -1,6 +1,7 @@
-import { Routes, Route, Navigate, Outlet } from "react-router-dom";
+import { Routes, Route, Outlet } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AppLayout } from "@/components/layout/app-layout";
+import { LandingPage } from "@/pages/landing-page";
 import { LoginPage } from "@/pages/login-page";
 import { AuthCallbackPage } from "@/pages/auth-callback-page";
 import { DashboardPage } from "@/pages/dashboard-page";
@@ -38,7 +39,7 @@ function App() {
         </Route>
         </Route>
       </Route>
-      <Route path="/" element={<Navigate to="/connect-brokers" replace />} />
+      <Route path="/" element={<LandingPage />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
