@@ -181,7 +181,8 @@ export interface ShiftPositionPayload {
   qty: number;
   direction: "up" | "down";
   product: string;
-  targetPremium: number;
+  currentStrike: number;
+  strikeGap: number;
   underlyingKey: string;
   expiry: string;
   instrumentType: string;
@@ -190,6 +191,20 @@ export interface ShiftPositionPayload {
 
 export async function shiftPosition(broker: string, payload: ShiftPositionPayload): Promise<void> {
   await apiClient.post(`/api/${broker}/positions/shift`, payload);
+}
+
+export interface ByPriceOrderPayload {
+  underlyingKey: string;
+  expiry: string;
+  instrumentType: string;
+  targetPremium: number;
+  qty: number;
+  transactionType: "Buy" | "Sell";
+  product: string;
+}
+
+export async function placeOrderByPrice(broker: string, payload: ByPriceOrderPayload): Promise<void> {
+  await apiClient.post(`/api/${broker}/orders/by-price`, payload);
 }
 
 export async function placeOrder(

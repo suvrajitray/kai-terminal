@@ -97,8 +97,7 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
     if (qty === 0) return;
 
     const position = positions.find((p) => p.instrumentToken === token && p.product === product)!;
-    const offset = getShiftOffset(index);
-    const targetPremium = position.ltp + (direction === "up" ? offset : -offset);
+    const strikeGap = getShiftOffset(index);
     const underlyingKey = UNDERLYING_KEYS[index];
 
     return withActing(token + ":shift-" + direction, () =>
@@ -108,7 +107,8 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
         qty,
         direction,
         product,
-        targetPremium,
+        currentStrike: contract.strikePrice,
+        strikeGap,
         underlyingKey,
         expiry: contract.expiry,
         instrumentType: contract.instrumentType,

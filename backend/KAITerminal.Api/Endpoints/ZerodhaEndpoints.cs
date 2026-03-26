@@ -129,17 +129,18 @@ public static class ZerodhaEndpoints
 
         group.MapPost("/positions/shift", async (
             [FromBody] ShiftPositionRequest request,
-            ShiftService shiftSvc,
+            OptionStrikeService strikeSvc,
             ZerodhaClient zerodha,
             IZerodhaInstrumentService zerodhaInstruments,
             ClaimsPrincipal user,
             ILoggerFactory lf,
             CancellationToken ct) =>
         {
-            // ShiftService returns the Upstox instrument key (format: "{exchange}|{exchange_token}")
-            var upstoxKey = await shiftSvc.FindTargetStrikeAsync(
+            // OptionStrikeService returns the Upstox instrument key (format: "{exchange}|{exchange_token}")
+            var strikeGap = request.Direction == "up" ? request.StrikeGap : -request.StrikeGap;
+            var upstoxKey = await strikeSvc.FindByStrikeGapAsync(
                 request.UnderlyingKey, request.Expiry, request.InstrumentType,
-                request.TargetPremium, request.Direction, ct);
+                request.CurrentStrike, strikeGap, ct);
 
             if (upstoxKey is null)
                 return Results.Problem("No matching strike found in option chain.");
@@ -251,6 +252,42 @@ public static class ZerodhaEndpoints
                 user.FindFirstValue(ClaimTypes.Email) ?? "unknown",
                 request.InstrumentToken, request.Quantity, request.TransactionType, orderId);
             return Results.Ok(new { orderId });
+        });
+
+        group.MapPost("/orders/by-price", async (
+            [FromBody] ByPriceOrderRequest request,
+            OptionStrikeService strikeSvc,
+            ZerodhaClient zerodha,
+            IZerodhaInstrumentService zerodhaInstruments,
+            ClaimsPrincipal user,
+            ILoggerFactory lf,
+            CancellationToken ct) =>
+        {
+            var upstoxKey = await strikeSvc.FindByPriceAsync(
+                request.UnderlyingKey, request.Expiry, request.InstrumentType,
+                request.TargetPremium, ct);
+
+            if (upstoxKey is null)
+                return Results.Problem("No matching strike found in option chain.");
+
+            var exchangeToken = upstoxKey.Contains('|') ? upstoxKey.Split('|')[1] : upstoxKey;
+            var contracts     = await zerodhaInstruments.GetAllCurrentYearContractsAsync(ct);
+            var match         = contracts.FirstOrDefault(c => c.ExchangeToken == exchangeToken);
+
+            if (match is null)
+                return Results.Problem($"Zerodha trading symbol not found for exchange token {exchangeToken}.");
+
+            var orderToken = $"{match.Exchange}|{match.TradingSymbol}";
+            var brokerRequest = new BrokerOrderRequest(orderToken, request.Qty, request.TransactionType, request.Product, "MARKET");
+            await zerodha.PlaceOrderAsync(brokerRequest, ct);
+
+            lf.CreateLogger("ZerodhaEndpoints").LogInformation(
+                "By-price order — {User} — {Underlying} {Expiry} {Type} qty={Qty} {Side} target=₹{Premium} → {Token}",
+                user.FindFirstValue(ClaimTypes.Email) ?? "unknown",
+                request.UnderlyingKey, request.Expiry, request.InstrumentType,
+                request.Qty, request.TransactionType, request.TargetPremium, orderToken);
+
+            return Results.Ok(new { instrumentKey = upstoxKey });
         });
 
         // ── Margin ────────────────────────────────────────────────────────────

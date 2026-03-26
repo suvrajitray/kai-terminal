@@ -17,8 +17,7 @@ import {
 } from "@/components/ui/select";
 import { UNDERLYING_KEYS } from "@/lib/shift-config";
 import { getLotSize } from "@/lib/lot-sizes";
-import { fetchOptionChain, placeMarketOrder } from "@/services/trading-api";
-import type { OptionChainEntry } from "@/types";
+import { placeOrderByPrice } from "@/services/trading-api";
 import { useBrokerStore } from "@/stores/broker-store";
 import { useOptionContractsStore } from "@/stores/option-contracts-store";
 
@@ -252,8 +251,6 @@ function ByPriceContent({
   const isBuy = direction === "Buy";
 
   async function execute(action: ActionType) {
-    if (broker === "zerodha") { toast.info("Zerodha option-price orders coming soon"); return; }
-
     const targetPremium = parseFloat(price);
     if (!targetPremium || targetPremium <= 0) { toast.error("Enter a valid target premium"); return; }
     if (!expiry) { toast.error("Select an expiry"); return; }
@@ -261,25 +258,10 @@ function ByPriceContent({
     const underlyingKey = UNDERLYING_KEYS[underlying];
     setActing(action);
     try {
-      const chain = await fetchOptionChain(underlyingKey, expiry);
-
-      function findToken(side: "callOptions" | "putOptions"): string {
-        let best: OptionChainEntry | null = null;
-        let bestDiff = Infinity;
-        for (const entry of chain) {
-          const ltp = entry[side]?.marketData?.ltp;
-          if (ltp === undefined) continue;
-          const diff = Math.abs(ltp - targetPremium);
-          if (diff < bestDiff) { bestDiff = diff; best = entry; }
-        }
-        const token = best?.[side]?.instrumentKey;
-        if (!token) throw new Error(`${side === "callOptions" ? "CE" : "PE"} instrument not found`);
-        return token;
-      }
-
+      const base = { underlyingKey, expiry, targetPremium, qty: quantity, transactionType: direction, product };
       const orders: Promise<void>[] = [];
-      if (action === "CE" || action === "BOTH") orders.push(placeMarketOrder(findToken("callOptions"), quantity, direction, product));
-      if (action === "PE" || action === "BOTH") orders.push(placeMarketOrder(findToken("putOptions"),  quantity, direction, product));
+      if (action === "CE" || action === "BOTH") orders.push(placeOrderByPrice(broker, { ...base, instrumentType: "CE" }));
+      if (action === "PE" || action === "BOTH") orders.push(placeOrderByPrice(broker, { ...base, instrumentType: "PE" }));
 
       await Promise.all(orders);
       toast.success("Order placed successfully");

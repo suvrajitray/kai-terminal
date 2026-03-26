@@ -12,11 +12,11 @@ export interface UserTradingSettings {
 
 export const DEFAULT_TRADING_SETTINGS: UserTradingSettings = {
   defaultStoplossPercentage: 30,
-  niftyShiftOffset: 5,
-  sensexShiftOffset: 10,
-  bankniftyShiftOffset: 10,
-  finniftyShiftOffset: 5,
-  bankexShiftOffset: 10,
+  niftyShiftOffset: 1,
+  sensexShiftOffset: 1,
+  bankniftyShiftOffset: 1,
+  finniftyShiftOffset: 1,
+  bankexShiftOffset: 1,
   indexChangeMode: "prevClose",
 };
 

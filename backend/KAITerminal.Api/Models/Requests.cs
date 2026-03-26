@@ -49,9 +49,20 @@ public record ShiftPositionRequest(
     int     Qty,              // absolute quantity to shift
     string  Direction,        // "up" | "down"
     string  Product,          // e.g. "Intraday", "Delivery", "NRML"
-    decimal TargetPremium,    // pre-calculated by frontend: currentLtp ± offset
+    decimal CurrentStrike,    // strike price of the current position
+    int     StrikeGap,        // number of strikes to move
     string  UnderlyingKey,    // e.g. "NSE_INDEX|Nifty 50"
     string  Expiry,           // e.g. "2026-03-27"
     string  InstrumentType,   // "CE" | "PE"
     bool    IsShort           // true when position.quantity < 0
+);
+
+public record ByPriceOrderRequest(
+    string  UnderlyingKey,    // e.g. "NSE_INDEX|Nifty 50"
+    string  Expiry,           // e.g. "2026-03-27"
+    string  InstrumentType,   // "CE" | "PE"
+    decimal TargetPremium,
+    int     Qty,
+    string  TransactionType,  // "Buy" | "Sell"
+    string  Product           // e.g. "I", "D", "NRML", "MIS"
 );

@@ -122,9 +122,9 @@ export function UserTradingSettingsDialog({ open, onClose }: Props) {
           {/* Shift Offsets */}
           <div className="space-y-3">
             <div>
-              <p className="text-sm font-medium">Shift Offsets</p>
+              <p className="text-sm font-medium">Strike Gap</p>
               <p className="text-[11px] text-muted-foreground">
-                Premium offset (₹) used for Shift Up / Shift Down per index.
+                Number of strikes to move for Shift Up / Shift Down per index.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-x-6 gap-y-4">

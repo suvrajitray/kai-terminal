@@ -37,7 +37,7 @@ public static class BrokerExtensions
         // Also registers IOptionContractProvider (both brokers), IOptionChainProvider, IZerodhaInstrumentService.
         services.AddMarketDataConsumer();
 
-        services.AddSingleton<ShiftService>();
+        services.AddSingleton<OptionStrikeService>();
         services.AddScoped<BrokerCredentialService>();
         services.AddScoped<IAiSentimentService, AiSentimentService>();
 

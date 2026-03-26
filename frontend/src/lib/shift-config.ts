@@ -19,5 +19,5 @@ export function getShiftOffset(underlying: string): number {
     FINNIFTY: s.finniftyShiftOffset,
     BANKEX: s.bankexShiftOffset,
   };
-  return map[key] ?? 10;
+  return map[key] ?? 1;
 }

@@ -96,15 +96,16 @@ public static class UpstoxEndpoints
 
         group.MapPost("/positions/shift", async (
             [FromBody] ShiftPositionRequest request,
-            ShiftService shiftSvc,
+            OptionStrikeService strikeSvc,
             UpstoxClient upstox,
             ClaimsPrincipal user,
             ILoggerFactory lf,
             CancellationToken ct) =>
         {
-            var targetKey = await shiftSvc.FindTargetStrikeAsync(
+            var strikeGap = request.Direction == "up" ? request.StrikeGap : -request.StrikeGap;
+            var targetKey = await strikeSvc.FindByStrikeGapAsync(
                 request.UnderlyingKey, request.Expiry, request.InstrumentType,
-                request.TargetPremium, request.Direction, ct);
+                request.CurrentStrike, strikeGap, ct);
 
             if (targetKey is null)
                 return Results.Problem("No matching strike found in option chain.");
@@ -224,6 +225,48 @@ public static class UpstoxEndpoints
                 "Order cancelled — {User} — {OrderId} — latency {Latency}ms",
                 user.FindFirstValue(ClaimTypes.Email) ?? "unknown", id, latency);
             return Results.Ok(new { OrderId = id, Latency = latency });
+        });
+
+        group.MapPost("/orders/by-price", async (
+            [FromBody] ByPriceOrderRequest request,
+            OptionStrikeService strikeSvc,
+            UpstoxClient upstox,
+            ClaimsPrincipal user,
+            ILoggerFactory lf,
+            CancellationToken ct) =>
+        {
+            var key = await strikeSvc.FindByPriceAsync(
+                request.UnderlyingKey, request.Expiry, request.InstrumentType,
+                request.TargetPremium, ct);
+
+            if (key is null)
+                return Results.Problem("No matching strike found in option chain.");
+
+            var txn = request.TransactionType == "Buy" ? TransactionType.Buy : TransactionType.Sell;
+            var product = request.Product switch
+            {
+                "Delivery" or "D" or "NRML" => Product.Delivery,
+                "Mtf"      or "MTF"          => Product.MTF,
+                "CoverOrder" or "CO"         => Product.CoverOrder,
+                _                            => Product.Intraday,
+            };
+
+            await upstox.PlaceOrderV3Async(new PlaceOrderRequest
+            {
+                InstrumentToken = key,
+                Quantity        = request.Qty,
+                TransactionType = txn,
+                Product         = product,
+                Slice           = true,
+            });
+
+            lf.CreateLogger("UpstoxEndpoints").LogInformation(
+                "By-price order — {User} — {Underlying} {Expiry} {Type} qty={Qty} {Side} target=₹{Premium} → {Key}",
+                user.FindFirstValue(ClaimTypes.Email) ?? "unknown",
+                request.UnderlyingKey, request.Expiry, request.InstrumentType,
+                request.Qty, request.TransactionType, request.TargetPremium, key);
+
+            return Results.Ok(new { instrumentKey = key });
         });
 
         // ── Funds ─────────────────────────────────────────────────────────────
