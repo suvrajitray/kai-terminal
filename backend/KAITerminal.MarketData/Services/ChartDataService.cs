@@ -1,14 +1,14 @@
-using KAITerminal.Upstox.Http;
-using KAITerminal.Upstox.Models.Enums;
-using KAITerminal.Upstox.Models.Responses;
+using KAITerminal.Infrastructure.Services;
+using KAITerminal.MarketData.Http;
+using KAITerminal.MarketData.Models;
+using Microsoft.Extensions.DependencyInjection;
 
-namespace KAITerminal.Upstox.Services;
+namespace KAITerminal.MarketData.Services;
 
 internal sealed class ChartDataService : IChartDataService
 {
-    private readonly UpstoxHttpClient _http;
-
-    public ChartDataService(UpstoxHttpClient http) => _http = http;
+    private readonly UpstoxMarketDataHttpClient _http;
+    private readonly IServiceScopeFactory       _scopeFactory;
 
     private static readonly IReadOnlyList<InstrumentSearchResult> CuratedInstruments =
     [
@@ -33,15 +33,27 @@ internal sealed class ChartDataService : IChartDataService
         new() { InstrumentKey = "NSE_INDEX|India VIX",           TradingSymbol = "India VIX",           Name = "INDIA VIX",           Exchange = "NSE_INDEX", InstrumentType = "INDEX" },
     ];
 
-    public Task<IReadOnlyList<CandleData>> GetHistoricalCandlesAsync(
+    public ChartDataService(UpstoxMarketDataHttpClient http, IServiceScopeFactory scopeFactory)
+    {
+        _http         = http;
+        _scopeFactory = scopeFactory;
+    }
+
+    public async Task<IReadOnlyList<CandleData>> GetHistoricalCandlesAsync(
         string instrumentKey, CandleInterval interval, DateOnly from, DateOnly to,
         CancellationToken ct = default)
-        => _http.GetHistoricalCandlesAsync(instrumentKey, ToIntervalString(interval), from, to, ct);
+    {
+        var token = await GetTokenAsync(ct);
+        return await _http.GetHistoricalCandlesAsync(token, instrumentKey, ToIntervalString(interval), from, to, ct);
+    }
 
-    public Task<IReadOnlyList<CandleData>> GetIntradayCandlesAsync(
+    public async Task<IReadOnlyList<CandleData>> GetIntradayCandlesAsync(
         string instrumentKey, CandleInterval interval,
         CancellationToken ct = default)
-        => _http.GetIntradayCandlesAsync(instrumentKey, ToIntervalString(interval), ct);
+    {
+        var token = await GetTokenAsync(ct);
+        return await _http.GetIntradayCandlesAsync(token, instrumentKey, ToIntervalString(interval), ct);
+    }
 
     public Task<IReadOnlyList<InstrumentSearchResult>> SearchInstrumentsAsync(
         string query, CancellationToken ct = default)
@@ -53,6 +65,14 @@ internal sealed class ChartDataService : IChartDataService
             .ToList()
             .AsReadOnly();
         return Task.FromResult<IReadOnlyList<InstrumentSearchResult>>(results);
+    }
+
+    private async Task<string> GetTokenAsync(CancellationToken ct)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<IAppSettingService>();
+        return await svc.GetAsync(AppSettingKeys.UpstoxAnalyticsToken, ct)
+            ?? throw new InvalidOperationException("Analytics token not configured.");
     }
 
     private static string ToIntervalString(CandleInterval interval) => interval switch

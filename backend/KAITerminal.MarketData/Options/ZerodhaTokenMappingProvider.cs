@@ -1,15 +1,12 @@
 using KAITerminal.Contracts.Broker;
-using KAITerminal.Zerodha.Services;
+using KAITerminal.MarketData.Services;
 
-namespace KAITerminal.Zerodha.Options;
+namespace KAITerminal.MarketData.Options;
 
 /// <summary>
-/// Provides Zerodha numeric instrument tokens paired with their exchange-level token
+/// Provides Zerodha instrument tokens paired with their exchange-level token
 /// so that <c>CrossBrokerTokenMapper</c> can construct Upstox feed tokens directly —
 /// no Upstox API calls required.
-///
-/// Uses <see cref="IZerodhaInstrumentService.GetAllCurrentYearContractsAsync"/> which
-/// downloads from the public Kite Connect instruments CSV — no access token required.
 /// </summary>
 public sealed class ZerodhaTokenMappingProvider : ITokenMappingProvider
 {

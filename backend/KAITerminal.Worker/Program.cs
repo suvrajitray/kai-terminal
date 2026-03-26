@@ -13,7 +13,6 @@ using KAITerminal.Worker.Mapping;
 using KAITerminal.Worker.Notifications;
 using KAITerminal.Zerodha;
 using KAITerminal.Zerodha.Extensions;
-using KAITerminal.Zerodha.Options;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -53,12 +52,8 @@ builder.Services.AddSingleton<IBrokerClientFactory>(sp =>
     return new BrokerClientFactory(creators);
 });
 
-// Register one ITokenMappingProvider per non-Upstox broker.
-// CrossBrokerTokenMapper injects IEnumerable<ITokenMappingProvider> — adding Dhan etc.
-// means registering its provider here; CrossBrokerTokenMapper needs no changes.
-builder.Services.AddSingleton<ITokenMappingProvider, ZerodhaTokenMappingProvider>();
-
 // Register cross-broker token mapper before AddRiskEngine so it overrides the default IdentityTokenMapper.
+// ITokenMappingProvider (ZerodhaTokenMappingProvider) is registered via AddMarketDataProducer() above.
 builder.Services.AddSingleton<ITokenMapper, CrossBrokerTokenMapper>();
 
 builder.Services.AddRiskEngine<DbUserTokenSource>(builder.Configuration);

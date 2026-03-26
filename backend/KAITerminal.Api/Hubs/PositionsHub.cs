@@ -1,7 +1,7 @@
 using KAITerminal.Api.Services;
 using KAITerminal.Broker;
 using KAITerminal.Contracts.Streaming;
-using KAITerminal.Zerodha.Services;
+using KAITerminal.MarketData.Services;
 using Microsoft.AspNetCore.SignalR;
 
 namespace KAITerminal.Api.Hubs;

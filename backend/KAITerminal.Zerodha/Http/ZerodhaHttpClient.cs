@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using KAITerminal.Contracts.Domain;
+using KAITerminal.Zerodha.Services;
 
 namespace KAITerminal.Zerodha.Http;
 
@@ -56,6 +57,36 @@ public sealed class ZerodhaHttpClient
                  + (equity?.Utilised?.OptionPremium ?? 0);
 
         return new BrokerFunds(available, used);
+    }
+
+    // ── Margin ────────────────────────────────────────────────────────────────
+
+    public async Task<ZerodhaMarginResponse> GetRequiredMarginAsync(
+        IEnumerable<ZerodhaMarginOrderItem> items, CancellationToken ct = default)
+    {
+        var body = items.Select(i => new KiteMarginOrderDto
+        {
+            TradingSymbol   = i.TradingSymbol,
+            Exchange        = i.Exchange,
+            TransactionType = i.TransactionType.ToUpperInvariant(),
+            Variety         = "regular",
+            Product         = i.Product.ToUpperInvariant(),
+            OrderType       = "MARKET",
+            Quantity        = i.Quantity,
+        }).ToList();
+
+        var http = _httpFactory.CreateClient("ZerodhaApi");
+        var response = await http.PostAsJsonAsync(
+            "/margins/basket?consider_positions=true&mode=compact", body, _json, ct);
+        response.EnsureSuccessStatusCode();
+
+        var result = await response.Content.ReadFromJsonAsync<KiteEnvelope<KiteBasketMarginData>>(_json, ct)
+            ?? throw new InvalidOperationException("Null response from Kite basket margin");
+        EnsureSuccess(result);
+
+        return new ZerodhaMarginResponse(
+            RequiredMargin: result.Data?.Initial?.Total ?? 0m,
+            FinalMargin:    result.Data?.Final?.Total   ?? 0m);
     }
 
     // ── Orders ────────────────────────────────────────────────────────────────
@@ -242,5 +273,29 @@ public sealed class ZerodhaHttpClient
         [JsonPropertyName("api_key")]      public string? ApiKey      { get; init; }
         [JsonPropertyName("user_name")]    public string? UserName    { get; init; }
         [JsonPropertyName("email")]        public string? Email       { get; init; }
+    }
+
+    private sealed class KiteMarginOrderDto
+    {
+        [JsonPropertyName("tradingsymbol")]   public string TradingSymbol   { get; init; } = "";
+        [JsonPropertyName("exchange")]        public string Exchange        { get; init; } = "";
+        [JsonPropertyName("transaction_type")]public string TransactionType { get; init; } = "";
+        [JsonPropertyName("variety")]         public string Variety         { get; init; } = "regular";
+        [JsonPropertyName("product")]         public string Product         { get; init; } = "";
+        [JsonPropertyName("order_type")]      public string OrderType       { get; init; } = "MARKET";
+        [JsonPropertyName("quantity")]        public int    Quantity        { get; init; }
+    }
+
+    private sealed class KiteBasketMarginData
+    {
+        [JsonPropertyName("initial")] public KiteMarginTotals? Initial { get; init; }
+        [JsonPropertyName("final")]   public KiteMarginTotals? Final   { get; init; }
+    }
+
+    private sealed class KiteMarginTotals
+    {
+        [JsonPropertyName("total")]    public decimal Total    { get; init; }
+        [JsonPropertyName("span")]     public decimal Span     { get; init; }
+        [JsonPropertyName("exposure")] public decimal Exposure { get; init; }
     }
 }

@@ -9,7 +9,7 @@ using pb = global::Google.Protobuf;
 using pbc = global::Google.Protobuf.Collections;
 using pbr = global::Google.Protobuf.Reflection;
 using scg = global::System.Collections.Generic;
-namespace KAITerminal.Upstox.Protos {
+namespace KAITerminal.MarketData.Protos {
 
   /// <summary>Holder for reflection information generated from MarketDataFeedV3.proto</summary>
   public static partial class MarketDataFeedV3Reflection {
@@ -96,22 +96,22 @@ namespace KAITerminal.Upstox.Protos {
       descriptor = pbr::FileDescriptor.FromGeneratedCode(descriptorData,
           new pbr::FileDescriptor[] { },
           new pbr::GeneratedClrTypeInfo(null, null, new pbr::GeneratedClrTypeInfo[] {
-            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.Upstox.Protos.FeedResponse), global::KAITerminal.Upstox.Protos.FeedResponse.Parser, new[]{ "Type", "Feeds", "CurrentTs", "MarketInfo" }, null, new[]{ typeof(global::KAITerminal.Upstox.Protos.FeedResponse.Types.Type) }, null, new pbr::GeneratedClrTypeInfo[] { null, }),
-            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.Upstox.Protos.Feed), global::KAITerminal.Upstox.Protos.Feed.Parser, new[]{ "Ltpc", "FullFeed", "FirstLevelWithGreeks", "FullD30" }, new[]{ "FeedUnion" }, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.Upstox.Protos.LTPC), global::KAITerminal.Upstox.Protos.LTPC.Parser, new[]{ "Ltp", "Ltt", "Ltq", "Cp" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.Upstox.Protos.FullFeed), global::KAITerminal.Upstox.Protos.FullFeed.Parser, new[]{ "MarketFF", "IndexFF" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.Upstox.Protos.MarketFF), global::KAITerminal.Upstox.Protos.MarketFF.Parser, new[]{ "Ltpc", "Vtt", "Atp", "Oi", "Iv", "Depth", "OhlcData", "OptionGreeks" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.Upstox.Protos.IndexFF), global::KAITerminal.Upstox.Protos.IndexFF.Parser, new[]{ "Ltpc", "OhlcData" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.Upstox.Protos.FirstLevelWithGreeks), global::KAITerminal.Upstox.Protos.FirstLevelWithGreeks.Parser, new[]{ "Ltpc", "Vtt", "Atp", "Oi", "Iv", "OptionGreeks", "Depth" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.Upstox.Protos.FullD30), global::KAITerminal.Upstox.Protos.FullD30.Parser, new[]{ "MarketFullD30", "IndexFullD30" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.Upstox.Protos.MarketFullD30), global::KAITerminal.Upstox.Protos.MarketFullD30.Parser, new[]{ "Ltpc", "Vtt", "Atp", "Oi", "Iv", "DepthD30", "OhlcData", "OptionGreeks" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.Upstox.Protos.IndexFullD30), global::KAITerminal.Upstox.Protos.IndexFullD30.Parser, new[]{ "Ltpc", "OhlcData" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.Upstox.Protos.Depth), global::KAITerminal.Upstox.Protos.Depth.Parser, new[]{ "Bid", "Ask" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.Upstox.Protos.DepthD30), global::KAITerminal.Upstox.Protos.DepthD30.Parser, new[]{ "Bid", "Ask" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.Upstox.Protos.BidAsk), global::KAITerminal.Upstox.Protos.BidAsk.Parser, new[]{ "Quantity", "Price", "Orders" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.Upstox.Protos.OHLCData), global::KAITerminal.Upstox.Protos.OHLCData.Parser, new[]{ "Interval", "Open", "High", "Low", "Close", "Vol", "Ts" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.Upstox.Protos.OptionGreeks), global::KAITerminal.Upstox.Protos.OptionGreeks.Parser, new[]{ "Vega", "Theta", "Gamma", "Delta", "Iv" }, null, null, null, null),
-            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.Upstox.Protos.MarketInfo), global::KAITerminal.Upstox.Protos.MarketInfo.Parser, new[]{ "SegmentStatus" }, null, null, null, new pbr::GeneratedClrTypeInfo[] { null, })
+            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.MarketData.Protos.FeedResponse), global::KAITerminal.MarketData.Protos.FeedResponse.Parser, new[]{ "Type", "Feeds", "CurrentTs", "MarketInfo" }, null, new[]{ typeof(global::KAITerminal.MarketData.Protos.FeedResponse.Types.Type) }, null, new pbr::GeneratedClrTypeInfo[] { null, }),
+            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.MarketData.Protos.Feed), global::KAITerminal.MarketData.Protos.Feed.Parser, new[]{ "Ltpc", "FullFeed", "FirstLevelWithGreeks", "FullD30" }, new[]{ "FeedUnion" }, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.MarketData.Protos.LTPC), global::KAITerminal.MarketData.Protos.LTPC.Parser, new[]{ "Ltp", "Ltt", "Ltq", "Cp" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.MarketData.Protos.FullFeed), global::KAITerminal.MarketData.Protos.FullFeed.Parser, new[]{ "MarketFF", "IndexFF" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.MarketData.Protos.MarketFF), global::KAITerminal.MarketData.Protos.MarketFF.Parser, new[]{ "Ltpc", "Vtt", "Atp", "Oi", "Iv", "Depth", "OhlcData", "OptionGreeks" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.MarketData.Protos.IndexFF), global::KAITerminal.MarketData.Protos.IndexFF.Parser, new[]{ "Ltpc", "OhlcData" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.MarketData.Protos.FirstLevelWithGreeks), global::KAITerminal.MarketData.Protos.FirstLevelWithGreeks.Parser, new[]{ "Ltpc", "Vtt", "Atp", "Oi", "Iv", "OptionGreeks", "Depth" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.MarketData.Protos.FullD30), global::KAITerminal.MarketData.Protos.FullD30.Parser, new[]{ "MarketFullD30", "IndexFullD30" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.MarketData.Protos.MarketFullD30), global::KAITerminal.MarketData.Protos.MarketFullD30.Parser, new[]{ "Ltpc", "Vtt", "Atp", "Oi", "Iv", "DepthD30", "OhlcData", "OptionGreeks" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.MarketData.Protos.IndexFullD30), global::KAITerminal.MarketData.Protos.IndexFullD30.Parser, new[]{ "Ltpc", "OhlcData" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.MarketData.Protos.Depth), global::KAITerminal.MarketData.Protos.Depth.Parser, new[]{ "Bid", "Ask" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.MarketData.Protos.DepthD30), global::KAITerminal.MarketData.Protos.DepthD30.Parser, new[]{ "Bid", "Ask" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.MarketData.Protos.BidAsk), global::KAITerminal.MarketData.Protos.BidAsk.Parser, new[]{ "Quantity", "Price", "Orders" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.MarketData.Protos.OHLCData), global::KAITerminal.MarketData.Protos.OHLCData.Parser, new[]{ "Interval", "Open", "High", "Low", "Close", "Vol", "Ts" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.MarketData.Protos.OptionGreeks), global::KAITerminal.MarketData.Protos.OptionGreeks.Parser, new[]{ "Vega", "Theta", "Gamma", "Delta", "Iv" }, null, null, null, null),
+            new pbr::GeneratedClrTypeInfo(typeof(global::KAITerminal.MarketData.Protos.MarketInfo), global::KAITerminal.MarketData.Protos.MarketInfo.Parser, new[]{ "SegmentStatus" }, null, null, null, new pbr::GeneratedClrTypeInfo[] { null, })
           }));
     }
     #endregion
@@ -133,7 +133,7 @@ namespace KAITerminal.Upstox.Protos {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::KAITerminal.Upstox.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[0]; }
+      get { return global::KAITerminal.MarketData.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[0]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -168,10 +168,10 @@ namespace KAITerminal.Upstox.Protos {
 
     /// <summary>Field number for the "type" field.</summary>
     public const int TypeFieldNumber = 1;
-    private global::KAITerminal.Upstox.Protos.FeedResponse.Types.Type type_ = global::KAITerminal.Upstox.Protos.FeedResponse.Types.Type.InitialFeed;
+    private global::KAITerminal.MarketData.Protos.FeedResponse.Types.Type type_ = global::KAITerminal.MarketData.Protos.FeedResponse.Types.Type.InitialFeed;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::KAITerminal.Upstox.Protos.FeedResponse.Types.Type Type {
+    public global::KAITerminal.MarketData.Protos.FeedResponse.Types.Type Type {
       get { return type_; }
       set {
         type_ = value;
@@ -180,12 +180,12 @@ namespace KAITerminal.Upstox.Protos {
 
     /// <summary>Field number for the "feeds" field.</summary>
     public const int FeedsFieldNumber = 2;
-    private static readonly pbc::MapField<string, global::KAITerminal.Upstox.Protos.Feed>.Codec _map_feeds_codec
-        = new pbc::MapField<string, global::KAITerminal.Upstox.Protos.Feed>.Codec(pb::FieldCodec.ForString(10, ""), pb::FieldCodec.ForMessage(18, global::KAITerminal.Upstox.Protos.Feed.Parser), 18);
-    private readonly pbc::MapField<string, global::KAITerminal.Upstox.Protos.Feed> feeds_ = new pbc::MapField<string, global::KAITerminal.Upstox.Protos.Feed>();
+    private static readonly pbc::MapField<string, global::KAITerminal.MarketData.Protos.Feed>.Codec _map_feeds_codec
+        = new pbc::MapField<string, global::KAITerminal.MarketData.Protos.Feed>.Codec(pb::FieldCodec.ForString(10, ""), pb::FieldCodec.ForMessage(18, global::KAITerminal.MarketData.Protos.Feed.Parser), 18);
+    private readonly pbc::MapField<string, global::KAITerminal.MarketData.Protos.Feed> feeds_ = new pbc::MapField<string, global::KAITerminal.MarketData.Protos.Feed>();
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public pbc::MapField<string, global::KAITerminal.Upstox.Protos.Feed> Feeds {
+    public pbc::MapField<string, global::KAITerminal.MarketData.Protos.Feed> Feeds {
       get { return feeds_; }
     }
 
@@ -203,10 +203,10 @@ namespace KAITerminal.Upstox.Protos {
 
     /// <summary>Field number for the "marketInfo" field.</summary>
     public const int MarketInfoFieldNumber = 4;
-    private global::KAITerminal.Upstox.Protos.MarketInfo marketInfo_;
+    private global::KAITerminal.MarketData.Protos.MarketInfo marketInfo_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::KAITerminal.Upstox.Protos.MarketInfo MarketInfo {
+    public global::KAITerminal.MarketData.Protos.MarketInfo MarketInfo {
       get { return marketInfo_; }
       set {
         marketInfo_ = value;
@@ -239,7 +239,7 @@ namespace KAITerminal.Upstox.Protos {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public override int GetHashCode() {
       int hash = 1;
-      if (Type != global::KAITerminal.Upstox.Protos.FeedResponse.Types.Type.InitialFeed) hash ^= Type.GetHashCode();
+      if (Type != global::KAITerminal.MarketData.Protos.FeedResponse.Types.Type.InitialFeed) hash ^= Type.GetHashCode();
       hash ^= Feeds.GetHashCode();
       if (CurrentTs != 0L) hash ^= CurrentTs.GetHashCode();
       if (marketInfo_ != null) hash ^= MarketInfo.GetHashCode();
@@ -261,7 +261,7 @@ namespace KAITerminal.Upstox.Protos {
     #if !GOOGLE_PROTOBUF_REFSTRUCT_COMPATIBILITY_MODE
       output.WriteRawMessage(this);
     #else
-      if (Type != global::KAITerminal.Upstox.Protos.FeedResponse.Types.Type.InitialFeed) {
+      if (Type != global::KAITerminal.MarketData.Protos.FeedResponse.Types.Type.InitialFeed) {
         output.WriteRawTag(8);
         output.WriteEnum((int) Type);
       }
@@ -284,7 +284,7 @@ namespace KAITerminal.Upstox.Protos {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     void pb::IBufferMessage.InternalWriteTo(ref pb::WriteContext output) {
-      if (Type != global::KAITerminal.Upstox.Protos.FeedResponse.Types.Type.InitialFeed) {
+      if (Type != global::KAITerminal.MarketData.Protos.FeedResponse.Types.Type.InitialFeed) {
         output.WriteRawTag(8);
         output.WriteEnum((int) Type);
       }
@@ -307,7 +307,7 @@ namespace KAITerminal.Upstox.Protos {
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public int CalculateSize() {
       int size = 0;
-      if (Type != global::KAITerminal.Upstox.Protos.FeedResponse.Types.Type.InitialFeed) {
+      if (Type != global::KAITerminal.MarketData.Protos.FeedResponse.Types.Type.InitialFeed) {
         size += 1 + pb::CodedOutputStream.ComputeEnumSize((int) Type);
       }
       size += feeds_.CalculateSize(_map_feeds_codec);
@@ -329,7 +329,7 @@ namespace KAITerminal.Upstox.Protos {
       if (other == null) {
         return;
       }
-      if (other.Type != global::KAITerminal.Upstox.Protos.FeedResponse.Types.Type.InitialFeed) {
+      if (other.Type != global::KAITerminal.MarketData.Protos.FeedResponse.Types.Type.InitialFeed) {
         Type = other.Type;
       }
       feeds_.MergeFrom(other.feeds_);
@@ -338,7 +338,7 @@ namespace KAITerminal.Upstox.Protos {
       }
       if (other.marketInfo_ != null) {
         if (marketInfo_ == null) {
-          MarketInfo = new global::KAITerminal.Upstox.Protos.MarketInfo();
+          MarketInfo = new global::KAITerminal.MarketData.Protos.MarketInfo();
         }
         MarketInfo.MergeFrom(other.MarketInfo);
       }
@@ -362,7 +362,7 @@ namespace KAITerminal.Upstox.Protos {
             _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
             break;
           case 8: {
-            Type = (global::KAITerminal.Upstox.Protos.FeedResponse.Types.Type) input.ReadEnum();
+            Type = (global::KAITerminal.MarketData.Protos.FeedResponse.Types.Type) input.ReadEnum();
             break;
           }
           case 18: {
@@ -375,7 +375,7 @@ namespace KAITerminal.Upstox.Protos {
           }
           case 34: {
             if (marketInfo_ == null) {
-              MarketInfo = new global::KAITerminal.Upstox.Protos.MarketInfo();
+              MarketInfo = new global::KAITerminal.MarketData.Protos.MarketInfo();
             }
             input.ReadMessage(MarketInfo);
             break;
@@ -400,7 +400,7 @@ namespace KAITerminal.Upstox.Protos {
             _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
             break;
           case 8: {
-            Type = (global::KAITerminal.Upstox.Protos.FeedResponse.Types.Type) input.ReadEnum();
+            Type = (global::KAITerminal.MarketData.Protos.FeedResponse.Types.Type) input.ReadEnum();
             break;
           }
           case 18: {
@@ -413,7 +413,7 @@ namespace KAITerminal.Upstox.Protos {
           }
           case 34: {
             if (marketInfo_ == null) {
-              MarketInfo = new global::KAITerminal.Upstox.Protos.MarketInfo();
+              MarketInfo = new global::KAITerminal.MarketData.Protos.MarketInfo();
             }
             input.ReadMessage(MarketInfo);
             break;
@@ -454,7 +454,7 @@ namespace KAITerminal.Upstox.Protos {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::KAITerminal.Upstox.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[1]; }
+      get { return global::KAITerminal.MarketData.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[1]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -502,8 +502,8 @@ namespace KAITerminal.Upstox.Protos {
     public const int LtpcFieldNumber = 1;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::KAITerminal.Upstox.Protos.LTPC Ltpc {
-      get { return feedUnionCase_ == FeedUnionOneofCase.Ltpc ? (global::KAITerminal.Upstox.Protos.LTPC) feedUnion_ : null; }
+    public global::KAITerminal.MarketData.Protos.LTPC Ltpc {
+      get { return feedUnionCase_ == FeedUnionOneofCase.Ltpc ? (global::KAITerminal.MarketData.Protos.LTPC) feedUnion_ : null; }
       set {
         feedUnion_ = value;
         feedUnionCase_ = value == null ? FeedUnionOneofCase.None : FeedUnionOneofCase.Ltpc;
@@ -514,8 +514,8 @@ namespace KAITerminal.Upstox.Protos {
     public const int FullFeedFieldNumber = 2;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::KAITerminal.Upstox.Protos.FullFeed FullFeed {
-      get { return feedUnionCase_ == FeedUnionOneofCase.FullFeed ? (global::KAITerminal.Upstox.Protos.FullFeed) feedUnion_ : null; }
+    public global::KAITerminal.MarketData.Protos.FullFeed FullFeed {
+      get { return feedUnionCase_ == FeedUnionOneofCase.FullFeed ? (global::KAITerminal.MarketData.Protos.FullFeed) feedUnion_ : null; }
       set {
         feedUnion_ = value;
         feedUnionCase_ = value == null ? FeedUnionOneofCase.None : FeedUnionOneofCase.FullFeed;
@@ -526,8 +526,8 @@ namespace KAITerminal.Upstox.Protos {
     public const int FirstLevelWithGreeksFieldNumber = 3;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::KAITerminal.Upstox.Protos.FirstLevelWithGreeks FirstLevelWithGreeks {
-      get { return feedUnionCase_ == FeedUnionOneofCase.FirstLevelWithGreeks ? (global::KAITerminal.Upstox.Protos.FirstLevelWithGreeks) feedUnion_ : null; }
+    public global::KAITerminal.MarketData.Protos.FirstLevelWithGreeks FirstLevelWithGreeks {
+      get { return feedUnionCase_ == FeedUnionOneofCase.FirstLevelWithGreeks ? (global::KAITerminal.MarketData.Protos.FirstLevelWithGreeks) feedUnion_ : null; }
       set {
         feedUnion_ = value;
         feedUnionCase_ = value == null ? FeedUnionOneofCase.None : FeedUnionOneofCase.FirstLevelWithGreeks;
@@ -538,8 +538,8 @@ namespace KAITerminal.Upstox.Protos {
     public const int FullD30FieldNumber = 4;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::KAITerminal.Upstox.Protos.FullD30 FullD30 {
-      get { return feedUnionCase_ == FeedUnionOneofCase.FullD30 ? (global::KAITerminal.Upstox.Protos.FullD30) feedUnion_ : null; }
+    public global::KAITerminal.MarketData.Protos.FullD30 FullD30 {
+      get { return feedUnionCase_ == FeedUnionOneofCase.FullD30 ? (global::KAITerminal.MarketData.Protos.FullD30) feedUnion_ : null; }
       set {
         feedUnion_ = value;
         feedUnionCase_ = value == null ? FeedUnionOneofCase.None : FeedUnionOneofCase.FullD30;
@@ -698,25 +698,25 @@ namespace KAITerminal.Upstox.Protos {
       switch (other.FeedUnionCase) {
         case FeedUnionOneofCase.Ltpc:
           if (Ltpc == null) {
-            Ltpc = new global::KAITerminal.Upstox.Protos.LTPC();
+            Ltpc = new global::KAITerminal.MarketData.Protos.LTPC();
           }
           Ltpc.MergeFrom(other.Ltpc);
           break;
         case FeedUnionOneofCase.FullFeed:
           if (FullFeed == null) {
-            FullFeed = new global::KAITerminal.Upstox.Protos.FullFeed();
+            FullFeed = new global::KAITerminal.MarketData.Protos.FullFeed();
           }
           FullFeed.MergeFrom(other.FullFeed);
           break;
         case FeedUnionOneofCase.FirstLevelWithGreeks:
           if (FirstLevelWithGreeks == null) {
-            FirstLevelWithGreeks = new global::KAITerminal.Upstox.Protos.FirstLevelWithGreeks();
+            FirstLevelWithGreeks = new global::KAITerminal.MarketData.Protos.FirstLevelWithGreeks();
           }
           FirstLevelWithGreeks.MergeFrom(other.FirstLevelWithGreeks);
           break;
         case FeedUnionOneofCase.FullD30:
           if (FullD30 == null) {
-            FullD30 = new global::KAITerminal.Upstox.Protos.FullD30();
+            FullD30 = new global::KAITerminal.MarketData.Protos.FullD30();
           }
           FullD30.MergeFrom(other.FullD30);
           break;
@@ -742,7 +742,7 @@ namespace KAITerminal.Upstox.Protos {
             _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, input);
             break;
           case 10: {
-            global::KAITerminal.Upstox.Protos.LTPC subBuilder = new global::KAITerminal.Upstox.Protos.LTPC();
+            global::KAITerminal.MarketData.Protos.LTPC subBuilder = new global::KAITerminal.MarketData.Protos.LTPC();
             if (feedUnionCase_ == FeedUnionOneofCase.Ltpc) {
               subBuilder.MergeFrom(Ltpc);
             }
@@ -751,7 +751,7 @@ namespace KAITerminal.Upstox.Protos {
             break;
           }
           case 18: {
-            global::KAITerminal.Upstox.Protos.FullFeed subBuilder = new global::KAITerminal.Upstox.Protos.FullFeed();
+            global::KAITerminal.MarketData.Protos.FullFeed subBuilder = new global::KAITerminal.MarketData.Protos.FullFeed();
             if (feedUnionCase_ == FeedUnionOneofCase.FullFeed) {
               subBuilder.MergeFrom(FullFeed);
             }
@@ -760,7 +760,7 @@ namespace KAITerminal.Upstox.Protos {
             break;
           }
           case 26: {
-            global::KAITerminal.Upstox.Protos.FirstLevelWithGreeks subBuilder = new global::KAITerminal.Upstox.Protos.FirstLevelWithGreeks();
+            global::KAITerminal.MarketData.Protos.FirstLevelWithGreeks subBuilder = new global::KAITerminal.MarketData.Protos.FirstLevelWithGreeks();
             if (feedUnionCase_ == FeedUnionOneofCase.FirstLevelWithGreeks) {
               subBuilder.MergeFrom(FirstLevelWithGreeks);
             }
@@ -769,7 +769,7 @@ namespace KAITerminal.Upstox.Protos {
             break;
           }
           case 34: {
-            global::KAITerminal.Upstox.Protos.FullD30 subBuilder = new global::KAITerminal.Upstox.Protos.FullD30();
+            global::KAITerminal.MarketData.Protos.FullD30 subBuilder = new global::KAITerminal.MarketData.Protos.FullD30();
             if (feedUnionCase_ == FeedUnionOneofCase.FullD30) {
               subBuilder.MergeFrom(FullD30);
             }
@@ -797,7 +797,7 @@ namespace KAITerminal.Upstox.Protos {
             _unknownFields = pb::UnknownFieldSet.MergeFieldFrom(_unknownFields, ref input);
             break;
           case 10: {
-            global::KAITerminal.Upstox.Protos.LTPC subBuilder = new global::KAITerminal.Upstox.Protos.LTPC();
+            global::KAITerminal.MarketData.Protos.LTPC subBuilder = new global::KAITerminal.MarketData.Protos.LTPC();
             if (feedUnionCase_ == FeedUnionOneofCase.Ltpc) {
               subBuilder.MergeFrom(Ltpc);
             }
@@ -806,7 +806,7 @@ namespace KAITerminal.Upstox.Protos {
             break;
           }
           case 18: {
-            global::KAITerminal.Upstox.Protos.FullFeed subBuilder = new global::KAITerminal.Upstox.Protos.FullFeed();
+            global::KAITerminal.MarketData.Protos.FullFeed subBuilder = new global::KAITerminal.MarketData.Protos.FullFeed();
             if (feedUnionCase_ == FeedUnionOneofCase.FullFeed) {
               subBuilder.MergeFrom(FullFeed);
             }
@@ -815,7 +815,7 @@ namespace KAITerminal.Upstox.Protos {
             break;
           }
           case 26: {
-            global::KAITerminal.Upstox.Protos.FirstLevelWithGreeks subBuilder = new global::KAITerminal.Upstox.Protos.FirstLevelWithGreeks();
+            global::KAITerminal.MarketData.Protos.FirstLevelWithGreeks subBuilder = new global::KAITerminal.MarketData.Protos.FirstLevelWithGreeks();
             if (feedUnionCase_ == FeedUnionOneofCase.FirstLevelWithGreeks) {
               subBuilder.MergeFrom(FirstLevelWithGreeks);
             }
@@ -824,7 +824,7 @@ namespace KAITerminal.Upstox.Protos {
             break;
           }
           case 34: {
-            global::KAITerminal.Upstox.Protos.FullD30 subBuilder = new global::KAITerminal.Upstox.Protos.FullD30();
+            global::KAITerminal.MarketData.Protos.FullD30 subBuilder = new global::KAITerminal.MarketData.Protos.FullD30();
             if (feedUnionCase_ == FeedUnionOneofCase.FullD30) {
               subBuilder.MergeFrom(FullD30);
             }
@@ -854,7 +854,7 @@ namespace KAITerminal.Upstox.Protos {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::KAITerminal.Upstox.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[2]; }
+      get { return global::KAITerminal.MarketData.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[2]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -1163,7 +1163,7 @@ namespace KAITerminal.Upstox.Protos {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::KAITerminal.Upstox.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[3]; }
+      get { return global::KAITerminal.MarketData.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[3]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -1196,10 +1196,10 @@ namespace KAITerminal.Upstox.Protos {
 
     /// <summary>Field number for the "marketFF" field.</summary>
     public const int MarketFFFieldNumber = 1;
-    private global::KAITerminal.Upstox.Protos.MarketFF marketFF_;
+    private global::KAITerminal.MarketData.Protos.MarketFF marketFF_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::KAITerminal.Upstox.Protos.MarketFF MarketFF {
+    public global::KAITerminal.MarketData.Protos.MarketFF MarketFF {
       get { return marketFF_; }
       set {
         marketFF_ = value;
@@ -1208,10 +1208,10 @@ namespace KAITerminal.Upstox.Protos {
 
     /// <summary>Field number for the "indexFF" field.</summary>
     public const int IndexFFFieldNumber = 2;
-    private global::KAITerminal.Upstox.Protos.IndexFF indexFF_;
+    private global::KAITerminal.MarketData.Protos.IndexFF indexFF_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::KAITerminal.Upstox.Protos.IndexFF IndexFF {
+    public global::KAITerminal.MarketData.Protos.IndexFF IndexFF {
       get { return indexFF_; }
       set {
         indexFF_ = value;
@@ -1318,13 +1318,13 @@ namespace KAITerminal.Upstox.Protos {
       }
       if (other.marketFF_ != null) {
         if (marketFF_ == null) {
-          MarketFF = new global::KAITerminal.Upstox.Protos.MarketFF();
+          MarketFF = new global::KAITerminal.MarketData.Protos.MarketFF();
         }
         MarketFF.MergeFrom(other.MarketFF);
       }
       if (other.indexFF_ != null) {
         if (indexFF_ == null) {
-          IndexFF = new global::KAITerminal.Upstox.Protos.IndexFF();
+          IndexFF = new global::KAITerminal.MarketData.Protos.IndexFF();
         }
         IndexFF.MergeFrom(other.IndexFF);
       }
@@ -1349,14 +1349,14 @@ namespace KAITerminal.Upstox.Protos {
             break;
           case 10: {
             if (marketFF_ == null) {
-              MarketFF = new global::KAITerminal.Upstox.Protos.MarketFF();
+              MarketFF = new global::KAITerminal.MarketData.Protos.MarketFF();
             }
             input.ReadMessage(MarketFF);
             break;
           }
           case 18: {
             if (indexFF_ == null) {
-              IndexFF = new global::KAITerminal.Upstox.Protos.IndexFF();
+              IndexFF = new global::KAITerminal.MarketData.Protos.IndexFF();
             }
             input.ReadMessage(IndexFF);
             break;
@@ -1382,14 +1382,14 @@ namespace KAITerminal.Upstox.Protos {
             break;
           case 10: {
             if (marketFF_ == null) {
-              MarketFF = new global::KAITerminal.Upstox.Protos.MarketFF();
+              MarketFF = new global::KAITerminal.MarketData.Protos.MarketFF();
             }
             input.ReadMessage(MarketFF);
             break;
           }
           case 18: {
             if (indexFF_ == null) {
-              IndexFF = new global::KAITerminal.Upstox.Protos.IndexFF();
+              IndexFF = new global::KAITerminal.MarketData.Protos.IndexFF();
             }
             input.ReadMessage(IndexFF);
             break;
@@ -1416,7 +1416,7 @@ namespace KAITerminal.Upstox.Protos {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::KAITerminal.Upstox.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[4]; }
+      get { return global::KAITerminal.MarketData.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[4]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -1455,10 +1455,10 @@ namespace KAITerminal.Upstox.Protos {
 
     /// <summary>Field number for the "ltpc" field.</summary>
     public const int LtpcFieldNumber = 1;
-    private global::KAITerminal.Upstox.Protos.LTPC ltpc_;
+    private global::KAITerminal.MarketData.Protos.LTPC ltpc_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::KAITerminal.Upstox.Protos.LTPC Ltpc {
+    public global::KAITerminal.MarketData.Protos.LTPC Ltpc {
       get { return ltpc_; }
       set {
         ltpc_ = value;
@@ -1515,10 +1515,10 @@ namespace KAITerminal.Upstox.Protos {
 
     /// <summary>Field number for the "depth" field.</summary>
     public const int DepthFieldNumber = 6;
-    private global::KAITerminal.Upstox.Protos.Depth depth_;
+    private global::KAITerminal.MarketData.Protos.Depth depth_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::KAITerminal.Upstox.Protos.Depth Depth {
+    public global::KAITerminal.MarketData.Protos.Depth Depth {
       get { return depth_; }
       set {
         depth_ = value;
@@ -1527,21 +1527,21 @@ namespace KAITerminal.Upstox.Protos {
 
     /// <summary>Field number for the "ohlcData" field.</summary>
     public const int OhlcDataFieldNumber = 7;
-    private static readonly pb::FieldCodec<global::KAITerminal.Upstox.Protos.OHLCData> _repeated_ohlcData_codec
-        = pb::FieldCodec.ForMessage(58, global::KAITerminal.Upstox.Protos.OHLCData.Parser);
-    private readonly pbc::RepeatedField<global::KAITerminal.Upstox.Protos.OHLCData> ohlcData_ = new pbc::RepeatedField<global::KAITerminal.Upstox.Protos.OHLCData>();
+    private static readonly pb::FieldCodec<global::KAITerminal.MarketData.Protos.OHLCData> _repeated_ohlcData_codec
+        = pb::FieldCodec.ForMessage(58, global::KAITerminal.MarketData.Protos.OHLCData.Parser);
+    private readonly pbc::RepeatedField<global::KAITerminal.MarketData.Protos.OHLCData> ohlcData_ = new pbc::RepeatedField<global::KAITerminal.MarketData.Protos.OHLCData>();
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public pbc::RepeatedField<global::KAITerminal.Upstox.Protos.OHLCData> OhlcData {
+    public pbc::RepeatedField<global::KAITerminal.MarketData.Protos.OHLCData> OhlcData {
       get { return ohlcData_; }
     }
 
     /// <summary>Field number for the "optionGreeks" field.</summary>
     public const int OptionGreeksFieldNumber = 8;
-    private global::KAITerminal.Upstox.Protos.OptionGreeks optionGreeks_;
+    private global::KAITerminal.MarketData.Protos.OptionGreeks optionGreeks_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::KAITerminal.Upstox.Protos.OptionGreeks OptionGreeks {
+    public global::KAITerminal.MarketData.Protos.OptionGreeks OptionGreeks {
       get { return optionGreeks_; }
       set {
         optionGreeks_ = value;
@@ -1718,7 +1718,7 @@ namespace KAITerminal.Upstox.Protos {
       }
       if (other.ltpc_ != null) {
         if (ltpc_ == null) {
-          Ltpc = new global::KAITerminal.Upstox.Protos.LTPC();
+          Ltpc = new global::KAITerminal.MarketData.Protos.LTPC();
         }
         Ltpc.MergeFrom(other.Ltpc);
       }
@@ -1736,14 +1736,14 @@ namespace KAITerminal.Upstox.Protos {
       }
       if (other.depth_ != null) {
         if (depth_ == null) {
-          Depth = new global::KAITerminal.Upstox.Protos.Depth();
+          Depth = new global::KAITerminal.MarketData.Protos.Depth();
         }
         Depth.MergeFrom(other.Depth);
       }
       ohlcData_.Add(other.ohlcData_);
       if (other.optionGreeks_ != null) {
         if (optionGreeks_ == null) {
-          OptionGreeks = new global::KAITerminal.Upstox.Protos.OptionGreeks();
+          OptionGreeks = new global::KAITerminal.MarketData.Protos.OptionGreeks();
         }
         OptionGreeks.MergeFrom(other.OptionGreeks);
       }
@@ -1768,7 +1768,7 @@ namespace KAITerminal.Upstox.Protos {
             break;
           case 10: {
             if (ltpc_ == null) {
-              Ltpc = new global::KAITerminal.Upstox.Protos.LTPC();
+              Ltpc = new global::KAITerminal.MarketData.Protos.LTPC();
             }
             input.ReadMessage(Ltpc);
             break;
@@ -1791,7 +1791,7 @@ namespace KAITerminal.Upstox.Protos {
           }
           case 50: {
             if (depth_ == null) {
-              Depth = new global::KAITerminal.Upstox.Protos.Depth();
+              Depth = new global::KAITerminal.MarketData.Protos.Depth();
             }
             input.ReadMessage(Depth);
             break;
@@ -1802,7 +1802,7 @@ namespace KAITerminal.Upstox.Protos {
           }
           case 66: {
             if (optionGreeks_ == null) {
-              OptionGreeks = new global::KAITerminal.Upstox.Protos.OptionGreeks();
+              OptionGreeks = new global::KAITerminal.MarketData.Protos.OptionGreeks();
             }
             input.ReadMessage(OptionGreeks);
             break;
@@ -1828,7 +1828,7 @@ namespace KAITerminal.Upstox.Protos {
             break;
           case 10: {
             if (ltpc_ == null) {
-              Ltpc = new global::KAITerminal.Upstox.Protos.LTPC();
+              Ltpc = new global::KAITerminal.MarketData.Protos.LTPC();
             }
             input.ReadMessage(Ltpc);
             break;
@@ -1851,7 +1851,7 @@ namespace KAITerminal.Upstox.Protos {
           }
           case 50: {
             if (depth_ == null) {
-              Depth = new global::KAITerminal.Upstox.Protos.Depth();
+              Depth = new global::KAITerminal.MarketData.Protos.Depth();
             }
             input.ReadMessage(Depth);
             break;
@@ -1862,7 +1862,7 @@ namespace KAITerminal.Upstox.Protos {
           }
           case 66: {
             if (optionGreeks_ == null) {
-              OptionGreeks = new global::KAITerminal.Upstox.Protos.OptionGreeks();
+              OptionGreeks = new global::KAITerminal.MarketData.Protos.OptionGreeks();
             }
             input.ReadMessage(OptionGreeks);
             break;
@@ -1889,7 +1889,7 @@ namespace KAITerminal.Upstox.Protos {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::KAITerminal.Upstox.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[5]; }
+      get { return global::KAITerminal.MarketData.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[5]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -1922,10 +1922,10 @@ namespace KAITerminal.Upstox.Protos {
 
     /// <summary>Field number for the "ltpc" field.</summary>
     public const int LtpcFieldNumber = 1;
-    private global::KAITerminal.Upstox.Protos.LTPC ltpc_;
+    private global::KAITerminal.MarketData.Protos.LTPC ltpc_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::KAITerminal.Upstox.Protos.LTPC Ltpc {
+    public global::KAITerminal.MarketData.Protos.LTPC Ltpc {
       get { return ltpc_; }
       set {
         ltpc_ = value;
@@ -1934,12 +1934,12 @@ namespace KAITerminal.Upstox.Protos {
 
     /// <summary>Field number for the "ohlcData" field.</summary>
     public const int OhlcDataFieldNumber = 2;
-    private static readonly pb::FieldCodec<global::KAITerminal.Upstox.Protos.OHLCData> _repeated_ohlcData_codec
-        = pb::FieldCodec.ForMessage(18, global::KAITerminal.Upstox.Protos.OHLCData.Parser);
-    private readonly pbc::RepeatedField<global::KAITerminal.Upstox.Protos.OHLCData> ohlcData_ = new pbc::RepeatedField<global::KAITerminal.Upstox.Protos.OHLCData>();
+    private static readonly pb::FieldCodec<global::KAITerminal.MarketData.Protos.OHLCData> _repeated_ohlcData_codec
+        = pb::FieldCodec.ForMessage(18, global::KAITerminal.MarketData.Protos.OHLCData.Parser);
+    private readonly pbc::RepeatedField<global::KAITerminal.MarketData.Protos.OHLCData> ohlcData_ = new pbc::RepeatedField<global::KAITerminal.MarketData.Protos.OHLCData>();
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public pbc::RepeatedField<global::KAITerminal.Upstox.Protos.OHLCData> OhlcData {
+    public pbc::RepeatedField<global::KAITerminal.MarketData.Protos.OHLCData> OhlcData {
       get { return ohlcData_; }
     }
 
@@ -2035,7 +2035,7 @@ namespace KAITerminal.Upstox.Protos {
       }
       if (other.ltpc_ != null) {
         if (ltpc_ == null) {
-          Ltpc = new global::KAITerminal.Upstox.Protos.LTPC();
+          Ltpc = new global::KAITerminal.MarketData.Protos.LTPC();
         }
         Ltpc.MergeFrom(other.Ltpc);
       }
@@ -2061,7 +2061,7 @@ namespace KAITerminal.Upstox.Protos {
             break;
           case 10: {
             if (ltpc_ == null) {
-              Ltpc = new global::KAITerminal.Upstox.Protos.LTPC();
+              Ltpc = new global::KAITerminal.MarketData.Protos.LTPC();
             }
             input.ReadMessage(Ltpc);
             break;
@@ -2091,7 +2091,7 @@ namespace KAITerminal.Upstox.Protos {
             break;
           case 10: {
             if (ltpc_ == null) {
-              Ltpc = new global::KAITerminal.Upstox.Protos.LTPC();
+              Ltpc = new global::KAITerminal.MarketData.Protos.LTPC();
             }
             input.ReadMessage(Ltpc);
             break;
@@ -2122,7 +2122,7 @@ namespace KAITerminal.Upstox.Protos {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::KAITerminal.Upstox.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[6]; }
+      get { return global::KAITerminal.MarketData.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[6]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -2160,10 +2160,10 @@ namespace KAITerminal.Upstox.Protos {
 
     /// <summary>Field number for the "ltpc" field.</summary>
     public const int LtpcFieldNumber = 1;
-    private global::KAITerminal.Upstox.Protos.LTPC ltpc_;
+    private global::KAITerminal.MarketData.Protos.LTPC ltpc_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::KAITerminal.Upstox.Protos.LTPC Ltpc {
+    public global::KAITerminal.MarketData.Protos.LTPC Ltpc {
       get { return ltpc_; }
       set {
         ltpc_ = value;
@@ -2220,10 +2220,10 @@ namespace KAITerminal.Upstox.Protos {
 
     /// <summary>Field number for the "optionGreeks" field.</summary>
     public const int OptionGreeksFieldNumber = 6;
-    private global::KAITerminal.Upstox.Protos.OptionGreeks optionGreeks_;
+    private global::KAITerminal.MarketData.Protos.OptionGreeks optionGreeks_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::KAITerminal.Upstox.Protos.OptionGreeks OptionGreeks {
+    public global::KAITerminal.MarketData.Protos.OptionGreeks OptionGreeks {
       get { return optionGreeks_; }
       set {
         optionGreeks_ = value;
@@ -2232,10 +2232,10 @@ namespace KAITerminal.Upstox.Protos {
 
     /// <summary>Field number for the "depth" field.</summary>
     public const int DepthFieldNumber = 7;
-    private global::KAITerminal.Upstox.Protos.Depth depth_;
+    private global::KAITerminal.MarketData.Protos.Depth depth_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::KAITerminal.Upstox.Protos.Depth Depth {
+    public global::KAITerminal.MarketData.Protos.Depth Depth {
       get { return depth_; }
       set {
         depth_ = value;
@@ -2407,7 +2407,7 @@ namespace KAITerminal.Upstox.Protos {
       }
       if (other.ltpc_ != null) {
         if (ltpc_ == null) {
-          Ltpc = new global::KAITerminal.Upstox.Protos.LTPC();
+          Ltpc = new global::KAITerminal.MarketData.Protos.LTPC();
         }
         Ltpc.MergeFrom(other.Ltpc);
       }
@@ -2425,13 +2425,13 @@ namespace KAITerminal.Upstox.Protos {
       }
       if (other.optionGreeks_ != null) {
         if (optionGreeks_ == null) {
-          OptionGreeks = new global::KAITerminal.Upstox.Protos.OptionGreeks();
+          OptionGreeks = new global::KAITerminal.MarketData.Protos.OptionGreeks();
         }
         OptionGreeks.MergeFrom(other.OptionGreeks);
       }
       if (other.depth_ != null) {
         if (depth_ == null) {
-          Depth = new global::KAITerminal.Upstox.Protos.Depth();
+          Depth = new global::KAITerminal.MarketData.Protos.Depth();
         }
         Depth.MergeFrom(other.Depth);
       }
@@ -2456,7 +2456,7 @@ namespace KAITerminal.Upstox.Protos {
             break;
           case 10: {
             if (ltpc_ == null) {
-              Ltpc = new global::KAITerminal.Upstox.Protos.LTPC();
+              Ltpc = new global::KAITerminal.MarketData.Protos.LTPC();
             }
             input.ReadMessage(Ltpc);
             break;
@@ -2479,14 +2479,14 @@ namespace KAITerminal.Upstox.Protos {
           }
           case 50: {
             if (optionGreeks_ == null) {
-              OptionGreeks = new global::KAITerminal.Upstox.Protos.OptionGreeks();
+              OptionGreeks = new global::KAITerminal.MarketData.Protos.OptionGreeks();
             }
             input.ReadMessage(OptionGreeks);
             break;
           }
           case 58: {
             if (depth_ == null) {
-              Depth = new global::KAITerminal.Upstox.Protos.Depth();
+              Depth = new global::KAITerminal.MarketData.Protos.Depth();
             }
             input.ReadMessage(Depth);
             break;
@@ -2512,7 +2512,7 @@ namespace KAITerminal.Upstox.Protos {
             break;
           case 10: {
             if (ltpc_ == null) {
-              Ltpc = new global::KAITerminal.Upstox.Protos.LTPC();
+              Ltpc = new global::KAITerminal.MarketData.Protos.LTPC();
             }
             input.ReadMessage(Ltpc);
             break;
@@ -2535,14 +2535,14 @@ namespace KAITerminal.Upstox.Protos {
           }
           case 50: {
             if (optionGreeks_ == null) {
-              OptionGreeks = new global::KAITerminal.Upstox.Protos.OptionGreeks();
+              OptionGreeks = new global::KAITerminal.MarketData.Protos.OptionGreeks();
             }
             input.ReadMessage(OptionGreeks);
             break;
           }
           case 58: {
             if (depth_ == null) {
-              Depth = new global::KAITerminal.Upstox.Protos.Depth();
+              Depth = new global::KAITerminal.MarketData.Protos.Depth();
             }
             input.ReadMessage(Depth);
             break;
@@ -2569,7 +2569,7 @@ namespace KAITerminal.Upstox.Protos {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::KAITerminal.Upstox.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[7]; }
+      get { return global::KAITerminal.MarketData.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[7]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -2602,10 +2602,10 @@ namespace KAITerminal.Upstox.Protos {
 
     /// <summary>Field number for the "marketFullD30" field.</summary>
     public const int MarketFullD30FieldNumber = 1;
-    private global::KAITerminal.Upstox.Protos.MarketFullD30 marketFullD30_;
+    private global::KAITerminal.MarketData.Protos.MarketFullD30 marketFullD30_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::KAITerminal.Upstox.Protos.MarketFullD30 MarketFullD30 {
+    public global::KAITerminal.MarketData.Protos.MarketFullD30 MarketFullD30 {
       get { return marketFullD30_; }
       set {
         marketFullD30_ = value;
@@ -2614,10 +2614,10 @@ namespace KAITerminal.Upstox.Protos {
 
     /// <summary>Field number for the "indexFullD30" field.</summary>
     public const int IndexFullD30FieldNumber = 2;
-    private global::KAITerminal.Upstox.Protos.IndexFullD30 indexFullD30_;
+    private global::KAITerminal.MarketData.Protos.IndexFullD30 indexFullD30_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::KAITerminal.Upstox.Protos.IndexFullD30 IndexFullD30 {
+    public global::KAITerminal.MarketData.Protos.IndexFullD30 IndexFullD30 {
       get { return indexFullD30_; }
       set {
         indexFullD30_ = value;
@@ -2724,13 +2724,13 @@ namespace KAITerminal.Upstox.Protos {
       }
       if (other.marketFullD30_ != null) {
         if (marketFullD30_ == null) {
-          MarketFullD30 = new global::KAITerminal.Upstox.Protos.MarketFullD30();
+          MarketFullD30 = new global::KAITerminal.MarketData.Protos.MarketFullD30();
         }
         MarketFullD30.MergeFrom(other.MarketFullD30);
       }
       if (other.indexFullD30_ != null) {
         if (indexFullD30_ == null) {
-          IndexFullD30 = new global::KAITerminal.Upstox.Protos.IndexFullD30();
+          IndexFullD30 = new global::KAITerminal.MarketData.Protos.IndexFullD30();
         }
         IndexFullD30.MergeFrom(other.IndexFullD30);
       }
@@ -2755,14 +2755,14 @@ namespace KAITerminal.Upstox.Protos {
             break;
           case 10: {
             if (marketFullD30_ == null) {
-              MarketFullD30 = new global::KAITerminal.Upstox.Protos.MarketFullD30();
+              MarketFullD30 = new global::KAITerminal.MarketData.Protos.MarketFullD30();
             }
             input.ReadMessage(MarketFullD30);
             break;
           }
           case 18: {
             if (indexFullD30_ == null) {
-              IndexFullD30 = new global::KAITerminal.Upstox.Protos.IndexFullD30();
+              IndexFullD30 = new global::KAITerminal.MarketData.Protos.IndexFullD30();
             }
             input.ReadMessage(IndexFullD30);
             break;
@@ -2788,14 +2788,14 @@ namespace KAITerminal.Upstox.Protos {
             break;
           case 10: {
             if (marketFullD30_ == null) {
-              MarketFullD30 = new global::KAITerminal.Upstox.Protos.MarketFullD30();
+              MarketFullD30 = new global::KAITerminal.MarketData.Protos.MarketFullD30();
             }
             input.ReadMessage(MarketFullD30);
             break;
           }
           case 18: {
             if (indexFullD30_ == null) {
-              IndexFullD30 = new global::KAITerminal.Upstox.Protos.IndexFullD30();
+              IndexFullD30 = new global::KAITerminal.MarketData.Protos.IndexFullD30();
             }
             input.ReadMessage(IndexFullD30);
             break;
@@ -2822,7 +2822,7 @@ namespace KAITerminal.Upstox.Protos {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::KAITerminal.Upstox.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[8]; }
+      get { return global::KAITerminal.MarketData.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[8]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -2861,10 +2861,10 @@ namespace KAITerminal.Upstox.Protos {
 
     /// <summary>Field number for the "ltpc" field.</summary>
     public const int LtpcFieldNumber = 1;
-    private global::KAITerminal.Upstox.Protos.LTPC ltpc_;
+    private global::KAITerminal.MarketData.Protos.LTPC ltpc_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::KAITerminal.Upstox.Protos.LTPC Ltpc {
+    public global::KAITerminal.MarketData.Protos.LTPC Ltpc {
       get { return ltpc_; }
       set {
         ltpc_ = value;
@@ -2921,10 +2921,10 @@ namespace KAITerminal.Upstox.Protos {
 
     /// <summary>Field number for the "depthD30" field.</summary>
     public const int DepthD30FieldNumber = 6;
-    private global::KAITerminal.Upstox.Protos.DepthD30 depthD30_;
+    private global::KAITerminal.MarketData.Protos.DepthD30 depthD30_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::KAITerminal.Upstox.Protos.DepthD30 DepthD30 {
+    public global::KAITerminal.MarketData.Protos.DepthD30 DepthD30 {
       get { return depthD30_; }
       set {
         depthD30_ = value;
@@ -2933,21 +2933,21 @@ namespace KAITerminal.Upstox.Protos {
 
     /// <summary>Field number for the "ohlcData" field.</summary>
     public const int OhlcDataFieldNumber = 7;
-    private static readonly pb::FieldCodec<global::KAITerminal.Upstox.Protos.OHLCData> _repeated_ohlcData_codec
-        = pb::FieldCodec.ForMessage(58, global::KAITerminal.Upstox.Protos.OHLCData.Parser);
-    private readonly pbc::RepeatedField<global::KAITerminal.Upstox.Protos.OHLCData> ohlcData_ = new pbc::RepeatedField<global::KAITerminal.Upstox.Protos.OHLCData>();
+    private static readonly pb::FieldCodec<global::KAITerminal.MarketData.Protos.OHLCData> _repeated_ohlcData_codec
+        = pb::FieldCodec.ForMessage(58, global::KAITerminal.MarketData.Protos.OHLCData.Parser);
+    private readonly pbc::RepeatedField<global::KAITerminal.MarketData.Protos.OHLCData> ohlcData_ = new pbc::RepeatedField<global::KAITerminal.MarketData.Protos.OHLCData>();
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public pbc::RepeatedField<global::KAITerminal.Upstox.Protos.OHLCData> OhlcData {
+    public pbc::RepeatedField<global::KAITerminal.MarketData.Protos.OHLCData> OhlcData {
       get { return ohlcData_; }
     }
 
     /// <summary>Field number for the "optionGreeks" field.</summary>
     public const int OptionGreeksFieldNumber = 8;
-    private global::KAITerminal.Upstox.Protos.OptionGreeks optionGreeks_;
+    private global::KAITerminal.MarketData.Protos.OptionGreeks optionGreeks_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::KAITerminal.Upstox.Protos.OptionGreeks OptionGreeks {
+    public global::KAITerminal.MarketData.Protos.OptionGreeks OptionGreeks {
       get { return optionGreeks_; }
       set {
         optionGreeks_ = value;
@@ -3124,7 +3124,7 @@ namespace KAITerminal.Upstox.Protos {
       }
       if (other.ltpc_ != null) {
         if (ltpc_ == null) {
-          Ltpc = new global::KAITerminal.Upstox.Protos.LTPC();
+          Ltpc = new global::KAITerminal.MarketData.Protos.LTPC();
         }
         Ltpc.MergeFrom(other.Ltpc);
       }
@@ -3142,14 +3142,14 @@ namespace KAITerminal.Upstox.Protos {
       }
       if (other.depthD30_ != null) {
         if (depthD30_ == null) {
-          DepthD30 = new global::KAITerminal.Upstox.Protos.DepthD30();
+          DepthD30 = new global::KAITerminal.MarketData.Protos.DepthD30();
         }
         DepthD30.MergeFrom(other.DepthD30);
       }
       ohlcData_.Add(other.ohlcData_);
       if (other.optionGreeks_ != null) {
         if (optionGreeks_ == null) {
-          OptionGreeks = new global::KAITerminal.Upstox.Protos.OptionGreeks();
+          OptionGreeks = new global::KAITerminal.MarketData.Protos.OptionGreeks();
         }
         OptionGreeks.MergeFrom(other.OptionGreeks);
       }
@@ -3174,7 +3174,7 @@ namespace KAITerminal.Upstox.Protos {
             break;
           case 10: {
             if (ltpc_ == null) {
-              Ltpc = new global::KAITerminal.Upstox.Protos.LTPC();
+              Ltpc = new global::KAITerminal.MarketData.Protos.LTPC();
             }
             input.ReadMessage(Ltpc);
             break;
@@ -3197,7 +3197,7 @@ namespace KAITerminal.Upstox.Protos {
           }
           case 50: {
             if (depthD30_ == null) {
-              DepthD30 = new global::KAITerminal.Upstox.Protos.DepthD30();
+              DepthD30 = new global::KAITerminal.MarketData.Protos.DepthD30();
             }
             input.ReadMessage(DepthD30);
             break;
@@ -3208,7 +3208,7 @@ namespace KAITerminal.Upstox.Protos {
           }
           case 66: {
             if (optionGreeks_ == null) {
-              OptionGreeks = new global::KAITerminal.Upstox.Protos.OptionGreeks();
+              OptionGreeks = new global::KAITerminal.MarketData.Protos.OptionGreeks();
             }
             input.ReadMessage(OptionGreeks);
             break;
@@ -3234,7 +3234,7 @@ namespace KAITerminal.Upstox.Protos {
             break;
           case 10: {
             if (ltpc_ == null) {
-              Ltpc = new global::KAITerminal.Upstox.Protos.LTPC();
+              Ltpc = new global::KAITerminal.MarketData.Protos.LTPC();
             }
             input.ReadMessage(Ltpc);
             break;
@@ -3257,7 +3257,7 @@ namespace KAITerminal.Upstox.Protos {
           }
           case 50: {
             if (depthD30_ == null) {
-              DepthD30 = new global::KAITerminal.Upstox.Protos.DepthD30();
+              DepthD30 = new global::KAITerminal.MarketData.Protos.DepthD30();
             }
             input.ReadMessage(DepthD30);
             break;
@@ -3268,7 +3268,7 @@ namespace KAITerminal.Upstox.Protos {
           }
           case 66: {
             if (optionGreeks_ == null) {
-              OptionGreeks = new global::KAITerminal.Upstox.Protos.OptionGreeks();
+              OptionGreeks = new global::KAITerminal.MarketData.Protos.OptionGreeks();
             }
             input.ReadMessage(OptionGreeks);
             break;
@@ -3295,7 +3295,7 @@ namespace KAITerminal.Upstox.Protos {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::KAITerminal.Upstox.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[9]; }
+      get { return global::KAITerminal.MarketData.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[9]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -3328,10 +3328,10 @@ namespace KAITerminal.Upstox.Protos {
 
     /// <summary>Field number for the "ltpc" field.</summary>
     public const int LtpcFieldNumber = 1;
-    private global::KAITerminal.Upstox.Protos.LTPC ltpc_;
+    private global::KAITerminal.MarketData.Protos.LTPC ltpc_;
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public global::KAITerminal.Upstox.Protos.LTPC Ltpc {
+    public global::KAITerminal.MarketData.Protos.LTPC Ltpc {
       get { return ltpc_; }
       set {
         ltpc_ = value;
@@ -3340,12 +3340,12 @@ namespace KAITerminal.Upstox.Protos {
 
     /// <summary>Field number for the "ohlcData" field.</summary>
     public const int OhlcDataFieldNumber = 2;
-    private static readonly pb::FieldCodec<global::KAITerminal.Upstox.Protos.OHLCData> _repeated_ohlcData_codec
-        = pb::FieldCodec.ForMessage(18, global::KAITerminal.Upstox.Protos.OHLCData.Parser);
-    private readonly pbc::RepeatedField<global::KAITerminal.Upstox.Protos.OHLCData> ohlcData_ = new pbc::RepeatedField<global::KAITerminal.Upstox.Protos.OHLCData>();
+    private static readonly pb::FieldCodec<global::KAITerminal.MarketData.Protos.OHLCData> _repeated_ohlcData_codec
+        = pb::FieldCodec.ForMessage(18, global::KAITerminal.MarketData.Protos.OHLCData.Parser);
+    private readonly pbc::RepeatedField<global::KAITerminal.MarketData.Protos.OHLCData> ohlcData_ = new pbc::RepeatedField<global::KAITerminal.MarketData.Protos.OHLCData>();
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public pbc::RepeatedField<global::KAITerminal.Upstox.Protos.OHLCData> OhlcData {
+    public pbc::RepeatedField<global::KAITerminal.MarketData.Protos.OHLCData> OhlcData {
       get { return ohlcData_; }
     }
 
@@ -3441,7 +3441,7 @@ namespace KAITerminal.Upstox.Protos {
       }
       if (other.ltpc_ != null) {
         if (ltpc_ == null) {
-          Ltpc = new global::KAITerminal.Upstox.Protos.LTPC();
+          Ltpc = new global::KAITerminal.MarketData.Protos.LTPC();
         }
         Ltpc.MergeFrom(other.Ltpc);
       }
@@ -3467,7 +3467,7 @@ namespace KAITerminal.Upstox.Protos {
             break;
           case 10: {
             if (ltpc_ == null) {
-              Ltpc = new global::KAITerminal.Upstox.Protos.LTPC();
+              Ltpc = new global::KAITerminal.MarketData.Protos.LTPC();
             }
             input.ReadMessage(Ltpc);
             break;
@@ -3497,7 +3497,7 @@ namespace KAITerminal.Upstox.Protos {
             break;
           case 10: {
             if (ltpc_ == null) {
-              Ltpc = new global::KAITerminal.Upstox.Protos.LTPC();
+              Ltpc = new global::KAITerminal.MarketData.Protos.LTPC();
             }
             input.ReadMessage(Ltpc);
             break;
@@ -3528,7 +3528,7 @@ namespace KAITerminal.Upstox.Protos {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::KAITerminal.Upstox.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[10]; }
+      get { return global::KAITerminal.MarketData.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[10]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -3561,23 +3561,23 @@ namespace KAITerminal.Upstox.Protos {
 
     /// <summary>Field number for the "bid" field.</summary>
     public const int BidFieldNumber = 1;
-    private static readonly pb::FieldCodec<global::KAITerminal.Upstox.Protos.BidAsk> _repeated_bid_codec
-        = pb::FieldCodec.ForMessage(10, global::KAITerminal.Upstox.Protos.BidAsk.Parser);
-    private readonly pbc::RepeatedField<global::KAITerminal.Upstox.Protos.BidAsk> bid_ = new pbc::RepeatedField<global::KAITerminal.Upstox.Protos.BidAsk>();
+    private static readonly pb::FieldCodec<global::KAITerminal.MarketData.Protos.BidAsk> _repeated_bid_codec
+        = pb::FieldCodec.ForMessage(10, global::KAITerminal.MarketData.Protos.BidAsk.Parser);
+    private readonly pbc::RepeatedField<global::KAITerminal.MarketData.Protos.BidAsk> bid_ = new pbc::RepeatedField<global::KAITerminal.MarketData.Protos.BidAsk>();
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public pbc::RepeatedField<global::KAITerminal.Upstox.Protos.BidAsk> Bid {
+    public pbc::RepeatedField<global::KAITerminal.MarketData.Protos.BidAsk> Bid {
       get { return bid_; }
     }
 
     /// <summary>Field number for the "ask" field.</summary>
     public const int AskFieldNumber = 2;
-    private static readonly pb::FieldCodec<global::KAITerminal.Upstox.Protos.BidAsk> _repeated_ask_codec
-        = pb::FieldCodec.ForMessage(18, global::KAITerminal.Upstox.Protos.BidAsk.Parser);
-    private readonly pbc::RepeatedField<global::KAITerminal.Upstox.Protos.BidAsk> ask_ = new pbc::RepeatedField<global::KAITerminal.Upstox.Protos.BidAsk>();
+    private static readonly pb::FieldCodec<global::KAITerminal.MarketData.Protos.BidAsk> _repeated_ask_codec
+        = pb::FieldCodec.ForMessage(18, global::KAITerminal.MarketData.Protos.BidAsk.Parser);
+    private readonly pbc::RepeatedField<global::KAITerminal.MarketData.Protos.BidAsk> ask_ = new pbc::RepeatedField<global::KAITerminal.MarketData.Protos.BidAsk>();
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public pbc::RepeatedField<global::KAITerminal.Upstox.Protos.BidAsk> Ask {
+    public pbc::RepeatedField<global::KAITerminal.MarketData.Protos.BidAsk> Ask {
       get { return ask_; }
     }
 
@@ -3741,7 +3741,7 @@ namespace KAITerminal.Upstox.Protos {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::KAITerminal.Upstox.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[11]; }
+      get { return global::KAITerminal.MarketData.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[11]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -3774,23 +3774,23 @@ namespace KAITerminal.Upstox.Protos {
 
     /// <summary>Field number for the "bid" field.</summary>
     public const int BidFieldNumber = 1;
-    private static readonly pb::FieldCodec<global::KAITerminal.Upstox.Protos.BidAsk> _repeated_bid_codec
-        = pb::FieldCodec.ForMessage(10, global::KAITerminal.Upstox.Protos.BidAsk.Parser);
-    private readonly pbc::RepeatedField<global::KAITerminal.Upstox.Protos.BidAsk> bid_ = new pbc::RepeatedField<global::KAITerminal.Upstox.Protos.BidAsk>();
+    private static readonly pb::FieldCodec<global::KAITerminal.MarketData.Protos.BidAsk> _repeated_bid_codec
+        = pb::FieldCodec.ForMessage(10, global::KAITerminal.MarketData.Protos.BidAsk.Parser);
+    private readonly pbc::RepeatedField<global::KAITerminal.MarketData.Protos.BidAsk> bid_ = new pbc::RepeatedField<global::KAITerminal.MarketData.Protos.BidAsk>();
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public pbc::RepeatedField<global::KAITerminal.Upstox.Protos.BidAsk> Bid {
+    public pbc::RepeatedField<global::KAITerminal.MarketData.Protos.BidAsk> Bid {
       get { return bid_; }
     }
 
     /// <summary>Field number for the "ask" field.</summary>
     public const int AskFieldNumber = 2;
-    private static readonly pb::FieldCodec<global::KAITerminal.Upstox.Protos.BidAsk> _repeated_ask_codec
-        = pb::FieldCodec.ForMessage(18, global::KAITerminal.Upstox.Protos.BidAsk.Parser);
-    private readonly pbc::RepeatedField<global::KAITerminal.Upstox.Protos.BidAsk> ask_ = new pbc::RepeatedField<global::KAITerminal.Upstox.Protos.BidAsk>();
+    private static readonly pb::FieldCodec<global::KAITerminal.MarketData.Protos.BidAsk> _repeated_ask_codec
+        = pb::FieldCodec.ForMessage(18, global::KAITerminal.MarketData.Protos.BidAsk.Parser);
+    private readonly pbc::RepeatedField<global::KAITerminal.MarketData.Protos.BidAsk> ask_ = new pbc::RepeatedField<global::KAITerminal.MarketData.Protos.BidAsk>();
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
-    public pbc::RepeatedField<global::KAITerminal.Upstox.Protos.BidAsk> Ask {
+    public pbc::RepeatedField<global::KAITerminal.MarketData.Protos.BidAsk> Ask {
       get { return ask_; }
     }
 
@@ -3954,7 +3954,7 @@ namespace KAITerminal.Upstox.Protos {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::KAITerminal.Upstox.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[12]; }
+      get { return global::KAITerminal.MarketData.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[12]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -4226,7 +4226,7 @@ namespace KAITerminal.Upstox.Protos {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::KAITerminal.Upstox.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[13]; }
+      get { return global::KAITerminal.MarketData.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[13]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -4646,7 +4646,7 @@ namespace KAITerminal.Upstox.Protos {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::KAITerminal.Upstox.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[14]; }
+      get { return global::KAITerminal.MarketData.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[14]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
@@ -4992,7 +4992,7 @@ namespace KAITerminal.Upstox.Protos {
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]
     [global::System.CodeDom.Compiler.GeneratedCode("protoc", null)]
     public static pbr::MessageDescriptor Descriptor {
-      get { return global::KAITerminal.Upstox.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[15]; }
+      get { return global::KAITerminal.MarketData.Protos.MarketDataFeedV3Reflection.Descriptor.MessageTypes[15]; }
     }
 
     [global::System.Diagnostics.DebuggerNonUserCodeAttribute]

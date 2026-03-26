@@ -137,23 +137,6 @@ public static class UpstoxEndpoints
             return Results.Ok(new { OrderId = id, Latency = latency });
         });
 
-        // ── Options ───────────────────────────────────────────────────────────
-
-        group.MapGet("/options/chain", async (
-            [FromQuery] string? underlyingKey,
-            [FromQuery] string? expiryDate,
-            UpstoxClient upstox) =>
-        {
-            if (string.IsNullOrEmpty(underlyingKey) || string.IsNullOrEmpty(expiryDate))
-                return Results.BadRequest(new { error = "underlyingKey and expiryDate are required." });
-            return Results.Ok(await upstox.GetOptionChainAsync(underlyingKey, expiryDate));
-        });
-
-        group.MapPost("/orders/by-option-price/v3", async (
-            [FromBody] PlaceOrderByOptionPriceRequest request,
-            UpstoxClient upstox) =>
-            Results.Ok(await upstox.PlaceOrderByOptionPriceV3Async(request)));
-
         // ── Funds ─────────────────────────────────────────────────────────────
 
         group.MapGet("/funds", async (UpstoxClient upstox, CancellationToken ct) =>

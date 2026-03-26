@@ -1,6 +1,6 @@
-using KAITerminal.Zerodha.Models;
+using KAITerminal.MarketData.Models;
 
-namespace KAITerminal.Zerodha.Services;
+namespace KAITerminal.MarketData.Services;
 
 public interface IZerodhaInstrumentService
 {

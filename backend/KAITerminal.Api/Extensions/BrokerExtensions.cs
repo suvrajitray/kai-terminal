@@ -1,14 +1,11 @@
 using KAITerminal.Api.Services;
 using KAITerminal.Broker;
 using KAITerminal.Broker.Adapters;
-using KAITerminal.Contracts.Broker;
 using KAITerminal.MarketData.Extensions;
 using KAITerminal.Upstox;
 using KAITerminal.Upstox.Extensions;
-using KAITerminal.Upstox.Options;
 using KAITerminal.Zerodha;
 using KAITerminal.Zerodha.Extensions;
-using KAITerminal.Zerodha.Options;
 
 namespace KAITerminal.Api.Extensions;
 
@@ -36,11 +33,8 @@ public static class BrokerExtensions
             return new BrokerClientFactory(creators);
         });
 
-        // Register broker-agnostic option contract providers
-        services.AddSingleton<IOptionContractProvider, UpstoxOptionContractProvider>();
-        services.AddSingleton<IOptionContractProvider, ZerodhaOptionContractProvider>();
-
-        // RedisLtpRelay: subscribes to Redis pub/sub, relays LTP ticks in-process to PositionStreamCoordinator.
+        // MarketDataConsumer: subscribes to Redis pub/sub for live LTP ticks.
+        // Also registers IOptionContractProvider (both brokers), IOptionChainProvider, IZerodhaInstrumentService.
         services.AddMarketDataConsumer();
 
         services.AddScoped<BrokerCredentialService>();

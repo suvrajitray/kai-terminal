@@ -1,6 +1,5 @@
 using KAITerminal.Broker;
 using KAITerminal.Contracts.Domain;
-using KAITerminal.Zerodha.Models;
 using KAITerminal.Zerodha.Services;
 using KAITerminal.Zerodha.Streaming;
 
@@ -16,7 +15,7 @@ public sealed class ZerodhaClient
     private readonly IZerodhaPositionService   _positions;
     private readonly IZerodhaOrderService      _orders;
     private readonly IZerodhaFundsService      _funds;
-    private readonly IZerodhaInstrumentService _instruments;
+    private readonly IZerodhaMarginService     _margin;
     private readonly Func<KiteTickerStreamer> _marketDataStreamerFactory;
 
     public ZerodhaClient(
@@ -24,14 +23,14 @@ public sealed class ZerodhaClient
         IZerodhaPositionService   positions,
         IZerodhaOrderService      orders,
         IZerodhaFundsService      funds,
-        IZerodhaInstrumentService instruments,
+        IZerodhaMarginService     margin,
         Func<KiteTickerStreamer>   marketDataStreamerFactory)
     {
         _auth                     = auth;
         _positions                = positions;
         _orders                   = orders;
         _funds                    = funds;
-        _instruments              = instruments;
+        _margin                   = margin;
         _marketDataStreamerFactory = marketDataStreamerFactory;
     }
 
@@ -72,10 +71,10 @@ public sealed class ZerodhaClient
     public Task<BrokerFunds> GetFundsAsync(CancellationToken ct = default)
         => _funds.GetFundsAsync(ct);
 
-    // ── Instruments ───────────────────────────────────────────────────────────
+    // ── Margin ────────────────────────────────────────────────────────────────
 
-    public Task<IReadOnlyList<ZerodhaOptionContract>> GetOptionContractsAsync(
-        string underlyingSymbol, CancellationToken ct = default)
-        => _instruments.GetCurrentYearContractsAsync(underlyingSymbol, ct);
+    public Task<ZerodhaMarginResponse> GetRequiredMarginAsync(
+        IEnumerable<ZerodhaMarginOrderItem> items, CancellationToken ct = default)
+        => _margin.GetRequiredMarginAsync(items, ct);
 
 }

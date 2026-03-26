@@ -1,7 +1,6 @@
-using KAITerminal.Upstox.Models.Enums;
-using KAITerminal.Upstox.Models.Responses;
+using KAITerminal.MarketData.Models;
 
-namespace KAITerminal.Upstox.Services;
+namespace KAITerminal.MarketData.Services;
 
 public interface IChartDataService
 {

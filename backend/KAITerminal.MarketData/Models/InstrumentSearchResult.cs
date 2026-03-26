@@ -1,4 +1,4 @@
-namespace KAITerminal.Upstox.Models.Responses;
+namespace KAITerminal.MarketData.Models;
 
 public sealed record InstrumentSearchResult
 {

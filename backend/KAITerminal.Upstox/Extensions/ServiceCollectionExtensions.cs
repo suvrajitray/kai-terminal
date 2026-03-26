@@ -1,4 +1,3 @@
-using KAITerminal.Contracts.Streaming;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using KAITerminal.Upstox.Configuration;
@@ -65,16 +64,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IPositionService, PositionService>();
         services.AddSingleton<IOrderService, OrderService>();
         services.AddSingleton<IOptionService, OptionService>();
-        services.AddSingleton<IMarketQuoteService, MarketQuoteService>();
-        services.AddSingleton<IChartDataService, ChartDataService>();
         services.AddSingleton<IMarginService, MarginService>();
         services.AddSingleton<IFundsService, FundsService>();
-
-        // MarketDataStreamer — Transient so each caller gets its own independent WebSocket connection.
-        services.AddTransient<IMarketDataStreamer, MarketDataStreamer>();
-        services.AddTransient<MarketDataStreamer>();
-        services.AddSingleton<Func<IMarketDataStreamer>>(sp => () => sp.GetRequiredService<IMarketDataStreamer>());
-        // MarketDataService is registered in KAITerminal.Worker (uses analytics token from AppSettings via Redis)
 
         services.AddSingleton<UpstoxClient>();
 

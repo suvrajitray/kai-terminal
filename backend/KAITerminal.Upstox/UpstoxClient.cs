@@ -1,4 +1,3 @@
-using KAITerminal.Contracts.Streaming;
 using KAITerminal.Upstox.Models.Enums;
 using KAITerminal.Upstox.Models.Requests;
 using KAITerminal.Upstox.Models.Responses;
@@ -17,42 +16,30 @@ public sealed class UpstoxClient
     private readonly IPositionService _positions;
     private readonly IOrderService _orders;
     private readonly IOptionService _options;
-    private readonly IMarketQuoteService _quotes;
-    private readonly IChartDataService _charts;
     private readonly IMarginService _margin;
     private readonly IFundsService _funds;
-    private readonly Func<IMarketDataStreamer>  _marketDataStreamerFactory;
 
     public UpstoxClient(
         IAuthService auth,
         IPositionService positions,
         IOrderService orders,
         IOptionService options,
-        IMarketQuoteService quotes,
-        IChartDataService charts,
         IMarginService margin,
-        IFundsService funds,
-        Func<IMarketDataStreamer>  marketDataStreamerFactory)
+        IFundsService funds)
     {
         ArgumentNullException.ThrowIfNull(auth);
         ArgumentNullException.ThrowIfNull(positions);
         ArgumentNullException.ThrowIfNull(orders);
         ArgumentNullException.ThrowIfNull(options);
-        ArgumentNullException.ThrowIfNull(quotes);
-        ArgumentNullException.ThrowIfNull(charts);
         ArgumentNullException.ThrowIfNull(margin);
         ArgumentNullException.ThrowIfNull(funds);
-        ArgumentNullException.ThrowIfNull(marketDataStreamerFactory);
 
         _auth = auth;
         _positions = positions;
         _orders = orders;
         _options = options;
-        _quotes = quotes;
-        _charts = charts;
         _margin = margin;
         _funds  = funds;
-        _marketDataStreamerFactory = marketDataStreamerFactory;
     }
 
     // ═══════════════════════════════════════════════════════
@@ -219,11 +206,6 @@ public sealed class UpstoxClient
         string orderId, CancellationToken cancellationToken = default)
         => _orders.CancelOrderV3Async(orderId, cancellationToken);
 
-    /// <summary>Fetch full market quotes (LTP + OHLC) for a list of instruments.</summary>
-    public Task<IReadOnlyDictionary<string, MarketQuote>> GetMarketQuotesAsync(
-        IEnumerable<string> instrumentKeys, CancellationToken cancellationToken = default)
-        => _quotes.GetMarketQuotesAsync(instrumentKeys, cancellationToken);
-
     /// <summary>Fetch the put/call option chain for an underlying at a given expiry.</summary>
     public Task<IReadOnlyList<OptionChainEntry>> GetOptionChainAsync(
         string underlyingKey, string expiryDate, CancellationToken cancellationToken = default)
@@ -233,27 +215,6 @@ public sealed class UpstoxClient
     public Task<IReadOnlyList<OptionContract>> GetOptionContractsAsync(
         string underlyingKey, string? expiryDate = null, CancellationToken cancellationToken = default)
         => _options.GetOptionContractsAsync(underlyingKey, expiryDate, cancellationToken);
-
-    // ═══════════════════════════════════════════════════════
-    // Charts — historical candles + instrument search
-    // ═══════════════════════════════════════════════════════
-
-    /// <summary>Fetch historical OHLCV candles for an instrument.</summary>
-    public Task<IReadOnlyList<CandleData>> GetHistoricalCandlesAsync(
-        string instrumentKey, CandleInterval interval, DateOnly from, DateOnly to,
-        CancellationToken cancellationToken = default)
-        => _charts.GetHistoricalCandlesAsync(instrumentKey, interval, from, to, cancellationToken);
-
-    /// <summary>Fetch today's intraday OHLCV candles for an instrument.</summary>
-    public Task<IReadOnlyList<CandleData>> GetIntradayCandlesAsync(
-        string instrumentKey, CandleInterval interval,
-        CancellationToken cancellationToken = default)
-        => _charts.GetIntradayCandlesAsync(instrumentKey, interval, cancellationToken);
-
-    /// <summary>Search for instruments by name or symbol.</summary>
-    public Task<IReadOnlyList<InstrumentSearchResult>> SearchInstrumentsAsync(
-        string query, CancellationToken cancellationToken = default)
-        => _charts.SearchInstrumentsAsync(query, cancellationToken);
 
     // ═══════════════════════════════════════════════════════
     // Margin
@@ -276,15 +237,4 @@ public sealed class UpstoxClient
     public Task<FundsResponse> GetFundsAsync(CancellationToken cancellationToken = default)
         => _funds.GetFundsAsync(cancellationToken);
 
-    // ═══════════════════════════════════════════════════════
-    // WebSocket streaming — streamer factories
-    // ═══════════════════════════════════════════════════════
-
-    /// <summary>
-    /// Create a new <see cref="IMarketDataStreamer"/> instance.
-    /// Each call returns an independent connection — call <see cref="IMarketDataStreamer.ConnectAsync"/>
-    /// on the returned instance to open the WebSocket, then subscribe to instruments.
-    /// Dispose the streamer when done.
-    /// </summary>
-    public IMarketDataStreamer CreateMarketDataStreamer() => _marketDataStreamerFactory();
 }

@@ -1,13 +1,15 @@
 using KAITerminal.Contracts.Broker;
 using KAITerminal.Contracts.Options;
+using KAITerminal.Infrastructure.Services;
+using KAITerminal.MarketData.Http;
+using Microsoft.Extensions.DependencyInjection;
 
-namespace KAITerminal.Upstox.Options;
+namespace KAITerminal.MarketData.Options;
 
 /// <summary>
-/// Fetches Upstox option contracts and exposes them via the broker-agnostic
-/// <see cref="IOptionContractProvider"/> interface consumed by <c>MasterDataService</c>.
+/// Fetches Upstox option contracts using the admin analytics token (no user token required).
 /// </summary>
-public sealed class UpstoxOptionContractProvider : IOptionContractProvider
+internal sealed class UpstoxOptionContractProvider : IOptionContractProvider
 {
     private static readonly Dictionary<string, string> UnderlyingToIndex = new()
     {
@@ -18,22 +20,31 @@ public sealed class UpstoxOptionContractProvider : IOptionContractProvider
         ["BSE_INDEX|BANKEX"]            = "BANKEX",
     };
 
-    private readonly UpstoxClient _upstox;
+    private readonly UpstoxMarketDataHttpClient _http;
+    private readonly IServiceScopeFactory       _scopeFactory;
 
-    public UpstoxOptionContractProvider(UpstoxClient upstox) => _upstox = upstox;
+    public UpstoxOptionContractProvider(UpstoxMarketDataHttpClient http, IServiceScopeFactory scopeFactory)
+    {
+        _http         = http;
+        _scopeFactory = scopeFactory;
+    }
 
     public string BrokerType => "upstox";
 
     public async Task<IReadOnlyList<IndexContracts>> GetContractsAsync(
         string accessToken, string? apiKey, CancellationToken ct)
     {
+        // Use analytics token — user token is ignored for contract fetching
+        using var scope = _scopeFactory.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<IAppSettingService>();
+        var token = await svc.GetAsync(AppSettingKeys.UpstoxAnalyticsToken, ct)
+            ?? throw new InvalidOperationException("Analytics token not configured.");
+
         var today = DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(5.5));
 
         var tasks = UnderlyingToIndex.Select(async kvp =>
         {
-            IReadOnlyList<KAITerminal.Upstox.Models.Responses.OptionContract> all;
-            using (UpstoxTokenContext.Use(accessToken))
-                all = await _upstox.GetOptionContractsAsync(kvp.Key, cancellationToken: ct);
+            var all = await _http.GetOptionContractsAsync(token, kvp.Key, ct: ct);
 
             var entries = all
                 .Where(c =>
@@ -41,7 +52,7 @@ public sealed class UpstoxOptionContractProvider : IOptionContractProvider
                     DateOnly.TryParse(c.Expiry, out var expiry) && expiry.Year == today.Year)
                 .OrderBy(c => c.Expiry)
                 .Select(c => new ContractEntry(
-                    c.Expiry, c.ExchangeToken, c.LotSize,
+                    c.Expiry, c.ExchangeToken, (int)c.LotSize,
                     c.InstrumentType,
                     UpstoxToken: c.InstrumentKey,
                     ZerodhaToken: "",

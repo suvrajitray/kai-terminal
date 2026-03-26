@@ -3,7 +3,8 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using KAITerminal.Api.Models;
-using KAITerminal.Upstox.Models.Enums;
+using KAITerminal.MarketData.Models;
+using KAITerminal.MarketData.Services;
 using KAITerminal.Upstox.Services;
 
 namespace KAITerminal.Api.Services;
@@ -172,12 +173,12 @@ public sealed class AiSentimentService : IAiSentimentService
     // ── Prompt builder ───────────────────────────────────────────────────────────
 
     private static string BuildPrompt(
-        Upstox.Models.Responses.MarketQuote? nifty,
-        Upstox.Models.Responses.MarketQuote? bankNifty,
-        Upstox.Models.Responses.MarketQuote? sensex,
+        MarketQuote? nifty,
+        MarketQuote? bankNifty,
+        MarketQuote? sensex,
         decimal niftyLtp, decimal bankNiftyLtp, decimal sensexLtp,
         OptionsData niftyOpts, OptionsData bankNiftyOpts,
-        IEnumerable<Upstox.Models.Responses.CandleData> candles)
+        IEnumerable<CandleData> candles)
     {
         var sb = new StringBuilder();
 
@@ -223,7 +224,7 @@ public sealed class AiSentimentService : IAiSentimentService
 
     private static void AppendIndexRow(
         StringBuilder sb, string name,
-        decimal ltp, Upstox.Models.Responses.MarketQuote? q)
+        decimal ltp, MarketQuote? q)
     {
         if (q is null) { sb.AppendLine($"{name,-9} | {ltp,9:F2} | N/A"); return; }
         var pct = ltp > 0 ? q.NetChange / (ltp - q.NetChange) * 100m : 0m;

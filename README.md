@@ -10,7 +10,7 @@ A full-stack options trading terminal built for **options sellers** in Indian eq
 | Database | PostgreSQL (Neon) |
 | Cache / Pub-Sub | Redis (StackExchange.Redis) |
 | Auth | Google OAuth 2.0, JWT (HS256) |
-| Brokers | Upstox (full), Zerodha (REST; streaming stub) |
+| Brokers | Upstox (execution + market data), Zerodha (REST; streaming stub) |
 | Frontend | React 19, TypeScript, Vite |
 | UI | Tailwind CSS, shadcn/ui |
 | State | Zustand (persisted to localStorage) |
@@ -55,8 +55,9 @@ kai-terminal/
 │   │   ├── Broker/                IOptionContractProvider
 │   │   └── Notifications/         IRiskEventNotifier, RiskNotification
 │   ├── KAITerminal.Broker/        IBrokerClient, IBrokerClientFactory
-│   ├── KAITerminal.Upstox/        Upstox SDK (full)
-│   ├── KAITerminal.Zerodha/       Zerodha SDK (streaming stubbed)
+│   ├── KAITerminal.Upstox/        Upstox SDK — execution only (auth, orders, positions, funds, margin)
+│   ├── KAITerminal.Zerodha/       Zerodha SDK — execution only + margin; streaming stubbed
+│   ├── KAITerminal.MarketData/    Market data — quotes, candles, option chain/contracts, WebSocket feed, Kite CSV
 │   ├── KAITerminal.Infrastructure/ EF Core + PostgreSQL
 │   └── KAITerminal.Auth/          OAuth + JWT helpers
 └── frontend/
@@ -217,16 +218,17 @@ KAITerminal.Contracts   ← leaf node — all shared domain + notification types
         ↑
 KAITerminal.Broker      ← IBrokerClient, IBrokerClientFactory
         ↑
-KAITerminal.Upstox      ← Upstox SDK (full implementation)
-KAITerminal.Zerodha     ← Zerodha SDK (streaming stubbed)
+KAITerminal.Upstox      ← execution only (auth, orders, positions, funds, margin)
+KAITerminal.Zerodha     ← execution only + margin; streaming stubbed
+KAITerminal.MarketData  ← market data only; zero Upstox/Zerodha SDK deps
         ↑
-KAITerminal.RiskEngine  ← risk logic; zero broker deps
+KAITerminal.RiskEngine  ← risk logic; zero broker/market-data deps
 KAITerminal.Api         ← REST API + SignalR hubs (PositionsHub, IndexHub, RiskHub)
-KAITerminal.Worker      ── RiskEngine + Infrastructure (multi-user host)
+KAITerminal.Worker      ── RiskEngine + Upstox + Zerodha + MarketData + Infrastructure
 KAITerminal.Console     ── RiskEngine (single-user host)
 ```
 
-**Adding a new broker** (e.g. Dhan): create `KAITerminal.Dhan`, implement `IBrokerClient` + `IOptionContractProvider`, register in `BrokerExtensions`. Zero changes to RiskEngine, Contracts, or Infrastructure.
+**Adding a new broker** (e.g. Dhan): create `KAITerminal.Dhan`, implement `IBrokerClient`, register in `BrokerExtensions`. Add an `IOptionContractProvider` implementation to `KAITerminal.MarketData` and register it in `AddMarketDataConsumer()`/`AddMarketDataProducer()`. Zero changes to RiskEngine, Contracts, or Infrastructure.
 
 ### Shared Market Data (Admin Account + Redis)
 
@@ -235,7 +237,7 @@ All LTP ticks flow through a single shared connection owned by an admin broker a
 ```
 Admin broker account (Upstox)
   └── AdminMarketDataService  (IHostedService, KAITerminal.Api)
-        └── MarketDataStreamer  (single WebSocket)
+        └── UpstoxMarketDataStreamer  (KAITerminal.MarketData, single WebSocket)
               LTP ticks
                ├── FeedReceived event  ──→  PositionStreamCoordinator (per browser tab)
                └── Redis pub/sub "ltp:feed"  ──→  Worker process
@@ -245,6 +247,8 @@ Admin broker account (Upstox)
 ```
 
 The `ISharedMarketDataService` interface (defined in `KAITerminal.Contracts`) decouples all consumers from the underlying WebSocket implementation. Swapping to TrueData or an NSE direct feed requires only a new `ISharedMarketDataService` implementation — zero changes to the risk engine, hubs, or any consumer.
+
+Market data services (`IMarketQuoteService`, `IChartDataService`, `IZerodhaInstrumentService`) and option contract/chain providers all live in `KAITerminal.MarketData` — the only project with market data HTTP calls. They use the admin analytics token, resolved per-call via `IServiceScopeFactory`.
 
 ---
 
@@ -346,8 +350,12 @@ Strike resolution rules:
 | `POST` | `/api/zerodha/access-token` | Exchange `request_token` for access token |
 | `GET` | `/api/zerodha/positions` | Zerodha open positions |
 | `GET` | `/api/zerodha/orders` | Zerodha today's orders |
+| `GET` | `/api/zerodha/funds` | Available margin + used margin |
+| `POST` | `/api/zerodha/margin` | Basket margin for a list of hypothetical orders |
 
 Zerodha endpoints require `X-Zerodha-Api-Key` and `X-Zerodha-Access-Token` headers.
+
+Margin request body: `{ "Instruments": [{ "TradingSymbol", "Exchange", "TransactionType", "Product", "Quantity" }] }` → Response: `{ "requiredMargin", "finalMargin" }`
 
 ### Master Data
 
@@ -634,7 +642,7 @@ All risk engine logs follow the format `{UserId} ({Broker})` and format monetary
 
 ## Upstox SDK
 
-`KAITerminal.Upstox` is a .NET 10 class library that wraps the Upstox REST API v2/v3 and real-time WebSocket feeds into a DI-friendly trading SDK.
+`KAITerminal.Upstox` is a .NET 10 class library wrapping the Upstox REST API for **execution**: auth, orders, positions, funds, and margin. Market data (quotes, candles, option chain/contracts, WebSocket feed) lives in `KAITerminal.MarketData`.
 
 ### Registration
 
@@ -690,7 +698,7 @@ using (UpstoxTokenContext.Use(currentUser.UpstoxToken))
 
 ### Market Data Streamer
 
-Streams tick data in protobuf binary over WebSocket.
+The WebSocket feed is implemented by `UpstoxMarketDataStreamer` in `KAITerminal.MarketData` — not in `KAITerminal.Upstox`. In the application it is managed exclusively by `AdminMarketDataService` via the `ISharedMarketDataService` interface.
 
 | FeedMode | Data included |
 |---|---|
@@ -698,22 +706,6 @@ Streams tick data in protobuf binary over WebSocket.
 | `Full` | LTPC + 5-level depth + OHLC + ATP, VTT, OI, IV + greeks |
 | `OptionGreeks` | LTPC + 1-level depth + greeks + VTT, OI, IV |
 | `FullD30` | Same as Full but 30-level depth |
-
-```csharp
-await using var streamer = client.CreateMarketDataStreamer();
-
-streamer.FeedReceived += (_, msg) =>
-{
-    foreach (var (key, feed) in msg.Instruments)
-        if (feed.Ltpc is { } ltpc)
-            Console.WriteLine($"{key}  LTP={ltpc.Ltp}");
-};
-
-await streamer.ConnectAsync();
-await streamer.SubscribeAsync(["NSE_INDEX|Nifty 50"], FeedMode.Ltpc);
-```
-
-> In the application, market data is managed exclusively by `AdminMarketDataService` via the `ISharedMarketDataService` interface. Direct use of `IMarketDataStreamer` is only appropriate for standalone tools or tests.
 
 ### Error Handling
 
@@ -732,12 +724,16 @@ catch (UpstoxException ex)
 
 ### Protobuf / Apple Silicon Note
 
-`Protos/MarketDataFeedV3.cs` is pre-generated because `Grpc.Tools` does not ship a native `macosx_arm64` binary. If the `.proto` is modified, regenerate with:
+`KAITerminal.MarketData/Protos/MarketDataFeedV3.cs` is pre-generated (namespace `KAITerminal.MarketData.Protos`) because `Grpc.Tools` does not ship a native `macosx_arm64` binary. If the `.proto` is modified, regenerate with:
 
 ```bash
 brew install protobuf
-protoc --csharp_out=Protos --proto_path=Protos Protos/MarketDataFeedV3.proto
+protoc --csharp_out=KAITerminal.MarketData/Protos \
+       --proto_path=KAITerminal.MarketData/Protos \
+       KAITerminal.MarketData/Protos/MarketDataFeedV3.proto
 ```
+
+Then update the namespace declaration at the top of the generated file from the default to `KAITerminal.MarketData.Protos`.
 
 ---
 

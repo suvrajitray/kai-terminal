@@ -44,8 +44,9 @@ The frontend `@` alias resolves to `frontend/src/`.
 | `KAITerminal.RiskEngine` | Library | Risk engine library — all risk logic, workers, state |
 | `KAITerminal.Contracts` | Library | Broker-agnostic domain types — `Position`, `BrokerFunds`, `BrokerOrderRequest`, streaming interfaces, option contract types, `IRiskEventNotifier` + `RiskNotification` |
 | `KAITerminal.Broker` | Library | Broker abstraction — `IBrokerClient`, `IBrokerClientFactory` |
-| `KAITerminal.Upstox` | Library | Upstox SDK — HTTP client, WebSocket streamers, order/option services; `UpstoxBrokerClient` implements `IBrokerClient` |
-| `KAITerminal.Zerodha` | Library | Zerodha SDK — Kite Connect REST + streaming stubs; `ZerodhaBrokerClient` implements `IBrokerClient` |
+| `KAITerminal.Upstox` | Library | Upstox SDK — auth, orders, positions, funds, margin; `UpstoxBrokerClient` implements `IBrokerClient`. No market data. |
+| `KAITerminal.Zerodha` | Library | Zerodha SDK — auth, orders, positions, funds, margin; `ZerodhaBrokerClient` implements `IBrokerClient`. No market data. |
+| `KAITerminal.MarketData` | Library | Market data library — option chain/contracts, market quotes, candles, WebSocket feed, Kite CSV. Zero Upstox/Zerodha SDK deps. |
 | `KAITerminal.Infrastructure` | Library | EF Core `AppDbContext`, DB initialisation, PostgreSQL integration |
 | `KAITerminal.Auth` | Library | OAuth/JWT service registration helpers |
 | `KAITerminal.Types` | Library | Cross-project shared types |
@@ -57,18 +58,17 @@ KAITerminal.Contracts     (no deps — leaf node)
         ↑
 KAITerminal.Broker        (Contracts)
         ↑
-KAITerminal.Upstox        (Contracts + Broker; all Upstox-internal types stay private)
-KAITerminal.Zerodha       (Contracts + Broker; all Zerodha-internal types stay private)
+KAITerminal.Upstox        (Contracts + Broker; execution only — auth, orders, positions, funds, margin)
+KAITerminal.Zerodha       (Contracts + Broker; execution only — auth, orders, positions, funds, margin)
+KAITerminal.MarketData    (Contracts + Infrastructure; market data only — no Upstox/Zerodha deps)
         ↑
-KAITerminal.RiskEngine    (Contracts + Broker; zero Upstox/Zerodha deps)
-KAITerminal.Api           (Contracts + Broker + Upstox + Zerodha + Infrastructure + Auth)
-
-KAITerminal.Worker        ──► KAITerminal.RiskEngine
-                          ──► KAITerminal.Infrastructure
+KAITerminal.RiskEngine    (Contracts + Broker; zero Upstox/Zerodha/MarketData deps)
+KAITerminal.Api           (all above + Auth)
+KAITerminal.Worker        (RiskEngine + Upstox + Zerodha + MarketData + Infrastructure)
 KAITerminal.Console       ──► KAITerminal.RiskEngine
 ```
 
-Adding a new broker (e.g. Dhan): create `KAITerminal.Dhan`, implement `IBrokerClient` + `IOptionContractProvider`, register in `BrokerExtensions`. Zero changes to RiskEngine, Broker, Contracts, or Infrastructure.
+Adding a new broker (e.g. Dhan): create `KAITerminal.Dhan`, implement `IBrokerClient`, register in `BrokerExtensions`. Add an `IOptionContractProvider` implementation to `KAITerminal.MarketData` and register it in `AddMarketDataConsumer()`/`AddMarketDataProducer()`. Zero changes to RiskEngine, Broker, or Contracts.
 
 ---
 
@@ -80,13 +80,13 @@ Adding a new broker (e.g. Dhan): create `KAITerminal.Dhan`, implement `IBrokerCl
 - Minimal-API style — no controllers.
 - Auth flow: `GET /auth/google` → Google OAuth → `GET /auth/google/callback` → `UserService.EnsureExistsAsync` creates user if new → if `IsActive=false` redirects to `{Frontend:Url}/auth/inactive` (no JWT) → if active issues JWT with `isActive` + `isAdmin` claims → frontend redirected to `/auth/callback?token=<jwt>`. All subsequent API calls use `Authorization: Bearer <token>`.
 - **User access control** — `AppUsers` table gates access. New users are created with `IsActive=false` on first login. `suvrajit.ray@gmail.com` is auto-activated as admin on first login. Inactive users are redirected to `/auth/inactive` before a JWT is issued. `ProtectedRoute` also checks the `isActive` claim from the stored JWT and redirects to `/auth/inactive` if false.
-- `BrokerExtensions.AddBrokerServices()` registers both `AddUpstoxSdk()` and `AddZerodhaSdk()`, wires `IBrokerClientFactory` (maps `"upstox"` / `"zerodha"` strings to concrete client instances), and registers `UpstoxOptionContractProvider` + `ZerodhaOptionContractProvider` as `IOptionContractProvider`. Per-request middleware injects credentials into the correct ambient token context: `/api/upstox/*` reads `X-Upstox-Access-Token` → `UpstoxTokenContext.Use(token)`; `/api/zerodha/*` reads `X-Zerodha-Api-Key` + `X-Zerodha-Access-Token` → `ZerodhaTokenContext.Use(apiKey, token)`.
+- `BrokerExtensions.AddBrokerServices()` registers both `AddUpstoxSdk()` and `AddZerodhaSdk()` and wires `IBrokerClientFactory` (maps `"upstox"` / `"zerodha"` strings to concrete client instances). `IOptionContractProvider` and `IOptionChainProvider` are now registered by `AddMarketDataConsumer()` in MarketData, not BrokerExtensions. Per-request middleware injects credentials into the correct ambient token context: `/api/upstox/*` reads `X-Upstox-Access-Token` → `UpstoxTokenContext.Use(token)`; `/api/zerodha/*` reads `X-Zerodha-Api-Key` + `X-Zerodha-Access-Token` → `ZerodhaTokenContext.Use(apiKey, token)`.
 - **PositionsHub supports live LTP for both Upstox and Zerodha** — Upstox positions and order updates are streamed via the broker WebSocket. Zerodha LTP is sourced from the shared Upstox market-data feed using `exchange_token` mapping (see below). Zerodha portfolio/order streaming remains stubbed.
 - Credentials (`Jwt:Key`, `GoogleAuth:ClientId/Secret`, `ConnectionStrings:DefaultConnection`) and `Frontend:Url` must be set in `appsettings.json` or `dotnet user-secrets` before the API starts.
 - `Frontend:Url` (default `http://localhost:3000`) controls CORS allowed origins and the OAuth redirect.
 - **Live positions** — `PositionsHub` (`Hubs/PositionsHub.cs`) is a SignalR hub mounted at `/hubs/positions`. On connect it builds a list of `IBrokerClient` for each authenticated broker present in the query params (Upstox and/or Zerodha), creates a `PositionStreamCoordinator` (`Hubs/PositionStreamCoordinator.cs`) for the connection, and pushes `ReceivePositions` / `ReceiveLtpBatch` / `ReceiveOrderUpdate` messages. The coordinator owns event wiring and all push logic for its connection lifetime. `PositionStreamManager` (singleton) tracks coordinators by connection ID and disposes them on disconnect.
-- **Zerodha live LTP** — if the WebSocket URL includes `zerodhaToken` + `zerodhaApiKey` query params, `PositionsHub` fetches open Zerodha positions, looks up each instrument's `exchange_token` from the Kite CSV via `IZerodhaInstrumentService`, constructs Upstox feed tokens (`NSE_FO|{exchangeToken}` / `BSE_FO|{exchangeToken}`), and passes a `feedToken → nativeToken` map to `PositionStreamCoordinator`. The coordinator subscribes those feed tokens to the shared Upstox market-data stream and pushes `ReceiveLtpBatch` with native Zerodha tokens so the frontend `instrumentToken` match works without changes.
-- **Index data hub** — `IndexHub` (`Hubs/IndexHub.cs`) is a SignalR hub mounted at `/hubs/indices`. On connect it uses the admin-configured **analytics token** (via `IAppSettingService`) — not the user's token — to make one REST call for the OHLC snapshot (`prevClose = ltp - netChange` computed from snapshot). If the analytics token is not configured the snapshot is skipped gracefully. Then subscribes the 5 index tokens to `ISharedMarketDataService` (shared Upstox WebSocket feed). Per-connection `FeedReceived` handler pushes `ReceiveIndexBatch` with `{ instrumentToken, ltp }` only; the frontend computes `netChange = ltp - prevClose` client-side. **No user token is required** — the hub works for Zerodha-only users.
+- **Zerodha live LTP** — if the WebSocket URL includes `zerodhaToken` + `zerodhaApiKey` query params, `PositionsHub` fetches open Zerodha positions, looks up each instrument's `exchange_token` from the Kite CSV via `IZerodhaInstrumentService` (now in `KAITerminal.MarketData.Services`), constructs Upstox feed tokens (`NSE_FO|{exchangeToken}` / `BSE_FO|{exchangeToken}`), and passes a `feedToken → nativeToken` map to `PositionStreamCoordinator`. The coordinator subscribes those feed tokens to the shared Upstox market-data stream and pushes `ReceiveLtpBatch` with native Zerodha tokens so the frontend `instrumentToken` match works without changes.
+- **Index data hub** — `IndexHub` (`Hubs/IndexHub.cs`) is a SignalR hub mounted at `/hubs/indices`. On connect it calls `IMarketQuoteService.GetMarketQuotesAsync` (from `KAITerminal.MarketData.Services`) for the OHLC snapshot — the service resolves the analytics token internally via `IServiceScopeFactory`. If the analytics token is not configured the snapshot is skipped gracefully. Then subscribes the 5 index tokens to `ISharedMarketDataService` (shared Upstox WebSocket feed). Per-connection `FeedReceived` handler pushes `ReceiveIndexBatch` with `{ instrumentToken, ltp }` only; the frontend computes `netChange = ltp - prevClose` client-side. **No user token is required** — the hub works for Zerodha-only users.
 - **Risk event notifications** — `RiskHub` (`Hubs/RiskHub.cs`) is a JWT-authenticated SignalR hub mounted at `/hubs/risk`. On connect the user (identified via `ClaimTypes.NameIdentifier` = email) is added to a SignalR group keyed by their email. `POST /api/internal/risk-event` (validated by `X-Internal-Key` header; returns 503 if key not configured) accepts a `RiskNotification` from the Worker and pushes `ReceiveRiskEvent` to the user's group. `SignalRRiskEventNotifier` (`Notifications/`) implements `IRiskEventNotifier` for the Api process. `Api:InternalKey` must be set via user-secrets in both Api and Worker.
 - **Portfolio stream** — `IPortfolioStreamer.ConnectAsync(ct)` takes no update-type parameters; the Upstox implementation subscribes to `[Order, Position]` internally. Upstox requires explicit `update_types` query params on the authorize endpoint (omitting them delivers no events) — this is encapsulated inside `PortfolioStreamer.ConnectAsync`. The Upstox portfolio stream JSON frame uses `update_type` (not `type`) at the root — mapped to `PortfolioUpdate.UpdateType` at the SDK boundary.
 - **Order update notifications** — `ReceiveOrderUpdate` is pushed to the frontend on every `update_type=order` event. Frontend shows `toast.error` for `rejected` status and `toast.success` for `complete`; the Orders panel auto-refreshes on every order event.
@@ -139,6 +139,8 @@ Leaf-node library with no dependencies — defines all cross-project types:
 
 ### Upstox SDK (`KAITerminal.Upstox`)
 
+**Scope: execution only** — auth, orders, positions, funds, margin. All market data (quotes, candles, option chain/contracts, WebSocket feed) lives in `KAITerminal.MarketData`.
+
 Layered: `UpstoxClient` (facade) → `IPositionService` / `IOrderService` / `IOptionService` / `IAuthService` / `IMarginService` → `UpstoxHttpClient` (internal HTTP layer) → Upstox REST API.
 
 - **`UpstoxTokenContext`** — `AsyncLocal<string?>` ambient token. Use `UpstoxTokenContext.Use(token)` to scope all API calls within the block to a specific user without passing the token explicitly.
@@ -148,16 +150,13 @@ Layered: `UpstoxClient` (facade) → `IPositionService` / `IOrderService` / `IOp
 - `Get*` variants (e.g. `GetOrderByOptionPriceAsync`) resolve the strike and return the `PlaceOrderRequest` without placing it — use to inspect before committing.
 - `IMarginService.GetRequiredMarginAsync(items)` — calls `POST /v2/charges/margin`; returns `RequiredMargin` and `FinalMargin`. Exposed via `UpstoxClient.GetRequiredMarginAsync`.
 - `IPositionService.ConvertPositionAsync` — calls `PUT /v2/portfolio/convert-position`. Exposed at `POST /api/upstox/positions/{instrumentToken}/convert`.
-- **`MarketDataStreamer`** implements `Contracts.Streaming.IMarketDataStreamer`. Internally has its own `FeedMode` enum (4 values: Ltpc, Full, OptionGreeks, FullD30) — aliased as `UpstoxFeedMode` inside the file to avoid conflict with `Contracts.Streaming.FeedMode` (2 values).
 - **`PortfolioStreamer`** implements `Contracts.Streaming.IPortfolioStreamer`. `ConnectAsync(ct)` subscribes to `[Order, Position]` internally and fires `PortfolioUpdate` events.
-- **`UpstoxOptionContractProvider`** (`Options/`) — implements `IOptionContractProvider`; fetches option contracts via `UpstoxClient.GetOptionContractsAsync` and maps to `Contracts.Options.IndexContracts`.
 
 **Key internal files** (useful when modifying the SDK):
 - `UpstoxClient.cs` — facade; all public entry points delegate here
-- `Http/UpstoxHttpClient.cs` — wraps all REST calls; handles JSON, errors, envelope unwrapping; token exchange endpoint bypasses the envelope handler (raw JSON response)
+- `Http/UpstoxHttpClient.cs` — wraps execution REST calls (positions, orders, funds, margin); no market data methods
 - `Http/UpstoxAuthHandler.cs` — `DelegatingHandler`; injects `Authorization: Bearer` per request; reads `UpstoxTokenContext.Current` first, falls back to `UpstoxConfig.AccessToken`
 - `Extensions/ServiceCollectionExtensions.cs` — `AddUpstoxSdk()` wires all services and named HttpClients
-- `Protos/MarketDataFeedV3.cs` — pre-generated protobuf file; do not delete
 
 **SDK design rules** (apply whenever modifying `KAITerminal.Upstox`):
 - All public methods are `async Task<T>` and accept `CancellationToken`
@@ -170,17 +169,41 @@ Layered: `UpstoxClient` (facade) → `IPositionService` / `IOrderService` / `IOp
 
 ### Zerodha SDK (`KAITerminal.Zerodha`)
 
-Layered: `ZerodhaClient` (facade) → `IZerodhaAuthService` / `IZerodhaPositionService` / `IZerodhaOrderService` / `IZerodhaFundsService` / `IZerodhaInstrumentService` → `ZerodhaHttpClient` → Kite Connect REST API.
+**Scope: execution only** — auth, orders, positions, funds, margin. Instrument CSV downloads, option contract providers, and token mapping all live in `KAITerminal.MarketData`.
+
+Layered: `ZerodhaClient` (facade) → `IZerodhaAuthService` / `IZerodhaPositionService` / `IZerodhaOrderService` / `IZerodhaFundsService` / `IZerodhaMarginService` → `ZerodhaHttpClient` → Kite Connect REST API.
 
 - **`ZerodhaTokenContext`** — `AsyncLocal<(string ApiKey, string AccessToken)?>` ambient credentials (pair, not just a token). Use `ZerodhaTokenContext.Use(apiKey, accessToken)` to scope calls. `ZerodhaAuthHandler` injects `Authorization: token {apiKey}:{accessToken}` on every request.
-- **Three named `HttpClient`s**: `"ZerodhaApi"` (authenticated REST), `"ZerodhaAuth"` (token exchange, no auth header), `"ZerodhaData"` (public instrument CSV downloads, no auth header).
+- **Two named `HttpClient`s**: `"ZerodhaApi"` (authenticated REST), `"ZerodhaAuth"` (token exchange, no auth header).
 - Register with `services.AddZerodhaSdk(configuration)`.
-- `IZerodhaInstrumentService` downloads option contracts from public endpoints `api.kite.trade/instruments/{NFO,BFO}` — no auth required. Filters to CE/PE for the 5 supported underlyings. Instruments have a `Weekly` flag (true = not last Thursday of month).
+- `IZerodhaMarginService.GetRequiredMarginAsync(items)` — calls `POST /margins/basket?consider_positions=true&mode=compact`; returns `RequiredMargin` and `FinalMargin`. Exposed via `ZerodhaClient.GetRequiredMarginAsync` and `POST /api/zerodha/margin`.
 - **OAuth flow**: `GET /api/zerodha/auth-url?apiKey={key}` → Kite Connect login → callback with `request_token` → `POST /api/zerodha/access-token` exchanges token and persists to `BrokerCredentials` DB table.
 - **Position token format**: trading symbol string (e.g. `NIFTY2641320700PE`) — same as `tradingsymbol` from Kite Connect. `ZerodhaHttpClient.MapPosition` sets `InstrumentToken = p.TradingSymbol`, so the trading symbol serves as the canonical Zerodha position identity throughout the stack. Product codes mapped to unified values in `ZerodhaHttpClient.MapProduct`: MIS → `"I"` (intraday), CNC → `"D"` (delivery), NRML → `"NRML"` (preserved so `PositionMapper.ParseProduct` maps it to `ProductType.Delivery` and `ZerodhaPositionService.MapProductBack` sends `"NRML"` back to Kite on exit — not `"CNC"`).
 - **Broker streaming is stubbed** — `KiteTickerStreamer` (implements `IMarketDataStreamer`) and `ZerodhaPortfolioStreamer` (implements `IPortfolioStreamer`) log a warning and never fire events. However, **LTP is live** for both the frontend (`PositionsHub` subscribes Zerodha instruments to the shared Upstox feed) and the risk engine (Worker's `CrossBrokerTokenMapper` converts Zerodha tokens to Upstox feed tokens). Portfolio-event-driven risk evaluation (instant fill detection) is unavailable until Kite postback webhooks are implemented.
-- **`ZerodhaOptionContractProvider`** (`Options/`) — implements `IOptionContractProvider`; fetches option contracts via `ZerodhaClient.GetOptionContractsAsync` and maps to `Contracts.Options.IndexContracts`. `ZerodhaToken` is set to `TradingSymbol` (e.g. `"NIFTY2641320700PE"`) — not the numeric `instrument_token` — so it can be used directly for Zerodha order placement.
-- **`ZerodhaTokenMappingProvider`** (`Options/`) — implements `ITokenMappingProvider`; returns `NativeContractKey` list (Segment + ExchangeToken + TradingSymbol) for all CE/PE contracts from the Kite CSV. `TradingSymbol` is both the native key and the order placement symbol. Used by `CrossBrokerTokenMapper` in the Worker.
+
+### MarketData (`KAITerminal.MarketData`)
+
+**Self-contained market data library** — zero references to `KAITerminal.Upstox` or `KAITerminal.Zerodha`. All market data concerns live here. References `KAITerminal.Contracts` and `KAITerminal.Infrastructure` (for `IAppSettingService` to resolve the analytics token).
+
+- **`Http/UpstoxMarketDataHttpClient.cs`** (`internal sealed`) — own named `HttpClient` `"UpstoxMarketData"`. Every method takes an explicit `string token` parameter; no ambient token context. Methods: `GetMarketQuotesAsync`, `GetOptionChainAsync`, `GetOptionContractsAsync`, `GetHistoricalCandlesAsync`, `GetIntradayCandlesAsync`, `GetMarketDataFeedUriAsync`.
+- **`IMarketQuoteService` / `MarketQuoteService`** — market quotes via `GET /v2/market-quote/quotes`. Registered as singleton; resolves analytics token via `IServiceScopeFactory` (pattern required because `IAppSettingService` is scoped).
+- **`IChartDataService` / `ChartDataService`** — historical and intraday candles. Same singleton + scope-factory pattern. Also exposes `SearchInstrumentsAsync` (in-memory curated instrument list, no HTTP call).
+- **`IZerodhaInstrumentService` / `ZerodhaInstrumentService`** — downloads NFO/BFO Kite CSVs from public `api.kite.trade/instruments/{NFO,BFO}` endpoints (no auth). Filters to CE/PE for the 5 supported underlyings. Instruments have a `Weekly` flag. Used by `PositionsHub`, `ZerodhaOptionContractProvider`, and `ZerodhaTokenMappingProvider`.
+- **`Options/UpstoxOptionContractProvider`** (`internal`) — implements `IOptionContractProvider`; uses analytics token via scope factory.
+- **`Options/UpstoxOptionChainProvider`** (`internal`) — implements `IOptionChainProvider`; uses analytics token via scope factory.
+- **`Options/ZerodhaOptionContractProvider`** (`internal`) — implements `IOptionContractProvider`; fetches from `IZerodhaInstrumentService`. `ZerodhaToken` = `TradingSymbol` (e.g. `"NIFTY2641320700PE"`).
+- **`Options/ZerodhaTokenMappingProvider`** (`internal`) — implements `ITokenMappingProvider`; returns `NativeContractKey` list (Segment + ExchangeToken + TradingSymbol) for `CrossBrokerTokenMapper` in the Worker.
+- **`Streaming/UpstoxMarketDataStreamer`** — implements `IMarketDataStreamer`; token passed at construction time (no ambient context). Internal `FeedMode` enum (4 values: Ltpc, Full, OptionGreeks, FullD30). Protobuf decoding via `Protos/MarketDataFeedV3.cs` (namespace `KAITerminal.MarketData.Protos`).
+- **`Services/MarketDataService`** — manages the shared Upstox WebSocket. Uses `Func<string, IMarketDataStreamer>` factory — analytics token passed at construction so the streamer is already bound to it. No `UpstoxTokenContext` needed.
+- **`Extensions/MarketDataExtensions`** — `AddMarketDataConsumer()` (Api) and `AddMarketDataProducer()` (Worker) both call shared registrations: `UpstoxMarketDataHttpClient`, `IMarketQuoteService`, `IChartDataService`, `IZerodhaInstrumentService`, both `IOptionContractProvider` implementations, `IOptionChainProvider`, `ITokenMappingProvider`, and the `Func<string, IMarketDataStreamer>` factory.
+
+**DI pattern for singletons that need `IAppSettingService`** — `IAppSettingService` is scoped (EF-backed). Singleton services that need the analytics token inject `IServiceScopeFactory` and call:
+```csharp
+using var scope = _scopeFactory.CreateScope();
+var svc = scope.ServiceProvider.GetRequiredService<IAppSettingService>();
+var token = await svc.GetAsync(AppSettingKeys.UpstoxAnalyticsToken, ct);
+```
+This pattern is used in `MarketQuoteService`, `ChartDataService`, `UpstoxOptionContractProvider`, `UpstoxOptionChainProvider`, and `MarketDataService`.
 
 ### Risk Engine (`KAITerminal.RiskEngine`)
 

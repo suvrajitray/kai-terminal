@@ -6,7 +6,7 @@ import { LogOut, LayoutList } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { BrokerBadge } from "@/components/ui/broker-badge";
 import { getLotSize } from "@/lib/lot-sizes";
-import { exitPosition, placeMarketOrder, placeOrderByOptionPrice } from "@/services/trading-api";
+import { exitPosition, fetchOptionChain, placeMarketOrder } from "@/services/trading-api";
 import { getShiftOffset, UNDERLYING_KEYS } from "@/lib/shift-config";
 import { useOptionContractsStore } from "@/stores/option-contracts-store";
 import { PositionRow } from "./position-row";
@@ -99,21 +99,30 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
     const openTxn  = position.quantity < 0 ? "Sell" : "Buy";
     const offset = getShiftOffset(index);
     const targetPremium = position.ltp + (direction === "up" ? offset : -offset);
-    const priceSearchMode = direction === "up" ? "GreaterThan" : "LessThan";
     const underlyingKey = UNDERLYING_KEYS[index];
+    const side = contract.instrumentType === "CE" ? "callOptions" : "putOptions";
 
     return withActing(token + ":shift-" + direction, async () => {
+      const chain = await fetchOptionChain(underlyingKey, contract.expiry);
+
+      // GreaterThan (shift up): smallest LTP >= target. LessThan (shift down): largest LTP <= target.
+      const candidates = chain
+        .map(e => ({ key: e[side]?.instrumentKey, ltp: e[side]?.marketData?.ltp }))
+        .filter((c): c is { key: string; ltp: number } => !!c.key && c.ltp !== undefined);
+
+      const eligible = direction === "up"
+        ? candidates.filter(c => c.ltp >= targetPremium).sort((a, b) => a.ltp - b.ltp)
+        : candidates.filter(c => c.ltp <= targetPremium).sort((a, b) => b.ltp - a.ltp);
+
+      // Fall back to nearest if no eligible strike found
+      const pick = eligible[0] ?? candidates.reduce((best, c) =>
+        Math.abs(c.ltp - targetPremium) < Math.abs(best.ltp - targetPremium) ? c : best,
+      );
+
+      if (!pick) { toast.error(`${contract.instrumentType} instrument not found`); return; }
+
       await placeMarketOrder(token, qty, closeTxn, product);
-      await placeOrderByOptionPrice({
-        underlyingKey,
-        expiryDate: contract.expiry,
-        optionType: contract.instrumentType,
-        targetPremium,
-        priceSearchMode,
-        quantity: qty,
-        transactionType: openTxn,
-        product,
-      });
+      await placeMarketOrder(pick.key, qty, openTxn, product);
     });
   };
 

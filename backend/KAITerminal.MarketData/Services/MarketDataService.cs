@@ -1,7 +1,6 @@
 using System.Text.Json;
 using KAITerminal.Contracts.Streaming;
 using KAITerminal.Infrastructure.Services;
-using KAITerminal.Upstox;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -19,7 +18,7 @@ public sealed class MarketDataService : ISharedMarketDataService, IHostedService
 {
     private readonly IConnectionMultiplexer     _redis;
     private readonly IServiceScopeFactory       _scopeFactory;
-    private readonly Func<IMarketDataStreamer>   _streamerFactory;
+    private readonly Func<string, IMarketDataStreamer> _streamerFactory;
     private readonly ILogger<MarketDataService> _logger;
 
     private IMarketDataStreamer? _streamer;
@@ -30,10 +29,10 @@ public sealed class MarketDataService : ISharedMarketDataService, IHostedService
     public event EventHandler<LtpUpdate>? FeedReceived;
 
     public MarketDataService(
-        IConnectionMultiplexer     redis,
-        IServiceScopeFactory       scopeFactory,
-        Func<IMarketDataStreamer>   streamerFactory,
-        ILogger<MarketDataService> logger)
+        IConnectionMultiplexer          redis,
+        IServiceScopeFactory            scopeFactory,
+        Func<string, IMarketDataStreamer> streamerFactory,
+        ILogger<MarketDataService>      logger)
     {
         _redis           = redis;
         _scopeFactory    = scopeFactory;
@@ -56,11 +55,9 @@ public sealed class MarketDataService : ISharedMarketDataService, IHostedService
 
         _logger.LogInformation("MarketDataService: analytics token found — connecting Upstox market data WebSocket");
 
-        _streamer = _streamerFactory();
+        _streamer = _streamerFactory(token);
         _streamer.FeedReceived += OnFeedReceived!;
-
-        using (UpstoxTokenContext.Use(token))
-            await _streamer.ConnectAsync(ct);
+        await _streamer.ConnectAsync(ct);
 
         // Listen for subscription requests from the Api process (PositionStreamCoordinator)
         // so live LTP works regardless of whether the risk engine is enabled for a user.

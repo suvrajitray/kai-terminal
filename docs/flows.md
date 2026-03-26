@@ -62,7 +62,7 @@ _lastOrderStatuses:      Dictionary<(broker, orderId), status> // detects order 
 **Lifetime:** Created in `PositionsHub.OnConnectedAsync`; disposed in `PositionStreamManager` on SignalR disconnect.
 
 **Notes:**
-- `_zerodhaFeedToNative` is built once on connect from `exchange_token` → `tradingSymbol` lookups via `IZerodhaInstrumentService`.
+- `_zerodhaFeedToNative` is built once on connect from `exchange_token` → `tradingSymbol` lookups via `IZerodhaInstrumentService` (now in `KAITerminal.MarketData.Services` — moved from Zerodha SDK).
 - Feed tokens for Zerodha instruments are `NSE_FO|{exchangeToken}` / `BSE_FO|{exchangeToken}` — subscribed to the shared Upstox market-data WebSocket.
 - On each `LtpUpdate`, the coordinator translates feed tokens back to native Zerodha trading symbols before pushing `ReceiveLtpBatch` so the frontend `instrumentToken` match works without changes.
 
@@ -145,7 +145,7 @@ Survives Worker restarts — prevents TSL re-activation and duplicate square-off
 
 ### 7. `MarketDataService` + `RedisLtpRelay` — Redis pub/sub
 
-**Projects:** `KAITerminal.Worker` (publisher); `KAITerminal.Api` (subscriber/relay)
+**Projects:** `KAITerminal.MarketData` (owns the WebSocket streamer — `UpstoxMarketDataStreamer`; used by both Worker and Api via `AddMarketDataProducer()` / `AddMarketDataConsumer()`); `KAITerminal.Worker` (Redis publisher via `RedisLtpRelay`); `KAITerminal.Api` (Redis subscriber/relay via `RedisLtpRelay`)
 
 | Channel | Direction | Message format |
 |---|---|---|
@@ -193,5 +193,5 @@ Survives Worker restarts — prevents TSL re-activation and duplicate square-off
 | `IndexStreamManager` | `ConcurrentDictionary` | `connectionId` | event handler | On SignalR disconnect |
 | `StreamingRiskWorker` | `ConcurrentDictionary` | `userId` / `userId::broker` | gates + sessions | Dynamic (30 s DB refresh) |
 | `RedisRiskRepository` | Redis string | `risk-state:{userId}` | JSON `UserRiskState` | Indefinite |
-| `MarketDataService` / `RedisLtpRelay` | Redis pub/sub | `ltp:feed`, `ltp:sub-req` | JSON LTP dict / token list | — (fire-and-forget) |
+| `UpstoxMarketDataStreamer` (`MarketData`) / `RedisLtpRelay` | Redis pub/sub | `ltp:feed`, `ltp:sub-req` | JSON LTP dict / token list | — (fire-and-forget) |
 | `AppSettingService` | Redis L1 + PostgreSQL L2 | `appsetting:{key}` | `string` | Indefinite |

@@ -1,5 +1,5 @@
-using KAITerminal.Upstox.Models.Enums;
-using KAITerminal.Upstox.Services;
+using KAITerminal.MarketData.Models;
+using KAITerminal.MarketData.Services;
 
 namespace KAITerminal.Api.Endpoints;
 

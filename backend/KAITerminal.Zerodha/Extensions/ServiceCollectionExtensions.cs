@@ -45,21 +45,12 @@ public static class ServiceCollectionExtensions
             client.DefaultRequestHeaders.Add("X-Kite-Version", "3");
         });
 
-        // Public data client — no auth header; used for instrument master CSV downloads
-        services.AddHttpClient("ZerodhaData", (sp, client) =>
-        {
-            var cfg = ResolveConfig(sp);
-            client.BaseAddress = new Uri(cfg.ApiBaseUrl);
-            client.Timeout = TimeSpan.FromSeconds(60); // instrument CSVs can be large
-            client.DefaultRequestHeaders.Add("X-Kite-Version", "3");
-        });
-
         services.AddSingleton<ZerodhaHttpClient>();
         services.AddSingleton<IZerodhaAuthService,       ZerodhaAuthService>();
         services.AddSingleton<IZerodhaPositionService,   ZerodhaPositionService>();
         services.AddSingleton<IZerodhaOrderService,      ZerodhaOrderService>();
         services.AddSingleton<IZerodhaFundsService,      ZerodhaFundsService>();
-        services.AddSingleton<IZerodhaInstrumentService, ZerodhaInstrumentService>();
+        services.AddSingleton<IZerodhaMarginService,     ZerodhaMarginService>();
 
         // KiteTickerStreamer is stateful — Transient gives each caller its own independent instance
         services.AddTransient<KiteTickerStreamer>();

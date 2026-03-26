@@ -7,6 +7,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Google.Protobuf" Version="3.29.3" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
     <PackageReference Include="StackExchange.Redis" Version="2.8.16" />
   </ItemGroup>
@@ -14,7 +16,6 @@
   <ItemGroup>
     <ProjectReference Include="../KAITerminal.Contracts/KAITerminal.Contracts.csproj" />
     <ProjectReference Include="../KAITerminal.Infrastructure/KAITerminal.Infrastructure.csproj" />
-    <ProjectReference Include="../KAITerminal.Upstox/KAITerminal.Upstox.csproj" />
   </ItemGroup>
 
 </Project>

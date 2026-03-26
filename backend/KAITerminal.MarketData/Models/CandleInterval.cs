@@ -1,4 +1,4 @@
-namespace KAITerminal.Upstox.Models.Enums;
+namespace KAITerminal.MarketData.Models;
 
 /// <summary>
 /// Intervals supported by the Upstox v2 historical candle API.

@@ -2,6 +2,7 @@ using KAITerminal.Api.Mapping;
 using KAITerminal.Api.Models;
 using KAITerminal.Api.Services;
 using KAITerminal.Zerodha;
+using KAITerminal.Zerodha.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace KAITerminal.Api.Endpoints;
@@ -89,6 +90,20 @@ public static class ZerodhaEndpoints
             return Results.Ok(positions.Select(p => p.ToResponse()));
         });
 
+        // ── Margin ────────────────────────────────────────────────────────────
+
+        /// <summary>Calculates required margin for a basket of hypothetical Zerodha orders.</summary>
+        group.MapPost("/margin", async (
+            [FromBody] ZerodhaMarginRequest request,
+            ZerodhaClient zerodha,
+            CancellationToken ct) =>
+        {
+            var items = request.Instruments.Select(i =>
+                new ZerodhaMarginOrderItem(i.TradingSymbol, i.Exchange, i.TransactionType, i.Product, i.Quantity));
+            var margin = await zerodha.GetRequiredMarginAsync(items, ct);
+            return Results.Ok(new { requiredMargin = margin.RequiredMargin, finalMargin = margin.FinalMargin });
+        });
+
         // ── Funds ─────────────────────────────────────────────────────────────
 
         /// <summary>Returns available and used margin for the Zerodha equity/F&amp;O segment.</summary>
@@ -121,4 +136,14 @@ public static class ZerodhaEndpoints
         string ApiKey,
         string ApiSecret,
         string RequestToken);
+
+    private sealed record ZerodhaMarginRequest(
+        IReadOnlyList<ZerodhaMarginInstrument> Instruments);
+
+    private sealed record ZerodhaMarginInstrument(
+        string TradingSymbol,
+        string Exchange,
+        string TransactionType,
+        string Product,
+        int    Quantity);
 }

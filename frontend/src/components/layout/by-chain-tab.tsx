@@ -38,25 +38,25 @@ function buildRows(
 ): { rows: StraddleRow[]; atmStrike: number | null } {
   if (!chain.length) return { rows: [], atmStrike: null };
 
-  const sorted = [...chain].sort((a, b) => a.strike_price - b.strike_price);
+  const sorted = [...chain].sort((a, b) => a.strikePrice - b.strikePrice);
 
   const atmEntry = sorted.reduce((best, e) =>
-    Math.abs(e.strike_price - spotPrice) < Math.abs(best.strike_price - spotPrice) ? e : best,
+    Math.abs(e.strikePrice - spotPrice) < Math.abs(best.strikePrice - spotPrice) ? e : best,
   );
-  const atmStrike = atmEntry.strike_price;
-  const atmIdx    = sorted.findIndex((e) => e.strike_price === atmStrike);
+  const atmStrike = atmEntry.strikePrice;
+  const atmIdx    = sorted.findIndex((e) => e.strikePrice === atmStrike);
 
   if (mode === "straddle") {
     // Each chain entry → one row. CE and PE at the SAME strike.
     // DIFF = strike − ATM  (negative = below ATM, 0 = ATM, positive = above ATM)
     const rows = sorted.map((entry) => ({
-      diff:      entry.strike_price - atmStrike,
-      ceStrike:  entry.strike_price,
-      ceLtp:     entry.call_options?.market_data?.ltp,
-      ceKey:     entry.call_options?.instrument_key,
-      peStrike:  entry.strike_price,
-      peLtp:     entry.put_options?.market_data?.ltp,
-      peKey:     entry.put_options?.instrument_key,
+      diff:      entry.strikePrice - atmStrike,
+      ceStrike:  entry.strikePrice,
+      ceLtp:     entry.callOptions?.marketData?.ltp,
+      ceKey:     entry.callOptions?.instrumentKey,
+      peStrike:  entry.strikePrice,
+      peLtp:     entry.putOptions?.marketData?.ltp,
+      peKey:     entry.putOptions?.instrumentKey,
     }));
     return { rows, atmStrike };
   } else {
@@ -69,13 +69,13 @@ function buildRows(
       const ceEntry = sorted[atmIdx + i]; // OTM CE (above ATM)
       const peEntry = sorted[atmIdx - i]; // OTM PE (below ATM)
       rows.push({
-        diff:     ceEntry.strike_price - atmStrike,
-        ceStrike: ceEntry.strike_price,
-        ceLtp:    ceEntry.call_options?.market_data?.ltp,
-        ceKey:    ceEntry.call_options?.instrument_key,
-        peStrike: peEntry.strike_price,
-        peLtp:    peEntry.put_options?.market_data?.ltp,
-        peKey:    peEntry.put_options?.instrument_key,
+        diff:     ceEntry.strikePrice - atmStrike,
+        ceStrike: ceEntry.strikePrice,
+        ceLtp:    ceEntry.callOptions?.marketData?.ltp,
+        ceKey:    ceEntry.callOptions?.instrumentKey,
+        peStrike: peEntry.strikePrice,
+        peLtp:    peEntry.putOptions?.marketData?.ltp,
+        peKey:    peEntry.putOptions?.instrumentKey,
       });
     }
     return { rows, atmStrike };
@@ -110,7 +110,7 @@ export function ByChainTab({ broker, underlying, expiry, product, quantity, isAc
   const scrollRef  = useRef<HTMLDivElement | null>(null);
 
   const underlyingKey = UNDERLYING_KEYS[underlying];
-  const spotPrice     = chain[0]?.underlying_spot_price ?? 0;
+  const spotPrice     = chain[0]?.underlyingSpotPrice ?? 0;
 
   const { rows, atmStrike } = buildRows(chain, spotPrice, mode);
 

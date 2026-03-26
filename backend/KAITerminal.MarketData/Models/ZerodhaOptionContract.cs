@@ -1,9 +1,8 @@
-namespace KAITerminal.Zerodha.Models;
+namespace KAITerminal.MarketData.Models;
 
 /// <summary>
 /// A single option contract from the Kite Connect instruments CSV
 /// (api.kite.trade/instruments/{exchange}).
-/// Field names match the CSV columns exactly.
 /// </summary>
 public sealed record ZerodhaOptionContract(
     string InstrumentToken,   // instrument_token — raw numeric string, e.g. "15942914"

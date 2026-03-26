@@ -54,26 +54,26 @@ export interface OptionMarketData {
   ltp: number;
   volume: number;
   oi: number;
-  close_price: number;
-  bid_price: number;
-  bid_qty: number;
-  ask_price: number;
-  ask_qty: number;
+  closePrice: number;
+  bidPrice: number;
+  bidQty: number;
+  askPrice: number;
+  askQty: number;
 }
 
 export interface OptionSide {
-  instrument_key: string;
-  market_data?: OptionMarketData;
+  instrumentKey: string;
+  marketData?: OptionMarketData;
 }
 
 export interface OptionChainEntry {
   expiry: string;
-  strike_price: number;
-  underlying_key: string;
-  underlying_spot_price: number;
+  strikePrice: number;
+  underlyingKey: string;
+  underlyingSpotPrice: number;
   pcr: number;
-  call_options?: OptionSide;
-  put_options?: OptionSide;
+  callOptions?: OptionSide;
+  putOptions?: OptionSide;
 }
 
 export interface ContractEntry {
