@@ -382,13 +382,12 @@ The `.in` entry isn't strictly necessary (since it redirects to `.com` before au
 
 ## First-Time Setup Checklist
 
-- [ ] VM created, SSH key installed
-- [ ] DNS A record pointing to VM public IP
+- [ ] VM created, SSH key installed (`ssh-copy-id azureuser@<VM-IP>`)
+- [ ] Both DNS A records pointing to VM public IP (kaiterminal.com + kaiterminal.in)
 - [ ] All dependencies installed (.NET, Node, Redis, PostgreSQL, Nginx, Certbot)
 - [ ] PostgreSQL `kaiuser` + `kaiterminal` database created
 - [ ] Repo cloned to `/opt/kaiterminal/repo`
-- [ ] Frontend built and copied to `/var/www/kaiterminal`
-- [ ] API and Worker published to `/opt/kaiterminal/api` and `/opt/kaiterminal/worker`
+- [ ] First deploy run via `./deploy/deploy.sh` from Mac
 - [ ] `/etc/kaiterminal/api.env` created with all secrets
 - [ ] `/etc/kaiterminal/worker.env` created with all secrets
 - [ ] `Api__InternalKey` identical in both env files
@@ -397,35 +396,86 @@ The `.in` entry isn't strictly necessary (since it redirects to `.com` before au
 - [ ] NSG rules configured (22 restricted, 80+443 open, rest blocked)
 - [ ] UFW enabled
 - [ ] Systemd services enabled and started
+- [ ] Passwordless sudo rule created (`/etc/sudoers.d/kaiterminal-deploy`)
+- [ ] `deploy/deploy.sh` — server IP set, tested with `./deploy/deploy.sh`
 - [ ] Google OAuth redirect URI updated in Cloud Console
 - [ ] Log in with `suvrajit.ray@gmail.com` (auto-activated as admin)
 - [ ] Set Upstox analytics token via Admin page → restart Worker
 
 ---
 
-## Deploying Updates
+## Deploying from Your Mac
+
+After the one-time server setup, every update can be deployed directly from your Mac — no need to SSH in manually.
+
+### One-time Mac setup
+
+#### 1. Set up SSH key authentication
+
+If you haven't already, generate an SSH key and copy it to the server so you never type a password:
 
 ```bash
-cd /opt/kaiterminal/repo
-git pull
+# On your Mac — generate a key (skip if you already have one)
+ssh-keygen -t ed25519 -C "kaiterminal-deploy"
 
-# Rebuild frontend if changed
-cd frontend && npm ci && npm run build
-sudo cp -r dist/* /var/www/kaiterminal/
+# Copy it to the server (you'll type your password once, then never again)
+ssh-copy-id azureuser@<YOUR-VM-IP>
 
-# Rebuild API if changed
-cd ../backend
-dotnet publish KAITerminal.Api -c Release -o /opt/kaiterminal/api
-sudo chown -R kaiterm:kaiterm /opt/kaiterminal/api
-sudo systemctl restart kaiterminal-api
-
-# Rebuild Worker if changed
-dotnet publish KAITerminal.Worker -c Release -o /opt/kaiterminal/worker
-sudo chown -R kaiterm:kaiterm /opt/kaiterminal/worker
-sudo systemctl restart kaiterminal-worker
+# Test it works — should log in with no password prompt
+ssh azureuser@<YOUR-VM-IP>
 ```
 
-> Restart Worker **outside market hours** (before 9:00 AM or after 3:35 PM IST) since it reconnects the Upstox WebSocket on startup.
+#### 2. Allow passwordless sudo for service restarts (on the server)
+
+The deploy script runs `sudo systemctl restart` remotely. Set up a narrow sudoers rule so it works without a password prompt:
+
+```bash
+# SSH into the server first
+ssh azureuser@<YOUR-VM-IP>
+
+# Create a sudoers rule
+sudo tee /etc/sudoers.d/kaiterminal-deploy << 'EOF'
+azureuser ALL=(ALL) NOPASSWD: /bin/systemctl restart kaiterminal-api, \
+                               /bin/systemctl restart kaiterminal-worker, \
+                               /bin/chown -R kaiterm\:kaiterm /opt/kaiterminal/api, \
+                               /bin/chown -R kaiterm\:kaiterm /opt/kaiterminal/worker
+EOF
+
+sudo chmod 440 /etc/sudoers.d/kaiterminal-deploy
+
+# Log out
+exit
+```
+
+#### 3. Configure the deploy script
+
+Edit `deploy/deploy.sh` on your Mac — replace the server IP:
+
+```bash
+# In deploy/deploy.sh, change this line:
+SERVER="azureuser@<YOUR-VM-IP>"
+# to e.g.:
+SERVER="azureuser@20.10.50.100"
+```
+
+### Running a deploy
+
+```bash
+# From the repo root on your Mac:
+
+# Deploy everything (frontend + API + Worker)
+./deploy/deploy.sh
+
+# Deploy frontend only (CSS/JS change)
+./deploy/deploy.sh --frontend
+
+# Deploy backend only (API/Worker code change)
+./deploy/deploy.sh --backend
+```
+
+The script builds locally on your Mac, transfers the compiled output via `rsync`, then restarts the services over SSH. A full deploy takes about 30–60 seconds.
+
+> Restart the Worker **outside market hours** (before 9:00 AM or after 3:35 PM IST) — it reconnects the Upstox WebSocket on startup.
 
 ---
 
