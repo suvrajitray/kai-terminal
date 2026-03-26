@@ -156,10 +156,10 @@ cd /opt/kaiterminal/repo
 
 ### Build the frontend
 
-Edit `frontend/.env.production` — replace `YOURDOMAIN` with your actual domain:
+Edit `frontend/.env.production` — replace `kaiterminal.com` with your actual domain:
 
 ```bash
-sed -i 's/YOURDOMAIN/kai.yourdomain.com/g' frontend/.env.production
+sed -i 's/kaiterminal.com/kaiterminal.com/g' frontend/.env.production
 ```
 
 Build:
@@ -216,7 +216,7 @@ ConnectionStrings__Redis=localhost:6379
 Jwt__Key=<random-256-bit-secret>
 GoogleAuth__ClientId=<google-oauth-client-id>
 GoogleAuth__ClientSecret=<google-oauth-client-secret>
-Frontend__Url=https://kai.yourdomain.com
+Frontend__Url=https://kaiterminal.com
 Api__InternalKey=<any-uuid>
 Serilog__WriteTo__1__Args__serverUrl=http://localhost:5341
 ```
@@ -253,24 +253,33 @@ sudo chown root:kaiterm /etc/kaiterminal/worker.env
 
 ### Install site config
 
-Edit `deploy/nginx.conf` — replace `YOURDOMAIN`:
 ```bash
-sed -i 's/YOURDOMAIN/kai.yourdomain.com/g' /opt/kaiterminal/repo/deploy/nginx.conf
 sudo cp /opt/kaiterminal/repo/deploy/nginx.conf /etc/nginx/sites-available/kaiterminal
 sudo ln -s /etc/nginx/sites-available/kaiterminal /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default   # remove default site
-sudo nginx -t   # test config
+sudo nginx -t   # test config — fix any errors before continuing
 ```
 
-### Obtain SSL certificate
+### Obtain SSL certificates
 
-Point your DNS A record to the VM's public IP **before** running Certbot:
+Point **both** DNS A records to the VM's public IP in Hostinger before running Certbot:
+
+```
+kaiterminal.com  → A record → <VM public IP>
+kaiterminal.in   → A record → <VM public IP>
+```
+
+Wait 5–15 minutes for DNS to propagate, then get certificates for each domain:
 
 ```bash
-sudo certbot --nginx -d kai.yourdomain.com
+# Primary domain
+sudo certbot --nginx -d kaiterminal.com
+
+# .in domain (used only for the redirect server block)
+sudo certbot --nginx -d kaiterminal.in
 ```
 
-Certbot automatically edits the Nginx config to add SSL paths and schedules auto-renewal via a systemd timer.
+Certbot fills in the certificate paths in nginx.conf and sets up auto-renewal every 90 days via a systemd timer.
 
 ### Start Nginx
 
@@ -360,13 +369,14 @@ sudo ufw enable
 
 ## Google OAuth — Update Redirect URI
 
-In Google Cloud Console → OAuth 2.0 credentials, add:
+In Google Cloud Console → OAuth 2.0 credentials, add **both** to **Authorized redirect URIs**:
 
 ```
-https://kai.yourdomain.com/auth/callback
+https://kaiterminal.com/auth/callback
+https://kaiterminal.in/auth/callback
 ```
 
-to **Authorized redirect URIs**. Without this, Google login will fail.
+The `.in` entry isn't strictly necessary (since it redirects to `.com` before auth completes), but adding it prevents any edge-case issues. The `Frontend__Url` in `api.env` must be `https://kaiterminal.com`.
 
 ---
 

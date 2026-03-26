@@ -35,15 +35,15 @@ Three tools handle this:
 
 Nginx is a **reverse proxy and web server** that sits at the front door of your server.
 
-Your server has one public IP. When someone visits `https://kai.yourdomain.com`, the request arrives at port 443. Nginx looks at the URL and decides where to send it:
+Your server has one public IP. When someone visits `https://kaiterminal.com`, the request arrives at port 443. Nginx looks at the URL and decides where to send it:
 
 ```
 Request URL                              Nginx sends it to...
 ───────────────────────────────────────────────────────────────
-https://kai.yourdomain.com/              Serve React files from /var/www/kaiterminal
-https://kai.yourdomain.com/api/...       Forward to .NET API on localhost:5001
-https://kai.yourdomain.com/auth/...      Forward to .NET API on localhost:5001
-https://kai.yourdomain.com/hubs/...      Forward to .NET API (WebSocket mode)
+https://kaiterminal.com/              Serve React files from /var/www/kaiterminal
+https://kaiterminal.com/api/...       Forward to .NET API on localhost:5001
+https://kaiterminal.com/auth/...      Forward to .NET API on localhost:5001
+https://kaiterminal.com/hubs/...      Forward to .NET API (WebSocket mode)
 ```
 
 ### SSL Termination
@@ -65,18 +65,18 @@ Browser ──HTTPS──► Nginx ──HTTP──► .NET API on localhost:500
 # Block 1 — redirect all HTTP to HTTPS
 server {
     listen 80;
-    server_name YOURDOMAIN;
+    server_name kaiterminal.com;
     return 301 https://$host$request_uri;   # 301 = permanent redirect
 }
 
 # Block 2 — the main HTTPS server
 server {
     listen 443 ssl;
-    server_name YOURDOMAIN;
+    server_name kaiterminal.com;
 
     # SSL certificate files (filled in by Certbot/Let's Encrypt)
-    ssl_certificate     /etc/letsencrypt/live/YOURDOMAIN/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/YOURDOMAIN/privkey.pem;
+    ssl_certificate     /etc/letsencrypt/live/kaiterminal.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/kaiterminal.com/privkey.pem;
 
     # Serve React app files from this folder
     root /var/www/kaiterminal;
@@ -104,7 +104,7 @@ server {
 
 ### The SPA Fallback Trick
 
-When someone visits `https://kai.yourdomain.com/dashboard`, Nginx looks for a file called `dashboard` in `/var/www/kaiterminal/` — it doesn't exist. Without `try_files`, Nginx returns 404.
+When someone visits `https://kaiterminal.com/dashboard`, Nginx looks for a file called `dashboard` in `/var/www/kaiterminal/` — it doesn't exist. Without `try_files`, Nginx returns 404.
 
 With `try_files $uri $uri/ /index.html`, Nginx falls back to serving `index.html`, and React Router takes over and shows the dashboard. **This is required for every React / Vue / Angular app.**
 
@@ -175,7 +175,7 @@ ConnectionStrings__DefaultConnection=Host=localhost;Database=kaiterminal;Usernam
 Jwt__Key=some-long-random-string-nobody-can-guess
 GoogleAuth__ClientId=123456-abc.apps.googleusercontent.com
 GoogleAuth__ClientSecret=GOCSPX-...
-Frontend__Url=https://kai.yourdomain.com
+Frontend__Url=https://kaiterminal.com
 Api__InternalKey=550e8400-e29b-41d4-a716-446655440000
 ```
 
@@ -196,7 +196,7 @@ The file never gets committed to git. It only exists on the production server.
 When you run `npm run build`, Vite **bakes environment variables into the JavaScript bundle at build time**. The compiled JS files contain your API URL hardcoded inside them.
 
 - `.env` — used during `npm run dev` → API URL is `https://localhost:5001`
-- `.env.production` — used during `npm run build` → API URL is `https://kai.yourdomain.com`
+- `.env.production` — used during `npm run build` → API URL is `https://kaiterminal.com`
 
 Vite automatically picks up `.env.production` when building. You never need to switch manually.
 
@@ -205,9 +205,9 @@ npm run build   # Vite reads .env.production automatically
                 # Output in dist/ has your real domain baked in
 ```
 
-Before building for production, replace `YOURDOMAIN` in the file:
+Before building for production, replace `kaiterminal.com` in the file:
 ```bash
-sed -i 's/YOURDOMAIN/kai.yourdomain.com/g' frontend/.env.production
+sed -i 's/kaiterminal.com/kaiterminal.com/g' frontend/.env.production
 ```
 
 ---
@@ -219,7 +219,7 @@ sed -i 's/YOURDOMAIN/kai.yourdomain.com/g' frontend/.env.production
    └── Note the public IP, e.g. 20.10.50.100
 
 2. Point your domain to the VM
-   └── DNS A record: kai.yourdomain.com → 20.10.50.100
+   └── DNS A record: kaiterminal.com → 20.10.50.100
    └── Wait 5–15 minutes for DNS to propagate worldwide
 
 3. SSH into the server
@@ -235,7 +235,7 @@ sed -i 's/YOURDOMAIN/kai.yourdomain.com/g' frontend/.env.production
    └── git clone <your-repo> /opt/kaiterminal/repo
 
 7. Build the frontend
-   └── Edit .env.production — replace YOURDOMAIN with your real domain
+   └── Edit .env.production — replace kaiterminal.com with your real domain
    └── npm ci && npm run build → creates dist/ folder
    └── Copy dist/ to /var/www/kaiterminal/ (Nginx serves from here)
 
@@ -254,7 +254,7 @@ sed -i 's/YOURDOMAIN/kai.yourdomain.com/g' frontend/.env.production
     └── systemctl reload nginx
 
 11. Get a free SSL certificate (Let's Encrypt)
-    └── certbot --nginx -d kai.yourdomain.com
+    └── certbot --nginx -d kaiterminal.com
     └── Certbot edits nginx.conf automatically and adds the cert paths
     └── Auto-renews every 90 days via a systemd timer
 
@@ -273,10 +273,10 @@ sed -i 's/YOURDOMAIN/kai.yourdomain.com/g' frontend/.env.production
 
 14. Update Google OAuth
     └── Google Cloud Console → OAuth credentials
-    └── Add https://kai.yourdomain.com/auth/callback to Authorized redirect URIs
+    └── Add https://kaiterminal.com/auth/callback to Authorized redirect URIs
 
 15. First login
-    └── Visit https://kai.yourdomain.com
+    └── Visit https://kaiterminal.com
     └── Sign in with your Google account
     └── Admin page → paste Upstox analytics token
     └── sudo systemctl restart kaiterminal-worker
