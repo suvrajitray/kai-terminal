@@ -12,8 +12,22 @@ using KAITerminal.Auth.Extensions;
 using KAITerminal.Upstox;
 using KAITerminal.Zerodha;
 using Scalar.AspNetCore;
+using Serilog;
+
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .CreateBootstrapLogger();
+
+try
+{
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((ctx, services, cfg) => cfg
+    .ReadFrom.Configuration(ctx.Configuration)
+    .ReadFrom.Services(services)
+    .Enrich.FromLogContext()
+    .Enrich.WithMachineName());
 
 builder.Services.ConfigureHttpJsonOptions(o =>
     o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
@@ -45,9 +59,6 @@ builder.Services.AddSingleton<PositionStreamManager>();
 builder.Services.AddSingleton<IndexStreamManager>();
 builder.Services.AddScoped<UserTradingSettingsService>();
 builder.Services.AddSingleton<MasterDataService>();
-
-if (!string.IsNullOrEmpty(builder.Configuration["ApplicationInsights:ConnectionString"]))
-    builder.Services.AddApplicationInsightsTelemetry(builder.Configuration);
 
 var app = builder.Build();
 
@@ -132,3 +143,13 @@ if (app.Environment.IsDevelopment())
     app.MapDiagnosticsEndpoints();
 
 app.Run();
+
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "API host terminated unexpectedly");
+}
+finally
+{
+    Log.CloseAndFlush();
+}

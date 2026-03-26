@@ -1,5 +1,6 @@
 using KAITerminal.Broker;
 using KAITerminal.Broker.Adapters;
+using Serilog;
 using KAITerminal.Contracts.Notifications;
 using KAITerminal.Contracts.Broker;
 using KAITerminal.Contracts.Streaming;
@@ -14,7 +15,20 @@ using KAITerminal.Worker.Notifications;
 using KAITerminal.Zerodha;
 using KAITerminal.Zerodha.Extensions;
 
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .CreateBootstrapLogger();
+
+try
+{
+
 var builder = Host.CreateApplicationBuilder(args);
+
+builder.Services.AddSerilog((services, cfg) => cfg
+    .ReadFrom.Configuration(builder.Configuration)
+    .ReadFrom.Services(services)
+    .Enrich.FromLogContext()
+    .Enrich.WithMachineName());
 
 builder.Services.AddUpstoxSdk(builder.Configuration);
 builder.Services.AddZerodhaSdk(builder.Configuration);
@@ -58,8 +72,15 @@ builder.Services.AddSingleton<ITokenMapper, CrossBrokerTokenMapper>();
 
 builder.Services.AddRiskEngine<DbUserTokenSource>(builder.Configuration);
 
-if (!string.IsNullOrEmpty(builder.Configuration["ApplicationInsights:ConnectionString"]))
-    builder.Services.AddApplicationInsightsTelemetryWorkerService(builder.Configuration);
-
 var host = builder.Build();
 host.Run();
+
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Worker host terminated unexpectedly");
+}
+finally
+{
+    Log.CloseAndFlush();
+}
