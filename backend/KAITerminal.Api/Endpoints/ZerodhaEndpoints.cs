@@ -1,6 +1,8 @@
+using System.Security.Claims;
 using KAITerminal.Api.Mapping;
 using KAITerminal.Api.Models;
 using KAITerminal.Api.Services;
+using KAITerminal.Contracts.Domain;
 using KAITerminal.Zerodha;
 using KAITerminal.Zerodha.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -90,6 +92,66 @@ public static class ZerodhaEndpoints
             return Results.Ok(positions.Select(p => p.ToResponse()));
         });
 
+        group.MapPost("/positions/exit-all", async (
+            ZerodhaClient zerodha,
+            ClaimsPrincipal user,
+            ILoggerFactory lf,
+            [FromQuery] string? exchange = null,
+            CancellationToken ct = default) =>
+        {
+            var exchanges = string.IsNullOrWhiteSpace(exchange)
+                ? null
+                : exchange.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                          .ToList()
+                          .AsReadOnly();
+            await zerodha.ExitAllPositionsAsync(exchanges, ct);
+            lf.CreateLogger("ZerodhaEndpoints").LogInformation(
+                "Exit all positions — {User}", user.FindFirstValue(ClaimTypes.Email) ?? "unknown");
+            return Results.Ok();
+        });
+
+        group.MapPost("/positions/{instrumentToken}/exit", async (
+            string instrumentToken,
+            ZerodhaClient zerodha,
+            ClaimsPrincipal user,
+            ILoggerFactory lf,
+            [FromQuery] string product = "NRML",
+            CancellationToken ct = default) =>
+        {
+            await zerodha.ExitPositionAsync(instrumentToken, product, ct);
+            lf.CreateLogger("ZerodhaEndpoints").LogInformation(
+                "Exit position — {User} — {Token}",
+                user.FindFirstValue(ClaimTypes.Email) ?? "unknown", instrumentToken);
+            return Results.Ok();
+        });
+
+        // ── Orders ────────────────────────────────────────────────────────────
+
+        group.MapGet("/orders", async (ZerodhaClient zerodha, CancellationToken ct) =>
+            Results.Ok(await zerodha.GetAllOrdersAsync(ct)));
+
+        group.MapPost("/orders/v3", async (
+            [FromBody] ZerodhaOrderRequest request,
+            ZerodhaClient zerodha,
+            ClaimsPrincipal user,
+            ILoggerFactory lf,
+            CancellationToken ct) =>
+        {
+            var brokerRequest = new BrokerOrderRequest(
+                request.InstrumentToken,
+                request.Quantity,
+                request.TransactionType,
+                request.Product,
+                request.OrderType,
+                request.Price);
+            var orderId = await zerodha.PlaceOrderAsync(brokerRequest, ct);
+            lf.CreateLogger("ZerodhaEndpoints").LogInformation(
+                "Order placed — {User} — {Token} qty={Qty} {Side} — order {OrderId}",
+                user.FindFirstValue(ClaimTypes.Email) ?? "unknown",
+                request.InstrumentToken, request.Quantity, request.TransactionType, orderId);
+            return Results.Ok(new { orderId });
+        });
+
         // ── Margin ────────────────────────────────────────────────────────────
 
         /// <summary>Calculates required margin for a basket of hypothetical Zerodha orders.</summary>
@@ -136,6 +198,14 @@ public static class ZerodhaEndpoints
         string ApiKey,
         string ApiSecret,
         string RequestToken);
+
+    private sealed record ZerodhaOrderRequest(
+        string   InstrumentToken,
+        int      Quantity,
+        string   TransactionType,
+        string   Product,
+        string   OrderType,
+        decimal? Price = null);
 
     private sealed record ZerodhaMarginRequest(
         IReadOnlyList<ZerodhaMarginInstrument> Instruments);

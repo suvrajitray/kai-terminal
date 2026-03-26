@@ -30,17 +30,17 @@ public sealed class ZerodhaPositionService : IZerodhaPositionService
             open = open.Where(p => set.Contains(p.Exchange.ToUpperInvariant()));
         }
 
-        var tasks = open.Select(p =>
-        {
-            var txType   = p.Quantity > 0 ? "SELL" : "BUY";
-            var quantity = Math.Abs(p.Quantity);
-            var symbol   = p.TradingSymbol;
-            var exchange = p.Exchange;
-            var product  = MapProductBack(p.Product);
-            return _http.PlaceOrderAsync(symbol, exchange, txType, product, "MARKET", quantity, null, ct);
-        });
+        var openList = open.ToList();
 
-        await Task.WhenAll(tasks);
+        // Exit short positions (qty < 0, BUY-to-close) before long positions (qty > 0, SELL-to-close)
+        var shorts = openList.Where(p => p.Quantity < 0).ToList();
+        var longs  = openList.Where(p => p.Quantity > 0).ToList();
+
+        await Task.WhenAll(shorts.Select(p => _http.PlaceOrderAsync(
+            p.TradingSymbol, p.Exchange, "BUY", MapProductBack(p.Product), "MARKET", Math.Abs(p.Quantity), null, ct)));
+
+        await Task.WhenAll(longs.Select(p => _http.PlaceOrderAsync(
+            p.TradingSymbol, p.Exchange, "SELL", MapProductBack(p.Product), "MARKET", Math.Abs(p.Quantity), null, ct)));
     }
 
     public async Task ExitPositionAsync(
@@ -54,7 +54,7 @@ public sealed class ZerodhaPositionService : IZerodhaPositionService
 
         var txType      = pos.Quantity > 0 ? "SELL" : "BUY";
         var quantity    = Math.Abs(pos.Quantity);
-        var kiteProduct = MapProductBack(product);
+        var kiteProduct = MapProductBack(pos.Product);   // use raw Kite product, not the API-mapped param
         await _http.PlaceOrderAsync(pos.TradingSymbol, pos.Exchange, txType, kiteProduct, "MARKET", quantity, null, ct);
     }
 

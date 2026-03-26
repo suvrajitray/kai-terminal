@@ -20,11 +20,14 @@ public sealed class ZerodhaOrderService : IZerodhaOrderService
         var exchange = parts.Length == 2 ? parts[0] : "NFO";
         var symbol   = parts.Length == 2 ? parts[1] : request.InstrumentToken;
 
+        // F&O exchanges require NRML for delivery products; equity CNC for stock delivery
+        var isFoExchange = exchange is "NFO" or "BFO";
         var kiteProduct = request.Product.ToUpperInvariant() switch
         {
-            "I" or "MIS"  => "MIS",
-            "D" or "CNC"  => "CNC",
-            _             => "NRML",
+            "I" or "MIS"                                      => "MIS",
+            "D" or "CNC" or "DELIVERY" when isFoExchange      => "NRML",
+            "D" or "CNC" or "DELIVERY"                        => "CNC",
+            _                                                 => "NRML",
         };
 
         return _http.PlaceOrderAsync(

@@ -67,16 +67,16 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
     }
   };
 
-  const handleExit = (token: string, product: string) =>
-    withActing(token + ":exit", () => exitPosition(token, product));
+  const handleExit = (token: string, product: string, broker: string) =>
+    withActing(token + ":exit", () => exitPosition(token, product, broker));
 
-  const handleAdd = (token: string, tradingSymbol: string, product: string) => {
+  const handleAdd = (token: string, tradingSymbol: string, product: string, broker: string, exchange: string) => {
     const lot = getLotSize(tradingSymbol);
     const num = parseInt(qtys[token] ?? "", 10);
     const qty = isNaN(num) || num <= 0 ? 0 : qtyMode === "lot" ? num * lot : num;
     const position = positions.find((p) => p.instrumentToken === token && p.product === product)!;
     const txn = position.quantity >= 0 ? "Buy" : "Sell";
-    return withActing(token + ":add", () => placeMarketOrder(token, qty, txn, product));
+    return withActing(token + ":add", () => placeMarketOrder(token, qty, txn, product, broker, exchange));
   };
 
   const handleShift = (
@@ -126,13 +126,13 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
     });
   };
 
-  const handleReduce = (token: string, tradingSymbol: string, product: string) => {
+  const handleReduce = (token: string, tradingSymbol: string, product: string, broker: string, exchange: string) => {
     const lot = getLotSize(tradingSymbol);
     const num = parseInt(qtys[token] ?? "", 10);
     const qty = isNaN(num) || num <= 0 ? 0 : qtyMode === "lot" ? num * lot : num;
     const position = positions.find((p) => p.instrumentToken === token && p.product === product)!;
     const txn = position.quantity >= 0 ? "Sell" : "Buy";
-    return withActing(token + ":reduce", () => placeMarketOrder(token, qty, txn, product));
+    return withActing(token + ":reduce", () => placeMarketOrder(token, qty, txn, product, broker, exchange));
   };
 
   const posKey = useCallback((p: Position) => p.instrumentToken + p.product, []);
@@ -174,7 +174,7 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
     const toExit = openPositions.filter((p) => selected.has(selKey(p)));
     setActing("selected");
     try {
-      await Promise.all(toExit.map((p) => exitPosition(p.instrumentToken, p.product)));
+      await Promise.all(toExit.map((p) => exitPosition(p.instrumentToken, p.product, p.broker ?? "upstox")));
       setSelected(new Set());
       await load();
     } catch (e) {
@@ -232,9 +232,9 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
       onToggleSelect={() => toggleSelect(p)}
       onQtyChange={(v) => setQty(p.instrumentToken, v)}
       onToggleMode={toggleMode}
-      onAdd={() => handleAdd(p.instrumentToken, p.tradingSymbol, p.product)}
-      onReduce={() => handleReduce(p.instrumentToken, p.tradingSymbol, p.product)}
-      onExit={() => handleExit(p.instrumentToken, p.product)}
+      onAdd={() => handleAdd(p.instrumentToken, p.tradingSymbol, p.product, p.broker ?? "upstox", p.exchange)}
+      onReduce={() => handleReduce(p.instrumentToken, p.tradingSymbol, p.product, p.broker ?? "upstox", p.exchange)}
+      onExit={() => handleExit(p.instrumentToken, p.product, p.broker ?? "upstox")}
       onShiftUp={() => handleShift(p.instrumentToken, p.tradingSymbol, p.product, "up")}
       onShiftDown={() => handleShift(p.instrumentToken, p.tradingSymbol, p.product, "down")}
     />

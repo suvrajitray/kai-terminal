@@ -44,9 +44,15 @@ internal sealed class PositionService : IPositionService
         if (openPositions.Count == 0)
             return [];
 
-        var tasks = openPositions.Select(p => ExitSingleAsync(p, cancellationToken));
-        var results = await Task.WhenAll(tasks);
-        return results.ToList().AsReadOnly();
+        // Exit short positions (qty < 0, BUY-to-close) before long positions (qty > 0, SELL-to-close)
+        // to reduce risk exposure as fast as possible
+        var shorts = openPositions.Where(p => p.Quantity < 0).ToList();
+        var longs  = openPositions.Where(p => p.Quantity > 0).ToList();
+
+        var shortResults = await Task.WhenAll(shorts.Select(p => ExitSingleAsync(p, cancellationToken)));
+        var longResults  = await Task.WhenAll(longs.Select(p => ExitSingleAsync(p, cancellationToken)));
+
+        return shortResults.Concat(longResults).ToList().AsReadOnly();
     }
 
     /// <inheritdoc />

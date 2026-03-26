@@ -18,6 +18,7 @@ interface PositionActionsProps {
   acting: string | null;
   hasOpenQty: boolean;
   isSell: boolean;
+  showConvert?: boolean;
   onQtyChange: (v: string) => void;
   onToggleMode: () => void;
   onAdd: () => void;
@@ -65,6 +66,7 @@ export function PositionActions({
   acting,
   hasOpenQty,
   isSell,
+  showConvert = true,
   onQtyChange,
   onToggleMode,
   onAdd,
@@ -154,12 +156,15 @@ export function PositionActions({
               <span>Exit position</span>
             </DropdownMenuItem>
 
-            <DropdownMenuSeparator />
-
-            <DropdownMenuItem onClick={onConvert} className="gap-2 cursor-pointer text-muted-foreground">
-              <RefreshCw className="size-3.5" />
-              <span>Convert position</span>
-            </DropdownMenuItem>
+            {showConvert && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onConvert} className="gap-2 cursor-pointer text-muted-foreground">
+                  <RefreshCw className="size-3.5" />
+                  <span>Convert position</span>
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

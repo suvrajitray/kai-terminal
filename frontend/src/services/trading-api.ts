@@ -19,10 +19,24 @@ export async function exitAllPositions(exchanges = ["NFO", "BFO"]): Promise<void
   });
 }
 
-export async function exitPosition(instrumentToken: string, product: string): Promise<void> {
-  await apiClient.post(`/api/upstox/positions/${encodeURIComponent(instrumentToken)}/exit`, null, {
-    params: { product: productToUpstoxStr(product) },
+export async function exitAllZerodhaPositions(exchanges = ["NFO", "BFO"]): Promise<void> {
+  await apiClient.post("/api/zerodha/positions/exit-all", null, {
+    params: { exchange: exchanges.join(",") },
   });
+}
+
+export async function exitPosition(
+  instrumentToken: string,
+  product: string,
+  broker: string = "upstox",
+): Promise<void> {
+  if (broker === "zerodha") {
+    await apiClient.post(`/api/zerodha/positions/${encodeURIComponent(instrumentToken)}/exit`);
+  } else {
+    await apiClient.post(`/api/upstox/positions/${encodeURIComponent(instrumentToken)}/exit`, null, {
+      params: { product: productToUpstoxStr(product) },
+    });
+  }
 }
 
 export async function convertPosition(
@@ -128,15 +142,29 @@ export async function placeMarketOrder(
   quantity: number,
   transactionType: "Buy" | "Sell",
   product: string,
+  broker: string = "upstox",
+  exchange?: string,
 ): Promise<void> {
-  await apiClient.post("/api/upstox/orders/v3", {
-    instrumentToken,
-    quantity,
-    transactionType: transactionType === "Buy" ? 0 : 1,
-    orderType: 0,  // Market
-    product: productToEnum(product),
-    slice: true,
-  });
+  if (broker === "zerodha") {
+    const token = exchange ? `${exchange}|${instrumentToken}` : instrumentToken;
+    await apiClient.post("/api/zerodha/orders/v3", {
+      instrumentToken: token,
+      quantity,
+      transactionType,
+      product,
+      orderType: "Market",
+      price: null,
+    });
+  } else {
+    await apiClient.post("/api/upstox/orders/v3", {
+      instrumentToken,
+      quantity,
+      transactionType: transactionType === "Buy" ? 0 : 1,
+      orderType: 0,  // Market
+      product: productToEnum(product),
+      slice: true,
+    });
+  }
 }
 
 export async function placeOrder(
@@ -146,14 +174,28 @@ export async function placeOrder(
   product: string,
   orderType: "market" | "limit",
   limitPrice?: number,
+  broker: string = "upstox",
+  exchange?: string,
 ): Promise<void> {
-  await apiClient.post("/api/upstox/orders/v3", {
-    instrumentToken,
-    quantity,
-    transactionType: transactionType === "Buy" ? 0 : 1,
-    orderType: orderType === "market" ? 0 : 1,
-    price: orderType === "limit" ? (limitPrice ?? 0) : 0,
-    product: productToEnum(product),
-    slice: true,
-  });
+  if (broker === "zerodha") {
+    const token = exchange ? `${exchange}|${instrumentToken}` : instrumentToken;
+    await apiClient.post("/api/zerodha/orders/v3", {
+      instrumentToken: token,
+      quantity,
+      transactionType,
+      product,
+      orderType: orderType === "market" ? "Market" : "Limit",
+      price: orderType === "limit" ? (limitPrice ?? 0) : null,
+    });
+  } else {
+    await apiClient.post("/api/upstox/orders/v3", {
+      instrumentToken,
+      quantity,
+      transactionType: transactionType === "Buy" ? 0 : 1,
+      orderType: orderType === "market" ? 0 : 1,
+      price: orderType === "limit" ? (limitPrice ?? 0) : 0,
+      product: productToEnum(product),
+      slice: true,
+    });
+  }
 }

@@ -9,7 +9,7 @@ import { usePositionsFeed } from "@/components/panels/positions-panel/use-positi
 import { useProfitProtection } from "./use-profit-protection";
 import { useRiskConfig } from "@/hooks/use-risk-config";
 import { useOptionContractsPrefetch } from "@/hooks/use-option-contracts-prefetch";
-import { exitAllPositions } from "@/services/trading-api";
+import { exitAllPositions, exitAllZerodhaPositions } from "@/services/trading-api";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
 import { useBrokerStore } from "@/stores/broker-store";
 import { isBrokerTokenExpired } from "@/lib/token-utils";
@@ -41,6 +41,7 @@ export function TerminalPage() {
 }
 
 function TerminalPageInner() {
+  const credentials = useBrokerStore((s) => s.credentials);
   const loadOrdersRef = useRef<(() => void) | null>(null);
   const { positions, setPositions, loading, isLive, load } = usePositionsFeed(
     () => loadOrdersRef.current?.()
@@ -68,7 +69,14 @@ function TerminalPageInner() {
   const handleExitAll = async () => {
     setActing("all");
     try {
-      await exitAllPositions();
+      // Exit all open positions across every active broker in parallel
+      const activeBrokers = Object.entries(credentials).filter(
+        ([id, c]) => !isBrokerTokenExpired(id, c?.accessToken),
+      );
+      const calls: Promise<void>[] = [];
+      if (activeBrokers.some(([id]) => id === "upstox"))   calls.push(exitAllPositions());
+      if (activeBrokers.some(([id]) => id === "zerodha"))  calls.push(exitAllZerodhaPositions());
+      await Promise.all(calls);
       await load();
     } catch (e) {
       toast.error((e as Error).message);

@@ -309,6 +309,8 @@ export function SellBuyMoreDialog({ open, onOpenChange, position }: MoreDialogPr
         position.product,
         orderMode,
         orderMode === "limit" ? parseFloat(limitPrice) : undefined,
+        position.broker ?? "upstox",
+        position.exchange,
       );
       toast.success(`${label} order placed`);
       onOpenChange(false);
