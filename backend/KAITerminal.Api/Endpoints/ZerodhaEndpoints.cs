@@ -3,6 +3,7 @@ using KAITerminal.Api.Mapping;
 using KAITerminal.Api.Models;
 using KAITerminal.Api.Services;
 using KAITerminal.Contracts.Domain;
+using KAITerminal.MarketData.Services;
 using KAITerminal.Zerodha;
 using KAITerminal.Zerodha.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -124,6 +125,90 @@ public static class ZerodhaEndpoints
                 user.FindFirstValue(ClaimTypes.Email) ?? "unknown",
                 instrumentToken, request.Quantity, request.OldProduct);
             return Results.Ok();
+        });
+
+        group.MapPost("/positions/shift", async (
+            [FromBody] ShiftPositionRequest request,
+            ShiftService shiftSvc,
+            ZerodhaClient zerodha,
+            IZerodhaInstrumentService zerodhaInstruments,
+            ClaimsPrincipal user,
+            ILoggerFactory lf,
+            CancellationToken ct) =>
+        {
+            // ShiftService returns the Upstox instrument key (format: "{exchange}|{exchange_token}")
+            var upstoxKey = await shiftSvc.FindTargetStrikeAsync(
+                request.UnderlyingKey, request.Expiry, request.InstrumentType,
+                request.TargetPremium, request.Direction, ct);
+
+            if (upstoxKey is null)
+                return Results.Problem("No matching strike found in option chain.");
+
+            // Derive exchange_token from Upstox key, look up Zerodha trading symbol
+            var exchangeToken = upstoxKey.Contains('|') ? upstoxKey.Split('|')[1] : upstoxKey;
+            var contracts     = await zerodhaInstruments.GetAllCurrentYearContractsAsync(ct);
+            var match         = contracts.FirstOrDefault(c => c.ExchangeToken == exchangeToken);
+
+            if (match is null)
+                return Results.Problem($"Zerodha trading symbol not found for exchange token {exchangeToken}.");
+
+            // Prefix both tokens with exchange so ZerodhaOrderService parses correctly.
+            // Close uses the exchange from the request (position's exchange e.g. "NFO", "BFO").
+            // Open uses the exchange from the matched contract.
+            var closeToken = string.IsNullOrEmpty(request.Exchange)
+                ? request.InstrumentToken
+                : $"{request.Exchange}|{request.InstrumentToken}";
+            var openToken  = $"{match.Exchange}|{match.TradingSymbol}";
+
+            var closeTxn = request.IsShort ? "Buy"  : "Sell";
+            var openTxn  = request.IsShort ? "Sell" : "Buy";
+
+            var closeOrder = new BrokerOrderRequest(closeToken, request.Qty, closeTxn, request.Product, "MARKET");
+            var openOrder  = new BrokerOrderRequest(openToken,  request.Qty, openTxn,  request.Product, "MARKET");
+
+            var logger = lf.CreateLogger("ZerodhaEndpoints");
+            var email  = user.FindFirstValue(ClaimTypes.Email) ?? "unknown";
+
+            // Short: close first (buying back releases margin), then open new short.
+            // Long:  open first (maintains hedge), then close old long — avoids margin spike on shorts.
+            if (request.IsShort)
+            {
+                await zerodha.PlaceOrderAsync(closeOrder, ct);
+                try
+                {
+                    await zerodha.PlaceOrderAsync(openOrder, ct);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex,
+                        "PARTIAL SHIFT — {User} — close {CloseToken} succeeded but open {OpenToken} failed. Manual intervention required.",
+                        email, closeToken, openToken);
+                    return Results.Problem(
+                        $"Close order placed but open order failed: {ex.Message}. Check your positions — manual intervention may be required.");
+                }
+            }
+            else
+            {
+                await zerodha.PlaceOrderAsync(openOrder, ct);
+                try
+                {
+                    await zerodha.PlaceOrderAsync(closeOrder, ct);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex,
+                        "PARTIAL SHIFT — {User} — open {OpenToken} succeeded but close {CloseToken} failed. Manual intervention required.",
+                        email, openToken, closeToken);
+                    return Results.Problem(
+                        $"Open order placed but close order failed: {ex.Message}. Check your positions — manual intervention may be required.");
+                }
+            }
+
+            logger.LogInformation(
+                "Shift {Direction} — {User} — close {CloseToken} qty={Qty} | open {OpenToken} product={Product}",
+                request.Direction, email, closeToken, request.Qty, openToken, request.Product);
+
+            return Results.Ok(new { targetToken = openToken });
         });
 
         group.MapPost("/positions/{instrumentToken}/exit", async (

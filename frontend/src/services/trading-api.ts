@@ -175,6 +175,23 @@ export async function placeMarketOrder(
   }
 }
 
+export interface ShiftPositionPayload {
+  instrumentToken: string;
+  exchange: string;
+  qty: number;
+  direction: "up" | "down";
+  product: string;
+  targetPremium: number;
+  underlyingKey: string;
+  expiry: string;
+  instrumentType: string;
+  isShort: boolean;
+}
+
+export async function shiftPosition(broker: string, payload: ShiftPositionPayload): Promise<void> {
+  await apiClient.post(`/api/${broker}/positions/shift`, payload);
+}
+
 export async function placeOrder(
   instrumentToken: string,
   quantity: number,

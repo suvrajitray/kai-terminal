@@ -42,3 +42,16 @@ public record ResolveByStrikeQuery(
 
 public record MarginRequest(List<MarginInstrumentRequest> Instruments);
 public record MarginInstrumentRequest(string InstrumentToken, int Quantity, string Product, string TransactionType);
+
+public record ShiftPositionRequest(
+    string  InstrumentToken,  // current position token (broker-specific format)
+    string  Exchange,         // exchange of the current position e.g. "NFO", "BFO", "NSE_FO"
+    int     Qty,              // absolute quantity to shift
+    string  Direction,        // "up" | "down"
+    string  Product,          // e.g. "Intraday", "Delivery", "NRML"
+    decimal TargetPremium,    // pre-calculated by frontend: currentLtp ± offset
+    string  UnderlyingKey,    // e.g. "NSE_INDEX|Nifty 50"
+    string  Expiry,           // e.g. "2026-03-27"
+    string  InstrumentType,   // "CE" | "PE"
+    bool    IsShort           // true when position.quantity < 0
+);

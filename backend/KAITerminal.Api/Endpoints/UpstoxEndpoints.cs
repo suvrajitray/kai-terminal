@@ -1,8 +1,10 @@
 using System.Security.Claims;
 using KAITerminal.Api.Mapping;
 using KAITerminal.Api.Models;
+using KAITerminal.Api.Services;
 using KAITerminal.Upstox;
 using KAITerminal.Upstox.Exceptions;
+using KAITerminal.Upstox.Models.Enums;
 using KAITerminal.Upstox.Models.Requests;
 using KAITerminal.Upstox.Models.Responses;
 using Microsoft.AspNetCore.Mvc;
@@ -90,6 +92,93 @@ public static class UpstoxEndpoints
                 user.FindFirstValue(ClaimTypes.Email) ?? "unknown",
                 instrumentToken, request.Quantity, request.OldProduct);
             return Results.Ok();
+        });
+
+        group.MapPost("/positions/shift", async (
+            [FromBody] ShiftPositionRequest request,
+            ShiftService shiftSvc,
+            UpstoxClient upstox,
+            ClaimsPrincipal user,
+            ILoggerFactory lf,
+            CancellationToken ct) =>
+        {
+            var targetKey = await shiftSvc.FindTargetStrikeAsync(
+                request.UnderlyingKey, request.Expiry, request.InstrumentType,
+                request.TargetPremium, request.Direction, ct);
+
+            if (targetKey is null)
+                return Results.Problem("No matching strike found in option chain.");
+
+            var closeTxn = request.IsShort ? TransactionType.Buy  : TransactionType.Sell;
+            var openTxn  = request.IsShort ? TransactionType.Sell : TransactionType.Buy;
+            var product  = request.Product switch
+            {
+                "Delivery" or "D" or "NRML" => Product.Delivery,
+                "Mtf"      or "MTF"          => Product.MTF,
+                "CoverOrder" or "CO"         => Product.CoverOrder,
+                _                            => Product.Intraday,
+            };
+
+            var closeOrder = new PlaceOrderRequest
+            {
+                InstrumentToken = request.InstrumentToken,
+                Quantity        = request.Qty,
+                TransactionType = closeTxn,
+                Product         = product,
+                Slice           = true,
+            };
+            var openOrder = new PlaceOrderRequest
+            {
+                InstrumentToken = targetKey,
+                Quantity        = request.Qty,
+                TransactionType = openTxn,
+                Product         = product,
+                Slice           = true,
+            };
+
+            var logger = lf.CreateLogger("UpstoxEndpoints");
+            var email  = user.FindFirstValue(ClaimTypes.Email) ?? "unknown";
+
+            // Short: close first (buying back releases margin), then open new short.
+            // Long:  open first (maintains hedge), then close old long — avoids margin spike on shorts.
+            if (request.IsShort)
+            {
+                await upstox.PlaceOrderV3Async(closeOrder);
+                try
+                {
+                    await upstox.PlaceOrderV3Async(openOrder);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex,
+                        "PARTIAL SHIFT — {User} — close {CloseToken} succeeded but open {OpenToken} failed. Manual intervention required.",
+                        email, request.InstrumentToken, targetKey);
+                    return Results.Problem(
+                        $"Close order placed but open order failed: {ex.Message}. Check your positions — manual intervention may be required.");
+                }
+            }
+            else
+            {
+                await upstox.PlaceOrderV3Async(openOrder);
+                try
+                {
+                    await upstox.PlaceOrderV3Async(closeOrder);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex,
+                        "PARTIAL SHIFT — {User} — open {OpenToken} succeeded but close {CloseToken} failed. Manual intervention required.",
+                        email, targetKey, request.InstrumentToken);
+                    return Results.Problem(
+                        $"Open order placed but close order failed: {ex.Message}. Check your positions — manual intervention may be required.");
+                }
+            }
+
+            logger.LogInformation(
+                "Shift {Direction} — {User} — close {CloseToken} qty={Qty} | open {OpenToken} product={Product}",
+                request.Direction, email, request.InstrumentToken, request.Qty, targetKey, request.Product);
+
+            return Results.Ok(new { targetToken = targetKey });
         });
 
         // ── Orders ────────────────────────────────────────────────────────────
