@@ -181,10 +181,12 @@ function TerminalPageInner() {
         style={{ height: ordersHeight }}
       >
         <div
-          className="absolute -top-1 left-0 right-0 h-2 cursor-row-resize hover:bg-primary/20 active:bg-primary/30 transition-colors z-10"
+          className="group absolute -top-2 left-0 right-0 h-4 cursor-row-resize z-10 flex items-center justify-center"
           onMouseDown={onDragStart}
           title="Drag to resize"
-        />
+        >
+          <div className="h-1 w-8 rounded-full bg-border/40 transition-colors group-hover:bg-primary/50 group-active:bg-primary/70" />
+        </div>
         <OrdersPanel
           expanded={ordersExpanded}
           onToggle={handleOrdersToggle}

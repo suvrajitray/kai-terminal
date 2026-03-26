@@ -9,7 +9,7 @@ interface EmptyStateProps {
 
 export function EmptyState({ icon: Icon, message, className }: EmptyStateProps) {
   return (
-    <div className={cn("flex h-full flex-col items-center justify-center gap-2 text-muted-foreground/40", className)}>
+    <div className={cn("flex h-full flex-col items-center justify-center gap-2 text-muted-foreground/50", className)}>
       <Icon className="size-8 stroke-[1.25]" />
       <p className="text-xs">{message}</p>
     </div>

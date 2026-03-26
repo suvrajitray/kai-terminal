@@ -98,7 +98,7 @@ export function PositionRow({
           isNew && "animate-row-enter",
         )}
       >
-        <td className="pl-3 py-1.5 w-7">
+        <td className={cn("pl-3 py-1.5 w-7", selected && "border-l-2 border-l-primary/50")}>
           <Checkbox checked={selected} disabled={p.quantity === 0} onCheckedChange={onToggleSelect} />
         </td>
         <td className="px-3 py-1.5">

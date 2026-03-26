@@ -252,7 +252,7 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
           />
         ) : (
           <table className="w-full text-xs">
-            <thead className="sticky top-0 z-10 bg-background">
+            <thead className="sticky top-0 z-10 bg-muted/20 backdrop-blur-sm">
               <tr className="border-b border-border text-muted-foreground">
                 <th className="px-3 py-1.5 text-left font-medium">Time</th>
                 <th className="px-3 py-1.5 text-left font-medium">Symbol</th>
