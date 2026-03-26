@@ -136,9 +136,9 @@ export function LandingPage() {
             </span>
             <span className="mx-1 h-3 w-px bg-border/40" />
             <span className="text-xs text-muted-foreground">5 indices</span>
-            <span className="text-border/40">·</span>
+            <span className="text-muted-foreground/40">·</span>
             <span className="text-xs text-muted-foreground">&lt; 50ms LTP</span>
-            <span className="text-border/40">·</span>
+            <span className="text-muted-foreground/40">·</span>
             <span className="text-xs text-muted-foreground">1-click orders</span>
           </motion.div>
         </section>
@@ -173,15 +173,15 @@ export function LandingPage() {
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.35, delay: 0.42 + i * 0.04 }}
-                className="group relative overflow-hidden rounded-xl border border-border/40 bg-card/30 p-5 backdrop-blur-sm transition-all duration-250 hover:border-primary/35 hover:bg-card/60 hover:shadow-md hover:shadow-primary/5"
+                className="group relative overflow-hidden rounded-xl border border-border/40 bg-card/30 p-5 backdrop-blur-sm transition-all duration-300 hover:border-primary/30 hover:bg-card/60 hover:shadow-md hover:shadow-primary/5"
               >
-                <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent opacity-0 transition-opacity duration-250 group-hover:opacity-100" />
+                <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
                 <div
-                  className="pointer-events-none absolute inset-0 rounded-xl opacity-0 transition-opacity duration-250 group-hover:opacity-100"
+                  className="pointer-events-none absolute inset-0 rounded-xl opacity-0 transition-opacity duration-300 group-hover:opacity-100"
                   style={{ background: "radial-gradient(ellipse at top left, hsl(var(--primary) / 0.06), transparent 65%)" }}
                 />
                 <div className="relative">
-                  <div className="mb-3 flex size-9 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/15 transition-all duration-250 group-hover:bg-primary/18 group-hover:ring-primary/35">
+                  <div className="mb-3 flex size-9 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/15 transition-all duration-300 group-hover:bg-primary/20 group-hover:ring-primary/30">
                     <Icon className="size-4 text-primary" />
                   </div>
                   <p className="mb-1.5 text-sm font-semibold">{title}</p>
@@ -201,11 +201,8 @@ export function LandingPage() {
               <span className="mx-1 text-border/40">·</span>
               <span className="text-xs text-muted-foreground">For personal use. Not SEBI registered.</span>
             </div>
-            <Link to="/login">
-              <Button variant="outline" size="sm" className="h-9 gap-2 border-border/60 text-sm hover:bg-muted/40">
-                <GoogleIcon />
-                Continue with Google
-              </Button>
+            <Link to="/login" className="text-xs text-muted-foreground transition-colors hover:text-foreground">
+              Sign in →
             </Link>
           </div>
         </footer>
