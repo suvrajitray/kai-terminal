@@ -152,7 +152,6 @@ export function PositionRow({
             acting={acting}
             hasOpenQty={p.quantity !== 0}
             isSell={p.quantity < 0}
-            showConvert={(p.broker ?? "upstox") !== "zerodha"}
             onQtyChange={onQtyChange}
             onToggleMode={onToggleMode}
             onAdd={onAdd}

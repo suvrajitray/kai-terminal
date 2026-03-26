@@ -126,6 +126,38 @@ public sealed class ZerodhaHttpClient
         return result.Data?.OrderId ?? "";
     }
 
+    // ── Position conversion ───────────────────────────────────────────────────
+
+    public async Task ConvertPositionAsync(
+        string tradingSymbol,
+        string exchange,
+        string transactionType,
+        string positionType,
+        string oldProduct,
+        string newProduct,
+        int quantity,
+        CancellationToken ct = default)
+    {
+        var form = new Dictionary<string, string>
+        {
+            ["exchange"]         = exchange,
+            ["tradingsymbol"]    = tradingSymbol,
+            ["transaction_type"] = transactionType.ToUpperInvariant(),
+            ["position_type"]    = positionType,   // "day" (MIS) or "overnight" (NRML/CNC)
+            ["quantity"]         = quantity.ToString(),
+            ["old_product"]      = oldProduct.ToUpperInvariant(),
+            ["new_product"]      = newProduct.ToUpperInvariant(),
+        };
+
+        var http     = _httpFactory.CreateClient("ZerodhaApi");
+        var response = await http.PutAsync("/portfolio/positions", new FormUrlEncodedContent(form), ct);
+        response.EnsureSuccessStatusCode();
+
+        var result = await response.Content.ReadFromJsonAsync<KiteEnvelope<bool>>(_json, ct)
+            ?? throw new InvalidOperationException("Null response converting Zerodha position");
+        EnsureSuccess(result);
+    }
+
     // ── Auth ─────────────────────────────────────────────────────────────────
 
     public async Task<string> ExchangeTokenAsync(

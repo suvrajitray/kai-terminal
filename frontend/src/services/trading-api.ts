@@ -43,11 +43,19 @@ export async function convertPosition(
   instrumentToken: string,
   oldProduct: string,
   quantity: number,
+  broker: string = "upstox",
 ): Promise<void> {
-  await apiClient.post(`/api/upstox/positions/${encodeURIComponent(instrumentToken)}/convert`, {
-    oldProduct: productToUpstoxStr(oldProduct),
-    quantity,
-  });
+  if (broker === "zerodha") {
+    await apiClient.post(`/api/zerodha/positions/${encodeURIComponent(instrumentToken)}/convert`, {
+      oldProduct,
+      quantity,
+    });
+  } else {
+    await apiClient.post(`/api/upstox/positions/${encodeURIComponent(instrumentToken)}/convert`, {
+      oldProduct: productToUpstoxStr(oldProduct),
+      quantity,
+    });
+  }
 }
 
 export async function fetchOrders(): Promise<Order[]> {

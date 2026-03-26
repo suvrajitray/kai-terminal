@@ -8,4 +8,5 @@ public interface IZerodhaPositionService
     Task<decimal> GetTotalMtmAsync(CancellationToken ct = default);
     Task ExitAllPositionsAsync(IReadOnlyCollection<string>? exchanges = null, CancellationToken ct = default);
     Task ExitPositionAsync(string instrumentToken, string product, CancellationToken ct = default);
+    Task ConvertPositionAsync(string instrumentToken, string oldProduct, int quantity, CancellationToken ct = default);
 }

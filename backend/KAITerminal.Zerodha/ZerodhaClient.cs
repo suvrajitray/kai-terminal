@@ -58,6 +58,10 @@ public sealed class ZerodhaClient
         string instrumentToken, string product, CancellationToken ct = default)
         => _positions.ExitPositionAsync(instrumentToken, product, ct);
 
+    public Task ConvertPositionAsync(
+        string instrumentToken, string oldProduct, int quantity, CancellationToken ct = default)
+        => _positions.ConvertPositionAsync(instrumentToken, oldProduct, quantity, ct);
+
     // ── Orders ────────────────────────────────────────────────────────────────
 
     public Task<IReadOnlyList<KAITerminal.Contracts.Domain.BrokerOrder>> GetAllOrdersAsync(CancellationToken ct = default)

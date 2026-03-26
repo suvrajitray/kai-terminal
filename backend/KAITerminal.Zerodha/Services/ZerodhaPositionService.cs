@@ -58,6 +58,26 @@ public sealed class ZerodhaPositionService : IZerodhaPositionService
         await _http.PlaceOrderAsync(pos.TradingSymbol, pos.Exchange, txType, kiteProduct, "MARKET", quantity, null, ct);
     }
 
+    public async Task ConvertPositionAsync(
+        string instrumentToken, string oldProduct, int quantity, CancellationToken ct = default)
+    {
+        var positions = await _http.GetPositionsAsync(ct);
+        var pos = positions.FirstOrDefault(p =>
+            p.InstrumentToken.Equals(instrumentToken, StringComparison.OrdinalIgnoreCase));
+
+        if (pos is null || pos.Quantity == 0) return;
+
+        var txType   = pos.Quantity >= 0 ? "BUY" : "SELL";
+        var kiteOld  = MapProductBack(pos.Product);   // e.g. "MIS" or "NRML"
+        var isFo     = pos.Exchange.Equals("NFO", StringComparison.OrdinalIgnoreCase)
+                    || pos.Exchange.Equals("BFO", StringComparison.OrdinalIgnoreCase);
+        var kiteNew  = kiteOld == "MIS" ? (isFo ? "NRML" : "CNC") : "MIS";
+        var posType  = kiteOld == "MIS" ? "day" : "overnight";
+
+        await _http.ConvertPositionAsync(
+            pos.TradingSymbol, pos.Exchange, txType, posType, kiteOld, kiteNew, quantity, ct);
+    }
+
     /// <summary>Map unified product codes back to Kite product codes for order placement.</summary>
     private static string MapProductBack(string product) => product.ToUpperInvariant() switch
     {

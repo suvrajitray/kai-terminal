@@ -110,6 +110,22 @@ public static class ZerodhaEndpoints
             return Results.Ok();
         });
 
+        group.MapPost("/positions/{instrumentToken}/convert", async (
+            string instrumentToken,
+            [FromBody] ZerodhaConvertRequest request,
+            ZerodhaClient zerodha,
+            ClaimsPrincipal user,
+            ILoggerFactory lf,
+            CancellationToken ct) =>
+        {
+            await zerodha.ConvertPositionAsync(instrumentToken, request.OldProduct, request.Quantity, ct);
+            lf.CreateLogger("ZerodhaEndpoints").LogInformation(
+                "Convert position — {User} — {Token} qty={Qty} from {OldProduct}",
+                user.FindFirstValue(ClaimTypes.Email) ?? "unknown",
+                instrumentToken, request.Quantity, request.OldProduct);
+            return Results.Ok();
+        });
+
         group.MapPost("/positions/{instrumentToken}/exit", async (
             string instrumentToken,
             ZerodhaClient zerodha,
@@ -198,6 +214,8 @@ public static class ZerodhaEndpoints
         string ApiKey,
         string ApiSecret,
         string RequestToken);
+
+    private sealed record ZerodhaConvertRequest(string OldProduct, int Quantity);
 
     private sealed record ZerodhaOrderRequest(
         string   InstrumentToken,

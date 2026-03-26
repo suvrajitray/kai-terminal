@@ -396,7 +396,7 @@ export function ConvertPositionDialog({ open, onOpenChange, position }: ConvertD
   async function handleConfirm() {
     setConverting(true);
     try {
-      await convertPosition(position.instrumentToken, position.product, qty);
+      await convertPosition(position.instrumentToken, position.product, qty, position.broker ?? "upstox");
       toast.success(`Converted ${qty} units to ${toLabel}`);
       onOpenChange(false);
     } catch (e) {
