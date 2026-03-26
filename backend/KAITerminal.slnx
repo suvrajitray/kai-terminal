@@ -3,7 +3,6 @@
   <Project Path="KAITerminal.Auth/KAITerminal.Auth.csproj" />
   <Project Path="KAITerminal.Broker/KAITerminal.Broker.csproj" />
   <Project Path="KAITerminal.Contracts/KAITerminal.Contracts.csproj" />
-  <Project Path="KAITerminal.Console/KAITerminal.Console.csproj" />
   <Project Path="KAITerminal.Infrastructure/KAITerminal.Infrastructure.csproj" />
   <Project Path="KAITerminal.MarketData/KAITerminal.MarketData.csproj" />
   <Project Path="KAITerminal.RiskEngine/KAITerminal.RiskEngine.csproj" />
