@@ -17,6 +17,53 @@ This guide deploys KAI Terminal on a single Azure VM running Ubuntu 24.04 LTS.
 
 ---
 
+## Step 0 — Create the VM in Azure and Connect from Your Mac
+
+### 1. Create the VM in Azure Portal
+
+1. Go to **Azure Portal → Virtual Machines → Create**
+2. Choose:
+   - **Image**: Ubuntu Server 24.04 LTS
+   - **Size**: D2as_v5 (search "D2as_v5" in the size picker)
+   - **Authentication**: SSH public key
+   - **Username**: `azureuser`
+   - **SSH public key source**: Generate new key pair (Azure will let you download the `.pem` file) — or use your existing key
+   - **Inbound ports**: Allow SSH (22) for now; you'll lock it down after setup
+3. Under **Disks**: Standard SSD, 30 GB is enough
+4. Click **Review + Create → Create**
+5. Note the **Public IP address** from the VM overview page
+
+### 2. Set up your SSH key on Mac
+
+If you generated a new key pair in Azure, move the downloaded `.pem` to your SSH folder and fix permissions:
+
+```bash
+# Move the downloaded key (adjust filename to match what Azure gave you)
+mv ~/Downloads/kaiterminal_key.pem ~/.ssh/kaiterminal.pem
+chmod 600 ~/.ssh/kaiterminal.pem
+```
+
+Add a host alias so you never have to type the IP again. Open (or create) `~/.ssh/config` and add:
+
+```
+Host kaiterminal
+    HostName <YOUR-VM-PUBLIC-IP>
+    User azureuser
+    IdentityFile ~/.ssh/kaiterminal.pem
+```
+
+### 3. First SSH connection
+
+```bash
+ssh kaiterminal
+# Type "yes" when asked to confirm the host fingerprint
+# You should land at: azureuser@<vm-name>:~$
+```
+
+From here, all remaining commands in this guide are run **inside this SSH session** unless stated otherwise.
+
+---
+
 ## Architecture on the VM
 
 ```
@@ -36,6 +83,75 @@ localhost:8080  Seq                (Docker container, optional)
 ---
 
 ## Prerequisites on the VM
+
+> **Tip — run it all at once:** Copy the entire block below and paste it into your SSH session. It runs every step in order and takes about 5–10 minutes. Skip to [Create App User](#create-app-user) when it finishes.
+
+```bash
+# ── System update ──────────────────────────────────────────────────────────
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y git curl unzip
+
+# ── .NET 10 SDK ────────────────────────────────────────────────────────────
+wget -q https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh
+chmod +x dotnet-install.sh
+sudo ./dotnet-install.sh --channel 10.0 --install-dir /usr/share/dotnet
+sudo ln -sf /usr/share/dotnet/dotnet /usr/bin/dotnet
+
+# ── Node.js 20 ─────────────────────────────────────────────────────────────
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# ── Redis ──────────────────────────────────────────────────────────────────
+sudo apt install -y redis-server
+sudo systemctl enable redis-server
+sudo systemctl start redis-server
+
+# ── PostgreSQL ─────────────────────────────────────────────────────────────
+sudo apt install -y postgresql postgresql-contrib
+sudo systemctl enable postgresql
+sudo systemctl start postgresql
+
+# ── Nginx + Certbot ────────────────────────────────────────────────────────
+sudo apt install -y nginx certbot python3-certbot-nginx
+sudo systemctl enable nginx
+
+# ── Docker (for Seq — optional) ────────────────────────────────────────────
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker $USER
+
+echo ""
+echo "✓ All dependencies installed."
+echo "  dotnet: $(dotnet --version)"
+echo "  node:   $(node --version)"
+echo "  redis:  $(redis-cli ping)"
+echo "  psql:   $(psql --version)"
+echo ""
+echo "Next: create the PostgreSQL database, then continue with 'Create App User'."
+```
+
+After the script finishes, create the PostgreSQL database (this needs interactive input):
+
+```bash
+sudo -u postgres psql
+```
+
+```sql
+CREATE USER kaiuser WITH PASSWORD 'choose-a-strong-password';
+CREATE DATABASE kaiterminal OWNER kaiuser;
+GRANT ALL PRIVILEGES ON DATABASE kaiterminal TO kaiuser;
+\q
+```
+
+Verify the connection:
+```bash
+psql -U kaiuser -d kaiterminal -h localhost -c "SELECT version();"
+```
+
+Then skip ahead to [Create App User](#create-app-user).
+
+---
+
+### Step-by-step (if you prefer to run each part separately)
 
 ### 1. Initial system update
 
