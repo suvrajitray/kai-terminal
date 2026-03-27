@@ -374,23 +374,42 @@ sudo rm -f /etc/nginx/sites-enabled/default   # remove default site
 sudo nginx -t   # test config — fix any errors before continuing
 ```
 
+### Configure DNS in Hostinger
+
+Do this **before** running Certbot — certificates will fail if DNS isn't pointing at your VM yet.
+
+1. Log in to Hostinger → **Domains → your domain → DNS / Zone Editor**
+2. Add or update these records (do this for **each domain** you own — `.com` and `.in`):
+
+| Type | Name | Value | TTL |
+|------|------|-------|-----|
+| A | `@` | `<your VM public IP>` | 300 |
+| A | `www` | `<your VM public IP>` | 300 |
+
+- `@` = root domain (`kaiterminal.com`)
+- `www` = `www.kaiterminal.com`
+- Set TTL to **300** (5 minutes) so changes propagate quickly
+
+3. Wait 5–15 minutes, then verify propagation from your Mac before proceeding:
+
+```bash
+dig kaiterminal.com +short      # must return your VM IP
+dig www.kaiterminal.com +short
+dig kaiterminal.in +short       # if you have the .in domain
+```
+
+Or use `nslookup kaiterminal.com` if `dig` isn't installed.
+
+> Do not run Certbot until `dig` returns the correct IP. If it still shows the old value, wait a few more minutes and try again.
+
 ### Obtain SSL certificates
-
-Point **both** DNS A records to the VM's public IP in Hostinger before running Certbot:
-
-```
-kaiterminal.com  → A record → <VM public IP>
-kaiterminal.in   → A record → <VM public IP>
-```
-
-Wait 5–15 minutes for DNS to propagate, then get certificates for each domain:
 
 ```bash
 # Primary domain
-sudo certbot --nginx -d kaiterminal.com
+sudo certbot --nginx -d kaiterminal.com -d www.kaiterminal.com
 
 # .in domain (used only for the redirect server block)
-sudo certbot --nginx -d kaiterminal.in
+sudo certbot --nginx -d kaiterminal.in -d www.kaiterminal.in
 ```
 
 Certbot fills in the certificate paths in nginx.conf and sets up auto-renewal every 90 days via a systemd timer.
@@ -497,7 +516,8 @@ The `.in` entry isn't strictly necessary (since it redirects to `.com` before au
 ## First-Time Setup Checklist
 
 - [ ] VM created, SSH key installed (`ssh-copy-id azureuser@<VM-IP>`)
-- [ ] Both DNS A records pointing to VM public IP (kaiterminal.com + kaiterminal.in)
+- [ ] Hostinger DNS — A records for `@` and `www` pointing to VM public IP (both .com and .in)
+- [ ] DNS propagation verified — `dig kaiterminal.com +short` returns VM IP
 - [ ] All dependencies installed (.NET, Node, Redis, PostgreSQL, Nginx, Certbot)
 - [ ] PostgreSQL `kaiuser` + `kaiterminal` database created
 - [ ] Repo cloned to `/opt/kaiterminal/repo`
