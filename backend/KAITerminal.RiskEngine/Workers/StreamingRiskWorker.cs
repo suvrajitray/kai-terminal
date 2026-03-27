@@ -30,6 +30,7 @@ public sealed class StreamingRiskWorker : BackgroundService
     private readonly IPositionCache           _cache;
     private readonly IRiskRepository          _repo;
     private readonly RiskEvaluator            _evaluator;
+    private readonly IAutoShiftEvaluator      _autoShift;
     private readonly IRiskEventNotifier       _notifier;
     private readonly ISharedMarketDataService _sharedMarketData;
     private readonly ITokenMapper             _tokenMapper;
@@ -63,6 +64,7 @@ public sealed class StreamingRiskWorker : BackgroundService
         IPositionCache           cache,
         IRiskRepository          repo,
         RiskEvaluator            evaluator,
+        IAutoShiftEvaluator      autoShift,
         IRiskEventNotifier       notifier,
         ISharedMarketDataService sharedMarketData,
         ITokenMapper             tokenMapper,
@@ -74,6 +76,7 @@ public sealed class StreamingRiskWorker : BackgroundService
         _cache            = cache;
         _repo             = repo;
         _evaluator        = evaluator;
+        _autoShift        = autoShift;
         _notifier         = notifier;
         _sharedMarketData = sharedMarketData;
         _tokenMapper      = tokenMapper;
@@ -383,6 +386,7 @@ public sealed class StreamingRiskWorker : BackgroundService
         {
             var mtm = _cache.GetMtm(user.UserId);
             await _evaluator.EvaluateAsync(user.UserId, mtm, user, broker, ct);
+            await _autoShift.EvaluateAsync(user.UserId, user, broker, ct);
         }
         finally
         {

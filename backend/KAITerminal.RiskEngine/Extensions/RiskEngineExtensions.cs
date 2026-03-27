@@ -28,6 +28,7 @@ public static class RiskEngineExtensions
 
         services.TryAddSingleton<IRiskEventNotifier, NullRiskEventNotifier>();
         services.TryAddSingleton<ITokenMapper, IdentityTokenMapper>();
+        services.TryAddSingleton<IAutoShiftEvaluator, NullAutoShiftEvaluator>();
 
         services.AddSingleton<IRiskRepository, RedisRiskRepository>();
         services.AddSingleton<IPositionCache, PositionCache>();

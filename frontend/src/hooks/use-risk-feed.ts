@@ -30,6 +30,10 @@ function buildToastMessage(event: RiskEvent): string {
       return `Square-off complete — all positions exited (PnL ${formatRupee(event.mtm)})`;
     case "SquareOffFailed":
       return `Square-off FAILED — manual verification required`;
+    case "AutoShiftTriggered":
+      return `Auto-shifted ${event.instrumentToken ?? "position"} — shift #${event.shiftCount ?? ""}`;
+    case "AutoShiftExhausted":
+      return `Max auto-shifts reached for ${event.instrumentToken ?? "position"} — position exited`;
     default:
       return "Risk engine event";
   }
@@ -73,7 +77,11 @@ export function useRiskFeed(): void {
         case "SessionStarted":
         case "TslActivated":
         case "TslRaised":
+        case "AutoShiftTriggered":
           toast.info(message, { duration: 8000 });
+          break;
+        case "AutoShiftExhausted":
+          toast.warning(message, { duration: 10000 });
           break;
       }
     });

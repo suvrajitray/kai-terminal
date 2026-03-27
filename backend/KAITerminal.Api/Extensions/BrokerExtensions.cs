@@ -1,5 +1,6 @@
 using KAITerminal.Api.Services;
 using KAITerminal.Broker;
+using KAITerminal.MarketData.Services;
 using KAITerminal.Broker.Adapters;
 using KAITerminal.MarketData.Extensions;
 using KAITerminal.Upstox;

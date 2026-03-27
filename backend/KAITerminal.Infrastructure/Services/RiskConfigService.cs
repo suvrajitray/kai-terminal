@@ -26,15 +26,19 @@ public sealed class RiskConfigService(AppDbContext db) : IRiskConfigService
         }
         else
         {
-            existing.Enabled            = config.Enabled;
-            existing.MtmTarget          = config.MtmTarget;
-            existing.MtmSl              = config.MtmSl;
-            existing.TrailingEnabled    = config.TrailingEnabled;
-            existing.TrailingActivateAt = config.TrailingActivateAt;
-            existing.LockProfitAt       = config.LockProfitAt;
-            existing.IncreaseBy         = config.IncreaseBy;
-            existing.TrailBy            = config.TrailBy;
-            existing.UpdatedAt          = DateTime.UtcNow;
+            existing.Enabled              = config.Enabled;
+            existing.MtmTarget            = config.MtmTarget;
+            existing.MtmSl                = config.MtmSl;
+            existing.TrailingEnabled      = config.TrailingEnabled;
+            existing.TrailingActivateAt   = config.TrailingActivateAt;
+            existing.LockProfitAt         = config.LockProfitAt;
+            existing.IncreaseBy           = config.IncreaseBy;
+            existing.TrailBy              = config.TrailBy;
+            existing.AutoShiftEnabled     = config.AutoShiftEnabled;
+            existing.AutoShiftThresholdPct = config.AutoShiftThresholdPct;
+            existing.AutoShiftMaxCount    = config.AutoShiftMaxCount;
+            existing.AutoShiftStrikeGap   = config.AutoShiftStrikeGap;
+            existing.UpdatedAt            = DateTime.UtcNow;
         }
 
         await db.SaveChangesAsync();

@@ -11,14 +11,18 @@ public static class RiskConfigEndpoints
 {
     private static readonly UserRiskConfig Defaults = new()
     {
-        Enabled            = false,
-        MtmTarget          = 25_000m,
-        MtmSl              = -25_000m,
-        TrailingEnabled    = true,
-        TrailingActivateAt = 12_000m,
-        LockProfitAt       = 2_000m,
-        IncreaseBy         = 99m,
-        TrailBy            = 33m,
+        Enabled               = false,
+        MtmTarget             = 25_000m,
+        MtmSl                 = -25_000m,
+        TrailingEnabled       = true,
+        TrailingActivateAt    = 12_000m,
+        LockProfitAt          = 2_000m,
+        IncreaseBy            = 99m,
+        TrailBy               = 33m,
+        AutoShiftEnabled      = false,
+        AutoShiftThresholdPct = 30m,
+        AutoShiftMaxCount     = 2,
+        AutoShiftStrikeGap    = 1,
     };
 
     public static void MapRiskConfigEndpoints(this IEndpointRouteBuilder app)

@@ -56,6 +56,10 @@ public sealed class DbUserTokenSource(
                 LockProfitAt          = x.r.LockProfitAt,
                 WhenProfitIncreasesBy = x.r.IncreaseBy,
                 IncreaseTrailingBy    = x.r.TrailBy,
+                AutoShiftEnabled      = x.r.AutoShiftEnabled,
+                AutoShiftThresholdPct = x.r.AutoShiftThresholdPct,
+                AutoShiftMaxCount     = x.r.AutoShiftMaxCount,
+                AutoShiftStrikeGap    = x.r.AutoShiftStrikeGap,
             })
             .ToList()
             .AsReadOnly();

@@ -99,7 +99,9 @@ export type RiskNotificationType =
   | "TslRaised"
   | "TslHit"
   | "SquareOffComplete"
-  | "SquareOffFailed";
+  | "SquareOffFailed"
+  | "AutoShiftTriggered"
+  | "AutoShiftExhausted";
 
 export interface RiskEvent {
   userId:            string;
@@ -111,6 +113,9 @@ export interface RiskEvent {
   tslFloor:          number | null;
   openPositionCount: number | null;
   timestamp:         string;
+  instrumentToken:   string | null;
+  newToken:          string | null;
+  shiftCount:        number | null;
 }
 
 // CamelCase matches the unified KAI Terminal OrderResponse DTO from the backend

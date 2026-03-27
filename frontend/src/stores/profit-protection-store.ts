@@ -9,17 +9,25 @@ export interface ProfitProtectionConfig {
   lockProfitAt: number;        // SL floor jumps to this value the moment trailing activates
   increaseBy: number;          // every time MTM gains this much from last step...
   trailBy: number;             // ...raise the SL floor by this much
+  autoShiftEnabled: boolean;
+  autoShiftThresholdPct: number;  // trigger when sell position LTP rises by this % from entry
+  autoShiftMaxCount: number;      // after this many shifts, exit the position
+  autoShiftStrikeGap: number;     // number of strikes to move per shift
 }
 
 export const defaults: ProfitProtectionConfig = {
-  enabled:            false,
-  mtmTarget:          Number(import.meta.env.VITE_PP_MTM_TARGET)            || 25000,
-  mtmSl:              Number(import.meta.env.VITE_PP_MTM_SL)                || -25000,
-  trailingEnabled:    import.meta.env.VITE_PP_TRAILING_ENABLED !== "false",
-  trailingActivateAt: Number(import.meta.env.VITE_PP_TRAILING_ACTIVATE_AT)  || 12000,
-  lockProfitAt:       Number(import.meta.env.VITE_PP_LOCK_PROFIT_AT)        || 2000,
-  increaseBy:         Number(import.meta.env.VITE_PP_INCREASE_BY)           || 99,
-  trailBy:            Number(import.meta.env.VITE_PP_TRAIL_BY)              || 33,
+  enabled:               false,
+  mtmTarget:             Number(import.meta.env.VITE_PP_MTM_TARGET)            || 25000,
+  mtmSl:                 Number(import.meta.env.VITE_PP_MTM_SL)                || -25000,
+  trailingEnabled:       import.meta.env.VITE_PP_TRAILING_ENABLED !== "false",
+  trailingActivateAt:    Number(import.meta.env.VITE_PP_TRAILING_ACTIVATE_AT)  || 12000,
+  lockProfitAt:          Number(import.meta.env.VITE_PP_LOCK_PROFIT_AT)        || 2000,
+  increaseBy:            Number(import.meta.env.VITE_PP_INCREASE_BY)           || 99,
+  trailBy:               Number(import.meta.env.VITE_PP_TRAIL_BY)              || 33,
+  autoShiftEnabled:      false,
+  autoShiftThresholdPct: 30,
+  autoShiftMaxCount:     2,
+  autoShiftStrikeGap:    1,
 };
 
 interface ProfitProtectionState {

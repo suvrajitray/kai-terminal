@@ -15,4 +15,10 @@ public class UserRiskConfig
     public decimal IncreaseBy { get; set; } = 99m;   // WhenProfitIncreasesBy
     public decimal TrailBy { get; set; } = 33m;      // IncreaseTrailingBy
     public DateTime UpdatedAt { get; set; }
+
+    // Auto-shift: per-position risk management for sell positions
+    public bool    AutoShiftEnabled      { get; set; } = false;
+    public decimal AutoShiftThresholdPct { get; set; } = 30m;  // 30 = trigger when LTP rises 30% from entry
+    public int     AutoShiftMaxCount     { get; set; } = 2;    // after this many shifts, exit the position
+    public int     AutoShiftStrikeGap    { get; set; } = 1;    // strikes to move per auto-shift
 }

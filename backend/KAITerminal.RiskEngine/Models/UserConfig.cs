@@ -18,4 +18,10 @@ public sealed record UserConfig
     public decimal LockProfitAt { get; init; } = 2_000m;
     public decimal WhenProfitIncreasesBy { get; init; } = 99m;
     public decimal IncreaseTrailingBy { get; init; } = 33m;
+
+    // Auto-shift config
+    public bool    AutoShiftEnabled      { get; init; } = false;
+    public decimal AutoShiftThresholdPct { get; init; } = 30m;
+    public int     AutoShiftMaxCount     { get; init; } = 2;
+    public int     AutoShiftStrikeGap    { get; init; } = 1;
 }

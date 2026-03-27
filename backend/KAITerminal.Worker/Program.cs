@@ -6,6 +6,8 @@ using KAITerminal.Contracts.Broker;
 using KAITerminal.Contracts.Streaming;
 using KAITerminal.Infrastructure.Extensions;
 using KAITerminal.MarketData.Extensions;
+using KAITerminal.MarketData.Services;
+using KAITerminal.RiskEngine.Abstractions;
 using KAITerminal.RiskEngine.Extensions;
 using KAITerminal.Upstox;
 using KAITerminal.Upstox.Extensions;
@@ -69,6 +71,11 @@ builder.Services.AddSingleton<IBrokerClientFactory>(sp =>
 // Register cross-broker token mapper before AddRiskEngine so it overrides the default IdentityTokenMapper.
 // ITokenMappingProvider (ZerodhaTokenMappingProvider) is registered via AddMarketDataProducer() above.
 builder.Services.AddSingleton<ITokenMapper, CrossBrokerTokenMapper>();
+
+// Register OptionStrikeService and AutoShiftEvaluator before AddRiskEngine so TryAddSingleton
+// in AddRiskEngine does not override IAutoShiftEvaluator with the null implementation.
+builder.Services.AddSingleton<OptionStrikeService>();
+builder.Services.AddSingleton<IAutoShiftEvaluator, AutoShiftEvaluator>();
 
 builder.Services.AddRiskEngine<DbUserTokenSource>(builder.Configuration);
 

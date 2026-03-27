@@ -14,18 +14,26 @@ interface RiskConfigDto {
   lockProfitAt: number;
   increaseBy: number;
   trailBy: number;
+  autoShiftEnabled: boolean;
+  autoShiftThresholdPct: number;
+  autoShiftMaxCount: number;
+  autoShiftStrikeGap: number;
 }
 
 function toDto(config: ProfitProtectionConfig): RiskConfigDto {
   return {
-    enabled:            config.enabled,
-    mtmTarget:          config.mtmTarget,
-    mtmSl:              config.mtmSl,
-    trailingEnabled:    config.trailingEnabled,
-    trailingActivateAt: config.trailingActivateAt,
-    lockProfitAt:       config.lockProfitAt,
-    increaseBy:         config.increaseBy,
-    trailBy:            config.trailBy,
+    enabled:               config.enabled,
+    mtmTarget:             config.mtmTarget,
+    mtmSl:                 config.mtmSl,
+    trailingEnabled:       config.trailingEnabled,
+    trailingActivateAt:    config.trailingActivateAt,
+    lockProfitAt:          config.lockProfitAt,
+    increaseBy:            config.increaseBy,
+    trailBy:               config.trailBy,
+    autoShiftEnabled:      config.autoShiftEnabled,
+    autoShiftThresholdPct: config.autoShiftThresholdPct,
+    autoShiftMaxCount:     config.autoShiftMaxCount,
+    autoShiftStrikeGap:    config.autoShiftStrikeGap,
   };
 }
 

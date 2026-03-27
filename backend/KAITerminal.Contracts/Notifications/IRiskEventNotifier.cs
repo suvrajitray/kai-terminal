@@ -12,11 +12,14 @@ public sealed record RiskNotification(
     string               Broker,
     RiskNotificationType Type,
     decimal              Mtm,
-    decimal?             Target           = null,
-    decimal?             Sl               = null,
-    decimal?             TslFloor         = null,
+    decimal?             Target            = null,
+    decimal?             Sl                = null,
+    decimal?             TslFloor          = null,
     int?                 OpenPositionCount = null,
-    DateTimeOffset       Timestamp        = default);
+    DateTimeOffset       Timestamp         = default,
+    string?              InstrumentToken   = null,   // position that triggered auto-shift
+    string?              NewToken          = null,   // new position opened (AutoShiftTriggered)
+    int?                 ShiftCount        = null);  // cumulative auto-shifts for this chain
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum RiskNotificationType
@@ -29,4 +32,6 @@ public enum RiskNotificationType
     TslHit,
     SquareOffComplete,
     SquareOffFailed,
+    AutoShiftTriggered,   // sell position shifted further OTM automatically
+    AutoShiftExhausted,   // max auto-shifts reached — position exited
 }
