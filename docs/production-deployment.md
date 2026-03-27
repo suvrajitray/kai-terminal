@@ -510,6 +510,34 @@ SERVER="azureuser@20.193.130.6"
 
 ---
 
+## Restarting Services
+
+### Frontend
+No restart needed — it's static files. Just copy the new build:
+```bash
+sudo cp -r /opt/kaiterminal/repo/frontend/dist/* /var/www/kaiterminal/
+sudo chown -R www-data:www-data /var/www/kaiterminal
+```
+
+### API
+```bash
+sudo systemctl restart kaiterminal-api
+```
+
+### Worker
+```bash
+sudo systemctl restart kaiterminal-worker
+```
+
+### All at once
+```bash
+sudo systemctl restart kaiterminal-api kaiterminal-worker
+```
+
+> Restart the Worker **outside market hours** (before 9:00 AM or after 3:35 PM IST) — it reconnects the Upstox WebSocket on startup.
+
+---
+
 ## Monitoring
 
 ```bash
