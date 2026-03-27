@@ -4,18 +4,16 @@ This guide deploys KAI Terminal on a single Azure VM running Ubuntu 24.04 LTS.
 
 ---
 
-## VM Assessment — B2as_v2
+## VM — D2as_v5
 
 | Spec | Value |
 |------|-------|
 | vCPUs | 2 (AMD EPYC) |
 | RAM | 8 GB |
 | Storage | Standard SSD |
-| Series | Bsas_v2 (burstable) |
+| Series | Dasv5 (general purpose, non-burstable) |
 
-**Verdict: Good choice for personal/small-team use.** The app runs 5 processes (API + Worker + Redis + PostgreSQL + Nginx) which comfortably fit in 8 GB.
-
-**One thing to watch:** The B-series VMs in Azure are *burstable* — they accumulate CPU credits during idle periods and spend them during spikes. During market hours (9:15–15:30 IST), the Worker runs continuously. If CPU credits drain, performance throttles to the baseline (20% of 1 vCPU). In practice the app's CPU load is very low, so this should not be an issue. Monitor the **CPU Credits Remaining** metric in Azure Monitor during the first few trading days. If credits regularly hit zero, consider upgrading to **D2as_v5** (non-burstable, similar cost).
+**Verdict: Solid choice for personal/small-team use.** The app runs 5 processes (API + Worker + Redis + PostgreSQL + Nginx) which comfortably fit in 8 GB. Unlike the B-series, the D2as_v5 delivers full 2 vCPU performance at all times — no CPU credit throttling during sustained market-hours load.
 
 ---
 
@@ -499,9 +497,6 @@ sudo -u postgres psql -c "SELECT pg_size_pretty(pg_database_size('kaiterminal'))
 
 # Disk space (PostgreSQL data lives in /var/lib/postgresql)
 df -h /
-
-# CPU credit balance (check in Azure Monitor portal)
-# Alert: CPU Credits Remaining < 20
 ```
 
 ---
