@@ -540,6 +540,7 @@ sudo systemctl restart kaiterminal-api kaiterminal-worker
 
 ## Monitoring
 
+### Service status and logs
 ```bash
 # Service status
 sudo systemctl status kaiterminal-api kaiterminal-worker redis postgresql nginx
@@ -556,6 +557,33 @@ sudo -u postgres psql -c "SELECT pg_size_pretty(pg_database_size('kaiterminal'))
 
 # Disk space
 df -h /
+```
+
+### Server performance
+
+**Quick — live terminal view:**
+```bash
+# Install once
+sudo apt install -y htop glances
+
+# htop — CPU, memory, processes
+htop
+
+# glances — CPU, memory, disk, network all on one screen
+glances
+```
+
+Press `q` to quit either tool.
+
+**Azure Portal — built-in charts (no setup needed):**
+
+Go to **Azure Portal → VM → Monitoring** for charts showing CPU %, memory, disk read/write, and network in/out over time.
+
+**Quick one-liners:**
+```bash
+free -h          # memory usage
+df -h /          # disk usage
+ss -tulnp        # active network connections
 ```
 
 ---
