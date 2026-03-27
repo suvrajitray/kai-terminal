@@ -11,7 +11,6 @@ public record struct UpstoxTokenRequest(
 public record struct UpdateAccessTokenRequest(string AccessToken);
 
 public record struct SaveUserTradingSettingsRequest(
-    decimal DefaultStoplossPercentage,
     int NiftyShiftOffset,
     int SensexShiftOffset,
     int BankniftyShiftOffset,

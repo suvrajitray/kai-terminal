@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { Settings2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 import { useUserTradingSettingsStore } from "@/stores/user-trading-settings-store";
 import { saveUserTradingSettings, type UserTradingSettings } from "@/services/user-settings-api";
 
@@ -24,7 +24,6 @@ const SHIFT_FIELDS: { key: keyof UserTradingSettings; label: string }[] = [
 export function UserTradingSettingsDialog({ open, onClose }: Props) {
   const store = useUserTradingSettingsStore();
   const [draft, setDraft] = useState<UserTradingSettings>(() => ({
-    defaultStoplossPercentage: store.defaultStoplossPercentage,
     niftyShiftOffset: store.niftyShiftOffset,
     sensexShiftOffset: store.sensexShiftOffset,
     bankniftyShiftOffset: store.bankniftyShiftOffset,
@@ -38,7 +37,6 @@ export function UserTradingSettingsDialog({ open, onClose }: Props) {
   useEffect(() => {
     if (!open) return;
     setDraft({
-      defaultStoplossPercentage: store.defaultStoplossPercentage,
       niftyShiftOffset: store.niftyShiftOffset,
       sensexShiftOffset: store.sensexShiftOffset,
       bankniftyShiftOffset: store.bankniftyShiftOffset,
@@ -73,24 +71,6 @@ export function UserTradingSettingsDialog({ open, onClose }: Props) {
         </DialogHeader>
 
         <div className="space-y-6 py-1">
-          {/* Default Stoploss */}
-          <div className="space-y-1.5">
-            <Label htmlFor="sl-pct">Default Stoploss Percentage (%)</Label>
-            <Input
-              id="sl-pct"
-              type="number"
-              min={0}
-              max={100}
-              value={draft.defaultStoplossPercentage}
-              onChange={(e) => set("defaultStoplossPercentage", Number(e.target.value))}
-            />
-            <p className="text-[11px] text-muted-foreground">
-              Applied as the default stop loss when placing option orders.
-            </p>
-          </div>
-
-          <Separator />
-
           {/* Index Change Mode */}
           <div className="space-y-1.5">
             <Label>Index Change Display</Label>
@@ -98,18 +78,18 @@ export function UserTradingSettingsDialog({ open, onClose }: Props) {
               <Button
                 type="button"
                 size="sm"
-                variant={draft.indexChangeMode === "open" ? "default" : "outline"}
-                onClick={() => setDraft((d) => ({ ...d, indexChangeMode: "open" }))}
-              >
-                From Open
-              </Button>
-              <Button
-                type="button"
-                size="sm"
                 variant={draft.indexChangeMode === "prevClose" ? "default" : "outline"}
                 onClick={() => setDraft((d) => ({ ...d, indexChangeMode: "prevClose" }))}
               >
                 From Prev Close
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={draft.indexChangeMode === "open" ? "default" : "outline"}
+                onClick={() => setDraft((d) => ({ ...d, indexChangeMode: "open" }))}
+              >
+                From Open
               </Button>
             </div>
             <p className="text-[11px] text-muted-foreground">
@@ -124,20 +104,34 @@ export function UserTradingSettingsDialog({ open, onClose }: Props) {
             <div>
               <p className="text-sm font-medium">Strike Gap</p>
               <p className="text-[11px] text-muted-foreground">
-                Number of strikes to move for Shift Up / Shift Down per index.
+                Number of strikes to move per Shift Up / Down.
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+            <div className="space-y-1.5">
               {SHIFT_FIELDS.map(({ key, label }) => (
-                <div key={key} className="space-y-1.5">
-                  <Label htmlFor={key}>{label}</Label>
-                  <Input
-                    id={key}
-                    type="number"
-                    min={0}
-                    value={draft[key] as number}
-                    onChange={(e) => set(key, Number(e.target.value))}
-                  />
+                <div key={key} className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/20 px-3 py-2">
+                  <span className="text-xs font-medium text-muted-foreground">{label}</span>
+                  <div className="flex h-7 overflow-hidden rounded-md border border-border/50">
+                    {[1, 2, 3, 4, 5].map((v) => {
+                      const active = (draft[key] as number) === v;
+                      return (
+                        <button
+                          key={v}
+                          type="button"
+                          onClick={() => set(key, v)}
+                          className={cn(
+                            "w-8 text-xs font-medium transition-colors",
+                            v > 1 && "border-l border-border/50",
+                            active
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground",
+                          )}
+                        >
+                          {v}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               ))}
             </div>

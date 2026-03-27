@@ -7,12 +7,11 @@ namespace KAITerminal.Api.Services;
 public class UserTradingSettingsService(AppDbContext db)
 {
     private static readonly UserTradingSettingsResponse Defaults = new(
-        DefaultStoplossPercentage: 30m,
-        NiftyShiftOffset: 5,
-        SensexShiftOffset: 10,
-        BankniftyShiftOffset: 10,
-        FinniftyShiftOffset: 5,
-        BankexShiftOffset: 10,
+        NiftyShiftOffset: 1,
+        SensexShiftOffset: 1,
+        BankniftyShiftOffset: 1,
+        FinniftyShiftOffset: 1,
+        BankexShiftOffset: 1,
         IndexChangeMode: "prevClose");
 
     public async Task<UserTradingSettingsResponse> GetAsync(string username)
@@ -23,7 +22,6 @@ public class UserTradingSettingsService(AppDbContext db)
         if (settings is null) return Defaults;
 
         return new UserTradingSettingsResponse(
-            settings.DefaultStoplossPercentage,
             settings.NiftyShiftOffset,
             settings.SensexShiftOffset,
             settings.BankniftyShiftOffset,
@@ -39,7 +37,6 @@ public class UserTradingSettingsService(AppDbContext db)
 
         if (existing is not null)
         {
-            existing.DefaultStoplossPercentage = request.DefaultStoplossPercentage;
             existing.NiftyShiftOffset = request.NiftyShiftOffset;
             existing.SensexShiftOffset = request.SensexShiftOffset;
             existing.BankniftyShiftOffset = request.BankniftyShiftOffset;
@@ -53,7 +50,6 @@ public class UserTradingSettingsService(AppDbContext db)
             db.UserTradingSettings.Add(new UserTradingSettings
             {
                 Username = username,
-                DefaultStoplossPercentage = request.DefaultStoplossPercentage,
                 NiftyShiftOffset = request.NiftyShiftOffset,
                 SensexShiftOffset = request.SensexShiftOffset,
                 BankniftyShiftOffset = request.BankniftyShiftOffset,

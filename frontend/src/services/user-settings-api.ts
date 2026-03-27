@@ -1,7 +1,6 @@
 import { apiClient } from "@/lib/api-client";
 
 export interface UserTradingSettings {
-  defaultStoplossPercentage: number;
   niftyShiftOffset: number;
   sensexShiftOffset: number;
   bankniftyShiftOffset: number;
@@ -11,7 +10,6 @@ export interface UserTradingSettings {
 }
 
 export const DEFAULT_TRADING_SETTINGS: UserTradingSettings = {
-  defaultStoplossPercentage: 30,
   niftyShiftOffset: 1,
   sensexShiftOffset: 1,
   bankniftyShiftOffset: 1,

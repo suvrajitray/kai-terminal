@@ -4,7 +4,6 @@ public class UserTradingSettings
 {
     public int Id { get; set; }
     public string Username { get; set; } = string.Empty;
-    public decimal DefaultStoplossPercentage { get; set; } = 30m;
     public int NiftyShiftOffset { get; set; } = 1;
     public int SensexShiftOffset { get; set; } = 1;
     public int BankniftyShiftOffset { get; set; } = 1;
