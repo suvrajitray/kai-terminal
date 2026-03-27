@@ -1,6 +1,6 @@
 using KAITerminal.Contracts.Options;
 
-namespace KAITerminal.Api.Services;
+namespace KAITerminal.MarketData.Services;
 
 /// <summary>
 /// Fetches the option chain and selects the best strike for a shift or by-price order.

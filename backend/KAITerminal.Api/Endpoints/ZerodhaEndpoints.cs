@@ -136,8 +136,14 @@ public static class ZerodhaEndpoints
             ILoggerFactory lf,
             CancellationToken ct) =>
         {
+            // "down" = lower premium (safer for sellers).
+            // CE: lower premium = higher strike → positive gap for "down".
+            // PE: lower premium = lower strike  → negative gap for "down".
+            bool isCe = request.InstrumentType.Equals("CE", StringComparison.OrdinalIgnoreCase);
+            var strikeGap = isCe
+                ? (request.Direction == "down" ? request.StrikeGap : -request.StrikeGap)
+                : (request.Direction == "up"   ? request.StrikeGap : -request.StrikeGap);
             // OptionStrikeService returns the Upstox instrument key (format: "{exchange}|{exchange_token}")
-            var strikeGap = request.Direction == "up" ? request.StrikeGap : -request.StrikeGap;
             var upstoxKey = await strikeSvc.FindByStrikeGapAsync(
                 request.UnderlyingKey, request.Expiry, request.InstrumentType,
                 request.CurrentStrike, strikeGap, ct);

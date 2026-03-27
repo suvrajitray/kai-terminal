@@ -2,6 +2,7 @@ using System.Security.Claims;
 using KAITerminal.Api.Mapping;
 using KAITerminal.Api.Models;
 using KAITerminal.Api.Services;
+using KAITerminal.MarketData.Services;
 using KAITerminal.Upstox;
 using KAITerminal.Upstox.Exceptions;
 using KAITerminal.Upstox.Models.Enums;
@@ -102,7 +103,13 @@ public static class UpstoxEndpoints
             ILoggerFactory lf,
             CancellationToken ct) =>
         {
-            var strikeGap = request.Direction == "up" ? request.StrikeGap : -request.StrikeGap;
+            // "down" = lower premium (safer for sellers).
+            // CE: lower premium = higher strike → positive gap for "down".
+            // PE: lower premium = lower strike  → negative gap for "down".
+            bool isCe = request.InstrumentType.Equals("CE", StringComparison.OrdinalIgnoreCase);
+            var strikeGap = isCe
+                ? (request.Direction == "down" ? request.StrikeGap : -request.StrikeGap)
+                : (request.Direction == "up"   ? request.StrikeGap : -request.StrikeGap);
             var targetKey = await strikeSvc.FindByStrikeGapAsync(
                 request.UnderlyingKey, request.Expiry, request.InstrumentType,
                 request.CurrentStrike, strikeGap, ct);
