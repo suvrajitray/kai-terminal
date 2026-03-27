@@ -1,13 +1,19 @@
 using KAITerminal.Contracts.Domain;
 using KAITerminal.Zerodha.Http;
+using Microsoft.Extensions.Logging;
 
 namespace KAITerminal.Zerodha.Services;
 
 public sealed class ZerodhaPositionService : IZerodhaPositionService
 {
-    private readonly ZerodhaHttpClient _http;
+    private readonly ZerodhaHttpClient              _http;
+    private readonly ILogger<ZerodhaPositionService> _logger;
 
-    public ZerodhaPositionService(ZerodhaHttpClient http) => _http = http;
+    public ZerodhaPositionService(ZerodhaHttpClient http, ILogger<ZerodhaPositionService> logger)
+    {
+        _http   = http;
+        _logger = logger;
+    }
 
     public Task<IReadOnlyList<Position>> GetAllPositionsAsync(CancellationToken ct = default)
         => _http.GetPositionsAsync(ct);
@@ -68,14 +74,24 @@ public sealed class ZerodhaPositionService : IZerodhaPositionService
         if (pos is null || pos.Quantity == 0) return;
 
         var txType   = pos.Quantity >= 0 ? "BUY" : "SELL";
-        var kiteOld  = MapProductBack(pos.Product);   // e.g. "MIS" or "NRML"
+        var kiteOld  = MapProductBack(pos.Product);
         var isFo     = pos.Exchange.Equals("NFO", StringComparison.OrdinalIgnoreCase)
                     || pos.Exchange.Equals("BFO", StringComparison.OrdinalIgnoreCase);
         var kiteNew  = kiteOld == "MIS" ? (isFo ? "NRML" : "CNC") : "MIS";
-        var posType  = kiteOld == "MIS" ? "day" : "overnight";
+
+        // position_type = "day"      → position opened today (sits in the day bucket)
+        // position_type = "overnight" → carried from a previous session (no trades today)
+        // Derived from day_buy_quantity / day_sell_quantity, NOT from the product type.
+        var dayNet  = pos.BuyQuantity - pos.SellQuantity;
+        var posType = Math.Abs(dayNet) >= Math.Abs(pos.Quantity) ? "day" : "overnight";
+
+        _logger.LogInformation(
+            "ConvertPosition — symbol={Symbol} exchange={Exchange} txType={TxType} posType={PosType} oldProduct={Old} newProduct={New} qty={Qty} (raw pos.Product={RawProduct} pos.Quantity={RawQty})",
+            pos.TradingSymbol, pos.Exchange, txType, posType, kiteOld, kiteNew, Math.Abs(quantity),
+            pos.Product, pos.Quantity);
 
         await _http.ConvertPositionAsync(
-            pos.TradingSymbol, pos.Exchange, txType, posType, kiteOld, kiteNew, quantity, ct);
+            pos.TradingSymbol, pos.Exchange, txType, posType, kiteOld, kiteNew, Math.Abs(quantity), ct);
     }
 
     /// <summary>Map unified product codes back to Kite product codes for order placement.</summary>

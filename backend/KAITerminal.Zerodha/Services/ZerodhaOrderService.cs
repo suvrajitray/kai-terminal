@@ -24,7 +24,7 @@ public sealed class ZerodhaOrderService : IZerodhaOrderService
         var isFoExchange = exchange is "NFO" or "BFO";
         var kiteProduct = request.Product.ToUpperInvariant() switch
         {
-            "I" or "MIS"                                      => "MIS",
+            "I" or "MIS" or "INTRADAY"                        => "MIS",
             "D" or "CNC" or "DELIVERY" when isFoExchange      => "NRML",
             "D" or "CNC" or "DELIVERY"                        => "CNC",
             _                                                 => "NRML",

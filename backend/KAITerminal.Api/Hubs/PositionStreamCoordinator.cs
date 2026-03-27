@@ -174,9 +174,21 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
 
             foreach (var pos in zerodhaPositions)
             {
-                if (!tokenLookup.TryGetValue(pos.InstrumentToken, out var exchangeToken)) continue;
+                if (!tokenLookup.TryGetValue(pos.InstrumentToken, out var exchangeToken))
+                {
+                    _logger.LogWarning(
+                        "PositionStreamCoordinator [{Id}]: no CSV match for Zerodha token '{Token}' (exchange={Exchange}) — live LTP will not update for this position",
+                        _connectionId, pos.InstrumentToken, pos.Exchange);
+                    continue;
+                }
                 var prefix = ExchangeToFeedPrefix(pos.Exchange);
-                if (prefix is null) continue;
+                if (prefix is null)
+                {
+                    _logger.LogWarning(
+                        "PositionStreamCoordinator [{Id}]: unsupported exchange '{Exchange}' for token '{Token}' — skipping",
+                        _connectionId, pos.Exchange, pos.InstrumentToken);
+                    continue;
+                }
                 map[$"{prefix}|{exchangeToken}"] = pos.InstrumentToken;
             }
         }
@@ -260,7 +272,7 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
         {
             if (_subscribedUpstoxTokens.Contains(feedToken))
                 relevant.Add(new { instrumentToken = feedToken, ltp });
-            else if (_zerodhaFeedToNative.TryGetValue(feedToken, out var native))
+            if (_zerodhaFeedToNative.TryGetValue(feedToken, out var native))
                 relevant.Add(new { instrumentToken = native, ltp });
         }
 

@@ -151,7 +151,14 @@ public sealed class ZerodhaHttpClient
 
         var http     = _httpFactory.CreateClient("ZerodhaApi");
         var response = await http.PutAsync("/portfolio/positions", new FormUrlEncodedContent(form), ct);
-        response.EnsureSuccessStatusCode();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(ct);
+            throw new HttpRequestException(
+                $"Kite position convert failed ({(int)response.StatusCode}): {body}",
+                null, response.StatusCode);
+        }
 
         var result = await response.Content.ReadFromJsonAsync<KiteEnvelope<bool>>(_json, ct)
             ?? throw new InvalidOperationException("Null response converting Zerodha position");

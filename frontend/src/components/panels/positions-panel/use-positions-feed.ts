@@ -70,7 +70,7 @@ export function usePositionsFeed(onOrderUpdate?: () => void) {
         const map = new Map(updates.map((u) => [u.instrumentToken, u.ltp]));
         return prev.map((p) => {
           const ltp = map.get(p.instrumentToken);
-          if (ltp === undefined || p.ltp === 0) return p;
+          if (ltp === undefined) return p;
           const pnl = p.pnl + p.quantity * (ltp - p.ltp);
           return { ...p, ltp, pnl };
         });
