@@ -1,6 +1,7 @@
 # Production Deployment Guide — Azure VM
 
 This guide deploys KAI Terminal on a single Azure VM running Ubuntu 24.04 LTS.
+Follow the steps **in order** — the sequence matters (NSG before Certbot, DNS before Certbot, temp Nginx before Certbot).
 
 ---
 
@@ -15,52 +16,7 @@ This guide deploys KAI Terminal on a single Azure VM running Ubuntu 24.04 LTS.
 
 **Verdict: Solid choice for personal/small-team use.** The app runs 5 processes (API + Worker + Redis + PostgreSQL + Nginx) which comfortably fit in 8 GB. Unlike the B-series, the D2as_v5 delivers full 2 vCPU performance at all times — no CPU credit throttling during sustained market-hours load.
 
----
-
-## Step 0 — Create the VM in Azure and Connect from Your Mac
-
-### 1. Create the VM in Azure Portal
-
-1. Go to **Azure Portal → Virtual Machines → Create**
-2. Choose:
-   - **Image**: Ubuntu Server 24.04 LTS
-   - **Size**: D2as_v5 (search "D2as_v5" in the size picker)
-   - **Authentication**: SSH public key
-   - **Username**: `azureuser`
-   - **SSH public key source**: Generate new key pair (Azure will let you download the `.pem` file) — or use your existing key
-   - **Inbound ports**: Allow SSH (22) for now; you'll lock it down after setup
-3. Under **Disks**: Standard SSD, 30 GB is enough
-4. Click **Review + Create → Create**
-5. Note the **Public IP address** from the VM overview page
-
-### 2. Set up your SSH key on Mac
-
-If you generated a new key pair in Azure, move the downloaded `.pem` to your SSH folder and fix permissions:
-
-```bash
-# Move the downloaded key (adjust filename to match what Azure gave you)
-mv ~/Downloads/kaiterminal_key.pem ~/.ssh/kaiterminal.pem
-chmod 600 ~/.ssh/kaiterminal.pem
-```
-
-Add a host alias so you never have to type the IP again. Open (or create) `~/.ssh/config` and add:
-
-```
-Host kaiterminal
-    HostName <YOUR-VM-PUBLIC-IP>
-    User azureuser
-    IdentityFile ~/.ssh/kaiterminal.pem
-```
-
-### 3. First SSH connection
-
-```bash
-ssh kaiterminal
-# Type "yes" when asked to confirm the host fingerprint
-# You should land at: azureuser@<vm-name>:~$
-```
-
-From here, all remaining commands in this guide are run **inside this SSH session** unless stated otherwise.
+> **Note:** D2as_v5 may have limited availability in Indian regions. Try **Central India** first. If unavailable, try `D2as_v4`, `D2s_v3`, or fall back to **UAE North** with D2as_v5.
 
 ---
 
@@ -82,9 +38,99 @@ localhost:8080  Seq                (Docker container, optional)
 
 ---
 
-## Prerequisites on the VM
+## Step 1 — Create VM in Azure and Connect from Mac
 
-> **Tip — run it all at once:** Copy the entire block below and paste it into your SSH session. It runs every step in order and takes about 5–10 minutes. Skip to [Create App User](#create-app-user) when it finishes.
+### Create the VM
+
+1. Go to **Azure Portal → Virtual Machines → Create**
+2. Choose:
+   - **Image**: Ubuntu Server 24.04 LTS
+   - **Size**: D2as_v5
+   - **Authentication**: SSH public key
+   - **Username**: `azureuser`
+   - **SSH public key source**: Generate new key pair — download the `.pem` file when prompted
+   - **Inbound ports**: Allow SSH (22) for now
+3. **Disks**: Standard SSD, 30 GB
+4. Click **Review + Create → Create**
+5. Note the **Public IP address** from the VM overview page
+
+### Set up SSH on your Mac
+
+```bash
+# Move the downloaded key and lock down permissions (SSH refuses keys readable by others)
+mv ~/Downloads/kaiterminal_key.pem ~/.ssh/kaiterminal.pem
+chmod 600 ~/.ssh/kaiterminal.pem
+```
+
+Add a host alias to `~/.ssh/config` so `ssh kaiterminal` just works:
+
+```
+Host kaiterminal
+    HostName <YOUR-VM-PUBLIC-IP>
+    User azureuser
+    IdentityFile ~/.ssh/kaiterminal.pem
+```
+
+Connect:
+
+```bash
+ssh kaiterminal
+# Type "yes" to confirm the host fingerprint
+# You should land at: azureuser@kaiterminal-vm:~$
+```
+
+All remaining commands are run **inside this SSH session** unless stated otherwise.
+
+---
+
+## Step 2 — Open Azure NSG Firewall Ports
+
+Do this **now** — Certbot needs port 80 reachable from the internet or it will fail.
+
+In **Azure Portal → VM → Networking → Inbound port rules**, add:
+
+| Priority | Name | Service | Source | Action |
+|----------|------|---------|--------|--------|
+| 100 | SSH | SSH (22) | **Your IP only** | Allow |
+| 110 | HTTP | HTTP (80) | Any | Allow |
+| 120 | HTTPS | HTTPS (443) | Any | Allow |
+| 1000 | DenyAll | Any (*) | Any | Deny |
+
+Use the **Service** dropdown (HTTP / HTTPS) — it auto-fills the port and protocol.
+
+**Critical:** Never expose ports 5001, 6379, 5341, or 8080 to the internet.
+
+---
+
+## Step 3 — Configure DNS in Hostinger
+
+Do this **before** running Certbot — certificates fail if DNS isn't pointing at your VM.
+
+1. Log in to Hostinger → **Domains → your domain → DNS / Zone Editor**
+2. Delete any existing A records and CNAME records for `@` and `www`
+3. Add these records for **each domain** (`.com` and `.in`):
+
+| Type | Name | Value | TTL |
+|------|------|-------|-----|
+| A | `@` | `<your VM public IP>` | 300 |
+| A | `www` | `<your VM public IP>` | 300 |
+
+4. Wait 5–15 minutes, then verify from your Mac:
+
+```bash
+dig kaiterminal.com +short        # must return your VM IP
+dig www.kaiterminal.com +short
+dig kaiterminal.in +short
+dig www.kaiterminal.in +short
+```
+
+> Do not proceed to Certbot until all four return the correct IP.
+
+---
+
+## Step 4 — Install Dependencies
+
+Paste this entire block into your SSH session. Takes about 5–10 minutes:
 
 ```bash
 # ── System update ──────────────────────────────────────────────────────────
@@ -125,193 +171,120 @@ echo "  dotnet: $(dotnet --version)"
 echo "  node:   $(node --version)"
 echo "  redis:  $(redis-cli ping)"
 echo "  psql:   $(psql --version)"
-echo ""
-echo "Next: create the PostgreSQL database, then continue with 'Create App User'."
 ```
 
-After the script finishes, create the PostgreSQL database (this needs interactive input):
-
+Verify Redis is bound to localhost only:
 ```bash
-sudo -u postgres psql
+sudo grep "^bind" /etc/redis/redis.conf
+# should show: bind 127.0.0.1 -::1
 ```
-
-```sql
-CREATE USER kaiuser WITH PASSWORD 'choose-a-strong-password';
-CREATE DATABASE kaiterminal OWNER kaiuser;
-GRANT ALL PRIVILEGES ON DATABASE kaiterminal TO kaiuser;
-\q
-```
-
-Verify the connection:
-```bash
-psql -U kaiuser -d kaiterminal -h localhost -c "SELECT version();"
-```
-
-Then skip ahead to [Create App User](#create-app-user).
 
 ---
 
-### Step-by-step (if you prefer to run each part separately)
+## Step 5 — Create PostgreSQL Database
 
-### 1. Initial system update
-
-```bash
-sudo apt update && sudo apt upgrade -y
-sudo apt install -y git curl unzip
-```
-
-### 2. Install .NET 10 SDK
-
-```bash
-wget https://dot.net/v1/dotnet-install.sh -O dotnet-install.sh
-chmod +x dotnet-install.sh
-sudo ./dotnet-install.sh --channel 10.0 --install-dir /usr/share/dotnet
-sudo ln -sf /usr/share/dotnet/dotnet /usr/bin/dotnet
-dotnet --version   # should be 10.x
-```
-
-### 3. Install Node.js 20 (for building the frontend)
-
-```bash
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs
-node --version   # 20+
-```
-
-### 4. Install Redis
-
-```bash
-sudo apt install -y redis-server
-sudo systemctl enable redis-server
-sudo systemctl start redis-server
-redis-cli ping   # PONG
-```
-
-Secure Redis — bind to localhost only (default on Ubuntu, verify):
-```bash
-grep "^bind" /etc/redis/redis.conf   # should show: bind 127.0.0.1 -::1
-```
-
-### 5. Install PostgreSQL
-
-```bash
-sudo apt install -y postgresql postgresql-contrib
-sudo systemctl enable postgresql
-sudo systemctl start postgresql
-```
-
-Create the database and user:
 ```bash
 sudo -u postgres psql
 ```
 
 ```sql
-CREATE USER kaiuser WITH PASSWORD 'choose-a-strong-password';
+CREATE USER kaiuser WITH PASSWORD 'your-strong-password';
 CREATE DATABASE kaiterminal OWNER kaiuser;
 GRANT ALL PRIVILEGES ON DATABASE kaiterminal TO kaiuser;
 \q
 ```
 
-Verify the connection:
+Verify:
 ```bash
 psql -U kaiuser -d kaiterminal -h localhost -c "SELECT version();"
-```
-
-PostgreSQL binds to localhost by default on Ubuntu — no extra hardening needed. Verify:
-```bash
-grep "^listen_addresses" /etc/postgresql/*/main/postgresql.conf
-# should show: listen_addresses = 'localhost'
 ```
 
 > The app uses `EnsureCreatedAsync` on startup — tables are created automatically on first run.
 
-### 6. Install Nginx
+---
+
+## Step 6 — Set Up GitHub SSH Key on VM
+
+Your Mac's SSH key doesn't transfer to the VM. Generate a new one:
 
 ```bash
-sudo apt install -y nginx
-sudo systemctl enable nginx
+ssh-keygen -t ed25519 -C "kaiterminal-vm"
+# Press Enter 3 times (accept defaults, no passphrase)
+
+cat ~/.ssh/id_ed25519.pub
 ```
 
-### 7. Install Certbot (Let's Encrypt SSL)
+Copy the output. Go to **GitHub → Settings → SSH and GPG keys → New SSH key**, paste and save.
 
+Test:
 ```bash
-sudo apt install -y certbot python3-certbot-nginx
-```
-
-### 8. Install Docker (optional — for Seq log viewer)
-
-```bash
-curl -fsSL https://get.docker.com | sudo sh
-sudo usermod -aG docker $USER   # then log out and back in
+ssh -T git@github.com
+# Hi <username>! You've successfully authenticated...
 ```
 
 ---
 
-## Create App User
-
-Run the app as a non-root user:
+## Step 7 — Create App User and Clone Repo
 
 ```bash
+# Create app user (runs services, no login shell)
 sudo useradd -r -s /bin/false -d /opt/kaiterminal kaiterm
-```
 
----
-
-## Build and Deploy
-
-### Clone the repo
-
-```bash
-sudo mkdir -p /opt/kaiterminal
-sudo chown $USER:$USER /opt/kaiterminal
-git clone <your-repo-url> /opt/kaiterminal/repo
-cd /opt/kaiterminal/repo
-```
-
-### Build the frontend
-
-Edit `frontend/.env.production` — replace `kaiterminal.com` with your actual domain:
-
-```bash
-sed -i 's/kaiterminal.com/kaiterminal.com/g' frontend/.env.production
-```
-
-Build:
-```bash
-cd frontend
-npm ci
-npm run build   # outputs to frontend/dist/
-```
-
-Deploy to Nginx root:
-```bash
+# Create directories
+sudo mkdir -p /opt/kaiterminal/{api,worker}
 sudo mkdir -p /var/www/kaiterminal
-sudo cp -r dist/* /var/www/kaiterminal/
-sudo chown -R www-data:www-data /var/www/kaiterminal
-```
+sudo chown $USER:$USER /opt/kaiterminal
 
-### Build the API
-
-```bash
-cd /opt/kaiterminal/repo/backend
-dotnet publish KAITerminal.Api -c Release -o /opt/kaiterminal/api
-sudo chown -R kaiterm:kaiterm /opt/kaiterminal/api
-```
-
-### Build the Worker
-
-```bash
-dotnet publish KAITerminal.Worker -c Release -o /opt/kaiterminal/worker
-sudo chown -R kaiterm:kaiterm /opt/kaiterminal/worker
+# Clone the repo
+git clone git@github.com:your-username/kaiterminal.git /opt/kaiterminal/repo
 ```
 
 ---
 
-## Secrets Configuration
+## Step 8 — SSL Certificates (Certbot)
 
-Secrets are passed via environment files that are **never committed to the repo**. ASP.NET Core reads them as environment variables that override appsettings.json.
+First, deploy a temporary minimal Nginx config so Certbot can verify domain ownership over port 80:
 
-### Create the secrets directory
+```bash
+sudo rm -f /etc/nginx/sites-enabled/default
+
+sudo bash -c 'cat > /etc/nginx/sites-enabled/kaiterminal' << 'EOF'
+server {
+    listen 80;
+    listen [::]:80;
+    server_name kaiterminal.com www.kaiterminal.com kaiterminal.in www.kaiterminal.in;
+    root /var/www/kaiterminal;
+    index index.html;
+    location / { try_files $uri $uri/ /index.html; }
+}
+EOF
+
+sudo nginx -t
+sudo systemctl restart nginx
+```
+
+Now run Certbot for both domains:
+
+```bash
+sudo certbot --nginx -d kaiterminal.com -d www.kaiterminal.com
+sudo certbot --nginx -d kaiterminal.in -d www.kaiterminal.in
+```
+
+Certbot auto-renews certificates every 90 days via a systemd timer.
+
+Now replace the temp config with the real one from the repo:
+
+```bash
+sudo cp /opt/kaiterminal/repo/deploy/nginx.conf /etc/nginx/sites-enabled/kaiterminal
+sudo nginx -t
+sudo systemctl restart nginx
+```
+
+---
+
+## Step 9 — Secrets Configuration
+
+Secrets are passed as environment variables via files that are **never committed to the repo**.
 
 ```bash
 sudo mkdir -p /etc/kaiterminal
@@ -363,132 +336,63 @@ sudo chown root:kaiterm /etc/kaiterminal/worker.env
 
 ---
 
-## Nginx Setup
+## Step 10 — Build and Deploy
 
-### Install site config
+### Build the frontend
 
 ```bash
-sudo cp /opt/kaiterminal/repo/deploy/nginx.conf /etc/nginx/sites-available/kaiterminal
-sudo ln -s /etc/nginx/sites-available/kaiterminal /etc/nginx/sites-enabled/
-sudo rm -f /etc/nginx/sites-enabled/default   # remove default site
-sudo nginx -t   # test config — fix any errors before continuing
+cd /opt/kaiterminal/repo/frontend
+npm ci
+npm run build   # outputs to frontend/dist/
+
+sudo cp -r dist/* /var/www/kaiterminal/
+sudo chown -R www-data:www-data /var/www/kaiterminal
 ```
 
-### Configure DNS in Hostinger
-
-Do this **before** running Certbot — certificates will fail if DNS isn't pointing at your VM yet.
-
-1. Log in to Hostinger → **Domains → your domain → DNS / Zone Editor**
-2. Add or update these records (do this for **each domain** you own — `.com` and `.in`):
-
-| Type | Name | Value | TTL |
-|------|------|-------|-----|
-| A | `@` | `<your VM public IP>` | 300 |
-| A | `www` | `<your VM public IP>` | 300 |
-
-- `@` = root domain (`kaiterminal.com`)
-- `www` = `www.kaiterminal.com`
-- Set TTL to **300** (5 minutes) so changes propagate quickly
-
-3. Wait 5–15 minutes, then verify propagation from your Mac before proceeding:
+### Build the API
 
 ```bash
-dig kaiterminal.com +short      # must return your VM IP
-dig www.kaiterminal.com +short
-dig kaiterminal.in +short       # if you have the .in domain
+cd /opt/kaiterminal/repo/backend
+dotnet publish KAITerminal.Api -c Release -o /opt/kaiterminal/api
+sudo chown -R kaiterm:kaiterm /opt/kaiterminal/api
 ```
 
-Or use `nslookup kaiterminal.com` if `dig` isn't installed.
-
-> Do not run Certbot until `dig` returns the correct IP. If it still shows the old value, wait a few more minutes and try again.
-
-### Obtain SSL certificates
+### Build the Worker
 
 ```bash
-# Primary domain
-sudo certbot --nginx -d kaiterminal.com -d www.kaiterminal.com
-
-# .in domain (used only for the redirect server block)
-sudo certbot --nginx -d kaiterminal.in -d www.kaiterminal.in
-```
-
-Certbot fills in the certificate paths in nginx.conf and sets up auto-renewal every 90 days via a systemd timer.
-
-### Start Nginx
-
-```bash
-sudo systemctl restart nginx
-sudo systemctl enable nginx
+dotnet publish KAITerminal.Worker -c Release -o /opt/kaiterminal/worker
+sudo chown -R kaiterm:kaiterm /opt/kaiterminal/worker
 ```
 
 ---
 
-## Systemd Services
-
-### Install service files
+## Step 11 — Systemd Services
 
 ```bash
 sudo cp /opt/kaiterminal/repo/deploy/kaiterminal-api.service    /etc/systemd/system/
 sudo cp /opt/kaiterminal/repo/deploy/kaiterminal-worker.service /etc/systemd/system/
 sudo systemctl daemon-reload
-```
 
-### Enable and start
-
-```bash
 sudo systemctl enable kaiterminal-api kaiterminal-worker
-sudo systemctl start  kaiterminal-api
-sleep 5   # give API a moment to start before Worker connects
-sudo systemctl start  kaiterminal-worker
+sudo systemctl start kaiterminal-api
+sleep 5   # give API a moment before Worker connects
+sudo systemctl start kaiterminal-worker
 ```
 
-### Verify they're running
-
+Verify:
 ```bash
 sudo systemctl status kaiterminal-api
 sudo systemctl status kaiterminal-worker
-journalctl -u kaiterminal-api -f        # tail live logs
+journalctl -u kaiterminal-api -f
 journalctl -u kaiterminal-worker -f
 ```
 
 ---
 
-## Seq (Optional — Structured Log Viewer)
+## Step 12 — UFW (VM-level Firewall)
 
-```bash
-docker run -d --name seq --restart unless-stopped \
-  -p 127.0.0.1:5341:5341 \
-  -p 127.0.0.1:8080:80 \
-  -e ACCEPT_EULA=Y \
-  -e SEQ_FIRSTRUN_ADMINPASSWORD=<choose-a-password> \
-  -v /opt/seq-data:/data \
-  datalust/seq:latest
-```
+Second layer of protection on top of Azure NSG:
 
-> Note: `-p 127.0.0.1:5341:5341` binds only to localhost — Seq is **not** accessible from the internet.
-
-Access Seq by SSH tunnel from your laptop:
-```bash
-ssh -L 8080:localhost:8080 <user>@<vm-ip>
-# then open http://localhost:8080 in your browser
-```
-
----
-
-## Azure Network Security Group (Firewall)
-
-In the Azure portal → VM → Networking → Inbound port rules, configure:
-
-| Priority | Name | Port | Source | Action |
-|----------|------|------|--------|--------|
-| 100 | SSH | 22 | **Your IP only** | Allow |
-| 110 | HTTP | 80 | Any | Allow |
-| 120 | HTTPS | 443 | Any | Allow |
-| 1000 | DenyAll | * | Any | Deny |
-
-**Critical:** Never expose ports 5001, 6379, 5341, or 8080 to the internet.
-
-Also enable UFW on the VM as a second layer:
 ```bash
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
@@ -500,116 +404,98 @@ sudo ufw enable
 
 ---
 
-## Google OAuth — Update Redirect URI
+## Step 13 — Google OAuth Redirect URIs
 
-In Google Cloud Console → OAuth 2.0 credentials, add **both** to **Authorized redirect URIs**:
+In **Google Cloud Console → OAuth 2.0 credentials**, add to **Authorized redirect URIs**:
 
 ```
 https://kaiterminal.com/auth/callback
 https://kaiterminal.in/auth/callback
 ```
 
-The `.in` entry isn't strictly necessary (since it redirects to `.com` before auth completes), but adding it prevents any edge-case issues. The `Frontend__Url` in `api.env` must be `https://kaiterminal.com`.
+The `Frontend__Url` in `api.env` must be `https://kaiterminal.com`.
+
+---
+
+## Step 14 — Seq (Optional — Structured Log Viewer)
+
+```bash
+docker run -d --name seq --restart unless-stopped \
+  -p 127.0.0.1:5341:5341 \
+  -p 127.0.0.1:8080:80 \
+  -e ACCEPT_EULA=Y \
+  -e SEQ_FIRSTRUN_ADMINPASSWORD=<choose-a-password> \
+  -v /opt/seq-data:/data \
+  datalust/seq:latest
+```
+
+Access via SSH tunnel from your Mac:
+```bash
+ssh -L 8080:localhost:8080 kaiterminal
+# then open http://localhost:8080
+```
 
 ---
 
 ## First-Time Setup Checklist
 
-- [ ] VM created, SSH key installed (`ssh-copy-id azureuser@<VM-IP>`)
-- [ ] Hostinger DNS — A records for `@` and `www` pointing to VM public IP (both .com and .in)
-- [ ] DNS propagation verified — `dig kaiterminal.com +short` returns VM IP
-- [ ] All dependencies installed (.NET, Node, Redis, PostgreSQL, Nginx, Certbot)
+- [ ] VM created (D2as_v5, Ubuntu 24.04 LTS)
+- [ ] SSH key moved to `~/.ssh/kaiterminal.pem`, `chmod 600`, `~/.ssh/config` alias set
+- [ ] Azure NSG — SSH (your IP only), HTTP (any), HTTPS (any), DenyAll configured
+- [ ] Hostinger DNS — A records for `@` and `www` pointing to VM IP (both .com and .in)
+- [ ] DNS propagation verified — all four `dig` commands return VM IP
+- [ ] All dependencies installed (.NET 10, Node 20, Redis, PostgreSQL, Nginx, Certbot)
 - [ ] PostgreSQL `kaiuser` + `kaiterminal` database created
+- [ ] GitHub SSH key generated on VM and added to GitHub
 - [ ] Repo cloned to `/opt/kaiterminal/repo`
-- [ ] First deploy run via `./deploy/deploy.sh` from Mac
+- [ ] App user `kaiterm` created
+- [ ] Temp Nginx config deployed → Certbot run for both domains → real nginx.conf deployed
 - [ ] `/etc/kaiterminal/api.env` created with all secrets
 - [ ] `/etc/kaiterminal/worker.env` created with all secrets
 - [ ] `Api__InternalKey` identical in both env files
-- [ ] Nginx config deployed and tested (`nginx -t`)
-- [ ] SSL certificate issued via Certbot
-- [ ] NSG rules configured (22 restricted, 80+443 open, rest blocked)
-- [ ] UFW enabled
+- [ ] Frontend + API + Worker built and deployed
 - [ ] Systemd services enabled and started
-- [ ] Passwordless sudo rule created (`/etc/sudoers.d/kaiterminal-deploy`)
-- [ ] `deploy/deploy.sh` — server IP set, tested with `./deploy/deploy.sh`
+- [ ] UFW enabled
 - [ ] Google OAuth redirect URI updated in Cloud Console
 - [ ] Log in with `suvrajit.ray@gmail.com` (auto-activated as admin)
 - [ ] Set Upstox analytics token via Admin page → restart Worker
 
 ---
 
-## Deploying from Your Mac
+## Deploying Updates from Your Mac
 
-After the one-time server setup, every update can be deployed directly from your Mac — no need to SSH in manually.
+After the one-time server setup, every update is deployed from your Mac.
 
 ### One-time Mac setup
 
-#### 1. Set up SSH key authentication
-
-If you haven't already, generate an SSH key and copy it to the server so you never type a password:
-
 ```bash
-# On your Mac — generate a key (skip if you already have one)
-ssh-keygen -t ed25519 -C "kaiterminal-deploy"
+# Set up passwordless sudo on the server for service restarts
+ssh kaiterminal
 
-# Copy it to the server (you'll type your password once, then never again)
-ssh-copy-id azureuser@<YOUR-VM-IP>
-
-# Test it works — should log in with no password prompt
-ssh azureuser@<YOUR-VM-IP>
-```
-
-#### 2. Allow passwordless sudo for service restarts (on the server)
-
-The deploy script runs `sudo systemctl restart` remotely. Set up a narrow sudoers rule so it works without a password prompt:
-
-```bash
-# SSH into the server first
-ssh azureuser@<YOUR-VM-IP>
-
-# Create a sudoers rule
 sudo tee /etc/sudoers.d/kaiterminal-deploy << 'EOF'
 azureuser ALL=(ALL) NOPASSWD: /bin/systemctl restart kaiterminal-api, \
                                /bin/systemctl restart kaiterminal-worker, \
                                /bin/chown -R kaiterm\:kaiterm /opt/kaiterminal/api, \
                                /bin/chown -R kaiterm\:kaiterm /opt/kaiterminal/worker
 EOF
-
 sudo chmod 440 /etc/sudoers.d/kaiterminal-deploy
-
-# Log out
 exit
 ```
 
-#### 3. Configure the deploy script
-
-Edit `deploy/deploy.sh` on your Mac — replace the server IP:
-
+Edit `deploy/deploy.sh` on your Mac — set the server IP:
 ```bash
-# In deploy/deploy.sh, change this line:
-SERVER="azureuser@<YOUR-VM-IP>"
-# to e.g.:
-SERVER="azureuser@20.10.50.100"
+SERVER="azureuser@20.193.130.6"
 ```
 
 ### Running a deploy
 
 ```bash
-# From the repo root on your Mac:
-
-# Deploy everything (frontend + API + Worker)
-./deploy/deploy.sh
-
-# Deploy frontend only (CSS/JS change)
-./deploy/deploy.sh --frontend
-
-# Deploy backend only (API/Worker code change)
-./deploy/deploy.sh --backend
+./deploy/deploy.sh             # full deploy (frontend + API + Worker)
+./deploy/deploy.sh --frontend  # frontend only
+./deploy/deploy.sh --backend   # API + Worker only
 ```
 
-The script builds locally on your Mac, transfers the compiled output via `rsync`, then restarts the services over SSH. A full deploy takes about 30–60 seconds.
-
-> Restart the Worker **outside market hours** (before 9:00 AM or after 3:35 PM IST) — it reconnects the Upstox WebSocket on startup.
+> Restart the Worker **outside market hours** (before 9:00 AM or after 3:35 PM IST).
 
 ---
 
@@ -619,19 +505,17 @@ The script builds locally on your Mac, transfers the compiled output via `rsync`
 # Service status
 sudo systemctl status kaiterminal-api kaiterminal-worker redis postgresql nginx
 
-# Live API logs
-journalctl -u kaiterminal-api -f --since "1h ago"
-
-# Live Worker logs
+# Live logs
+journalctl -u kaiterminal-api -f
 journalctl -u kaiterminal-worker -f
 
-# Redis memory usage
+# Redis memory
 redis-cli info memory | grep used_memory_human
 
-# PostgreSQL database size
+# PostgreSQL DB size
 sudo -u postgres psql -c "SELECT pg_size_pretty(pg_database_size('kaiterminal'));"
 
-# Disk space (PostgreSQL data lives in /var/lib/postgresql)
+# Disk space
 df -h /
 ```
 
@@ -642,7 +526,7 @@ df -h /
 | Process | Port | Accessible From |
 |---------|------|-----------------|
 | Nginx | 80, 443 | Internet (via NSG) |
-| KAITerminal.Api | 5001 (HTTP) | localhost only |
+| KAITerminal.Api | 5001 | localhost only |
 | KAITerminal.Worker | — | localhost only |
 | Redis | 6379 | localhost only |
 | PostgreSQL | 5432 | localhost only |
