@@ -21,8 +21,10 @@ A full-stack options trading terminal built for **options sellers** in Indian eq
 
 - **Live positions** — WebSocket-driven LTP + P&L updates via SignalR; live Wifi/WifiOff indicator
 - **Profit Protection** — backend Worker monitors MTM per user and fires exits on hard SL, target, or trailing SL
-- **Risk event alerts** — every risk trigger (SL hit, target hit, TSL activated/raised/fired, square-off) delivered as a browser toast in real time via a dedicated SignalR hub
-- **Quick Trade** — place options orders by premium or by chain (straddle/strangle), with live margin preview
+- **Auto Shift** — risk engine automatically shifts sell positions further OTM when premium rises by a configured %; exits the position after a configurable max number of shifts
+- **Risk event alerts** — every risk trigger (SL hit, target hit, TSL activated/raised/fired, square-off, auto-shift) delivered as a browser toast in real time via a dedicated SignalR hub
+- **Position shift** — manually shift any sell position up or down by a configurable strike gap; ↓ always means lower premium (safer/further OTM) for both CE and PE
+- **Quick Trade** — place options orders by premium or by chain (straddle/strangle), for both Upstox and Zerodha, with live margin preview
 - **AI Signals** — GPT-4o, Grok, Gemini, and Claude analyse the market in parallel every 15 minutes
 - **Multi-broker** — unified position/order DTOs regardless of broker; add a new broker by implementing two interfaces
 - **Option contracts** — live merged contract list from all connected brokers; cached daily until 8:15 AM IST
@@ -77,7 +79,7 @@ kai-terminal/
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
 - [Node.js 20+](https://nodejs.org/)
-- PostgreSQL database ([Neon](https://neon.tech) free tier works)
+- PostgreSQL 18 database ([Neon](https://neon.tech) free tier works, or local via `brew install postgresql@18`)
 - Redis (`redis-server` locally, or any managed Redis)
 - Upstox developer account with an app (API key + secret)
 - Google Cloud OAuth 2.0 app (Client ID + secret)
@@ -485,8 +487,12 @@ The Worker process monitors every enabled user's MTM and fires exit orders autom
 | Lock profit at | Floor is set to this value when TSL first activates |
 | When profit increases by | Raise floor every time MTM gains this much from last step |
 | Increase trailing by | Raise the floor by this amount per step |
+| Auto Shift enabled | Automatically shift sell positions further OTM when premium rises |
+| Threshold % | Shift when a sell position's LTP rises by this % from entry (e.g. `30`) |
+| Max shifts | Exit the position after this many auto-shifts (e.g. `2`) |
+| Strike gap | Number of strikes to move further OTM per shift (e.g. `1`) |
 
-Checks run in order: **Hard SL → Target → Trailing SL**.
+Checks run in order: **Hard SL → Target → Trailing SL → Auto Shift** (per sell position).
 
 ### Trailing SL Example
 
@@ -521,7 +527,7 @@ The Worker supervisor re-queries the DB every `UserRefreshIntervalMs` (default 6
 |---|---|
 | New user added to `UserRiskConfigs` | Session starts automatically within 60s |
 | User re-authenticates (fresh token today) | Session starts or resumes within 60s |
-| Risk config changed (SL, target, trailing, etc.) | Session restarts with new config; Redis state cleared |
+| Risk config changed (SL, target, trailing, auto-shift, etc.) | Session restarts with new config; Redis state cleared |
 | Access token rotated (new `UpdatedAt`) | Session restarts with new token |
 | User disabled or `UpdatedAt` is not today (IST) | Session stopped; no restart |
 
@@ -541,6 +547,8 @@ Every time a risk event fires, a toast notification appears in the browser immed
 | Hard SL hit | Red | MTM hits the hard stop loss |
 | TSL hit | Red | MTM falls to or below the trailing floor |
 | Square-off failed | Red | Exit order failed — manual action required |
+| Auto-shift triggered | Blue | A sell position was shifted further OTM automatically |
+| Auto-shift exhausted | Orange | Max auto-shifts reached — position exited |
 
 **How it works:**
 
@@ -636,6 +644,9 @@ All risk engine logs follow the format `{UserId} ({Broker})` and format monetary
 | TSL hit | Warn | `TSL HIT — user@email (upstox)  PnL ₹+3,000  ≤  floor ₹+3,025 — exiting all` |
 | Square-off complete | Warn | `Square-off complete — user@email (upstox) — all positions exited` |
 | Square-off failed | Error | `Square-off FAILED — user@email (upstox) — marked as squared-off; manual verification required` |
+| Auto-shift triggered | Info | `AutoShift NIFTY_2026-04-17_PE: shift 1+1 — closing NFO\|NIFTY..., opening NFO\|NIFTY...` |
+| Auto-shift exhausted | Warn | `AutoShift exhausted for user@email (upstox) — exiting NFO\|NIFTY... after 2 shifts` |
+| Auto-shift partial failure | Error | `AutoShift PARTIAL — close succeeded but open failed for user@email. Manual intervention required.` |
 | Session crash + restart | Warn | `Restarting session — user@email (upstox) in 30s` |
 
 ---

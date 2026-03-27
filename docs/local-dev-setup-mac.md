@@ -71,25 +71,22 @@ redis-cli ping   # should return PONG
 ### 6. Install PostgreSQL
 
 ```bash
-brew install postgresql
+brew install postgresql@18
 ```
 
 Start PostgreSQL (and auto-start on login):
 ```bash
-brew services start postgresql
+brew services start postgresql@18
 ```
 
-Create the database and user:
+Create the database and user (Homebrew uses your macOS login as the PostgreSQL superuser, so no `-U` flag needed):
 ```bash
-psql postgres
+psql -d postgres -c "CREATE USER kaiuser WITH PASSWORD 'kaipassword';"
+psql -d postgres -c "CREATE DATABASE kaiterminal OWNER kaiuser;"
+psql -d kaiterminal -c "GRANT ALL ON SCHEMA public TO kaiuser;"
 ```
 
-```sql
-CREATE USER kaiuser WITH PASSWORD 'kaipassword';
-CREATE DATABASE kaiterminal OWNER kaiuser;
-GRANT ALL PRIVILEGES ON DATABASE kaiterminal TO kaiuser;
-\q
-```
+> Making `kaiuser` the database **owner** avoids `permission denied for schema public` errors — a PostgreSQL 15+ behaviour change that affects `EnsureCreatedAsync`.
 
 Verify the connection:
 ```bash
@@ -239,6 +236,13 @@ CREATE TABLE IF NOT EXISTS "AppSettings" (
 DROP INDEX IF EXISTS "ix_userriskconfigs_username";
 CREATE UNIQUE INDEX IF NOT EXISTS "ix_userriskconfigs_username_broker"
   ON "UserRiskConfigs" ("Username", "BrokerType");
+
+-- Auto-shift columns (if upgrading from schema before auto-shift feature)
+ALTER TABLE "UserRiskConfigs"
+  ADD COLUMN IF NOT EXISTS "AutoShiftEnabled"      boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS "AutoShiftThresholdPct" numeric NOT NULL DEFAULT 30,
+  ADD COLUMN IF NOT EXISTS "AutoShiftMaxCount"     integer NOT NULL DEFAULT 2,
+  ADD COLUMN IF NOT EXISTS "AutoShiftStrikeGap"    integer NOT NULL DEFAULT 1;
 ```
 
 > Fresh databases created by `EnsureCreatedAsync` get all tables automatically — skip this section.
@@ -340,5 +344,5 @@ cd frontend && npm run lint
 | KAITerminal.Worker | — | Risk engine + market data WebSocket |
 | Frontend (Vite) | 3000 (HTTP) | React UI |
 | Redis | 6379 | LTP pub/sub (`ltp:feed`, `ltp:sub-req`) + app settings cache + SignalR backplane |
-| PostgreSQL | 5432 | Persistent storage |
+| PostgreSQL 18 | 5432 | Persistent storage |
 | Seq (Docker) | 5341 (ingest) / 8080 (UI) | Structured log viewer — `http://localhost:8080` |
