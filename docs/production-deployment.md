@@ -431,8 +431,19 @@ docker run -d --name seq --restart unless-stopped \
 
 Access via SSH tunnel from your Mac:
 ```bash
-ssh -L 8080:localhost:8080 kaiterminal
-# then open http://localhost:8080
+ssh -L 9080:localhost:8080 kaiterminal
+# then open http://localhost:9080
+```
+
+> Port 9080 is used on the Mac side to avoid conflicting with a local Seq instance running on 8080.
+
+**Set up log retention after first login** — otherwise logs will grow and fill the disk:
+
+Seq UI → **Settings → Retention → Add policy** → delete events older than **7 days**.
+
+Monitor disk usage occasionally:
+```bash
+du -sh /opt/seq-data
 ```
 
 ---
