@@ -118,7 +118,7 @@ _sessions: Dictionary<"{userId}::{brokerType}", SessionEntry>
            }
 ```
 
-**Lifetime:** Supervisor loop re-queries the DB every `UserRefreshIntervalMs` (30 s). Sessions are started/stopped/restarted dynamically as users are enabled or disabled in `UserRiskConfigs`.
+**Lifetime:** Supervisor loop re-queries the DB every `UserRefreshIntervalMs` (default 60 s). Sessions are started/stopped/restarted dynamically as users are enabled or disabled in `UserRiskConfigs`.
 
 **Notes:**
 - A session key includes `brokerType` — one session per user per broker (e.g. `user@email.com::upstox`).
@@ -141,12 +141,13 @@ _sessions: Dictionary<"{userId}::{brokerType}", SessionEntry>
 
 ```
 UserRiskState {
-  LastSessionDate:      DateOnly   // detects new trading day → auto-reset state
+  LastSessionDate:      DateOnly                        // detects new trading day → auto-reset state
   IsSquaredOff:         bool
   TrailingActive:       bool
-  TrailingStop:         decimal    // current TSL floor (₹)
-  TrailingLastTrigger:  decimal    // MTM at which TSL was last raised
-  ReentryCounts:        Dictionary<tradingSymbol, int>
+  TrailingStop:         decimal                         // current TSL floor (₹)
+  TrailingLastTrigger:  decimal                         // MTM at which TSL was last raised
+  ReentryCounts:        IReadOnlyDictionary<tradingSymbol, int>
+  AutoShiftCounts:      IReadOnlyDictionary<chainKey, int>  // tracks auto-shift counts per chain
 }
 ```
 
@@ -192,7 +193,7 @@ Survives Worker restarts — prevents TSL re-activation and duplicate square-off
 1. Check Redis — return immediately on hit.
 2. Fall back to PostgreSQL `AppSettings` table.
 3. Write-through: DB update always precedes Redis update.
-4. **Warm-up on Api startup** — `AppSettingService.WarmUpAsync()` pre-populates Redis from DB so the first request never hits Postgres.
+4. Redis is populated **lazily on first access** — no explicit warm-up on startup; first request after a restart may hit Postgres.
 
 ---
 
@@ -203,7 +204,7 @@ Survives Worker restarts — prevents TSL re-activation and duplicate square-off
 | `MasterDataService` | `IMemoryCache` | `contracts:{broker}:{date}` | `IReadOnlyList<IndexContracts>` | 8:15 AM IST daily |
 | `PositionCache` | `ConcurrentDictionary` | `userId` | positions + LTP map | Process lifetime |
 | `PositionStreamCoordinator` | in-process per-connection | — | token maps, order statuses | On SignalR disconnect |
-| `PositionStreamManager` | `ConcurrentDictionary` | `connectionId` | coordinator ref | On SignalR disconnect |
+| `PositionStreamManager` | `ConcurrentDictionary` | `connectionId` | `IAsyncDisposable` (coordinator) | On SignalR disconnect |
 | `IndexStreamManager` | `ConcurrentDictionary` | `connectionId` | event handler | On SignalR disconnect |
 | `StreamingRiskWorker` | `ConcurrentDictionary` | `userId` / `userId::broker` | gates + sessions | Dynamic (30 s DB refresh) |
 | `RedisRiskRepository` | Redis string | `risk-state:{userId}` | JSON `UserRiskState` | Indefinite |

@@ -56,13 +56,13 @@ kai-terminal/
 │   ├── KAITerminal.Api/           REST API + SignalR hubs
 │   │   ├── Endpoints/             Minimal API route groups
 │   │   ├── Hubs/                  PositionsHub, IndexHub, RiskHub
-│   │   ├── Services/              AdminMarketDataService, MasterDataService, …
+│   │   ├── Services/              MasterDataService, …
 │   │   └── Notifications/         SignalRRiskEventNotifier
 │   ├── KAITerminal.Worker/        Multi-user risk engine host
 │   │   └── Notifications/         HttpRiskEventNotifier
 │   ├── KAITerminal.Console/       Single-user risk engine host
 │   ├── KAITerminal.RiskEngine/    Risk logic library
-│   │   ├── Services/              RiskEvaluator, RedisLtpRelay
+│   │   ├── Services/              RiskEvaluator
 │   │   ├── State/                 PositionCache, RedisRiskRepository
 │   │   ├── Workers/               StreamingRiskWorker
 │   │   └── Notifications/         NullRiskEventNotifier (no-op default)
@@ -75,7 +75,7 @@ kai-terminal/
 │   ├── KAITerminal.Broker/        IBrokerClient, IBrokerClientFactory
 │   ├── KAITerminal.Upstox/        Upstox SDK — execution only (auth, orders, positions, funds, margin)
 │   ├── KAITerminal.Zerodha/       Zerodha SDK — execution only + margin; streaming stubbed
-│   ├── KAITerminal.MarketData/    Market data — quotes, candles, option chain/contracts, WebSocket feed, Kite CSV
+│   ├── KAITerminal.MarketData/    Market data — quotes, candles, option chain/contracts, WebSocket feed, Kite CSV, RedisLtpRelay
 │   ├── KAITerminal.Infrastructure/ EF Core + PostgreSQL
 │   └── KAITerminal.Auth/          OAuth + JWT helpers
 └── frontend/
@@ -138,9 +138,6 @@ dotnet user-secrets set "AiSentiment:OpenAiApiKey"   "sk-..."
 dotnet user-secrets set "AiSentiment:GrokApiKey"     "xai-..."
 dotnet user-secrets set "AiSentiment:GeminiApiKey"   "AIza..."
 dotnet user-secrets set "AiSentiment:ClaudeApiKey"   "sk-ant-..."
-
-# Application Insights (optional)
-dotnet user-secrets set "ApplicationInsights:ConnectionString" "InstrumentationKey=...;IngestionEndpoint=..."
 ```
 
 ```bash
@@ -151,7 +148,6 @@ dotnet user-secrets set "ConnectionStrings:DefaultConnection" \
 dotnet user-secrets set "ConnectionStrings:Redis"    "localhost:6379"
 dotnet user-secrets set "Api:InternalKey"  "<same-uuid-as-above>"
 dotnet user-secrets set "Api:BaseUrl"      "https://localhost:5001"
-dotnet user-secrets set "ApplicationInsights:ConnectionString" "..."
 ```
 
 ```bash
@@ -160,8 +156,8 @@ cd ../KAITerminal.Console
 dotnet user-secrets set "Upstox:AccessToken" "<your-daily-upstox-token>"
 ```
 
-> [!NOTE] Admin Broker Account
-> The API uses one shared Upstox connection for all market data. Set `AdminBroker:BrokerType` in `KAITerminal.Api/appsettings.json` (default `"upstox"`). The access token is read automatically from the `BrokerCredentials` DB table — whichever admin user authenticated with that broker most recently is used. No separate secret is needed.
+> [!NOTE] Analytics Token
+> The Worker uses one shared Upstox WebSocket for all market data. The analytics token is stored in the `AppSettings` DB table (key `UpstoxAnalyticsToken`) and set via **Settings → Admin → Analytics Token** in the UI or `PUT /api/admin/analytics-token`. No separate secret is needed — it persists in the database.
 
 ### 3. Google OAuth
 
@@ -229,7 +225,7 @@ Open `http://localhost:3000` and sign in with Google.
 3. After login you receive a `request_token` — exchange it: `POST /api/zerodha/access-token`
 
 > [!NOTE]
-> Zerodha real-time streaming is not yet implemented. Position updates require a manual refresh. Risk monitoring for Zerodha users will not fire exit orders until streaming is added.
+> Zerodha portfolio/order streaming is stubbed — order status toasts (`ReceiveOrderUpdate`) will not appear for Zerodha orders. However, live LTP is sourced from the shared Upstox market-data feed via `exchange_token` mapping, so position P&L updates and risk monitoring (Profit Protection) work fully for Zerodha users.
 
 ---
 
@@ -252,25 +248,27 @@ KAITerminal.Console     ── RiskEngine (single-user host)
 
 **Adding a new broker** (e.g. Dhan): create `KAITerminal.Dhan`, implement `IBrokerClient`, register in `BrokerExtensions`. Add an `IOptionContractProvider` implementation to `KAITerminal.MarketData` and register it in `AddMarketDataConsumer()`/`AddMarketDataProducer()`. Zero changes to RiskEngine, Contracts, or Infrastructure.
 
-### Shared Market Data (Admin Account + Redis)
+### Shared Market Data (Analytics Token + Redis)
 
-All LTP ticks flow through a single shared connection owned by an admin broker account — not per-user connections. This eliminates WebSocket slot exhaustion regardless of how many browser tabs or risk users are active.
+All LTP ticks flow through a single shared Upstox WebSocket connection managed by the Worker process — not per-user connections. This eliminates WebSocket slot exhaustion regardless of how many browser tabs or risk users are active.
 
 ```
-Admin broker account (Upstox)
-  └── AdminMarketDataService  (IHostedService, KAITerminal.Api)
-        └── UpstoxMarketDataStreamer  (KAITerminal.MarketData, single WebSocket)
+Worker process
+  └── MarketDataService  (IHostedService, KAITerminal.MarketData, AddMarketDataProducer)
+        └── UpstoxMarketDataStreamer  (single Upstox WebSocket, analytics token)
               LTP ticks
-               ├── FeedReceived event  ──→  PositionStreamCoordinator (per browser tab)
-               └── Redis pub/sub "ltp:feed"  ──→  Worker process
-                                                     └── RedisLtpRelay (IHostedService)
-                                                           └── FeedReceived event
-                                                                 └── StreamingRiskWorker
+               └── Redis pub/sub "ltp:feed"
+                     └── Api process
+                           └── RedisLtpRelay  (IHostedService, KAITerminal.MarketData, AddMarketDataConsumer)
+                                 └── ISharedMarketDataService.FeedReceived event
+                                       ├── PositionStreamCoordinator (per browser tab)
+                                       ├── IndexHub (live index quotes)
+                                       └── StreamingRiskWorker
 ```
 
-The `ISharedMarketDataService` interface (defined in `KAITerminal.Contracts`) decouples all consumers from the underlying WebSocket implementation. Swapping to TrueData or an NSE direct feed requires only a new `ISharedMarketDataService` implementation — zero changes to the risk engine, hubs, or any consumer.
+The `ISharedMarketDataService` interface (defined in `KAITerminal.Contracts`) decouples all consumers from the underlying transport. In the Worker it is backed by `MarketDataService` (live WebSocket); in the Api by `RedisLtpRelay` (Redis subscriber). Swapping to TrueData or an NSE direct feed requires only a new `ISharedMarketDataService` implementation — zero changes to the risk engine, hubs, or any consumer.
 
-Market data services (`IMarketQuoteService`, `IChartDataService`, `IZerodhaInstrumentService`) and option contract/chain providers all live in `KAITerminal.MarketData` — the only project with market data HTTP calls. They use the admin analytics token, resolved per-call via `IServiceScopeFactory`.
+Market data services (`IMarketQuoteService`, `IChartDataService`, `IZerodhaInstrumentService`) and option contract/chain providers all live in `KAITerminal.MarketData` — the only project with market data HTTP calls. They use the admin analytics token stored via `AppSettingService`, resolved per-call via `IServiceScopeFactory`.
 
 ---
 
@@ -612,7 +610,7 @@ The `RiskEngine` section in `KAITerminal.Worker/appsettings.json` controls worke
 | `UserRefreshIntervalMs` | 60,000 | How often the supervisor re-queries DB for user/config changes |
 | `Exchanges` | `["NFO","BFO"]` | Only positions from these exchanges are included in MTM |
 
-The `AdminBroker:BrokerType` key in `KAITerminal.Api/appsettings.json` sets which broker's admin account owns the shared market data connection (default `"upstox"`).
+The analytics token used by the shared market data connection is stored in the DB (`AppSettings` key `UpstoxAnalyticsToken`) — set it via the admin UI or `PUT /api/admin/analytics-token`.
 
 ### API Log Messages
 
@@ -730,7 +728,7 @@ using (UpstoxTokenContext.Use(currentUser.UpstoxToken))
 
 ### Market Data Streamer
 
-The WebSocket feed is implemented by `UpstoxMarketDataStreamer` in `KAITerminal.MarketData` — not in `KAITerminal.Upstox`. In the application it is managed exclusively by `AdminMarketDataService` via the `ISharedMarketDataService` interface.
+The WebSocket feed is implemented by `UpstoxMarketDataStreamer` in `KAITerminal.MarketData` — not in `KAITerminal.Upstox`. In the application it is managed by `MarketDataService` (Worker) and consumed by `RedisLtpRelay` (Api), both via the `ISharedMarketDataService` interface.
 
 | FeedMode | Data included |
 |---|---|
@@ -796,81 +794,63 @@ PostgreSQL via [Neon](https://neon.tech). Tables are created automatically on fi
 
 ## Logging & Observability
 
-All backend logging uses `Microsoft.Extensions.Logging`. When `ApplicationInsights:ConnectionString` is set, logs are forwarded to Azure Application Insights. When unset, all logs go to console only — no configuration required for local development.
+Both `KAITerminal.Api` and `KAITerminal.Worker` use **Serilog** with two sinks:
 
-### Setting Up App Insights
-
-```bash
-# Set in each project that sends telemetry
-dotnet user-secrets set "ApplicationInsights:ConnectionString" "InstrumentationKey=...;IngestionEndpoint=..."
-```
-
-App Insights registration is guarded by a connection string check — the SDK is only registered when the value is non-empty.
-
-### How ILogger Maps to App Insights
-
-| `ILogger` call | App Insights telemetry type |
-|---|---|
-| `LogDebug` / `LogInformation` / `LogWarning` | **Trace** (with corresponding severity level) |
-| `LogError` / `LogCritical` | **Exception** (includes full stack trace) |
-
-All structured log properties (e.g. `{UserId}`, `{Mtm}`) are promoted to custom dimensions — filterable in Log Analytics.
+- **Console** — structured text, always active
+- **Seq** — structured log server at `http://localhost:5341` (local dev) or your hosted Seq instance. No logs are lost if Seq is unavailable — Serilog buffers and retries.
 
 ### Log Levels
 
-**Worker / Console** (`appsettings.json`):
-```json
-"Logging": {
-  "LogLevel": {
-    "Default": "Information",
-    "KAITerminal.RiskEngine": "Information",
-    "KAITerminal.Upstox": "Warning"
-  },
-  "ApplicationInsights": {
-    "LogLevel": {
-      "Default": "Warning",
-      "KAITerminal.RiskEngine": "Information",
-      "KAITerminal.Upstox": "Warning"
-    }
-  }
-}
-```
+**Worker** (`appsettings.json` — `Serilog.MinimumLevel.Override`):
 
-App Insights receives all `KAITerminal.RiskEngine` logs at `Information+` — this captures the 15-second heartbeat, enabling **Azure Monitor availability alerts** (e.g. "alert if no heartbeat for 20+ minutes during market hours").
+| Namespace | Level |
+|---|---|
+| Default | `Information` |
+| `Microsoft`, `System` | `Warning` |
+| `KAITerminal.Upstox`, `KAITerminal.Zerodha` | `Warning` |
 
 **API** (`appsettings.json`):
+
+| Namespace | Level |
+|---|---|
+| Default | `Information` |
+| `Microsoft`, `Microsoft.AspNetCore`, `Microsoft.EntityFrameworkCore`, `System` | `Warning` |
+
+All structured log properties (e.g. `{UserId}`, `{Mtm}`) are automatically captured as Seq event properties — filterable and searchable in the Seq UI.
+
+### Configuring Seq
+
+Update the `Serilog.WriteTo[Seq].serverUrl` in `appsettings.json` (or override via environment variable / user-secrets) for both Api and Worker:
+
 ```json
-"ApplicationInsights": {
-  "LogLevel": {
-    "Default": "Warning",
-    "UpstoxEndpoints": "Information",
-    "ZerodhaEndpoints": "Information",
-    "BrokerCredentialsEndpoints": "Information",
-    "KAITerminal.Auth.AuthEndpoints": "Information",
-    "KAITerminal.Api.Hubs": "Information"
-  }
+"Serilog": {
+  "WriteTo": [
+    { "Name": "Seq", "Args": { "serverUrl": "http://your-seq-host:5341" } }
+  ]
 }
 ```
 
-This captures all order placement, exit, cancel, auth, and credential operations in App Insights while keeping noisy framework logs at `Warning`.
+For local development `seq` can be run via Docker:
 
-### Suggested Azure Monitor Alerts
+```bash
+docker run -d --name seq -e ACCEPT_EULA=Y -p 5341:80 datalust/seq
+```
 
-| Alert | Condition |
+### Suggested Seq Alerts
+
+| Alert | Signal |
 |---|---|
-| Risk engine down during market hours | No `"Market open"` trace in 20-min window |
-| Square-off failure | Any `"Square-off FAILED"` trace |
-| Session crash loop | More than 3 `"Restarting session"` traces in 10 min |
-| High API error rate | More than 10 Upstox exceptions in 5 min |
-| Repeated order rejections | More than 3 `"Order placed"` traces where response contains rejected status in 5 min |
-| Auth failures | More than 5 `"Google OAuth callback failed"` traces in 10 min |
+| Risk engine down during market hours | No `"Market open"` event in 20-min window |
+| Square-off failure | Any `"Square-off FAILED"` event |
+| Session crash loop | More than 3 `"Restarting session"` events in 10 min |
+| Auth failures | More than 5 `"Google OAuth callback failed"` events in 10 min |
 
 ### Troubleshooting
 
 **Risk engine not evaluating despite open positions:**
 1. Check for `Market closed` — `TradingWindowStart/End` or `TradingTimeZone` may be wrong.
 2. Check for no active sessions — `UserRiskConfigs.Enabled` may be `false`, or the token `UpdatedAt` is not today (re-authenticate).
-3. Check `AdminMarketDataService` logs — if the admin LTP feed is disconnected, no ticks reach the evaluator.
+3. Check `MarketDataService` logs in the Worker — if the shared Upstox WebSocket is disconnected, no ticks reach the evaluator.
 
 **User session not starting for a new user:**
 1. Confirm `UserRiskConfigs.Enabled = true` and the broker credential was updated today (IST).
@@ -943,8 +923,8 @@ az webapp config set \
 
 | File | Key settings |
 |---|---|
-| `backend/KAITerminal.Api/appsettings.json` | `Jwt:*`, `GoogleAuth:*`, `Frontend:Url`, `Upstox:ApiBaseUrl/HftBaseUrl`, `Api:BaseUrl/InternalKey`, `AdminBroker:BrokerType`, `AiSentiment:*`, `ApplicationInsights:ConnectionString` |
-| `backend/KAITerminal.Worker/appsettings.json` | `RiskEngine:*`, `Api:BaseUrl`, `Api:InternalKey`, `ConnectionStrings:DefaultConnection` |
+| `backend/KAITerminal.Api/appsettings.json` | `Jwt:*`, `GoogleAuth:*`, `Frontend:Url`, `Upstox:ApiBaseUrl/HftBaseUrl`, `Api:InternalKey`, `AiSentiment:*`, `Serilog:*` |
+| `backend/KAITerminal.Worker/appsettings.json` | `RiskEngine:*`, `Api:BaseUrl`, `Api:InternalKey`, `ConnectionStrings:DefaultConnection`, `Serilog:*` |
 | `backend/KAITerminal.Console/appsettings.json` | `Upstox:AccessToken`, `RiskEngine:*` |
 | `frontend/.env` | `VITE_API_URL`, `VITE_PP_MTM_TARGET`, `VITE_PP_MTM_SL`, other PP defaults |
 
