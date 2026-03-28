@@ -1,3 +1,19 @@
+---
+tags:
+  - overview
+  - architecture
+  - api-reference
+  - kaiterminal
+aliases:
+  - KAI Terminal
+  - Overview
+related:
+  - "[[local-dev-setup-mac]]"
+  - "[[production-deployment]]"
+  - "[[deployment-concepts]]"
+  - "[[flows]]"
+---
+
 # KAI Terminal
 
 A full-stack options trading terminal built for **options sellers** in Indian equity derivatives (NFO/BFO). Live positions, real-time P&L, automated profit protection, AI market signals, and instant risk event alerts pushed to the browser the moment they fire.
@@ -93,7 +109,7 @@ kai-terminal/
 ### 1. Clone
 
 ```bash
-git clone <repo-url>
+git clone git@github.com:suvrajitray/kai-terminal.git
 cd kai-terminal
 ```
 
@@ -144,7 +160,8 @@ cd ../KAITerminal.Console
 dotnet user-secrets set "Upstox:AccessToken" "<your-daily-upstox-token>"
 ```
 
-> **Admin broker account:** The API uses one shared Upstox connection for all market data. Set `AdminBroker:BrokerType` in `KAITerminal.Api/appsettings.json` (default `"upstox"`). The access token is read automatically from the `BrokerCredentials` DB table — whichever admin user authenticated with that broker most recently is used. No separate secret is needed.
+> [!NOTE] Admin Broker Account
+> The API uses one shared Upstox connection for all market data. Set `AdminBroker:BrokerType` in `KAITerminal.Api/appsettings.json` (default `"upstox"`). The access token is read automatically from the `BrokerCredentials` DB table — whichever admin user authenticated with that broker most recently is used. No separate secret is needed.
 
 ### 3. Google OAuth
 
@@ -189,7 +206,8 @@ cd frontend && npm run dev
 
 Open `http://localhost:3000` and sign in with Google.
 
-> **First login:** Your account is created with `IsActive=false`. The email `suvrajit.ray@gmail.com` is auto-activated as admin. All other users must be activated manually in the `AppUsers` table in the database.
+> [!NOTE] First Login
+> Your account is created with `IsActive=false`. The email `suvrajit.ray@gmail.com` is auto-activated as admin. All other users must be activated manually in the `AppUsers` table in the database.
 
 ---
 
@@ -201,6 +219,7 @@ Open `http://localhost:3000` and sign in with Google.
 2. Click **Authenticate** → Upstox OAuth page opens → approve access
 3. You are redirected back to `/redirect/upstox` which exchanges the code, saves the token to DB, and navigates to `/terminal`
 
+> [!WARNING]
 > Upstox access tokens expire daily. Re-authenticate each morning before trading. The risk engine Worker automatically detects stale tokens (credentials not updated today) and excludes those users.
 
 ### Zerodha
@@ -209,6 +228,7 @@ Open `http://localhost:3000` and sign in with Google.
 2. `GET /api/zerodha/auth-url?apiKey=<key>` returns the Kite Connect login URL
 3. After login you receive a `request_token` — exchange it: `POST /api/zerodha/access-token`
 
+> [!NOTE]
 > Zerodha real-time streaming is not yet implemented. Position updates require a manual refresh. Risk monitoring for Zerodha users will not fire exit orders until streaming is added.
 
 ---
@@ -531,7 +551,8 @@ The Worker supervisor re-queries the DB every `UserRefreshIntervalMs` (default 6
 | Access token rotated (new `UpdatedAt`) | Session restarts with new token |
 | User disabled or `UpdatedAt` is not today (IST) | Session stopped; no restart |
 
-> **Token freshness:** Only credentials where `BrokerCredentials.UpdatedAt` falls on or after today's midnight IST are considered valid. A token from a previous day is treated as absent — re-authenticate to resume.
+> [!IMPORTANT] Token Freshness
+> Only credentials where `BrokerCredentials.UpdatedAt` falls on or after today's midnight IST are considered valid. A token from a previous day is treated as absent — re-authenticate to resume.
 
 ### Risk Event Notifications
 

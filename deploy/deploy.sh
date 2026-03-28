@@ -18,7 +18,7 @@
 set -euo pipefail
 
 # ── Config ────────────────────────────────────────────────────────────────────
-SERVER="azureuser@<YOUR-VM-IP>"   # ← replace with your Azure VM public IP
+SERVER="azureuser@20.193.130.6"
 REMOTE_APP_DIR="/opt/kaiterminal"
 REMOTE_WEB_DIR="/var/www/kaiterminal"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"

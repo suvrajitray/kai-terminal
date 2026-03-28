@@ -1,3 +1,18 @@
+---
+tags:
+  - deployment
+  - production
+  - azure
+  - devops
+aliases:
+  - Production Deployment
+  - Azure Deployment
+related:
+  - "[[deployment-concepts]]"
+  - "[[local-dev-setup-mac]]"
+  - "[[flows]]"
+---
+
 # Production Deployment Guide — Azure VM
 
 This guide deploys KAI Terminal on a single Azure VM running Ubuntu 24.04 LTS.
@@ -5,7 +20,7 @@ Follow the steps **in order** — the sequence matters (NSG before Certbot, DNS 
 
 ---
 
-## VM — D2as_v5
+## VM — D2as_v6
 
 | Spec | Value |
 |------|-------|
@@ -14,9 +29,10 @@ Follow the steps **in order** — the sequence matters (NSG before Certbot, DNS 
 | Storage | Standard SSD |
 | Series | Dasv5 (general purpose, non-burstable) |
 
-**Verdict: Solid choice for personal/small-team use.** The app runs 5 processes (API + Worker + Redis + PostgreSQL + Nginx) which comfortably fit in 8 GB. Unlike the B-series, the D2as_v5 delivers full 2 vCPU performance at all times — no CPU credit throttling during sustained market-hours load.
+**Verdict: Solid choice for personal/small-team use.** The app runs 5 processes (API + Worker + Redis + PostgreSQL + Nginx) which comfortably fit in 8 GB. Unlike the B-series, the D2as_v6 delivers full 2 vCPU performance at all times — no CPU credit throttling during sustained market-hours load.
 
-> **Note:** D2as_v5 may have limited availability in Indian regions. Try **Central India** first. If unavailable, try `D2as_v4`, `D2s_v3`, or fall back to **UAE North** with D2as_v5.
+> [!NOTE]
+> D2as_v6 may have limited availability in Indian regions. Try **Central India** first. If unavailable, try `D2as_v4`, `D2s_v3`, or fall back to **UAE North** with D2as_v6.
 
 ---
 
@@ -45,7 +61,7 @@ localhost:8080  Seq                (Docker container, optional)
 1. Go to **Azure Portal → Virtual Machines → Create**
 2. Choose:
    - **Image**: Ubuntu Server 24.04 LTS
-   - **Size**: D2as_v5
+   - **Size**: D2as_v6
    - **Authentication**: SSH public key
    - **Username**: `azureuser`
    - **SSH public key source**: Generate new key pair — download the `.pem` file when prompted
@@ -66,7 +82,7 @@ Add a host alias to `~/.ssh/config` so `ssh kaiterminal` just works:
 
 ```
 Host kaiterminal
-    HostName <YOUR-VM-PUBLIC-IP>
+    HostName 20.193.130.6
     User azureuser
     IdentityFile ~/.ssh/kaiterminal.pem
 ```
@@ -112,8 +128,8 @@ Do this **before** running Certbot — certificates fail if DNS isn't pointing a
 
 | Type | Name | Value | TTL |
 |------|------|-------|-----|
-| A | `@` | `<your VM public IP>` | 300 |
-| A | `www` | `<your VM public IP>` | 300 |
+| A | `@` | `20.193.130.6` | 300 |
+| A | `www` | `20.193.130.6` | 300 |
 
 4. Wait 5–15 minutes, then verify from your Mac:
 
@@ -124,6 +140,7 @@ dig kaiterminal.in +short
 dig www.kaiterminal.in +short
 ```
 
+> [!WARNING]
 > Do not proceed to Certbot until all four return the correct IP.
 
 ---
@@ -199,6 +216,7 @@ Verify:
 psql -U kaiuser -d kaiterminal -h localhost -c "SELECT version();"
 ```
 
+> [!NOTE]
 > The app uses `EnsureCreatedAsync` on startup — tables are created automatically on first run.
 
 ---
@@ -236,7 +254,7 @@ sudo mkdir -p /var/www/kaiterminal
 sudo chown $USER:$USER /opt/kaiterminal
 
 # Clone the repo
-git clone git@github.com:your-username/kaiterminal.git /opt/kaiterminal/repo
+git clone git@github.com:suvrajitray/kai-terminal.git /opt/kaiterminal/repo
 ```
 
 ---
@@ -332,6 +350,7 @@ sudo chmod 600 /etc/kaiterminal/worker.env
 sudo chown root:kaiterm /etc/kaiterminal/worker.env
 ```
 
+> [!IMPORTANT]
 > `Api__InternalKey` must be **identical** in both files. `__` (double underscore) is the ASP.NET Core env var separator for nested keys.
 
 ---
@@ -435,6 +454,7 @@ ssh -L 9080:localhost:8080 kaiterminal
 # then open http://localhost:9080
 ```
 
+> [!NOTE]
 > Port 9080 is used on the Mac side to avoid conflicting with a local Seq instance running on 8080.
 
 **Set up log retention after first login** — otherwise logs will grow and fill the disk:
@@ -450,7 +470,7 @@ du -sh /opt/seq-data
 
 ## First-Time Setup Checklist
 
-- [ ] VM created (D2as_v5, Ubuntu 24.04 LTS)
+- [ ] VM created (D2as_v6, Ubuntu 24.04 LTS)
 - [ ] SSH key moved to `~/.ssh/kaiterminal.pem`, `chmod 600`, `~/.ssh/config` alias set
 - [ ] Azure NSG — SSH (your IP only), HTTP (any), HTTPS (any), DenyAll configured
 - [ ] Hostinger DNS — A records for `@` and `www` pointing to VM IP (both .com and .in)
@@ -506,6 +526,7 @@ SERVER="azureuser@20.193.130.6"
 ./deploy/deploy.sh --backend   # API + Worker only
 ```
 
+> [!WARNING]
 > Restart the Worker **outside market hours** (before 9:00 AM or after 3:35 PM IST).
 
 ---
@@ -534,6 +555,7 @@ sudo systemctl restart kaiterminal-worker
 sudo systemctl restart kaiterminal-api kaiterminal-worker
 ```
 
+> [!WARNING]
 > Restart the Worker **outside market hours** (before 9:00 AM or after 3:35 PM IST) — it reconnects the Upstox WebSocket on startup.
 
 ---

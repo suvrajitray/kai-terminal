@@ -1,3 +1,18 @@
+---
+tags:
+  - setup
+  - development
+  - macos
+  - local-dev
+aliases:
+  - Local Dev Setup
+  - Mac Setup
+related:
+  - "[[production-deployment]]"
+  - "[[deployment-concepts]]"
+  - "[[README]]"
+---
+
 # Local Dev Environment Setup — macOS
 
 This guide sets up a complete local development environment using Homebrew.
@@ -86,6 +101,7 @@ psql -d postgres -c "CREATE DATABASE kaiterminal OWNER kaiuser;"
 psql -d kaiterminal -c "GRANT ALL ON SCHEMA public TO kaiuser;"
 ```
 
+> [!NOTE]
 > Making `kaiuser` the database **owner** avoids `permission denied for schema public` errors — a PostgreSQL 15+ behaviour change that affects `EnsureCreatedAsync`.
 
 Verify the connection:
@@ -98,6 +114,7 @@ Local connection string (use this in user-secrets):
 Host=localhost;Database=kaiterminal;Username=kaiuser;Password=kaipassword
 ```
 
+> [!NOTE]
 > The app uses `EnsureCreatedAsync` on startup — tables are created automatically on first run.
 
 ---
@@ -119,6 +136,7 @@ Connect to local PostgreSQL:
 - Password: `kaipassword`
 - Database: `kaiterminal`
 
+> [!TIP]
 > TablePlus can also connect to Neon — use the Neon connection string with SSL mode set to `Require`.
 
 ### Seq — Structured Log Viewer
@@ -169,7 +187,7 @@ Useful views for this project:
 ## Clone & Configure
 
 ```bash
-git clone <repo-url>
+git clone git@github.com:suvrajitray/kai-terminal.git
 cd kai-terminal
 ```
 
@@ -199,6 +217,7 @@ dotnet user-secrets set "Api:InternalKey" "<same-uuid-as-api>"
 dotnet user-secrets set "Api:BaseUrl" "https://localhost:5001"
 ```
 
+> [!IMPORTANT]
 > `Api:InternalKey` must be **identical** in both Api and Worker — it authenticates the Worker→Api risk event webhook.
 >
 > `ConnectionStrings:Redis` defaults to `localhost:6379` in both `appsettings.json` files — no user-secret needed for local dev.
@@ -245,6 +264,7 @@ ALTER TABLE "UserRiskConfigs"
   ADD COLUMN IF NOT EXISTS "AutoShiftStrikeGap"    integer NOT NULL DEFAULT 1;
 ```
 
+> [!NOTE]
 > Fresh databases created by `EnsureCreatedAsync` get all tables automatically — skip this section.
 
 ---
@@ -267,6 +287,7 @@ dotnet run --project KAITerminal.Api
 API available at: `https://localhost:5001`
 Scalar docs at: `https://localhost:5001/scalar/v1`
 
+> [!TIP] First Run — Trust Dev Certificate
 > On first run, accept the dev HTTPS certificate:
 > ```bash
 > dotnet dev-certs https --trust

@@ -1,3 +1,17 @@
+---
+tags:
+  - architecture
+  - caching
+  - redis
+  - state-management
+aliases:
+  - Flows
+  - State Flows
+related:
+  - "[[README]]"
+  - "[[production-deployment]]"
+---
+
 # KAI Terminal — End-to-End Flows & In-Process State
 
 Reference document for all major in-process caches, Redis stores, and pub/sub channels.

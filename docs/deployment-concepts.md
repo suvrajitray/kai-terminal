@@ -1,3 +1,16 @@
+---
+tags:
+  - deployment
+  - nginx
+  - systemd
+  - devops
+aliases:
+  - Deployment Concepts
+related:
+  - "[[production-deployment]]"
+  - "[[local-dev-setup-mac]]"
+---
+
 # Deployment Concepts — Plain English Reference
 
 This document explains what each deployment file does and why, written for someone new to Linux and Nginx.
@@ -216,14 +229,14 @@ sed -i 's/kaiterminal.com/kaiterminal.com/g' frontend/.env.production
 
 ```
 1. Create Azure VM (Ubuntu 24.04 LTS)
-   └── Note the public IP, e.g. 20.10.50.100
+   └── Note the public IP, e.g. 20.193.130.6
 
 2. Point your domain to the VM
-   └── DNS A record: kaiterminal.com → 20.10.50.100
+   └── DNS A record: kaiterminal.com → 20.193.130.6
    └── Wait 5–15 minutes for DNS to propagate worldwide
 
 3. SSH into the server
-   └── ssh azureuser@20.10.50.100
+   └── ssh azureuser@20.193.130.6
 
 4. Install software (one-time)
    └── .NET 10, Node.js 20, Redis, PostgreSQL, Nginx, Certbot, Docker
@@ -232,7 +245,7 @@ sed -i 's/kaiterminal.com/kaiterminal.com/g' frontend/.env.production
    └── CREATE USER kaiuser / CREATE DATABASE kaiterminal
 
 6. Clone your repo
-   └── git clone <your-repo> /opt/kaiterminal/repo
+   └── git clone git@github.com:suvrajitray/kai-terminal.git /opt/kaiterminal/repo
 
 7. Build the frontend
    └── Edit .env.production — replace kaiterminal.com with your real domain
@@ -315,6 +328,7 @@ dotnet publish KAITerminal.Api -c Release -o /opt/kaiterminal/api
 sudo systemctl restart kaiterminal-api
 ```
 
+> [!WARNING]
 > **Restart the Worker outside market hours** (before 9:00 AM or after 3:35 PM IST). It reconnects the Upstox WebSocket on startup — restarting mid-session drops live data briefly.
 
 ---
