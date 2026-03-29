@@ -7,6 +7,8 @@ public interface IUserService
 {
     Task<AppUser> EnsureExistsAsync(string email, string name);
     Task<AppUser?> FindAsync(string email);
+    Task<List<AppUser>> GetAllAsync();
+    Task<bool> SetActiveAsync(int id, bool isActive);
 }
 
 public sealed class UserService(AppDbContext db) : IUserService
@@ -35,4 +37,16 @@ public sealed class UserService(AppDbContext db) : IUserService
 
     public Task<AppUser?> FindAsync(string email) =>
         db.Users.FirstOrDefaultAsync(u => u.Email == email);
+
+    public Task<List<AppUser>> GetAllAsync() =>
+        db.Users.OrderBy(u => u.CreatedAt).ToListAsync();
+
+    public async Task<bool> SetActiveAsync(int id, bool isActive)
+    {
+        var user = await db.Users.FindAsync(id);
+        if (user is null) return false;
+        user.IsActive = isActive;
+        await db.SaveChangesAsync();
+        return true;
+    }
 }
