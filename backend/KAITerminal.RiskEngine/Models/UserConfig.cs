@@ -14,10 +14,10 @@ public sealed record UserConfig
     public decimal MtmTarget { get; init; } = 25_000m;
     public decimal MtmSl { get; init; } = -25_000m;
     public bool TrailingEnabled { get; init; } = true;
-    public decimal TrailingActivateAt { get; init; } = 12_000m;
-    public decimal LockProfitAt { get; init; } = 2_000m;
-    public decimal WhenProfitIncreasesBy { get; init; } = 99m;
-    public decimal IncreaseTrailingBy { get; init; } = 33m;
+    public decimal TrailingActivateAt { get; init; } = 10_000m;
+    public decimal LockProfitAt { get; init; } = 3_000m;
+    public decimal WhenProfitIncreasesBy { get; init; } = 100m;
+    public decimal IncreaseTrailingBy { get; init; } = 50m;
 
     // Auto-shift config
     public bool    AutoShiftEnabled      { get; init; } = false;

@@ -10,10 +10,10 @@ public class UserRiskConfig
     public decimal MtmTarget { get; set; } = 25_000m;
     public decimal MtmSl { get; set; } = -25_000m;
     public bool TrailingEnabled { get; set; } = true;
-    public decimal TrailingActivateAt { get; set; } = 12_000m;
-    public decimal LockProfitAt { get; set; } = 2_000m;
-    public decimal IncreaseBy { get; set; } = 99m;   // WhenProfitIncreasesBy
-    public decimal TrailBy { get; set; } = 33m;      // IncreaseTrailingBy
+    public decimal TrailingActivateAt { get; set; } = 10_000m;
+    public decimal LockProfitAt { get; set; } = 3_000m;
+    public decimal IncreaseBy { get; set; } = 100m;  // WhenProfitIncreasesBy
+    public decimal TrailBy { get; set; } = 50m;      // IncreaseTrailingBy
     public DateTime UpdatedAt { get; set; }
 
     // Auto-shift: per-position risk management for sell positions
