@@ -1,6 +1,7 @@
-import { Routes, Route, Outlet } from "react-router-dom";
+import { Routes, Route, Outlet, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AppLayout } from "@/components/layout/app-layout";
+import { AdminLayout } from "@/components/layout/admin-layout";
 import { LandingPage } from "@/pages/landing-page";
 import { LoginPage } from "@/pages/login-page";
 import { AuthCallbackPage } from "@/pages/auth-callback-page";
@@ -12,7 +13,8 @@ import { ChartsPage } from "@/pages/charts-page";
 import { AiSignalsPage } from "@/pages/ai-signals-page";
 import { NotFoundPage } from "@/pages/not-found-page";
 import { InactivePage } from "@/pages/inactive-page";
-import { AdminPage } from "@/pages/admin-page";
+import { AdminUsersPage } from "@/pages/admin/admin-users-page";
+import { AdminSettingsPage } from "@/pages/admin/admin-settings-page";
 import { useRiskFeed } from "@/hooks/use-risk-feed";
 
 function RiskFeedMount() {
@@ -35,7 +37,11 @@ function App() {
           <Route path="/ai-signals" element={<AiSignalsPage />} />
           <Route path="/connect-brokers" element={<ConnectBrokersPage />} />
           <Route path="/redirect/:brokerId" element={<BrokerRedirectPage />} />
-          <Route path="/admin" element={<AdminPage />} />
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<Navigate to="/admin/users" replace />} />
+            <Route path="users"    element={<AdminUsersPage />} />
+            <Route path="settings" element={<AdminSettingsPage />} />
+          </Route>
         </Route>
         </Route>
       </Route>
