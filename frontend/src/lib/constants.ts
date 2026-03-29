@@ -46,7 +46,7 @@ export const BROKERS: BrokerInfo[] = [
     description:
       "India's largest retail stockbroker. Trade in equities, commodities, futures & options via Kite Connect API.",
     color: "#387ED1",
-    features: ["Equities", "F&O", "Commodities", "WebSocket"],
+    features: ["Equities", "F&O", "WebSocket"],
     connected: false,
     redirectPath: "/redirect/zerodha",
   },
