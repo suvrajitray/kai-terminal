@@ -57,6 +57,7 @@ public sealed class StreamingRiskWorker : BackgroundService
     }
 
     private static string SessionKey(UserConfig u) => $"{u.UserId}::{u.BrokerType}";
+    private static string CacheKey(UserConfig u)   => $"{u.UserId}::{u.BrokerType}";
 
     public StreamingRiskWorker(
         IUserTokenSource         tokenSource,
@@ -150,7 +151,7 @@ public sealed class StreamingRiskWorker : BackgroundService
             // Config change = intentional reconfiguration; wipe TSL floor and squared-off state
             // so the new session starts clean with the updated parameters.
             if (configChanged)
-                await _repo.ResetAsync(entry.Config.UserId);
+                await _repo.ResetAsync($"{entry.Config.UserId}::{entry.Config.BrokerType}");
         }
 
         // Wait for stopped sessions to exit cleanly before restarting them
@@ -188,23 +189,24 @@ public sealed class StreamingRiskWorker : BackgroundService
 
         // Reset risk state at the start of each new trading day so stale TSL / squared-off
         // flags from yesterday do not carry over into today's session.
+        var stateKey = $"{user.UserId}::{user.BrokerType}";
         var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, _tradingTz).DateTime);
-        var existingState = await _repo.GetOrCreateAsync(user.UserId);
+        var existingState = await _repo.GetOrCreateAsync(stateKey);
         if (existingState.LastSessionDate < today)
         {
             _logger.LogInformation(
                 "New trading day — resetting risk state for {UserId} ({Broker})",
                 user.UserId, user.BrokerType);
-            await _repo.UpdateAsync(user.UserId, new UserRiskState { LastSessionDate = today });
+            await _repo.UpdateAsync(stateKey, new UserRiskState { LastSessionDate = today });
         }
 
         var broker = _brokerFactory.Create(user.BrokerType, user.AccessToken, user.ApiKey);
 
         // ── Initial position fetch ────────────────────────────────────────
         var positions = _cfg.FilterPositions(await broker.GetAllPositionsAsync(ct));
-        _cache.UpdatePositions(user.UserId, positions);  // also clears stale LTP
+        _cache.UpdatePositions(CacheKey(user), positions);  // also clears stale LTP
 
-        var tokens = _cache.GetOpenInstrumentTokens(user.UserId);
+        var tokens = _cache.GetOpenInstrumentTokens(CacheKey(user));
 
         // ── Subscribe to shared market data ───────────────────────────────
         if (tokens.Count > 0)
@@ -226,7 +228,7 @@ public sealed class StreamingRiskWorker : BackgroundService
         {
             await _notifier.NotifyAsync(new RiskNotification(
                 user.UserId, user.BrokerType, RiskNotificationType.SessionStarted,
-                _cache.GetMtm(user.UserId),
+                _cache.GetMtm(CacheKey(user)),
                 OpenPositionCount: openCount,
                 Timestamp: DateTimeOffset.UtcNow), ct);
         }
@@ -247,7 +249,7 @@ public sealed class StreamingRiskWorker : BackgroundService
             _sharedMarketData.FeedReceived -= ltpHandler;
 
             // Unsubscribe this user's instruments from shared feed
-            var currentTokens = _cache.GetOpenInstrumentTokens(user.UserId);
+            var currentTokens = _cache.GetOpenInstrumentTokens(CacheKey(user));
             if (currentTokens.Count > 0)
             {
                 try
@@ -306,10 +308,10 @@ public sealed class StreamingRiskWorker : BackgroundService
                 _logger.LogDebug("Polling positions — {UserId} ({Broker})", user.UserId, user.BrokerType);
 
                 var positions = _cfg.FilterPositions(await broker.GetAllPositionsAsync(ct));
-                _cache.UpdatePositions(user.UserId, positions);  // clears stale LTP
+                _cache.UpdatePositions(CacheKey(user), positions);  // clears stale LTP
 
                 // Re-subscribe if open instruments changed
-                var newTokens = _cache.GetOpenInstrumentTokens(user.UserId);
+                var newTokens = _cache.GetOpenInstrumentTokens(CacheKey(user));
                 if (newTokens.Count > 0)
                 {
                     var feedTokens = _tokenMapper.ToFeedTokens(user.BrokerType, newTokens);
@@ -337,19 +339,19 @@ public sealed class StreamingRiskWorker : BackgroundService
         // Filter to only this user's open instruments.
         // Feed tokens are in Upstox format (e.g. "NSE_FO|37590"); for Zerodha users
         // we map them back to native position tokens (e.g. "226623237") before cache lookup.
-        var userTokens = _cache.GetOpenInstrumentTokens(user.UserId);
+        var userTokens = _cache.GetOpenInstrumentTokens(CacheKey(user));
         bool relevant = false;
         foreach (var (feedToken, ltp) in update.Ltps)
         {
             var nativeToken = _tokenMapper.ToNativeToken(user.BrokerType, feedToken);
             if (!userTokens.Contains(nativeToken)) continue;
-            _cache.UpdateLtp(user.UserId, nativeToken, ltp);
+            _cache.UpdateLtp(CacheKey(user), nativeToken, ltp);
             relevant = true;
         }
 
         if (!relevant) return;
 
-        if (!CanEvaluateFromLtp(user.UserId))
+        if (!CanEvaluateFromLtp(CacheKey(user)))
         {
             _logger.LogDebug("LTP eval rate-limited — {UserId} ({Broker})", user.UserId, user.BrokerType);
             return;
@@ -376,7 +378,7 @@ public sealed class StreamingRiskWorker : BackgroundService
             return;
         }
 
-        var gate = _gates.GetOrAdd(user.UserId, _ => new UserGate());
+        var gate = _gates.GetOrAdd(CacheKey(user), _ => new UserGate());
         if (!await gate.Sem.WaitAsync(0, ct))
         {
             _logger.LogDebug("Evaluation in progress — skipping for {UserId} ({Broker})", user.UserId, user.BrokerType);
@@ -384,7 +386,7 @@ public sealed class StreamingRiskWorker : BackgroundService
         }
         try
         {
-            var mtm = _cache.GetMtm(user.UserId);
+            var mtm = _cache.GetMtm(CacheKey(user));
             await _evaluator.EvaluateAsync(user.UserId, mtm, user, broker, ct);
             await _autoShift.EvaluateAsync(user.UserId, user, broker, ct);
         }

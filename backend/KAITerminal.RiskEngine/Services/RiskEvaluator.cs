@@ -61,7 +61,8 @@ public sealed class RiskEvaluator
     public async Task EvaluateAsync(
         string userId, decimal mtm, UserConfig config, IBrokerClient broker, CancellationToken ct = default)
     {
-        var state = await _repo.GetOrCreateAsync(userId);
+        var stateKey = $"{userId}::{config.BrokerType}";
+        var state = await _repo.GetOrCreateAsync(stateKey);
 
         if (state.IsSquaredOff)
         {
@@ -82,7 +83,7 @@ public sealed class RiskEvaluator
             await _notifier.NotifyAsync(new RiskNotification(
                 userId, config.BrokerType, RiskNotificationType.HardSlHit,
                 mtm, Sl: config.MtmSl, Timestamp: DateTimeOffset.UtcNow), ct);
-            await SquareOffAsync(userId, config.BrokerType, mtm, state, broker, ct);
+            await SquareOffAsync(userId, config.BrokerType, stateKey, mtm, state, broker, ct);
             return;
         }
 
@@ -95,7 +96,7 @@ public sealed class RiskEvaluator
             await _notifier.NotifyAsync(new RiskNotification(
                 userId, config.BrokerType, RiskNotificationType.TargetHit,
                 mtm, Target: config.MtmTarget, Timestamp: DateTimeOffset.UtcNow), ct);
-            await SquareOffAsync(userId, config.BrokerType, mtm, state, broker, ct);
+            await SquareOffAsync(userId, config.BrokerType, stateKey, mtm, state, broker, ct);
             return;
         }
 
@@ -109,7 +110,7 @@ public sealed class RiskEvaluator
                 state.TrailingActive      = true;
                 state.TrailingStop        = config.LockProfitAt;
                 state.TrailingLastTrigger = mtm;
-                await _repo.UpdateAsync(userId, state);
+                await _repo.UpdateAsync(stateKey, state);
                 _logger.LogInformation(
                     "TSL ACTIVATED — {UserId} ({Broker})  floor locked at ₹{Stop:+#,##0;-#,##0}",
                     userId, config.BrokerType, state.TrailingStop);
@@ -126,7 +127,7 @@ public sealed class RiskEvaluator
                 long steps = (long)(gain / config.WhenProfitIncreasesBy);
                 state.TrailingStop        += steps * config.IncreaseTrailingBy;
                 state.TrailingLastTrigger += steps * config.WhenProfitIncreasesBy;
-                await _repo.UpdateAsync(userId, state);
+                await _repo.UpdateAsync(stateKey, state);
                 _logger.LogInformation(
                     "TSL RAISED — {UserId} ({Broker})  floor → ₹{Stop:+#,##0;-#,##0}",
                     userId, config.BrokerType, state.TrailingStop);
@@ -143,7 +144,7 @@ public sealed class RiskEvaluator
                 await _notifier.NotifyAsync(new RiskNotification(
                     userId, config.BrokerType, RiskNotificationType.TslHit,
                     mtm, TslFloor: state.TrailingStop, Timestamp: DateTimeOffset.UtcNow), ct);
-                await SquareOffAsync(userId, config.BrokerType, mtm, state, broker, ct);
+                await SquareOffAsync(userId, config.BrokerType, stateKey, mtm, state, broker, ct);
             }
         }
     }
@@ -165,13 +166,13 @@ public sealed class RiskEvaluator
     }
 
     private async Task SquareOffAsync(
-        string userId, string brokerType, decimal mtm, UserRiskState state, IBrokerClient broker, CancellationToken ct)
+        string userId, string brokerType, string stateKey, decimal mtm, UserRiskState state, IBrokerClient broker, CancellationToken ct)
     {
         try
         {
             await broker.ExitAllPositionsAsync(ct: ct);
             state.IsSquaredOff = true;
-            await _repo.UpdateAsync(userId, state);
+            await _repo.UpdateAsync(stateKey, state);
             _logger.LogWarning(
                 "Square-off complete — {UserId} ({Broker}) — all positions exited",
                 userId, brokerType);
@@ -182,7 +183,7 @@ public sealed class RiskEvaluator
         catch (Exception ex)
         {
             state.IsSquaredOff = true;
-            await _repo.UpdateAsync(userId, state);
+            await _repo.UpdateAsync(stateKey, state);
             _logger.LogError(ex,
                 "Square-off FAILED — {UserId} ({Broker}) — marked as squared-off; manual verification required",
                 userId, brokerType);

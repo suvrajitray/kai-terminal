@@ -12,30 +12,35 @@ function formatRupee(value: number): string {
   return value >= 0 ? `₹+${formatted}` : `₹-${formatted}`;
 }
 
+function brokerLabel(broker: string): string {
+  return broker.charAt(0).toUpperCase() + broker.slice(1).toLowerCase();
+}
+
 function buildToastMessage(event: RiskEvent): string {
+  const broker = brokerLabel(event.broker);
   switch (event.type) {
     case "SessionStarted":
-      return `Risk engine active — watching ${event.openPositionCount} open position(s) (PnL ${formatRupee(event.mtm)})`;
+      return `[${broker}] Risk engine active — watching ${event.openPositionCount} open position(s) (PnL ${formatRupee(event.mtm)})`;
     case "HardSlHit":
-      return `Hard SL Hit — PnL ${formatRupee(event.mtm)}${event.sl != null ? ` ≤ SL ${formatRupee(event.sl)}` : ""}`;
+      return `[${broker}] Hard SL Hit — PnL ${formatRupee(event.mtm)}${event.sl != null ? ` ≤ SL ${formatRupee(event.sl)}` : ""}`;
     case "TargetHit":
-      return `Target Hit — PnL ${formatRupee(event.mtm)}${event.target != null ? ` ≥ ${formatRupee(event.target)}` : ""}`;
+      return `[${broker}] Target Hit — PnL ${formatRupee(event.mtm)}${event.target != null ? ` ≥ ${formatRupee(event.target)}` : ""}`;
     case "TslActivated":
-      return `TSL Activated — floor locked at ${event.tslFloor != null ? formatRupee(event.tslFloor) : "—"}`;
+      return `[${broker}] TSL Activated — profit locked at ${event.tslFloor != null ? formatRupee(event.tslFloor) : "—"}`;
     case "TslRaised":
-      return `TSL Raised — new floor ${event.tslFloor != null ? formatRupee(event.tslFloor) : "—"}`;
+      return `[${broker}] TSL Raised — new floor ${event.tslFloor != null ? formatRupee(event.tslFloor) : "—"}`;
     case "TslHit":
-      return `TSL Hit — PnL ${formatRupee(event.mtm)}${event.tslFloor != null ? ` ≤ floor ${formatRupee(event.tslFloor)}` : ""}`;
+      return `[${broker}] TSL Hit — PnL ${formatRupee(event.mtm)}${event.tslFloor != null ? ` ≤ floor ${formatRupee(event.tslFloor)}` : ""}`;
     case "SquareOffComplete":
-      return `Square-off complete — all positions exited (PnL ${formatRupee(event.mtm)})`;
+      return `[${broker}] Square-off complete — all positions exited (PnL ${formatRupee(event.mtm)})`;
     case "SquareOffFailed":
-      return `Square-off FAILED — manual verification required`;
+      return `[${broker}] Square-off FAILED — manual verification required`;
     case "AutoShiftTriggered":
-      return `Auto-shifted ${event.instrumentToken ?? "position"} — shift #${event.shiftCount ?? ""}`;
+      return `[${broker}] Auto-shifted ${event.instrumentToken ?? "position"} — shift #${event.shiftCount ?? ""}`;
     case "AutoShiftExhausted":
-      return `Max auto-shifts reached for ${event.instrumentToken ?? "position"} — position exited`;
+      return `[${broker}] Max auto-shifts reached for ${event.instrumentToken ?? "position"} — position exited`;
     default:
-      return "Risk engine event";
+      return `[${broker}] Risk engine event`;
   }
 }
 

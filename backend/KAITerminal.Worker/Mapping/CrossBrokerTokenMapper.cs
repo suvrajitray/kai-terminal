@@ -24,11 +24,12 @@ public sealed class CrossBrokerTokenMapper : ITokenMapper
     private readonly ILogger<CrossBrokerTokenMapper>      _logger;
 
     // (brokerType, nativeToken) → upstox feed token
-    private Dictionary<(string, string), string> _nativeToFeed = new();
+    private volatile Dictionary<(string, string), string> _nativeToFeed = new();
     // (brokerType, upstox feed token) → native token
-    private Dictionary<(string, string), string> _feedToNative = new();
+    private volatile Dictionary<(string, string), string> _feedToNative = new();
 
-    private DateOnly           _loadedDate;
+    // Stored as DayNumber (int) so volatile is valid. DateOnly.DayNumber is unique per calendar day.
+    private volatile int _loadedDateDayNumber;
     private readonly SemaphoreSlim _lock = new(1, 1);
 
     public CrossBrokerTokenMapper(
@@ -45,14 +46,14 @@ public sealed class CrossBrokerTokenMapper : ITokenMapper
         if (IsUpstox(brokerType)) return;
 
         var today = IstToday();
-        if (_loadedDate == today && _nativeToFeed.Count > 0) return;
+        if (_loadedDateDayNumber == today.DayNumber && _nativeToFeed.Count > 0) return;
 
         await _lock.WaitAsync(ct);
         try
         {
-            if (_loadedDate == today && _nativeToFeed.Count > 0) return;
+            if (_loadedDateDayNumber == today.DayNumber && _nativeToFeed.Count > 0) return;
             await LoadMappingAsync(ct);
-            _loadedDate = today;
+            _loadedDateDayNumber = today.DayNumber;
         }
         finally { _lock.Release(); }
     }

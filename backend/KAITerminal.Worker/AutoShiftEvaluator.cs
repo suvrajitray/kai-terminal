@@ -59,11 +59,12 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
         if (!config.AutoShiftEnabled)
             return;
 
-        var state = await _repo.GetOrCreateAsync(userId);
+        var stateKey = $"{userId}::{config.BrokerType}";
+        var state = await _repo.GetOrCreateAsync(stateKey);
         if (state.IsSquaredOff)
             return;
 
-        var positions    = _cache.GetPositions(userId);
+        var positions    = _cache.GetPositions(stateKey);
         var sellPositions = positions.Where(p => p.Quantity < 0).ToList();
         if (sellPositions.Count == 0)
             return;
@@ -73,7 +74,7 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
 
         foreach (var position in sellPositions)
         {
-            var ltp       = _cache.GetEffectiveLtp(userId, position.InstrumentToken, position.Ltp);
+            var ltp       = _cache.GetEffectiveLtp(stateKey, position.InstrumentToken, position.Ltp);
             var threshold = position.AveragePrice * (1 + config.AutoShiftThresholdPct / 100m);
 
             if (ltp < threshold)
@@ -95,11 +96,11 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
 
             if (shiftCount >= config.AutoShiftMaxCount)
             {
-                await ExitExhaustedPositionAsync(userId, position, broker, state, shiftCount, ct);
+                await ExitExhaustedPositionAsync(userId, stateKey, position, broker, state, shiftCount, ct);
             }
             else
             {
-                await ShiftPositionAsync(userId, position, contract, chainKey, broker, state, config, ct);
+                await ShiftPositionAsync(userId, stateKey, position, contract, chainKey, broker, state, config, ct);
             }
         }
     }
@@ -107,7 +108,7 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private async Task ExitExhaustedPositionAsync(
-        string userId, Contracts.Domain.Position position, IBrokerClient broker,
+        string userId, string cacheKey, Contracts.Domain.Position position, IBrokerClient broker,
         RiskEngine.Models.UserRiskState state, int shiftCount, CancellationToken ct)
     {
         var exitToken = BuildCloseToken(position, broker.BrokerType);
@@ -122,14 +123,14 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
             UserId:          userId,
             Broker:          broker.BrokerType,
             Type:            RiskNotificationType.AutoShiftExhausted,
-            Mtm:             _cache.GetMtm(userId),
+            Mtm:             _cache.GetMtm(cacheKey),
             InstrumentToken: position.InstrumentToken,
             ShiftCount:      shiftCount,
             Timestamp:       DateTimeOffset.UtcNow), ct);
     }
 
     private async Task ShiftPositionAsync(
-        string userId, Contracts.Domain.Position position, ZerodhaOptionContract contract,
+        string userId, string stateKey, Contracts.Domain.Position position, ZerodhaOptionContract contract,
         string chainKey, IBrokerClient broker,
         RiskEngine.Models.UserRiskState state, UserConfig config, CancellationToken ct)
     {
@@ -192,13 +193,13 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
         }
 
         var newCount = state.IncrementAutoShiftCount(chainKey);
-        await _repo.UpdateAsync(userId, state);
+        await _repo.UpdateAsync(stateKey, state);
 
         await _notifier.NotifyAsync(new RiskNotification(
             UserId:          userId,
             Broker:          broker.BrokerType,
             Type:            RiskNotificationType.AutoShiftTriggered,
-            Mtm:             _cache.GetMtm(userId),
+            Mtm:             _cache.GetMtm(stateKey),
             InstrumentToken: position.InstrumentToken,
             NewToken:        openToken,
             ShiftCount:      newCount,

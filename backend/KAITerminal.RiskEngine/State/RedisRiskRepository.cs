@@ -41,5 +41,5 @@ public sealed class RedisRiskRepository : IRiskRepository
         await db.KeyDeleteAsync(Key(userId));
     }
 
-    private static string Key(string userId) => $"risk-state:{userId}";
+    private static string Key(string stateKey) => $"risk-state:{stateKey}";
 }
