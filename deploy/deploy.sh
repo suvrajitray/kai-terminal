@@ -14,6 +14,15 @@
 #
 # One-time server setup required before first run:
 #   See docs/production-deployment.md
+#
+# One-time daily-reset timer setup (run once on the server):
+#   sudo cp deploy/worker-daily-reset.sh /opt/kaiterminal/worker-daily-reset.sh
+#   sudo chmod +x /opt/kaiterminal/worker-daily-reset.sh
+#   sudo cp deploy/kaiterminal-worker-daily-reset.service /etc/systemd/system/
+#   sudo cp deploy/kaiterminal-worker-daily-reset.timer   /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now kaiterminal-worker-daily-reset.timer
+#   sudo systemctl list-timers kaiterminal-worker-daily-reset.timer  # verify
 
 set -euo pipefail
 
