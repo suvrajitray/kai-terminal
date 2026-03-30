@@ -9,12 +9,12 @@ const Toaster = ({ ...props }: ToasterProps) => {
       <style>{`
         /* ── Base toast ──────────────────────────────────────────────── */
         [data-sonner-toast] {
-          background: hsl(var(--popover)) !important;
-          border: 1px solid hsl(var(--border) / 0.5) !important;
-          border-left: 4px solid hsl(var(--border)) !important;
+          background: var(--popover) !important;
+          border: 1px solid color-mix(in oklch, var(--border) 50%, transparent) !important;
+          border-left: 4px solid var(--border) !important;
           border-radius: var(--radius) !important;
           padding: 14px 16px !important;
-          box-shadow: 0 4px 24px hsl(0 0% 0% / 0.4) !important;
+          box-shadow: 0 4px 24px rgb(0 0 0 / 0.4) !important;
           gap: 0 !important;
         }
 
@@ -29,17 +29,17 @@ const Toaster = ({ ...props }: ToasterProps) => {
         [data-sonner-toast] [data-title] {
           font-size: 0.875rem !important;
           font-weight: 600 !important;
-          color: hsl(var(--foreground)) !important;
+          color: var(--foreground) !important;
           line-height: 1.4 !important;
         }
-        [data-sonner-toast][data-type="error"]   [data-title] { color: hsl(var(--destructive)) !important; }
+        [data-sonner-toast][data-type="error"]   [data-title] { color: var(--destructive) !important; }
         [data-sonner-toast][data-type="success"] [data-title] { color: #10b981 !important; }
         [data-sonner-toast][data-type="warning"] [data-title] { color: #f59e0b !important; }
-        [data-sonner-toast][data-type="info"]    [data-title] { color: hsl(var(--primary)) !important; }
+        [data-sonner-toast][data-type="info"]    [data-title] { color: var(--primary) !important; }
 
         /* ── Description ─────────────────────────────────────────────── */
         [data-sonner-toast] [data-description] {
-          color: hsl(var(--foreground) / 0.8) !important;
+          color: color-mix(in oklch, var(--foreground) 80%, transparent) !important;
           font-size: 0.8125rem !important;
           line-height: 1.55 !important;
           margin-top: 4px !important;
@@ -55,10 +55,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
           top: 8px !important;
           background: transparent !important;
           border: none !important;
-          color: hsl(var(--muted-foreground)) !important;
+          color: var(--muted-foreground) !important;
         }
         [data-sonner-toast] [data-close-button]:hover {
-          color: hsl(var(--foreground)) !important;
+          color: var(--foreground) !important;
         }
       `}</style>
       <Sonner
@@ -66,9 +66,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
         className="toaster group"
         style={
           {
-            "--normal-bg":     "hsl(var(--popover))",
-            "--normal-text":   "hsl(var(--popover-foreground))",
-            "--normal-border": "hsl(var(--border))",
+            "--normal-bg":     "var(--popover)",
+            "--normal-text":   "var(--popover-foreground)",
+            "--normal-border": "var(--border)",
             "--border-radius": "var(--radius)",
           } as React.CSSProperties
         }

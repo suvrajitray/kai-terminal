@@ -93,7 +93,7 @@ export function PositionRow({
       <tr
         className={cn(
           "border-b border-border/40 transition-colors hover:bg-muted/30 [&>td]:align-middle",
-          p.quantity === 0 && "opacity-50",
+          p.quantity === 0 && "[&>td]:opacity-40",
           selected && "bg-primary/5",
           isNew && "animate-row-enter",
         )}

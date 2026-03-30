@@ -152,10 +152,7 @@ export function ProfitProtectionPanel({ open, onClose, mtmByBroker }: ProfitProt
       autoShiftMaxCount:     fromStr(draft.autoShiftMaxCount),
       autoShiftStrikeGap:    fromStr(draft.autoShiftStrikeGap),
     });
-    toast(draft.enabled ? "Profit Protection enabled" : "Profit Protection disabled", {
-      description: `${activeBrokerName} — configuration saved`,
-      duration: 3000,
-    });
+    toast.success(`${activeBrokerName} — configuration saved`);
     onClose();
   };
 
