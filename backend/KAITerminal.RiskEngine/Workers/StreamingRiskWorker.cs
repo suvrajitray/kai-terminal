@@ -185,8 +185,6 @@ public sealed class StreamingRiskWorker : BackgroundService
 
     private async Task RunUserAsync(UserConfig user, CancellationToken ct)
     {
-        _logger.LogInformation("Starting session — {UserId} ({Broker})", user.UserId, user.BrokerType);
-
         // Reset risk state at the start of each new trading day so stale TSL / squared-off
         // flags from yesterday do not carry over into today's session.
         var stateKey = $"{user.UserId}::{user.BrokerType}";

@@ -62,10 +62,10 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
     internal async Task StartAsync(CancellationToken ct = default)
     {
         var allPositions = await FetchAllPositionsAsync(ct);
-
-        await RefreshSubscriptionsAsync(allPositions, ct);
-
         var filtered = ApplyFilter(allPositions);
+
+        await RefreshSubscriptionsAsync(filtered, ct);
+
         await _hub.Clients.Client(_connectionId)
             .SendAsync("ReceivePositions", filtered.Select(p => p.ToResponse()).ToList(), ct);
 
@@ -88,7 +88,7 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
                 await _hub.Clients.Client(_connectionId)
                     .SendAsync("ReceivePositions", filtered.Select(p => p.ToResponse()).ToList(), ct);
 
-                await RefreshSubscriptionsAsync(allPositions, ct);
+                await RefreshSubscriptionsAsync(filtered, ct);
                 await PollOrdersAsync(ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { return; }
