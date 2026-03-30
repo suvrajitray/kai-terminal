@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { toast } from "sonner";
-import { Zap, TrendingUp, TrendingDown, ArrowUpDown, Layers } from "lucide-react";
+import { toast } from "@/lib/toast";
+import { Zap, TrendingUp, TrendingDown, ArrowUpDown, Layers, ArrowRightLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,18 +88,21 @@ export function QuickTradeDialog({ onTabChange }: Props) {
     <div className="space-y-4">
       {/* Broker selector — only shown when both brokers are connected */}
       {bothConnected && (
-        <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground uppercase tracking-wider">Route via</Label>
-          <div className="flex gap-1.5">
+        <div className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/20 px-3 py-2">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <ArrowRightLeft className="size-3.5" />
+            <span>Route via</span>
+          </div>
+          <div className="flex items-center gap-1 rounded-md border border-border/40 bg-background p-0.5">
             {(["upstox", "zerodha"] as const).map((b) => (
               <button
                 key={b}
                 onClick={() => setBroker(b)}
                 className={cn(
-                  "rounded px-3 py-1 text-xs font-semibold transition-colors border capitalize",
+                  "rounded px-3 py-1 text-xs font-semibold transition-all capitalize",
                   broker === b
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-muted/30 text-muted-foreground border-border/40 hover:bg-muted/60 hover:text-foreground",
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 {b === "upstox" ? "Upstox" : "Zerodha"}
