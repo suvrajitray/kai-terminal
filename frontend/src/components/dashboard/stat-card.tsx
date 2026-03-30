@@ -2,6 +2,7 @@ import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { useValueFlash } from "@/hooks/use-value-flash";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const INR = new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 });
 
@@ -12,6 +13,7 @@ interface StatCardProps {
   colored?: boolean;   // green/red based on sign
   prefix?: string;     // e.g. "₹"
   flash?: boolean;     // enable MTM-style flash animation
+  loading?: boolean;
 }
 
 const FLASH_BG: Record<"up" | "down", string> = {
@@ -27,7 +29,7 @@ function FlashingValue({ value, colored, prefix }: { value: number; colored: boo
 
   return (
     <motion.span
-      className={cn("tabular-nums font-bold text-2xl", color)}
+      className={cn("font-mono tabular-nums font-bold text-2xl", color)}
       animate={{ backgroundColor: flash ? FLASH_BG[flash] : "rgba(0,0,0,0)" }}
       transition={{ duration: flash ? 0.1 : 0.5 }}
       style={{ borderRadius: 4, padding: "0 2px" }}
@@ -37,7 +39,7 @@ function FlashingValue({ value, colored, prefix }: { value: number; colored: boo
   );
 }
 
-export function StatCard({ label, value, index, colored = false, prefix = "", flash = false }: StatCardProps) {
+export function StatCard({ label, value, index, colored = false, prefix = "", flash = false, loading = false }: StatCardProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -48,13 +50,17 @@ export function StatCard({ label, value, index, colored = false, prefix = "", fl
         <CardContent className="pt-5 pb-5 px-5">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">{label}</p>
           {value === null ? (
-            <span className="text-2xl font-bold text-muted-foreground/40">—</span>
+            loading ? (
+              <Skeleton className="mt-1 h-8 w-28" />
+            ) : (
+              <span className="text-2xl font-bold text-muted-foreground/40">—</span>
+            )
           ) : flash ? (
             <FlashingValue value={value} colored={colored} prefix={prefix} />
           ) : (
             <span
               className={cn(
-                "tabular-nums font-bold text-2xl",
+                "font-mono tabular-nums font-bold text-2xl",
                 colored
                   ? value > 0 ? "text-green-500" : value < 0 ? "text-red-500" : "text-foreground"
                   : "text-foreground",
@@ -71,7 +77,7 @@ export function StatCard({ label, value, index, colored = false, prefix = "", fl
 }
 
 /** Neutral count card (no sign, no INR) */
-export function CountCard({ label, value, index }: { label: string; value: number | null; index: number }) {
+export function CountCard({ label, value, index, loading = false }: { label: string; value: number | null; index: number; loading?: boolean }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -82,9 +88,13 @@ export function CountCard({ label, value, index }: { label: string; value: numbe
         <CardContent className="pt-5 pb-5 px-5">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">{label}</p>
           {value === null ? (
-            <span className="text-2xl font-bold text-muted-foreground/40">—</span>
+            loading ? (
+              <Skeleton className="mt-1 h-8 w-12" />
+            ) : (
+              <span className="text-2xl font-bold text-muted-foreground/40">—</span>
+            )
           ) : (
-            <span className="text-2xl font-bold tabular-nums">{value}</span>
+            <span className="font-mono text-2xl font-bold tabular-nums">{value}</span>
           )}
         </CardContent>
       </Card>

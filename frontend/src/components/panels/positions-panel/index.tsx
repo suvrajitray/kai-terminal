@@ -12,6 +12,7 @@ import { useOptionContractsStore } from "@/stores/option-contracts-store";
 import { PositionRow } from "./position-row";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { QtyMode } from "./qty-input";
 import type { Position } from "@/types";
 
@@ -238,7 +239,7 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
           <button
             onClick={() => setBrokerFilter(null)}
             className={cn(
-              "rounded px-2 py-0.5 text-[11px] font-medium transition-colors",
+              "cursor-pointer rounded px-2 py-0.5 text-[11px] font-medium transition-colors",
               brokerFilter === null
                 ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
                 : "text-muted-foreground hover:text-foreground",
@@ -251,7 +252,7 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
               key={bId}
               onClick={() => setBrokerFilter(brokerFilter === bId ? null : bId)}
               className={cn(
-                "flex items-center gap-1.5 rounded px-2 py-0.5 text-[11px] font-medium transition-colors",
+                "flex cursor-pointer items-center gap-1.5 rounded px-2 py-0.5 text-[11px] font-medium transition-colors",
                 brokerFilter === bId
                   ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
                   : "text-muted-foreground hover:text-foreground",
@@ -264,7 +265,27 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
         </div>
       )}
       <div className="flex-1 overflow-auto">
-        {sorted.length === 0 && !loading ? (
+        {loading && sorted.length === 0 ? (
+          <table className="w-full text-xs">
+            <tbody>
+              {[0, 1, 2, 3, 4].map((i) => (
+                <tr key={i} className="border-b border-border/30">
+                  <td className="px-3 py-2"><Skeleton className="h-3.5 w-3.5" /></td>
+                  <td className="px-3 py-2">
+                    <Skeleton className="mb-1 h-3.5 w-28" />
+                    <Skeleton className="h-2.5 w-20" />
+                  </td>
+                  <td className="px-3 py-2"><Skeleton className="h-3.5 w-14" /></td>
+                  <td className="px-3 py-2"><Skeleton className="h-3.5 w-8" /></td>
+                  <td className="px-3 py-2"><Skeleton className="h-3.5 w-14" /></td>
+                  <td className="px-3 py-2"><Skeleton className="h-3.5 w-14" /></td>
+                  <td className="px-3 py-2"><Skeleton className="h-3.5 w-16" /></td>
+                  <td className="px-3 py-2"><Skeleton className="ml-auto h-3.5 w-20" /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : sorted.length === 0 && !loading ? (
           <EmptyState icon={LayoutList} message="No positions" />
         ) : (
           <table className="w-full text-xs">

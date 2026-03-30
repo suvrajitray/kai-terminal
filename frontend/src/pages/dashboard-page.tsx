@@ -30,9 +30,9 @@ export function DashboardPage() {
       </motion.h1>
 
       {/* Row 1 — Stat Cards */}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Today's MTM"     value={totalPnl}  index={0} colored flash prefix="₹" />
-        <CountCard label="Open Positions" value={openCount} index={1} />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <StatCard label="Today's MTM"     value={totalPnl}  index={0} colored flash prefix="₹" loading={loading} />
+        <CountCard label="Open Positions" value={openCount} index={1} loading={loading} />
       </div>
 
       {/* Row 2 — Index Cards */}

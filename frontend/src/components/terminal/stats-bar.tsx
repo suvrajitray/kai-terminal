@@ -112,7 +112,7 @@ export function StatsBar({
                   <span key={b.id} className="flex items-center gap-1">
                     {i > 0 && <span className="text-muted-foreground/60">·</span>}
                     <BrokerBadge brokerId={b.id} />
-                    <span className={cn("tabular-nums font-medium", val >= 0 ? "text-green-500" : "text-red-500")}>
+                    <span className={cn("font-mono tabular-nums font-medium", val >= 0 ? "text-green-500" : "text-red-500")}>
                       {val >= 0 ? "+" : "-"}₹{Math.abs(val).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
                     </span>
                   </span>
@@ -131,7 +131,7 @@ export function StatsBar({
                 {maxProfit !== null && (
                   <span className="flex items-center gap-1">
                     <span className="text-muted-foreground">Peak</span>
-                    <span className={cn("tabular-nums font-medium", maxProfit >= 0 ? "text-green-500" : "text-red-500")}>
+                    <span className={cn("font-mono tabular-nums font-medium", maxProfit >= 0 ? "text-green-500" : "text-red-500")}>
                       {maxProfit >= 0 ? "+" : "-"}₹{Math.abs(maxProfit).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                     </span>
                   </span>
@@ -139,7 +139,7 @@ export function StatsBar({
                 {maxLoss !== null && maxLoss !== maxProfit && (
                   <span className="flex items-center gap-1">
                     <span className="text-muted-foreground">Trough</span>
-                    <span className={cn("tabular-nums font-medium", maxLoss >= 0 ? "text-green-500" : "text-red-500")}>
+                    <span className={cn("font-mono tabular-nums font-medium", maxLoss >= 0 ? "text-green-500" : "text-red-500")}>
                       {maxLoss >= 0 ? "+" : "-"}₹{Math.abs(maxLoss).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                     </span>
                   </span>
@@ -158,11 +158,11 @@ export function StatsBar({
             {ppBrokers.length === 1 ? (
               <>
                 <span className="text-muted-foreground">TGT</span>
-                <span className="font-medium tabular-nums text-green-500">
+                <span className="font-mono font-medium tabular-nums text-green-500">
                   ₹{ppBrokers[0].target.toLocaleString("en-IN")}
                 </span>
                 <span className="text-muted-foreground">SL</span>
-                <span className="font-medium tabular-nums text-red-500">
+                <span className="font-mono font-medium tabular-nums text-red-500">
                   ₹{ppBrokers[0].currentSl.toLocaleString("en-IN")}
                 </span>
               </>
@@ -172,11 +172,11 @@ export function StatsBar({
                   {i > 0 && <span className="text-muted-foreground/60">·</span>}
                   <BrokerBadge brokerId={b.broker} />
                   <span className="text-muted-foreground">TGT</span>
-                  <span className="font-medium tabular-nums text-green-500">
+                  <span className="font-mono font-medium tabular-nums text-green-500">
                     ₹{b.target.toLocaleString("en-IN")}
                   </span>
                   <span className="text-muted-foreground">SL</span>
-                  <span className="font-medium tabular-nums text-red-500">
+                  <span className="font-mono font-medium tabular-nums text-red-500">
                     ₹{b.currentSl.toLocaleString("en-IN")}
                   </span>
                 </span>
@@ -197,20 +197,20 @@ export function StatsBar({
           <span className="flex items-center gap-2 ml-1">
             <span className="flex items-center gap-1">
               <BrokerBadge brokerId="upstox" />
-              <span className="font-semibold tabular-nums text-foreground">
+              <span className="font-mono font-semibold tabular-nums text-foreground">
                 ₹{allFunds.upstox.availableMargin.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
               </span>
             </span>
             <span className="text-muted-foreground/60">·</span>
             <span className="flex items-center gap-1">
               <BrokerBadge brokerId="zerodha" />
-              <span className="font-semibold tabular-nums text-foreground">
+              <span className="font-mono font-semibold tabular-nums text-foreground">
                 ₹{allFunds.zerodha.availableMargin.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
               </span>
             </span>
           </span>
         ) : funds?.availableMargin != null ? (
-          <span className="font-semibold tabular-nums text-foreground ml-1">
+          <span className="font-mono font-semibold tabular-nums text-foreground ml-1">
             ₹{funds.availableMargin.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
           </span>
         ) : (
@@ -222,7 +222,7 @@ export function StatsBar({
             return !v;
           })}
           title={fundsVisible ? "Hide balance" : "Show balance"}
-          className="ml-0.5 rounded p-0.5 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+          className="ml-0.5 cursor-pointer rounded p-0.5 text-muted-foreground/50 hover:text-muted-foreground transition-colors active:scale-95"
         >
           {fundsVisible ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
         </button>
@@ -233,7 +233,7 @@ export function StatsBar({
         <button
           onClick={onOpenProfitProtection}
           className={cn(
-            "flex items-center gap-1.5 rounded px-2 py-1 text-xs font-medium transition-colors",
+            "flex cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-xs font-medium transition-colors",
             ppEnabled
               ? "text-green-500 hover:bg-green-500/10"
               : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -247,7 +247,7 @@ export function StatsBar({
             <span
               onClick={(e) => { e.stopPropagation(); setEnabled(!ppEnabled); }}
               className={cn(
-                "ml-0.5 inline-flex h-4 w-7 items-center rounded-full border border-transparent transition-colors",
+                "ml-0.5 inline-flex h-4 w-7 cursor-pointer items-center rounded-full border border-transparent transition-colors",
                 ppEnabled ? "bg-green-500" : "bg-muted-foreground/30",
               )}
             >

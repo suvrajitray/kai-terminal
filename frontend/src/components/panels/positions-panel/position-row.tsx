@@ -27,11 +27,11 @@ export function PnlCell({ value, pct }: { value: number; pct?: number }) {
   const color = value > 0 ? "text-green-500" : value < 0 ? "text-red-500" : "text-muted-foreground";
   return (
     <div className="flex flex-col items-end gap-0">
-      <span className={cn("tabular-nums", color)}>
+      <span className={cn("font-mono tabular-nums", color)}>
         {value >= 0 ? "+" : ""}₹{INR.format(value)}
       </span>
       {pct !== undefined && (
-        <span className={cn("text-[10px] tabular-nums opacity-60", color)}>
+        <span className={cn("font-mono text-[10px] tabular-nums opacity-60", color)}>
           {pct >= 0 ? "+" : ""}{pct.toFixed(1)}%
         </span>
       )}
@@ -128,17 +128,17 @@ export function PositionRow({
         </td>
         <td
           className={cn(
-            "px-3 py-1.5 text-right tabular-nums font-semibold",
+            "px-3 py-1.5 text-right font-mono tabular-nums font-semibold",
             p.quantity < 0 ? "text-red-500" : "text-green-500",
           )}
         >
           {p.quantity > 0 ? "+" : ""}
           {p.quantity}
         </td>
-        <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">
+        <td className="px-3 py-1.5 text-right font-mono tabular-nums text-muted-foreground">
           ₹{INR.format(p.averagePrice)}
         </td>
-        <td className="px-3 py-1.5 text-right tabular-nums">₹{INR.format(p.ltp)}</td>
+        <td className="px-3 py-1.5 text-right font-mono tabular-nums">₹{INR.format(p.ltp)}</td>
         <td className="px-3 py-1.5 text-right">
           <PnlCell value={p.pnl} pct={toPct(p.pnl)} />
         </td>

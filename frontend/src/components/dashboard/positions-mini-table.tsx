@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useOptionContractsStore, formatExpiryLabel } from "@/stores/option-contracts-store";
 import { OptionTypeBadge } from "@/components/panels/positions-panel/option-type-badge";
 import type { Position } from "@/types";
@@ -11,7 +12,7 @@ const INR = new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 });
 function PnlCell({ value }: { value: number }) {
   const color = value > 0 ? "text-green-500" : value < 0 ? "text-red-500" : "text-muted-foreground";
   return (
-    <span className={cn("tabular-nums", color)}>
+    <span className={cn("font-mono tabular-nums", color)}>
       {value >= 0 ? "+" : "-"}₹{INR.format(Math.abs(value))}
     </span>
   );
@@ -35,8 +36,23 @@ export function PositionsMiniTable({ positions, loading }: PositionsMiniTablePro
       </CardHeader>
       <CardContent className="px-0 pb-0 flex-1 flex flex-col">
         {loading ? (
-          <div className="flex flex-1 items-center justify-center py-10 text-xs text-muted-foreground">
-            Loading…
+          <div className="overflow-hidden">
+            <table className="w-full text-xs">
+              <tbody>
+                {[0, 1, 2].map((i) => (
+                  <tr key={i} className="border-b border-border/30">
+                    <td className="px-4 py-1.5">
+                      <Skeleton className="mb-1 h-3.5 w-24" />
+                      <Skeleton className="h-2.5 w-16" />
+                    </td>
+                    <td className="px-3 py-1.5 text-right"><Skeleton className="ml-auto h-3.5 w-8" /></td>
+                    <td className="px-3 py-1.5 text-right"><Skeleton className="ml-auto h-3.5 w-14" /></td>
+                    <td className="px-3 py-1.5 text-right"><Skeleton className="ml-auto h-3.5 w-14" /></td>
+                    <td className="px-4 py-1.5 text-right"><Skeleton className="ml-auto h-3.5 w-16" /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : open.length === 0 ? (
           <div className="flex flex-1 items-center justify-center py-10 text-xs text-muted-foreground">
@@ -87,16 +103,16 @@ export function PositionsMiniTable({ positions, loading }: PositionsMiniTablePro
                         </td>
                         <td
                           className={cn(
-                            "px-3 py-1.5 text-right tabular-nums font-semibold",
+                            "px-3 py-1.5 text-right font-mono tabular-nums font-semibold",
                             p.quantity < 0 ? "text-red-500" : "text-green-500",
                           )}
                         >
                           {p.quantity > 0 ? "+" : ""}{p.quantity}
                         </td>
-                        <td className="px-3 py-1.5 text-right tabular-nums text-muted-foreground">
+                        <td className="px-3 py-1.5 text-right font-mono tabular-nums text-muted-foreground">
                           ₹{INR.format(avg)}
                         </td>
-                        <td className="px-3 py-1.5 text-right tabular-nums">
+                        <td className="px-3 py-1.5 text-right font-mono tabular-nums">
                           ₹{INR.format(p.ltp)}
                         </td>
                         <td className="px-4 py-1.5 text-right">
