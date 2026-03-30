@@ -117,7 +117,11 @@ public sealed class ZerodhaHttpClient
             form["price"] = price.Value.ToString("F2");
 
         var response = await http.PostAsync("/orders/regular", new FormUrlEncodedContent(form), ct);
-        response.EnsureSuccessStatusCode();
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(ct);
+            throw new HttpRequestException($"Zerodha order failed ({(int)response.StatusCode}): {body}");
+        }
 
         var result = await response.Content.ReadFromJsonAsync<KiteEnvelope<KiteOrderData>>(_json, ct)
             ?? throw new InvalidOperationException("Null response placing Zerodha order");

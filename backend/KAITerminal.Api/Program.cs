@@ -79,6 +79,15 @@ app.UseExceptionHandler(errApp => errApp.Run(async ctx =>
         ctx.Response.ContentType = "application/json";
         await ctx.Response.WriteAsJsonAsync(new { message = ex.Message });
     }
+    else if (feature?.Error is HttpRequestException httpEx)
+    {
+        logger.LogWarning(httpEx,
+            "Broker API error on {Method} {Path}: {Message}",
+            ctx.Request.Method, ctx.Request.Path, httpEx.Message);
+        ctx.Response.StatusCode = 422;
+        ctx.Response.ContentType = "application/json";
+        await ctx.Response.WriteAsJsonAsync(new { message = httpEx.Message });
+    }
     else if (feature?.Error is not null)
     {
         logger.LogError(feature.Error,
