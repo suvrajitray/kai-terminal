@@ -408,7 +408,32 @@ journalctl -u kaiterminal-worker -f
 
 ---
 
-## Step 12 — UFW (VM-level Firewall)
+## Step 12 — Daily Worker Reset Timer
+
+The Worker holds per-user risk state (trailing SL floor, squared-off flag) in Redis. Without a daily reset, stale state from the previous session could trigger a false trailing SL hit on the next trading day.
+
+The timer flushes all `risk-state:*` keys and restarts the Worker every morning at **8:30 AM IST (03:00 UTC)** — before market open.
+
+```bash
+sudo cp /opt/kaiterminal/repo/deploy/worker-daily-reset.sh /opt/kaiterminal/worker-daily-reset.sh
+sudo chmod +x /opt/kaiterminal/worker-daily-reset.sh
+sudo cp /opt/kaiterminal/repo/deploy/kaiterminal-worker-daily-reset.service /etc/systemd/system/
+sudo cp /opt/kaiterminal/repo/deploy/kaiterminal-worker-daily-reset.timer   /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now kaiterminal-worker-daily-reset.timer
+```
+
+Verify the timer is scheduled:
+```bash
+sudo systemctl list-timers kaiterminal-worker-daily-reset.timer
+```
+
+> [!NOTE]
+> The timer has `Persistent=true` — if the server was off at 03:00 UTC (e.g. weekend shutdown), the reset runs automatically on the next boot. This means you can safely shut down the server over the weekend and restart Monday morning; Redis will be flushed and the Worker restarted as part of boot.
+
+---
+
+## Step 13 — UFW (VM-level Firewall)
 
 Second layer of protection on top of Azure NSG:
 
@@ -423,7 +448,7 @@ sudo ufw enable
 
 ---
 
-## Step 13 — Google OAuth Redirect URIs
+## Step 14 — Google OAuth Redirect URIs
 
 In **Google Cloud Console → OAuth 2.0 credentials**, add to **Authorized redirect URIs**:
 
@@ -436,7 +461,7 @@ The `Frontend__Url` in `api.env` must be `https://kaiterminal.com`.
 
 ---
 
-## Step 14 — Seq (Optional — Structured Log Viewer)
+## Step 15 — Seq (Optional — Structured Log Viewer)
 
 ```bash
 docker run -d --name seq --restart unless-stopped \
@@ -486,6 +511,7 @@ du -sh /opt/seq-data
 - [ ] `Api__InternalKey` identical in both env files
 - [ ] Frontend + API + Worker built and deployed
 - [ ] Systemd services enabled and started
+- [ ] Daily reset timer installed and enabled (`kaiterminal-worker-daily-reset.timer`)
 - [ ] UFW enabled
 - [ ] Google OAuth redirect URI updated in Cloud Console
 - [ ] Log in with `suvrajit.ray@gmail.com` (auto-activated as admin)
@@ -557,6 +583,19 @@ sudo systemctl restart kaiterminal-api kaiterminal-worker
 
 > [!WARNING]
 > Restart the Worker **outside market hours** (before 9:00 AM or after 3:35 PM IST) — it reconnects the Upstox WebSocket on startup.
+
+---
+
+## Weekend Shutdown
+
+Shutting down the VM over the weekend is safe. On Monday restart:
+
+1. All systemd services (`kaiterminal-api`, `kaiterminal-worker`) start automatically — they are `enabled`.
+2. The daily reset timer fires immediately on boot (missed Saturday/Sunday runs caught by `Persistent=true`) — Redis risk state from Friday is flushed and the Worker restarts clean.
+3. Log in to the app and re-authenticate with Upstox/Zerodha (tokens expire daily). Enable Profit Protection once you have open positions.
+
+> [!NOTE]
+> Redis persists data to disk by default — a server reboot alone does **not** clear Redis. The daily reset timer handles this explicitly.
 
 ---
 
