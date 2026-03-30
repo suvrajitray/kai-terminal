@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import * as signalR from "@microsoft/signalr";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { API_BASE_URL } from "@/lib/constants";
 import { useAuthStore } from "@/stores/auth-store";
 import { useRiskStateStore } from "@/stores/risk-state-store";

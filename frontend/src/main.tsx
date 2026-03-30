@@ -13,7 +13,6 @@ createRoot(document.getElementById("root")!).render(
         <App />
         <Toaster
           position="bottom-right"
-          richColors
           expand
           closeButton
           visibleToasts={8}

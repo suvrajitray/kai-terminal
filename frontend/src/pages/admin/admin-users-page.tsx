@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { getUsers, setUserActive, type AdminUser } from "@/services/admin-api";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 export function AdminUsersPage() {
   return (

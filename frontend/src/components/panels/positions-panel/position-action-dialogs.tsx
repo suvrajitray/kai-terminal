@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { LogOut, TrendingUp, TrendingDown, RefreshCw, ArrowRight } from "lucide-react";
 import {
   Dialog,

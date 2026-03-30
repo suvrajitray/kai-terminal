@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { RefreshCw, Zap, TrendingUp, TrendingDown, ArrowUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -123,8 +123,8 @@ export function ByChainTab({ broker, underlying, expiry, product, quantity, isAc
     try {
       const data = await fetchOptionChain(underlyingKey, expiry);
       setChain(data);
-    } catch {
-      toast.error("Failed to load option chain");
+    } catch (e) {
+      toast.error((e as Error).message ?? "Failed to load option chain");
     } finally {
       setLoading(false);
     }

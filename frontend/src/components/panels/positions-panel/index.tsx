@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { useNewRows } from "@/hooks/use-new-rows";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { LogOut, LayoutList } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { BrokerBadge } from "@/components/ui/broker-badge";

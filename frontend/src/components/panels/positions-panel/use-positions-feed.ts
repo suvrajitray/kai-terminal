@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as signalR from "@microsoft/signalr";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { fetchPositions, fetchZerodhaPositions } from "@/services/trading-api";
 import { isBrokerTokenExpired } from "@/lib/token-utils";
 import { API_BASE_URL } from "@/lib/constants";

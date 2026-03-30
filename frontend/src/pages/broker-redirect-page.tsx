@@ -12,7 +12,7 @@ import { exchangeAccessToken, exchangeZerodhaToken, updateBrokerAccessToken } fr
 import { fetchUserTradingSettings } from "@/services/user-settings-api";
 import { fetchMasterContracts } from "@/services/trading-api";
 import { useOptionContractsStore } from "@/stores/option-contracts-store";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 interface Step {
   message: string;
