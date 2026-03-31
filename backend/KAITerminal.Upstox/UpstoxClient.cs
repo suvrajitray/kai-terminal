@@ -3,6 +3,8 @@ using KAITerminal.Upstox.Models.Requests;
 using KAITerminal.Upstox.Models.Responses;
 using KAITerminal.Upstox.Services;
 using BrokerFunds = KAITerminal.Contracts.Domain.BrokerFunds;
+using BrokerMarginOrderItem = KAITerminal.Contracts.Domain.BrokerMarginOrderItem;
+using BrokerMarginResult = KAITerminal.Contracts.Domain.BrokerMarginResult;
 
 namespace KAITerminal.Upstox;
 
@@ -16,14 +18,14 @@ public sealed class UpstoxClient
     private readonly IBrokerAuthService _auth;
     private readonly IUpstoxPositionService _positions;
     private readonly IUpstoxOrderService _orders;
-    private readonly IUpstoxMarginService _margin;
+    private readonly IBrokerMarginService _margin;
     private readonly IBrokerFundsService _funds;
 
     public UpstoxClient(
         IBrokerAuthService auth,
         IUpstoxPositionService positions,
         IUpstoxOrderService orders,
-        IUpstoxMarginService margin,
+        IBrokerMarginService margin,
         IBrokerFundsService funds)
     {
         ArgumentNullException.ThrowIfNull(auth);
@@ -168,8 +170,8 @@ public sealed class UpstoxClient
     /// <summary>
     /// Calculate required margin for a set of hypothetical orders without placing them.
     /// </summary>
-    public Task<MarginResponse> GetRequiredMarginAsync(
-        IEnumerable<MarginOrderItem> items, CancellationToken cancellationToken = default)
+    public Task<BrokerMarginResult> GetRequiredMarginAsync(
+        IEnumerable<BrokerMarginOrderItem> items, CancellationToken cancellationToken = default)
         => _margin.GetRequiredMarginAsync(items, cancellationToken);
 
     // ═══════════════════════════════════════════════════════

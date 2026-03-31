@@ -51,7 +51,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IZerodhaPositionService,   ZerodhaPositionService>();
         services.AddSingleton<IZerodhaOrderService,      ZerodhaOrderService>();
         services.AddSingleton<IBrokerFundsService,        ZerodhaFundsService>();
-        services.AddSingleton<IZerodhaMarginService,     ZerodhaMarginService>();
+        services.AddSingleton<IBrokerMarginService,       ZerodhaMarginService>();
 
         // KiteTickerStreamer is stateful — Transient gives each caller its own independent instance
         services.AddTransient<KiteTickerStreamer>();

@@ -16,7 +16,7 @@ public sealed class ZerodhaClient
     private readonly IZerodhaPositionService   _positions;
     private readonly IZerodhaOrderService      _orders;
     private readonly IBrokerFundsService        _funds;
-    private readonly IZerodhaMarginService     _margin;
+    private readonly IBrokerMarginService       _margin;
     private readonly Func<KiteTickerStreamer> _marketDataStreamerFactory;
 
     public ZerodhaClient(
@@ -24,7 +24,7 @@ public sealed class ZerodhaClient
         IZerodhaPositionService   positions,
         IZerodhaOrderService      orders,
         IBrokerFundsService       funds,
-        IZerodhaMarginService     margin,
+        IBrokerMarginService      margin,
         Func<KiteTickerStreamer>   marketDataStreamerFactory)
     {
         _auth                     = auth;
@@ -76,8 +76,8 @@ public sealed class ZerodhaClient
 
     // ── Margin ────────────────────────────────────────────────────────────────
 
-    public Task<ZerodhaMarginResponse> GetRequiredMarginAsync(
-        IEnumerable<ZerodhaMarginOrderItem> items, CancellationToken ct = default)
+    public Task<BrokerMarginResult> GetRequiredMarginAsync(
+        IEnumerable<BrokerMarginOrderItem> items, CancellationToken ct = default)
         => _margin.GetRequiredMarginAsync(items, ct);
 
 }

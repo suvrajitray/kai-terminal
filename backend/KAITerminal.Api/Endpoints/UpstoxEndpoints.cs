@@ -2,6 +2,7 @@ using System.Security.Claims;
 using KAITerminal.Api.Mapping;
 using KAITerminal.Api.Models;
 using KAITerminal.Api.Services;
+using KAITerminal.Contracts.Domain;
 using KAITerminal.MarketData.Services;
 using KAITerminal.Upstox;
 using KAITerminal.Upstox.Exceptions;
@@ -305,7 +306,7 @@ public static class UpstoxEndpoints
             UpstoxClient upstox) =>
         {
             var items = request.Instruments.Select(i =>
-                new MarginOrderItem(i.InstrumentToken, i.Quantity, i.Product, i.TransactionType));
+                new BrokerMarginOrderItem(i.InstrumentToken, i.Quantity, i.Product, i.TransactionType));
             var margin = await upstox.GetRequiredMarginAsync(items);
             return Results.Ok(new { requiredMargin = margin.RequiredMargin, finalMargin = margin.FinalMargin });
         });

@@ -303,7 +303,7 @@ public static class ZerodhaEndpoints
             CancellationToken ct) =>
         {
             var items = request.Instruments.Select(i =>
-                new ZerodhaMarginOrderItem(i.TradingSymbol, i.Exchange, i.TransactionType, i.Product, i.Quantity));
+                new BrokerMarginOrderItem($"{i.Exchange}|{i.TradingSymbol}", i.Quantity, i.Product, i.TransactionType));
             var margin = await zerodha.GetRequiredMarginAsync(items, ct);
             return Results.Ok(new { requiredMargin = margin.RequiredMargin, finalMargin = margin.FinalMargin });
         });

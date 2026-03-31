@@ -61,7 +61,7 @@ public sealed class ZerodhaHttpClient
 
     // ── Margin ────────────────────────────────────────────────────────────────
 
-    public async Task<ZerodhaMarginResponse> GetRequiredMarginAsync(
+    internal async Task<ZerodhaMarginResponse> GetRequiredMarginAsync(
         IEnumerable<ZerodhaMarginOrderItem> items, CancellationToken ct = default)
     {
         var body = items.Select(i => new KiteMarginOrderDto
