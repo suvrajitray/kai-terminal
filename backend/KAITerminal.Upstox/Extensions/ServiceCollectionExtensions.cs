@@ -63,7 +63,6 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IAuthService, AuthService>();
         services.AddSingleton<IPositionService, PositionService>();
         services.AddSingleton<IOrderService, OrderService>();
-        services.AddSingleton<IOptionService, OptionService>();
         services.AddSingleton<IMarginService, MarginService>();
         services.AddSingleton<IFundsService, FundsService>();
 

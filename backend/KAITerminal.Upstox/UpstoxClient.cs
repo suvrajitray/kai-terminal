@@ -1,4 +1,3 @@
-using KAITerminal.Upstox.Models.Enums;
 using KAITerminal.Upstox.Models.Requests;
 using KAITerminal.Upstox.Models.Responses;
 using KAITerminal.Upstox.Services;
@@ -15,7 +14,6 @@ public sealed class UpstoxClient
     private readonly IAuthService _auth;
     private readonly IPositionService _positions;
     private readonly IOrderService _orders;
-    private readonly IOptionService _options;
     private readonly IMarginService _margin;
     private readonly IFundsService _funds;
 
@@ -23,21 +21,18 @@ public sealed class UpstoxClient
         IAuthService auth,
         IPositionService positions,
         IOrderService orders,
-        IOptionService options,
         IMarginService margin,
         IFundsService funds)
     {
         ArgumentNullException.ThrowIfNull(auth);
         ArgumentNullException.ThrowIfNull(positions);
         ArgumentNullException.ThrowIfNull(orders);
-        ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(margin);
         ArgumentNullException.ThrowIfNull(funds);
 
         _auth = auth;
         _positions = positions;
         _orders = orders;
-        _options = options;
         _margin = margin;
         _funds  = funds;
     }
@@ -151,48 +146,6 @@ public sealed class UpstoxClient
         => _orders.PlaceOrderV3Async(request, cancellationToken);
 
     // ═══════════════════════════════════════════════════════
-    // Feature 7 — Place Order by Option Price
-    // ═══════════════════════════════════════════════════════
-
-    /// <summary>
-    /// Resolve the option chain entry whose LTP best matches <paramref name="targetPremium"/>
-    /// and return it without placing any order.
-    /// </summary>
-    public Task<OptionChainEntry> GetOrderByOptionPriceAsync(
-        string underlyingKey, string expiryDate, OptionType optionType,
-        decimal targetPremium, PriceSearchMode priceSearchMode = PriceSearchMode.Nearest,
-        CancellationToken cancellationToken = default)
-        => _options.GetOrderByOptionPriceAsync(underlyingKey, expiryDate, optionType, targetPremium, priceSearchMode, cancellationToken);
-
-    /// <summary>
-    /// Find the strike whose LTP is nearest to the target premium and place a v3 HFT order.
-    /// </summary>
-    public Task<PlaceOrderV3Result> PlaceOrderByOptionPriceV3Async(
-        PlaceOrderByOptionPriceRequest request, CancellationToken cancellationToken = default)
-        => _options.PlaceOrderByOptionPriceV3Async(request, cancellationToken);
-
-    // ═══════════════════════════════════════════════════════
-    // Feature 8 — Place Order by Strike Type
-    // ═══════════════════════════════════════════════════════
-
-    /// <summary>
-    /// Resolve the option chain entry for the given strike type (ATM / OTM1-5 / ITM1-5)
-    /// and return it without placing any order.
-    /// </summary>
-    public Task<OptionChainEntry> GetOrderByStrikeAsync(
-        string underlyingKey, string expiryDate, OptionType optionType, StrikeType strikeType,
-        CancellationToken cancellationToken = default)
-        => _options.GetOrderByStrikeAsync(underlyingKey, expiryDate, optionType, strikeType, cancellationToken);
-
-    /// <summary>
-    /// Resolve the exact strike (ATM / OTM1-5 / ITM1-5) relative to the current spot price
-    /// and place a v3 HFT order.
-    /// </summary>
-    public Task<PlaceOrderV3Result> PlaceOrderByStrikeV3Async(
-        PlaceOrderByStrikeRequest request, CancellationToken cancellationToken = default)
-        => _options.PlaceOrderByStrikeV3Async(request, cancellationToken);
-
-    // ═══════════════════════════════════════════════════════
     // Additional helpers exposed for convenience
     // ═══════════════════════════════════════════════════════
 
@@ -205,16 +158,6 @@ public sealed class UpstoxClient
     public Task<(string OrderId, int Latency)> CancelOrderV3Async(
         string orderId, CancellationToken cancellationToken = default)
         => _orders.CancelOrderV3Async(orderId, cancellationToken);
-
-    /// <summary>Fetch the put/call option chain for an underlying at a given expiry.</summary>
-    public Task<IReadOnlyList<OptionChainEntry>> GetOptionChainAsync(
-        string underlyingKey, string expiryDate, CancellationToken cancellationToken = default)
-        => _options.GetOptionChainAsync(underlyingKey, expiryDate, cancellationToken);
-
-    /// <summary>Fetch option contract metadata (no live prices) for an underlying.</summary>
-    public Task<IReadOnlyList<OptionContract>> GetOptionContractsAsync(
-        string underlyingKey, string? expiryDate = null, CancellationToken cancellationToken = default)
-        => _options.GetOptionContractsAsync(underlyingKey, expiryDate, cancellationToken);
 
     // ═══════════════════════════════════════════════════════
     // Margin

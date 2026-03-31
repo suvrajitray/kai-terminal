@@ -1,5 +1,3 @@
-using KAITerminal.Upstox.Models.Enums;
-
 namespace KAITerminal.Api.Models;
 
 public record struct UpstoxTokenRequest(
@@ -25,19 +23,6 @@ public record struct SaveBrokerCredentialRequest(
     string AccessToken = "");
 
 public record struct ConvertPositionRequest(string OldProduct, int Quantity);
-
-public record ResolveByOptionPriceQuery(
-    string UnderlyingKey,
-    string ExpiryDate,
-    OptionType OptionType,
-    decimal TargetPremium,
-    PriceSearchMode PriceSearchMode = PriceSearchMode.Nearest);
-
-public record ResolveByStrikeQuery(
-    string UnderlyingKey,
-    string ExpiryDate,
-    OptionType OptionType,
-    StrikeType StrikeType);
 
 public record MarginRequest(List<MarginInstrumentRequest> Instruments);
 public record MarginInstrumentRequest(string InstrumentToken, int Quantity, string Product, string TransactionType);
