@@ -5,34 +5,9 @@ namespace KAITerminal.Api.Mapping;
 
 internal static class PositionMapper
 {
-    /// <summary>Maps an Upstox-specific position to the unified API response DTO.</summary>
-    internal static PositionResponse ToResponse(
-        this KAITerminal.Upstox.Models.Responses.Position p, string broker = "upstox")
-        => new()
-        {
-            Exchange        = p.Exchange,
-            InstrumentToken = p.InstrumentToken,
-            TradingSymbol   = p.TradingSymbol,
-            Product         = ParseProduct(p.Product),
-            Quantity        = p.Quantity,
-            BuyQuantity     = p.DayBuyQuantity,
-            SellQuantity    = p.DaySellQuantity,
-            AveragePrice    = p.AveragePrice,
-            Ltp             = p.LastPrice,
-            Pnl             = p.Pnl,
-            Unrealised      = p.Unrealised,
-            Realised        = p.Realised,
-            BuyPrice        = p.BuyPrice,
-            SellPrice       = p.SellPrice,
-            BuyValue        = p.BuyValue,
-            SellValue       = p.SellValue,
-            Broker          = broker,
-            IsOpen          = p.IsOpen,
-        };
-
     /// <summary>Maps a broker-agnostic domain position to the unified API response DTO.</summary>
     internal static PositionResponse ToResponse(
-        this KAITerminal.Contracts.Domain.Position p)
+        this KAITerminal.Contracts.Domain.BrokerPosition p)
         => new()
         {
             Exchange        = p.Exchange,

@@ -25,7 +25,7 @@ public sealed class ZerodhaHttpClient
 
     // ── Positions ─────────────────────────────────────────────────────────────
 
-    public async Task<IReadOnlyList<Position>> GetPositionsAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<BrokerPosition>> GetPositionsAsync(CancellationToken ct = default)
     {
         var http = _httpFactory.CreateClient("ZerodhaApi");
         var root = await http.GetFromJsonAsync<KiteEnvelope<KitePositionData>>("/portfolio/positions", _json, ct)
@@ -214,7 +214,7 @@ public sealed class ZerodhaHttpClient
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
-    private static Position MapPosition(KiteNetPosition p) => new()
+    private static BrokerPosition MapPosition(KiteNetPosition p) => new()
     {
         Exchange        = p.Exchange ?? "",
         InstrumentToken = p.TradingSymbol ?? "",

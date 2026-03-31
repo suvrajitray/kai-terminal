@@ -27,7 +27,7 @@ public sealed class ZerodhaBrokerClient : IBrokerClient
 
     public IDisposable UseToken() => ZerodhaTokenContext.Use(_apiKey, _accessToken);
 
-    public async Task<IReadOnlyList<Position>> GetAllPositionsAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<BrokerPosition>> GetAllPositionsAsync(CancellationToken ct = default)
     {
         using var _ = UseToken();
         return await _zerodha.GetAllPositionsAsync(ct);

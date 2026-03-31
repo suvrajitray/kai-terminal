@@ -13,7 +13,7 @@ namespace KAITerminal.Zerodha;
 public sealed class ZerodhaClient
 {
     private readonly IBrokerAuthService         _auth;
-    private readonly IZerodhaPositionService   _positions;
+    private readonly IBrokerPositionService     _positions;
     private readonly IZerodhaOrderService      _orders;
     private readonly IBrokerFundsService        _funds;
     private readonly IBrokerMarginService       _margin;
@@ -21,7 +21,7 @@ public sealed class ZerodhaClient
 
     public ZerodhaClient(
         IBrokerAuthService        auth,
-        IZerodhaPositionService   positions,
+        IBrokerPositionService    positions,
         IZerodhaOrderService      orders,
         IBrokerFundsService       funds,
         IBrokerMarginService      margin,
@@ -43,7 +43,7 @@ public sealed class ZerodhaClient
 
     // ── Positions ─────────────────────────────────────────────────────────────
 
-    public Task<IReadOnlyList<Position>> GetAllPositionsAsync(CancellationToken ct = default)
+    public Task<IReadOnlyList<BrokerPosition>> GetAllPositionsAsync(CancellationToken ct = default)
         => _positions.GetAllPositionsAsync(ct);
 
     public Task<decimal> GetTotalMtmAsync(CancellationToken ct = default)

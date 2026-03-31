@@ -12,13 +12,13 @@ public sealed class PositionCache : IPositionCache
     private sealed class Entry
     {
         // Written atomically; readers always see a consistent snapshot
-        public volatile IReadOnlyList<Position> Positions = [];
+        public volatile IReadOnlyList<BrokerPosition> Positions = [];
         public readonly ConcurrentDictionary<string, decimal> Ltp = new(StringComparer.Ordinal);
     }
 
     private Entry GetOrAdd(string userId) => _data.GetOrAdd(userId, _ => new Entry());
 
-    public void UpdatePositions(string userId, IReadOnlyList<Position> positions)
+    public void UpdatePositions(string userId, IReadOnlyList<BrokerPosition> positions)
     {
         var entry = GetOrAdd(userId);
         entry.Ltp.Clear();   // clear stale LTP values before replacing positions
@@ -28,7 +28,7 @@ public sealed class PositionCache : IPositionCache
     public void UpdateLtp(string userId, string instrumentToken, decimal ltp)
         => GetOrAdd(userId).Ltp[instrumentToken] = ltp;
 
-    public IReadOnlyList<Position> GetPositions(string userId)
+    public IReadOnlyList<BrokerPosition> GetPositions(string userId)
         => _data.TryGetValue(userId, out var e) ? e.Positions : [];
 
     public decimal GetEffectiveLtp(string userId, string instrumentToken, decimal fallback)

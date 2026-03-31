@@ -1,7 +1,7 @@
 namespace KAITerminal.Contracts.Domain;
 
 /// <summary>Broker-agnostic position representation.</summary>
-public sealed record Position
+public sealed record BrokerPosition
 {
     public string Exchange        { get; init; } = "";
     public string InstrumentToken { get; init; } = "";  // Broker-specific token string

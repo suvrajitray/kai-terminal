@@ -21,7 +21,7 @@ public interface IBrokerClient
     // ── Positions ────────────────────────────────────────────────────────────
 
     /// <summary>Fetch all open and closed positions for the current trading day.</summary>
-    Task<IReadOnlyList<Position>> GetAllPositionsAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<BrokerPosition>> GetAllPositionsAsync(CancellationToken ct = default);
 
     /// <summary>Calculate total MTM across all positions.</summary>
     Task<decimal> GetTotalMtmAsync(CancellationToken ct = default);

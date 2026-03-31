@@ -101,7 +101,7 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
 
     // ── Position fetch ────────────────────────────────────────────────────────
 
-    private async Task<IReadOnlyList<KAITerminal.Contracts.Domain.Position>> FetchAllPositionsAsync(
+    private async Task<IReadOnlyList<KAITerminal.Contracts.Domain.BrokerPosition>> FetchAllPositionsAsync(
         CancellationToken ct)
     {
         var tasks = _brokers.Select(async broker =>
@@ -116,7 +116,7 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
     // ── Feed subscription management ──────────────────────────────────────────
 
     private async Task RefreshSubscriptionsAsync(
-        IReadOnlyList<KAITerminal.Contracts.Domain.Position> allPositions, CancellationToken ct)
+        IReadOnlyList<KAITerminal.Contracts.Domain.BrokerPosition> allPositions, CancellationToken ct)
     {
         // Upstox: instrument token IS the feed token
         var newUpstoxTokens = allPositions
@@ -164,7 +164,7 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
     }
 
     private async Task<Dictionary<string, string>> BuildZerodhaFeedMapAsync(
-        IReadOnlyList<KAITerminal.Contracts.Domain.Position> zerodhaPositions, CancellationToken ct)
+        IReadOnlyList<KAITerminal.Contracts.Domain.BrokerPosition> zerodhaPositions, CancellationToken ct)
     {
         var map = new Dictionary<string, string>(StringComparer.Ordinal);
         try
@@ -287,8 +287,8 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private IReadOnlyList<KAITerminal.Contracts.Domain.Position> ApplyFilter(
-        IReadOnlyList<KAITerminal.Contracts.Domain.Position> positions)
+    private IReadOnlyList<KAITerminal.Contracts.Domain.BrokerPosition> ApplyFilter(
+        IReadOnlyList<KAITerminal.Contracts.Domain.BrokerPosition> positions)
     {
         if (_exchangeFilter is null) return positions;
         return positions

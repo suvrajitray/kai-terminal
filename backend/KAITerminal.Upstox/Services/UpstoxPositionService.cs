@@ -1,13 +1,14 @@
+using KAITerminal.Broker;
 using KAITerminal.Contracts.Constants;
+using KAITerminal.Contracts.Domain;
 using KAITerminal.Upstox.Exceptions;
 using KAITerminal.Upstox.Http;
 using KAITerminal.Upstox.Models.Enums;
 using KAITerminal.Upstox.Models.Requests;
-using KAITerminal.Upstox.Models.Responses;
 
 namespace KAITerminal.Upstox.Services;
 
-internal sealed class UpstoxPositionService : IUpstoxPositionService
+internal sealed class UpstoxPositionService : IBrokerPositionService
 {
     private readonly UpstoxHttpClient _http;
 
@@ -16,60 +17,52 @@ internal sealed class UpstoxPositionService : IUpstoxPositionService
         _http = http;
     }
 
-    /// <inheritdoc />
-    public async Task<IReadOnlyList<Position>> GetAllPositionsAsync(CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<BrokerPosition>> GetAllPositionsAsync(CancellationToken ct = default)
     {
-        var positions = await _http.GetPositionsAsync(cancellationToken);
-        return positions
+        var raw = await _http.GetPositionsAsync(ct);
+        return raw
             .Where(p => ExchangeConstants.OptionsExchanges.Contains(p.Exchange))
+            .Select(Map)
             .ToList()
             .AsReadOnly();
     }
 
-    /// <inheritdoc />
-    public async Task<decimal> GetTotalMtmAsync(CancellationToken cancellationToken = default)
+    public async Task<decimal> GetTotalMtmAsync(CancellationToken ct = default)
     {
-        var positions = await GetAllPositionsAsync(cancellationToken);
+        var positions = await GetAllPositionsAsync(ct);
         return positions.Sum(p => p.Pnl);
     }
 
-    /// <inheritdoc />
     public async Task<IReadOnlyList<string>> ExitAllPositionsAsync(
-        IReadOnlyCollection<string>? exchanges = null,
-        CancellationToken cancellationToken = default)
+        IReadOnlyCollection<string>? exchanges = null, CancellationToken ct = default)
     {
-        var positions = await GetAllPositionsAsync(cancellationToken);
-        var openPositions = positions.Where(p => p.IsOpen);
+        var positions = await GetAllPositionsAsync(ct);
+        var open = positions.Where(p => p.IsOpen);
 
         if (exchanges?.Count > 0)
         {
             var set = exchanges.Select(e => e.ToUpperInvariant()).ToHashSet();
-            openPositions = openPositions.Where(p => set.Contains(p.Exchange.ToUpperInvariant()));
+            open = open.Where(p => set.Contains(p.Exchange.ToUpperInvariant()));
         }
 
-        var openPosList = openPositions.ToList();
-
-        if (openPosList.Count == 0)
+        var openList = open.ToList();
+        if (openList.Count == 0)
             return [];
 
-        // Exit short positions (qty < 0, BUY-to-close) before long positions (qty > 0, SELL-to-close)
-        // to reduce risk exposure as fast as possible
-        var shorts = openPosList.Where(p => p.Quantity < 0).ToList();
-        var longs  = openPosList.Where(p => p.Quantity > 0).ToList();
+        // Exit shorts (BUY-to-close) before longs (SELL-to-close) to reduce risk exposure first
+        var shorts = openList.Where(p => p.Quantity < 0).ToList();
+        var longs  = openList.Where(p => p.Quantity > 0).ToList();
 
-        var shortResults = await Task.WhenAll(shorts.Select(p => ExitSingleAsync(p, cancellationToken)));
-        var longResults  = await Task.WhenAll(longs.Select(p => ExitSingleAsync(p, cancellationToken)));
+        var shortResults = await Task.WhenAll(shorts.Select(p => ExitSingleAsync(p, ct)));
+        var longResults  = await Task.WhenAll(longs.Select(p => ExitSingleAsync(p, ct)));
 
         return shortResults.Concat(longResults).ToList().AsReadOnly();
     }
 
-    /// <inheritdoc />
     public async Task<string> ExitPositionAsync(
-        string instrumentToken,
-        string product,
-        CancellationToken cancellationToken = default)
+        string instrumentToken, string product, CancellationToken ct = default)
     {
-        var positions = await GetAllPositionsAsync(cancellationToken);
+        var positions = await GetAllPositionsAsync(ct);
         var position = positions.FirstOrDefault(p =>
             string.Equals(p.InstrumentToken, instrumentToken, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(p.Product, product, StringComparison.OrdinalIgnoreCase));
@@ -80,17 +73,13 @@ internal sealed class UpstoxPositionService : IUpstoxPositionService
         if (!position.IsOpen)
             throw new UpstoxException($"Position for {instrumentToken}/{product} is already closed (quantity = 0).");
 
-        return await ExitSingleAsync(position, cancellationToken);
+        return await ExitSingleAsync(position, ct);
     }
 
-    /// <inheritdoc />
     public async Task ConvertPositionAsync(
-        string instrumentToken,
-        string oldProduct,
-        int quantity,
-        CancellationToken cancellationToken = default)
+        string instrumentToken, string oldProduct, int quantity, CancellationToken ct = default)
     {
-        var positions = await GetAllPositionsAsync(cancellationToken);
+        var positions = await GetAllPositionsAsync(ct);
         var position = positions.FirstOrDefault(p =>
             string.Equals(p.InstrumentToken, instrumentToken, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(p.Product, oldProduct, StringComparison.OrdinalIgnoreCase));
@@ -101,43 +90,60 @@ internal sealed class UpstoxPositionService : IUpstoxPositionService
         if (!position.IsOpen)
             throw new UpstoxException($"Position for {instrumentToken}/{oldProduct} is already closed (quantity = 0).");
 
-        var newProduct       = string.Equals(oldProduct, "I", StringComparison.OrdinalIgnoreCase) ? "D" : "I";
-        var transactionType  = position.Quantity >= 0 ? "BUY" : "SELL";
+        var newProduct      = string.Equals(oldProduct, "I", StringComparison.OrdinalIgnoreCase) ? "D" : "I";
+        var transactionType = position.Quantity >= 0 ? "BUY" : "SELL";
 
-        await _http.ConvertPositionAsync(instrumentToken, oldProduct.ToUpperInvariant(), newProduct, transactionType, quantity, cancellationToken);
+        await _http.ConvertPositionAsync(instrumentToken, oldProduct.ToUpperInvariant(), newProduct, transactionType, quantity, ct);
     }
 
-    // ──────────────────────────────────────────────────
-    // Helpers
-    // ──────────────────────────────────────────────────
+    // ── Helpers ──────────────────────────────────────────────────────────────
 
-    private async Task<string> ExitSingleAsync(Position position, CancellationToken ct)
+    private async Task<string> ExitSingleAsync(BrokerPosition position, CancellationToken ct)
     {
-        // Positive quantity → long position → exit with SELL
-        // Negative quantity → short position → exit with BUY
-        var transactionType = position.Quantity > 0
-            ? TransactionType.Sell
-            : TransactionType.Buy;
+        var txType = position.Quantity > 0 ? TransactionType.Sell : TransactionType.Buy;
 
         var request = new PlaceOrderRequest
         {
             InstrumentToken = position.InstrumentToken,
-            Quantity = Math.Abs(position.Quantity),
-            TransactionType = transactionType,
-            OrderType = OrderType.Market,
-            Product = ParseProduct(position.Product),
-            Tag = "EXIT"
+            Quantity        = Math.Abs(position.Quantity),
+            TransactionType = txType,
+            OrderType       = OrderType.Market,
+            Product         = ParseProduct(position.Product),
+            Tag             = "EXIT"
         };
 
         var result = await _http.PlaceOrderV3Async(request, ct);
         return result.OrderIds.FirstOrDefault()!;
     }
 
-    private static Product ParseProduct(string product) => product.ToUpperInvariant() switch
+    private static Models.Enums.Product ParseProduct(string product) => product.ToUpperInvariant() switch
     {
-        "D" => Product.Delivery,
-        "MTF" => Product.MTF,
-        "CO" => Product.CoverOrder,
-        _ => Product.Intraday
+        "D" or "NRML" => Models.Enums.Product.Delivery,
+        "MTF"         => Models.Enums.Product.MTF,
+        "CO"          => Models.Enums.Product.CoverOrder,
+        _             => Models.Enums.Product.Intraday
+    };
+
+    private static BrokerPosition Map(Models.Responses.Position p) => new()
+    {
+        Exchange        = p.Exchange,
+        InstrumentToken = p.InstrumentToken,
+        TradingSymbol   = p.TradingSymbol,
+        Product         = p.Product,
+        Quantity        = p.Quantity,
+        BuyQuantity     = p.DayBuyQuantity,
+        SellQuantity    = p.DaySellQuantity,
+        AveragePrice    = p.Quantity < 0
+                            ? (p.SellPrice != 0 ? p.SellPrice : p.ClosePrice)
+                            : (p.BuyPrice  != 0 ? p.BuyPrice  : p.ClosePrice),
+        BuyPrice        = p.BuyPrice,
+        SellPrice       = p.SellPrice,
+        Ltp             = p.LastPrice,
+        Pnl             = p.Pnl,
+        Unrealised      = p.Unrealised,
+        Realised        = p.Realised,
+        BuyValue        = p.BuyValue,
+        SellValue       = p.SellValue,
+        Broker          = "upstox",
     };
 }

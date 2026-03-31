@@ -108,7 +108,7 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private async Task ExitExhaustedPositionAsync(
-        string userId, string cacheKey, Contracts.Domain.Position position, IBrokerClient broker,
+        string userId, string cacheKey, Contracts.Domain.BrokerPosition position, IBrokerClient broker,
         RiskEngine.Models.UserRiskState state, int shiftCount, CancellationToken ct)
     {
         var exitToken = BuildCloseToken(position, broker.BrokerType);
@@ -130,7 +130,7 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
     }
 
     private async Task ShiftPositionAsync(
-        string userId, string stateKey, Contracts.Domain.Position position, ZerodhaOptionContract contract,
+        string userId, string stateKey, Contracts.Domain.BrokerPosition position, ZerodhaOptionContract contract,
         string chainKey, IBrokerClient broker,
         RiskEngine.Models.UserRiskState state, UserConfig config, CancellationToken ct)
     {
@@ -207,7 +207,7 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
     }
 
     private static ZerodhaOptionContract? LookupContract(
-        Contracts.Domain.Position position, string brokerType,
+        Contracts.Domain.BrokerPosition position, string brokerType,
         IReadOnlyList<ZerodhaOptionContract> contracts)
     {
         if (brokerType.Equals("zerodha", StringComparison.OrdinalIgnoreCase))
@@ -225,7 +225,7 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
             c.ExchangeToken.Equals(exchangeToken, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static string BuildCloseToken(Contracts.Domain.Position position, string brokerType)
+    private static string BuildCloseToken(Contracts.Domain.BrokerPosition position, string brokerType)
     {
         if (brokerType.Equals("zerodha", StringComparison.OrdinalIgnoreCase))
         {

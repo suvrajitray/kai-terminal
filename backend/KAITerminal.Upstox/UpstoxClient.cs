@@ -5,6 +5,7 @@ using KAITerminal.Upstox.Services;
 using BrokerFunds = KAITerminal.Contracts.Domain.BrokerFunds;
 using BrokerMarginOrderItem = KAITerminal.Contracts.Domain.BrokerMarginOrderItem;
 using BrokerMarginResult = KAITerminal.Contracts.Domain.BrokerMarginResult;
+using BrokerPosition = KAITerminal.Contracts.Domain.BrokerPosition;
 
 namespace KAITerminal.Upstox;
 
@@ -16,14 +17,14 @@ namespace KAITerminal.Upstox;
 public sealed class UpstoxClient
 {
     private readonly IBrokerAuthService _auth;
-    private readonly IUpstoxPositionService _positions;
+    private readonly IBrokerPositionService _positions;
     private readonly IUpstoxOrderService _orders;
     private readonly IBrokerMarginService _margin;
     private readonly IBrokerFundsService _funds;
 
     public UpstoxClient(
         IBrokerAuthService auth,
-        IUpstoxPositionService positions,
+        IBrokerPositionService positions,
         IUpstoxOrderService orders,
         IBrokerMarginService margin,
         IBrokerFundsService funds)
@@ -67,7 +68,7 @@ public sealed class UpstoxClient
     // ═══════════════════════════════════════════════════════
 
     /// <summary>Fetch all open and closed positions for the current trading day.</summary>
-    public Task<IReadOnlyList<Position>> GetAllPositionsAsync(
+    public Task<IReadOnlyList<BrokerPosition>> GetAllPositionsAsync(
         CancellationToken cancellationToken = default)
         => _positions.GetAllPositionsAsync(cancellationToken);
 

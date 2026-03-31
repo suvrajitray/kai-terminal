@@ -8,7 +8,6 @@ using KAITerminal.Upstox;
 using KAITerminal.Upstox.Exceptions;
 using KAITerminal.Upstox.Models.Enums;
 using KAITerminal.Upstox.Models.Requests;
-using KAITerminal.Upstox.Models.Responses;
 using Microsoft.AspNetCore.Mvc;
 
 namespace KAITerminal.Api.Endpoints;
@@ -316,8 +315,8 @@ public static class UpstoxEndpoints
     /// Filters positions by a comma-separated exchange list (e.g. "NFO,BFO").
     /// Returns all positions when <paramref name="exchange"/> is null or empty.
     /// </summary>
-    private static IReadOnlyList<Upstox.Models.Responses.Position> FilterByExchange(
-        IReadOnlyList<Upstox.Models.Responses.Position> positions,
+    private static IReadOnlyList<BrokerPosition> FilterByExchange(
+        IReadOnlyList<BrokerPosition> positions,
         string? exchange)
     {
         if (string.IsNullOrWhiteSpace(exchange))

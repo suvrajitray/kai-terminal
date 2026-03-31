@@ -28,11 +28,10 @@ public sealed class UpstoxBrokerClient : IBrokerClient
 
     public IDisposable UseToken() => UpstoxTokenContext.Use(_accessToken);
 
-    public async Task<IReadOnlyList<Position>> GetAllPositionsAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<BrokerPosition>> GetAllPositionsAsync(CancellationToken ct = default)
     {
         using var _ = UseToken();
-        var upstoxPositions = await _upstox.GetAllPositionsAsync(ct);
-        return upstoxPositions.Select(MapPosition).ToList().AsReadOnly();
+        return await _upstox.GetAllPositionsAsync(ct);
     }
 
     public async Task<decimal> GetTotalMtmAsync(CancellationToken ct = default)
@@ -102,29 +101,4 @@ public sealed class UpstoxBrokerClient : IBrokerClient
         return await _upstox.GetFundsAsync(ct);
     }
 
-    // ── Position mapping ─────────────────────────────────────────────────────
-
-    private static Position MapPosition(KAITerminal.Upstox.Models.Responses.Position p) => new()
-    {
-        Exchange        = p.Exchange,
-        InstrumentToken = p.InstrumentToken,
-        TradingSymbol   = p.TradingSymbol,
-        Product         = p.Product,
-        Quantity        = p.Quantity,
-        BuyQuantity     = p.DayBuyQuantity,
-        SellQuantity    = p.DaySellQuantity,
-        // sell_price / buy_price are the actual weighted avg entry prices per trade direction.
-        AveragePrice    = p.Quantity < 0
-                            ? (p.SellPrice != 0 ? p.SellPrice : p.ClosePrice)
-                            : (p.BuyPrice  != 0 ? p.BuyPrice  : p.ClosePrice),
-        BuyPrice        = p.BuyPrice,
-        SellPrice       = p.SellPrice,
-        Ltp             = p.LastPrice,
-        Pnl             = p.Pnl,
-        Unrealised      = p.Unrealised,
-        Realised        = p.Realised,
-        BuyValue        = p.BuyValue,
-        SellValue       = p.SellValue,
-        Broker          = "upstox",
-    };
 }

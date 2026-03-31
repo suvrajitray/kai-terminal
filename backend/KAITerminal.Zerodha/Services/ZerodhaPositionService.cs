@@ -1,3 +1,4 @@
+using KAITerminal.Broker;
 using KAITerminal.Contracts.Constants;
 using KAITerminal.Contracts.Domain;
 using KAITerminal.Zerodha.Http;
@@ -5,7 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace KAITerminal.Zerodha.Services;
 
-internal sealed class ZerodhaPositionService : IZerodhaPositionService
+internal sealed class ZerodhaPositionService : IBrokerPositionService
 {
     private readonly ZerodhaHttpClient              _http;
     private readonly ILogger<ZerodhaPositionService> _logger;
@@ -16,7 +17,7 @@ internal sealed class ZerodhaPositionService : IZerodhaPositionService
         _logger = logger;
     }
 
-    public async Task<IReadOnlyList<Position>> GetAllPositionsAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<BrokerPosition>> GetAllPositionsAsync(CancellationToken ct = default)
     {
         var positions = await _http.GetPositionsAsync(ct);
         return positions
@@ -31,7 +32,7 @@ internal sealed class ZerodhaPositionService : IZerodhaPositionService
         return positions.Sum(p => p.Pnl);
     }
 
-    public async Task ExitAllPositionsAsync(
+    public async Task<IReadOnlyList<string>> ExitAllPositionsAsync(
         IReadOnlyCollection<string>? exchanges = null, CancellationToken ct = default)
     {
         var positions = await GetAllPositionsAsync(ct);
@@ -54,21 +55,24 @@ internal sealed class ZerodhaPositionService : IZerodhaPositionService
 
         await Task.WhenAll(longs.Select(p => _http.PlaceOrderAsync(
             p.TradingSymbol, p.Exchange, "SELL", MapProductBack(p.Product), "MARKET", Math.Abs(p.Quantity), null, ct)));
+
+        return [];
     }
 
-    public async Task ExitPositionAsync(
+    public async Task<string> ExitPositionAsync(
         string instrumentToken, string product, CancellationToken ct = default)
     {
         var positions = await GetAllPositionsAsync(ct);
         var pos = positions.FirstOrDefault(p =>
             p.InstrumentToken.Equals(instrumentToken, StringComparison.OrdinalIgnoreCase));
 
-        if (pos is null || pos.Quantity == 0) return;
+        if (pos is null || pos.Quantity == 0) return string.Empty;
 
         var txType      = pos.Quantity > 0 ? "SELL" : "BUY";
         var quantity    = Math.Abs(pos.Quantity);
-        var kiteProduct = MapProductBack(pos.Product);   // use raw Kite product, not the API-mapped param
+        var kiteProduct = MapProductBack(pos.Product);
         await _http.PlaceOrderAsync(pos.TradingSymbol, pos.Exchange, txType, kiteProduct, "MARKET", quantity, null, ct);
+        return string.Empty;
     }
 
     public async Task ConvertPositionAsync(

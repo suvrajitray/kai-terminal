@@ -9,13 +9,13 @@ namespace KAITerminal.RiskEngine.Abstractions;
 public interface IPositionCache
 {
     /// <summary>Replace the full position list for a user (called after each REST fetch).</summary>
-    void UpdatePositions(string userId, IReadOnlyList<Position> positions);
+    void UpdatePositions(string userId, IReadOnlyList<BrokerPosition> positions);
 
     /// <summary>Update a single instrument's LTP (called on every market data tick).</summary>
     void UpdateLtp(string userId, string instrumentToken, decimal ltp);
 
     /// <summary>Returns the cached positions for a user (empty list if not yet populated).</summary>
-    IReadOnlyList<Position> GetPositions(string userId);
+    IReadOnlyList<BrokerPosition> GetPositions(string userId);
 
     /// <summary>
     /// Returns the live LTP for an instrument if available, otherwise <paramref name="fallback"/>.
