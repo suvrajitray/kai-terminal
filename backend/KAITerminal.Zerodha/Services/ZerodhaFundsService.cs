@@ -1,9 +1,10 @@
+using KAITerminal.Broker;
 using KAITerminal.Contracts.Domain;
 using KAITerminal.Zerodha.Http;
 
 namespace KAITerminal.Zerodha.Services;
 
-internal sealed class ZerodhaFundsService : IZerodhaFundsService
+internal sealed class ZerodhaFundsService : IBrokerFundsService
 {
     private readonly ZerodhaHttpClient _http;
 

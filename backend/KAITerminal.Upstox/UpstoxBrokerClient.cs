@@ -99,8 +99,7 @@ public sealed class UpstoxBrokerClient : IBrokerClient
     public async Task<BrokerFunds> GetFundsAsync(CancellationToken ct = default)
     {
         using var _ = UseToken();
-        var funds = await _upstox.GetFundsAsync(ct);
-        return new BrokerFunds(funds.AvailableMargin, funds.UsedMargin, funds.PayinAmount);
+        return await _upstox.GetFundsAsync(ct);
     }
 
     // ── Position mapping ─────────────────────────────────────────────────────

@@ -1,9 +1,10 @@
+using KAITerminal.Broker;
+using KAITerminal.Contracts.Domain;
 using KAITerminal.Upstox.Http;
-using KAITerminal.Upstox.Models.Responses;
 
 namespace KAITerminal.Upstox.Services;
 
-internal sealed class UpstoxFundsService : IUpstoxFundsService
+internal sealed class UpstoxFundsService : IBrokerFundsService
 {
     private readonly UpstoxHttpClient _http;
 
@@ -12,6 +13,9 @@ internal sealed class UpstoxFundsService : IUpstoxFundsService
         _http = http;
     }
 
-    public Task<FundsResponse> GetFundsAsync(CancellationToken ct = default)
-        => _http.GetFundsAsync(ct);
+    public async Task<BrokerFunds> GetFundsAsync(CancellationToken ct = default)
+    {
+        var r = await _http.GetFundsAsync(ct);
+        return new BrokerFunds(r.AvailableMargin, r.UsedMargin, r.PayinAmount);
+    }
 }

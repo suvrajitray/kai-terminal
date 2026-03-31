@@ -65,7 +65,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IUpstoxPositionService, UpstoxPositionService>();
         services.AddSingleton<IUpstoxOrderService, UpstoxOrderService>();
         services.AddSingleton<IUpstoxMarginService, UpstoxMarginService>();
-        services.AddSingleton<IUpstoxFundsService, UpstoxFundsService>();
+        services.AddSingleton<IBrokerFundsService, UpstoxFundsService>();
 
         services.AddSingleton<UpstoxClient>();
 

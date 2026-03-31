@@ -2,6 +2,7 @@ using KAITerminal.Broker;
 using KAITerminal.Upstox.Models.Requests;
 using KAITerminal.Upstox.Models.Responses;
 using KAITerminal.Upstox.Services;
+using BrokerFunds = KAITerminal.Contracts.Domain.BrokerFunds;
 
 namespace KAITerminal.Upstox;
 
@@ -16,14 +17,14 @@ public sealed class UpstoxClient
     private readonly IUpstoxPositionService _positions;
     private readonly IUpstoxOrderService _orders;
     private readonly IUpstoxMarginService _margin;
-    private readonly IUpstoxFundsService _funds;
+    private readonly IBrokerFundsService _funds;
 
     public UpstoxClient(
         IBrokerAuthService auth,
         IUpstoxPositionService positions,
         IUpstoxOrderService orders,
         IUpstoxMarginService margin,
-        IUpstoxFundsService funds)
+        IBrokerFundsService funds)
     {
         ArgumentNullException.ThrowIfNull(auth);
         ArgumentNullException.ThrowIfNull(positions);
@@ -178,7 +179,7 @@ public sealed class UpstoxClient
     /// <summary>
     /// Returns available margin, used margin, and payin amount for the equity/F&amp;O segment.
     /// </summary>
-    public Task<FundsResponse> GetFundsAsync(CancellationToken cancellationToken = default)
+    public Task<BrokerFunds> GetFundsAsync(CancellationToken cancellationToken = default)
         => _funds.GetFundsAsync(cancellationToken);
 
 }

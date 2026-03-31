@@ -285,9 +285,9 @@ public static class UpstoxEndpoints
                 var funds = await upstox.GetFundsAsync(ct);
                 return Results.Ok(new
                 {
-                    availableMargin = funds.AvailableMargin,
-                    usedMargin      = funds.UsedMargin,
-                    payinAmount     = funds.PayinAmount,
+                    availableMargin = funds.Available,
+                    usedMargin      = funds.Used,
+                    payinAmount     = funds.Payin,
                 });
             }
             catch (UpstoxException)

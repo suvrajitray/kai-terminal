@@ -15,7 +15,7 @@ public sealed class ZerodhaClient
     private readonly IBrokerAuthService         _auth;
     private readonly IZerodhaPositionService   _positions;
     private readonly IZerodhaOrderService      _orders;
-    private readonly IZerodhaFundsService      _funds;
+    private readonly IBrokerFundsService        _funds;
     private readonly IZerodhaMarginService     _margin;
     private readonly Func<KiteTickerStreamer> _marketDataStreamerFactory;
 
@@ -23,7 +23,7 @@ public sealed class ZerodhaClient
         IBrokerAuthService        auth,
         IZerodhaPositionService   positions,
         IZerodhaOrderService      orders,
-        IZerodhaFundsService      funds,
+        IBrokerFundsService       funds,
         IZerodhaMarginService     margin,
         Func<KiteTickerStreamer>   marketDataStreamerFactory)
     {
