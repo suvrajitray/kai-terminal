@@ -51,57 +51,6 @@ internal sealed class UpstoxMarketDataHttpClient
     }
 
     // ──────────────────────────────────────────────────
-    // Historical / intraday candles
-    // ──────────────────────────────────────────────────
-
-    public async Task<IReadOnlyList<CandleData>> GetHistoricalCandlesAsync(
-        string token, string instrumentKey, string interval,
-        DateOnly from, DateOnly to, CancellationToken ct = default)
-    {
-        var ek   = Uri.EscapeDataString(instrumentKey);
-        var path = $"/v2/historical-candle/{ek}/{interval}/{to:yyyy-MM-dd}/{from:yyyy-MM-dd}";
-        return await FetchCandlesAsync(token, path, ct);
-    }
-
-    public async Task<IReadOnlyList<CandleData>> GetIntradayCandlesAsync(
-        string token, string instrumentKey, string interval, CancellationToken ct = default)
-    {
-        var ek   = Uri.EscapeDataString(instrumentKey);
-        var path = $"/v2/historical-candle/intraday/{ek}/{interval}";
-        return await FetchCandlesAsync(token, path, ct);
-    }
-
-    private async Task<IReadOnlyList<CandleData>> FetchCandlesAsync(
-        string token, string path, CancellationToken ct)
-    {
-        var client   = CreateClient(token);
-        var response = await client.GetAsync(path, ct);
-        var json     = await response.Content.ReadAsStringAsync(ct);
-
-        var wrapper = JsonSerializer.Deserialize<CandlesWrapper>(json, JsonOptions);
-        if (wrapper?.Status != "success" || wrapper.Data?.Candles is null)
-            return Array.Empty<CandleData>();
-
-        return wrapper.Data.Candles
-            .Where(r => r.Count >= 6)
-            .Select(MapCandle)
-            .OrderBy(c => c.Timestamp)
-            .ToList()
-            .AsReadOnly();
-    }
-
-    private static CandleData MapCandle(List<JsonElement> row) => new()
-    {
-        Timestamp = row[0].GetDateTime(),
-        Open      = row[1].GetDecimal(),
-        High      = row[2].GetDecimal(),
-        Low       = row[3].GetDecimal(),
-        Close     = row[4].GetDecimal(),
-        Volume    = row[5].GetInt64(),
-        Oi        = row.Count > 6 ? row[6].GetInt64() : 0
-    };
-
-    // ──────────────────────────────────────────────────
     // Option chain
     // ──────────────────────────────────────────────────
 
@@ -237,17 +186,6 @@ internal sealed class UpstoxMarketDataHttpClient
     private sealed class AuthorizeResponse
     {
         [JsonPropertyName("authorizedRedirectUri")] public string? AuthorizedRedirectUri { get; init; }
-    }
-
-    private sealed class CandlesWrapper
-    {
-        [JsonPropertyName("status")] public string?          Status { get; init; }
-        [JsonPropertyName("data")]   public CandlesDataDto?  Data   { get; init; }
-    }
-
-    private sealed class CandlesDataDto
-    {
-        [JsonPropertyName("candles")] public List<List<JsonElement>>? Candles { get; init; }
     }
 
     // Raw option chain DTOs (snake_case from Upstox API)

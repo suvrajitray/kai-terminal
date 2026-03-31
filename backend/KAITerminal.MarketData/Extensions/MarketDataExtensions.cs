@@ -66,7 +66,6 @@ public static class MarketDataExtensions
 
         // Market data services (use analytics token internally)
         services.AddSingleton<IMarketQuoteService, MarketQuoteService>();
-        services.AddSingleton<IChartDataService,   ChartDataService>();
 
         // Zerodha instrument CSV service
         services.AddSingleton<IZerodhaInstrumentService, ZerodhaInstrumentService>();

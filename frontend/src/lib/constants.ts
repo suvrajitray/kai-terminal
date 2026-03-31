@@ -25,8 +25,6 @@ if (missing.length > 0) {
 export const NAV_ITEMS = [
   { label: "Dashboard",   path: "/dashboard"   },
   { label: "Terminal",    path: "/terminal"    },
-  { label: "Charts",      path: "/charts"      },
-  { label: "AI",          path: "/ai-signals"  },
 ] as const;
 
 export const BROKERS: BrokerInfo[] = [

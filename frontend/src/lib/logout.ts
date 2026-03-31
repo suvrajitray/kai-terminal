@@ -1,6 +1,5 @@
 import { useAuthStore } from "@/stores/auth-store";
 import { useBrokerStore } from "@/stores/broker-store";
-import { useChartsStore } from "@/stores/charts-store";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
 import { useRiskStateStore } from "@/stores/risk-state-store";
 import { useUserTradingSettingsStore } from "@/stores/user-trading-settings-store";
@@ -17,7 +16,6 @@ export function performLogout() {
   localStorage.clear();
   useAuthStore.getState().logout();
   useBrokerStore.getState().clearAll();
-  useChartsStore.getState().setInstrument(null);
   useProfitProtectionStore.getState().reset();
   useRiskStateStore.getState().reset();
   useUserTradingSettingsStore.getState().reset();
