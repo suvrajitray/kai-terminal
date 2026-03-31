@@ -3,7 +3,7 @@ using KAITerminal.Zerodha.Http;
 
 namespace KAITerminal.Zerodha.Services;
 
-public sealed class ZerodhaFundsService : IZerodhaFundsService
+internal sealed class ZerodhaFundsService : IZerodhaFundsService
 {
     private readonly ZerodhaHttpClient _http;
 

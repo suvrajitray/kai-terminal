@@ -5,7 +5,7 @@ namespace KAITerminal.Upstox.Services;
 /// <summary>
 /// Provides position management and MTM operations (Features 1–4).
 /// </summary>
-public interface IPositionService
+public interface IUpstoxPositionService
 {
     /// <summary>Feature 1 — Fetch all open and closed positions for the current day.</summary>
     Task<IReadOnlyList<Position>> GetAllPositionsAsync(CancellationToken cancellationToken = default);

@@ -7,11 +7,11 @@ using KAITerminal.Upstox.Models.Responses;
 
 namespace KAITerminal.Upstox.Services;
 
-internal sealed class PositionService : IPositionService
+internal sealed class UpstoxPositionService : IUpstoxPositionService
 {
     private readonly UpstoxHttpClient _http;
 
-    public PositionService(UpstoxHttpClient http)
+    public UpstoxPositionService(UpstoxHttpClient http)
     {
         _http = http;
     }

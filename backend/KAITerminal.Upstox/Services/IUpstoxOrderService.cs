@@ -6,7 +6,7 @@ namespace KAITerminal.Upstox.Services;
 /// <summary>
 /// Provides order management operations (Features 5–6).
 /// </summary>
-public interface IOrderService
+public interface IUpstoxOrderService
 {
     /// <summary>Retrieve all orders placed during the current trading day.</summary>
     Task<IReadOnlyList<Order>> GetAllOrdersAsync(CancellationToken cancellationToken = default);

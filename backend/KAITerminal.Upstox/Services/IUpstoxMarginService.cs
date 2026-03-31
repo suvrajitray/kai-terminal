@@ -3,7 +3,7 @@ using KAITerminal.Upstox.Models.Responses;
 
 namespace KAITerminal.Upstox.Services;
 
-public interface IMarginService
+public interface IUpstoxMarginService
 {
     Task<MarginResponse> GetRequiredMarginAsync(
         IEnumerable<MarginOrderItem> items, CancellationToken ct = default);

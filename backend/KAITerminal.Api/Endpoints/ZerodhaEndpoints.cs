@@ -19,13 +19,11 @@ public static class ZerodhaEndpoints
         // ── Auth ──────────────────────────────────────────────────────────────
 
         /// <summary>Returns the Kite Connect login URL for the given api_key.</summary>
-        group.MapGet("/auth-url", (
-            [FromQuery] string apiKey,
-            ZerodhaClient zerodha) =>
+        group.MapGet("/auth-url", ([FromQuery] string apiKey) =>
         {
             if (string.IsNullOrWhiteSpace(apiKey))
                 return Results.BadRequest(new { error = "apiKey is required." });
-            return Results.Ok(new { loginUrl = zerodha.GetLoginUrl(apiKey) });
+            return Results.Ok(new { loginUrl = $"https://kite.zerodha.com/connect/login?api_key={apiKey}&v=3" });
         });
 
         /// <summary>
@@ -50,7 +48,7 @@ public static class ZerodhaEndpoints
                 });
             }
 
-            var accessToken = await zerodha.ExchangeTokenAsync(
+            var accessToken = await zerodha.GenerateTokenAsync(
                 request.ApiKey, request.ApiSecret, request.RequestToken, ct);
 
             // Persist to DB (upsert) so the risk Worker can pick it up on next tick

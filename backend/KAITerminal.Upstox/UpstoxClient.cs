@@ -1,3 +1,4 @@
+using KAITerminal.Broker;
 using KAITerminal.Upstox.Models.Requests;
 using KAITerminal.Upstox.Models.Responses;
 using KAITerminal.Upstox.Services;
@@ -11,18 +12,18 @@ namespace KAITerminal.Upstox;
 /// </summary>
 public sealed class UpstoxClient
 {
-    private readonly IAuthService _auth;
-    private readonly IPositionService _positions;
-    private readonly IOrderService _orders;
-    private readonly IMarginService _margin;
-    private readonly IFundsService _funds;
+    private readonly IBrokerAuthService _auth;
+    private readonly IUpstoxPositionService _positions;
+    private readonly IUpstoxOrderService _orders;
+    private readonly IUpstoxMarginService _margin;
+    private readonly IUpstoxFundsService _funds;
 
     public UpstoxClient(
-        IAuthService auth,
-        IPositionService positions,
-        IOrderService orders,
-        IMarginService margin,
-        IFundsService funds)
+        IBrokerAuthService auth,
+        IUpstoxPositionService positions,
+        IUpstoxOrderService orders,
+        IUpstoxMarginService margin,
+        IUpstoxFundsService funds)
     {
         ArgumentNullException.ThrowIfNull(auth);
         ArgumentNullException.ThrowIfNull(positions);
@@ -48,15 +49,15 @@ public sealed class UpstoxClient
     /// </summary>
     /// <param name="clientId">API key from the Upstox developer console.</param>
     /// <param name="clientSecret">API secret from the Upstox developer console.</param>
-    /// <param name="redirectUri">Redirect URI registered in the Upstox developer console.</param>
     /// <param name="authorizationCode">The <c>code</c> received in the OAuth callback.</param>
-    public Task<TokenResponse> GenerateTokenAsync(
+    /// <param name="redirectUri">Redirect URI registered in the Upstox developer console.</param>
+    public Task<string> GenerateTokenAsync(
         string clientId,
         string clientSecret,
-        string redirectUri,
         string authorizationCode,
+        string? redirectUri = null,
         CancellationToken cancellationToken = default)
-        => _auth.GenerateTokenAsync(clientId, clientSecret, redirectUri, authorizationCode, cancellationToken);
+        => _auth.GenerateTokenAsync(clientId, clientSecret, authorizationCode, redirectUri, cancellationToken);
 
     // ═══════════════════════════════════════════════════════
     // Feature 1 — Get All Positions

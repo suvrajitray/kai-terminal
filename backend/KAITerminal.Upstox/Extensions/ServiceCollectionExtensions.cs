@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using KAITerminal.Broker;
 using KAITerminal.Upstox.Configuration;
 using KAITerminal.Upstox.Http;
 using KAITerminal.Upstox.Services;
@@ -60,11 +61,11 @@ public static class ServiceCollectionExtensions
         }).AddHttpMessageHandler<UpstoxAuthHandler>();
 
         services.AddSingleton<UpstoxHttpClient>();
-        services.AddSingleton<IAuthService, AuthService>();
-        services.AddSingleton<IPositionService, PositionService>();
-        services.AddSingleton<IOrderService, OrderService>();
-        services.AddSingleton<IMarginService, MarginService>();
-        services.AddSingleton<IFundsService, FundsService>();
+        services.AddSingleton<IBrokerAuthService, UpstoxAuthService>();
+        services.AddSingleton<IUpstoxPositionService, UpstoxPositionService>();
+        services.AddSingleton<IUpstoxOrderService, UpstoxOrderService>();
+        services.AddSingleton<IUpstoxMarginService, UpstoxMarginService>();
+        services.AddSingleton<IUpstoxFundsService, UpstoxFundsService>();
 
         services.AddSingleton<UpstoxClient>();
 

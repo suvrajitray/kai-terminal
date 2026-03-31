@@ -4,11 +4,11 @@ using KAITerminal.Upstox.Models.Responses;
 
 namespace KAITerminal.Upstox.Services;
 
-internal sealed class OrderService : IOrderService
+internal sealed class UpstoxOrderService : IUpstoxOrderService
 {
     private readonly UpstoxHttpClient _http;
 
-    public OrderService(UpstoxHttpClient http)
+    public UpstoxOrderService(UpstoxHttpClient http)
     {
         _http = http;
     }

@@ -5,7 +5,7 @@ using Microsoft.Extensions.Logging;
 
 namespace KAITerminal.Zerodha.Services;
 
-public sealed class ZerodhaPositionService : IZerodhaPositionService
+internal sealed class ZerodhaPositionService : IZerodhaPositionService
 {
     private readonly ZerodhaHttpClient              _http;
     private readonly ILogger<ZerodhaPositionService> _logger;

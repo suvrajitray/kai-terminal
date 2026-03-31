@@ -26,11 +26,11 @@ public static class UpstoxEndpoints
             ClaimsPrincipal user,
             ILoggerFactory lf) =>
         {
-            var token = await upstox.GenerateTokenAsync(
-                request.ApiKey, request.ApiSecret, request.RedirectUri, request.Code);
+            var accessToken = await upstox.GenerateTokenAsync(
+                request.ApiKey, request.ApiSecret, request.Code, request.RedirectUri);
             lf.CreateLogger("UpstoxEndpoints").LogInformation(
                 "Upstox access token generated — {User}", user.FindFirstValue(ClaimTypes.Email) ?? "unknown");
-            return Results.Ok(new { AccessToken = token.AccessToken });
+            return Results.Ok(new { AccessToken = accessToken });
         });
 
         // ── Positions ─────────────────────────────────────────────────────────

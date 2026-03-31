@@ -3,6 +3,7 @@ using KAITerminal.Contracts.Domain;
 using KAITerminal.Zerodha.Services;
 using KAITerminal.Zerodha.Streaming;
 
+
 namespace KAITerminal.Zerodha;
 
 /// <summary>
@@ -11,7 +12,7 @@ namespace KAITerminal.Zerodha;
 /// </summary>
 public sealed class ZerodhaClient
 {
-    private readonly IZerodhaAuthService       _auth;
+    private readonly IBrokerAuthService         _auth;
     private readonly IZerodhaPositionService   _positions;
     private readonly IZerodhaOrderService      _orders;
     private readonly IZerodhaFundsService      _funds;
@@ -19,7 +20,7 @@ public sealed class ZerodhaClient
     private readonly Func<KiteTickerStreamer> _marketDataStreamerFactory;
 
     public ZerodhaClient(
-        IZerodhaAuthService       auth,
+        IBrokerAuthService        auth,
         IZerodhaPositionService   positions,
         IZerodhaOrderService      orders,
         IZerodhaFundsService      funds,
@@ -36,11 +37,9 @@ public sealed class ZerodhaClient
 
     // ── Auth ──────────────────────────────────────────────────────────────────
 
-    public string GetLoginUrl(string apiKey) => _auth.GetLoginUrl(apiKey);
-
-    public Task<string> ExchangeTokenAsync(
-        string apiKey, string apiSecret, string requestToken, CancellationToken ct = default)
-        => _auth.ExchangeTokenAsync(apiKey, apiSecret, requestToken, ct);
+    public Task<string> GenerateTokenAsync(
+        string clientId, string clientSecret, string authorizationCode, CancellationToken ct = default)
+        => _auth.GenerateTokenAsync(clientId, clientSecret, authorizationCode, ct: ct);
 
     // ── Positions ─────────────────────────────────────────────────────────────
 

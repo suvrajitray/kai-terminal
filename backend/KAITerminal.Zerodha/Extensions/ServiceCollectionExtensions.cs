@@ -1,3 +1,4 @@
+using KAITerminal.Broker;
 using KAITerminal.Zerodha.Configuration;
 using KAITerminal.Zerodha.Http;
 using KAITerminal.Zerodha.Services;
@@ -46,7 +47,7 @@ public static class ServiceCollectionExtensions
         });
 
         services.AddSingleton<ZerodhaHttpClient>();
-        services.AddSingleton<IZerodhaAuthService,       ZerodhaAuthService>();
+        services.AddSingleton<IBrokerAuthService,         ZerodhaAuthService>();
         services.AddSingleton<IZerodhaPositionService,   ZerodhaPositionService>();
         services.AddSingleton<IZerodhaOrderService,      ZerodhaOrderService>();
         services.AddSingleton<IZerodhaFundsService,      ZerodhaFundsService>();

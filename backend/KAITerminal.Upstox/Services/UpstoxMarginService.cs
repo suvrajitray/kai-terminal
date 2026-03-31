@@ -4,11 +4,11 @@ using KAITerminal.Upstox.Models.Responses;
 
 namespace KAITerminal.Upstox.Services;
 
-internal sealed class MarginService : IMarginService
+internal sealed class UpstoxMarginService : IUpstoxMarginService
 {
     private readonly UpstoxHttpClient _http;
 
-    public MarginService(UpstoxHttpClient http)
+    public UpstoxMarginService(UpstoxHttpClient http)
     {
         _http = http;
     }
