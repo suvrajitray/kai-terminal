@@ -44,7 +44,7 @@ public sealed class RiskEvaluator
         try
         {
             var positions = await broker.GetAllPositionsAsync(ct);
-            mtm = _cfg.FilterPositions(positions).Sum(p => p.Pnl);
+            mtm = positions.Sum(p => p.Pnl);
         }
         catch (Exception ex)
         {

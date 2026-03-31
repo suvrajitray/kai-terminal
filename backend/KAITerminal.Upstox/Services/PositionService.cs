@@ -1,3 +1,4 @@
+using KAITerminal.Contracts.Constants;
 using KAITerminal.Upstox.Exceptions;
 using KAITerminal.Upstox.Http;
 using KAITerminal.Upstox.Models.Enums;
@@ -16,8 +17,14 @@ internal sealed class PositionService : IPositionService
     }
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<Position>> GetAllPositionsAsync(CancellationToken cancellationToken = default)
-        => _http.GetPositionsAsync(cancellationToken);
+    public async Task<IReadOnlyList<Position>> GetAllPositionsAsync(CancellationToken cancellationToken = default)
+    {
+        var positions = await _http.GetPositionsAsync(cancellationToken);
+        return positions
+            .Where(p => ExchangeConstants.OptionsExchanges.Contains(p.Exchange))
+            .ToList()
+            .AsReadOnly();
+    }
 
     /// <inheritdoc />
     public async Task<decimal> GetTotalMtmAsync(CancellationToken cancellationToken = default)
@@ -32,22 +39,23 @@ internal sealed class PositionService : IPositionService
         CancellationToken cancellationToken = default)
     {
         var positions = await GetAllPositionsAsync(cancellationToken);
-        var filter = (exchanges is null || exchanges.Count == 0)
-            ? ["NFO", "BFO"]
-            : exchanges;
+        var openPositions = positions.Where(p => p.IsOpen);
 
-        var openPositions = positions
-            .Where(p => p.IsOpen)
-            .Where(p => filter.Contains(p.Exchange, StringComparer.OrdinalIgnoreCase))
-            .ToList();
+        if (exchanges?.Count > 0)
+        {
+            var set = exchanges.Select(e => e.ToUpperInvariant()).ToHashSet();
+            openPositions = openPositions.Where(p => set.Contains(p.Exchange.ToUpperInvariant()));
+        }
 
-        if (openPositions.Count == 0)
+        var openPosList = openPositions.ToList();
+
+        if (openPosList.Count == 0)
             return [];
 
         // Exit short positions (qty < 0, BUY-to-close) before long positions (qty > 0, SELL-to-close)
         // to reduce risk exposure as fast as possible
-        var shorts = openPositions.Where(p => p.Quantity < 0).ToList();
-        var longs  = openPositions.Where(p => p.Quantity > 0).ToList();
+        var shorts = openPosList.Where(p => p.Quantity < 0).ToList();
+        var longs  = openPosList.Where(p => p.Quantity > 0).ToList();
 
         var shortResults = await Task.WhenAll(shorts.Select(p => ExitSingleAsync(p, cancellationToken)));
         var longResults  = await Task.WhenAll(longs.Select(p => ExitSingleAsync(p, cancellationToken)));

@@ -26,20 +26,5 @@ public sealed class RiskEngineConfig
     public TimeSpan TradingWindowEnd   { get; set; } = new(15, 30, 0);
     public string   TradingTimeZone    { get; set; } = "Asia/Kolkata";
 
-    /// <summary>
-    /// Only positions from these exchanges are considered by the risk engine.
-    /// An empty list means all exchanges are included.
-    /// </summary>
-    public List<string> Exchanges { get; set; } = ["NFO", "BFO"];
 
-    // Cached upper-case exchange set — built once on first use
-    private HashSet<string>? _exchangeSet;
-
-    /// <summary>Filters a position list to the configured exchanges (case-insensitive).</summary>
-    public IReadOnlyList<Position> FilterPositions(IReadOnlyList<Position> positions)
-    {
-        if (Exchanges.Count == 0) return positions;
-        var set = _exchangeSet ??= Exchanges.Select(e => e.ToUpperInvariant()).ToHashSet();
-        return positions.Where(p => set.Contains(p.Exchange.ToUpperInvariant())).ToList().AsReadOnly();
-    }
 }

@@ -13,16 +13,14 @@ export async function fetchZerodhaPositions(exchanges?: string[]): Promise<Posit
   return res.data;
 }
 
-export async function exitAllPositions(exchanges = ["NFO", "BFO"]): Promise<void> {
-  await apiClient.post("/api/upstox/positions/exit-all", null, {
-    params: { exchange: exchanges.join(",") },
-  });
+export async function exitAllPositions(exchanges?: string[]): Promise<void> {
+  const params = exchanges?.length ? { exchange: exchanges.join(",") } : undefined;
+  await apiClient.post("/api/upstox/positions/exit-all", null, { params });
 }
 
-export async function exitAllZerodhaPositions(exchanges = ["NFO", "BFO"]): Promise<void> {
-  await apiClient.post("/api/zerodha/positions/exit-all", null, {
-    params: { exchange: exchanges.join(",") },
-  });
+export async function exitAllZerodhaPositions(exchanges?: string[]): Promise<void> {
+  const params = exchanges?.length ? { exchange: exchanges.join(",") } : undefined;
+  await apiClient.post("/api/zerodha/positions/exit-all", null, { params });
 }
 
 export async function exitPosition(

@@ -201,7 +201,7 @@ public sealed class StreamingRiskWorker : BackgroundService
         var broker = _brokerFactory.Create(user.BrokerType, user.AccessToken, user.ApiKey);
 
         // ── Initial position fetch ────────────────────────────────────────
-        var positions = _cfg.FilterPositions(await broker.GetAllPositionsAsync(ct));
+        var positions = await broker.GetAllPositionsAsync(ct);
         _cache.UpdatePositions(CacheKey(user), positions);  // also clears stale LTP
 
         var tokens = _cache.GetOpenInstrumentTokens(CacheKey(user));
@@ -305,7 +305,7 @@ public sealed class StreamingRiskWorker : BackgroundService
 
                 _logger.LogDebug("Polling positions — {UserId} ({Broker})", user.UserId, user.BrokerType);
 
-                var positions = _cfg.FilterPositions(await broker.GetAllPositionsAsync(ct));
+                var positions = await broker.GetAllPositionsAsync(ct);
                 _cache.UpdatePositions(CacheKey(user), positions);  // clears stale LTP
 
                 // Re-subscribe if open instruments changed

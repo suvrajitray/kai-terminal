@@ -1,3 +1,4 @@
+using KAITerminal.Contracts.Constants;
 using KAITerminal.Contracts.Domain;
 using KAITerminal.Zerodha.Http;
 using Microsoft.Extensions.Logging;
@@ -15,19 +16,25 @@ public sealed class ZerodhaPositionService : IZerodhaPositionService
         _logger = logger;
     }
 
-    public Task<IReadOnlyList<Position>> GetAllPositionsAsync(CancellationToken ct = default)
-        => _http.GetPositionsAsync(ct);
+    public async Task<IReadOnlyList<Position>> GetAllPositionsAsync(CancellationToken ct = default)
+    {
+        var positions = await _http.GetPositionsAsync(ct);
+        return positions
+            .Where(p => ExchangeConstants.OptionsExchanges.Contains(p.Exchange))
+            .ToList()
+            .AsReadOnly();
+    }
 
     public async Task<decimal> GetTotalMtmAsync(CancellationToken ct = default)
     {
-        var positions = await _http.GetPositionsAsync(ct);
+        var positions = await GetAllPositionsAsync(ct);
         return positions.Sum(p => p.Pnl);
     }
 
     public async Task ExitAllPositionsAsync(
         IReadOnlyCollection<string>? exchanges = null, CancellationToken ct = default)
     {
-        var positions = await _http.GetPositionsAsync(ct);
+        var positions = await GetAllPositionsAsync(ct);
         var open = positions.Where(p => p.Quantity != 0);
 
         if (exchanges?.Count > 0)
@@ -52,7 +59,7 @@ public sealed class ZerodhaPositionService : IZerodhaPositionService
     public async Task ExitPositionAsync(
         string instrumentToken, string product, CancellationToken ct = default)
     {
-        var positions = await _http.GetPositionsAsync(ct);
+        var positions = await GetAllPositionsAsync(ct);
         var pos = positions.FirstOrDefault(p =>
             p.InstrumentToken.Equals(instrumentToken, StringComparison.OrdinalIgnoreCase));
 
@@ -67,7 +74,7 @@ public sealed class ZerodhaPositionService : IZerodhaPositionService
     public async Task ConvertPositionAsync(
         string instrumentToken, string oldProduct, int quantity, CancellationToken ct = default)
     {
-        var positions = await _http.GetPositionsAsync(ct);
+        var positions = await GetAllPositionsAsync(ct);
         var pos = positions.FirstOrDefault(p =>
             p.InstrumentToken.Equals(instrumentToken, StringComparison.OrdinalIgnoreCase));
 

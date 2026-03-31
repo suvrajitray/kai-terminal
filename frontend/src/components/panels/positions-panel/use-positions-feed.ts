@@ -14,7 +14,7 @@ export function usePositionsFeed(onOrderUpdate?: () => void) {
   const connectionRef = useRef<signalR.HubConnection | null>(null);
 
   /** Fallback: REST fetch when SignalR is unavailable. */
-  const load = useCallback(async (exchanges = ["NFO", "BFO"]) => {
+  const load = useCallback(async (exchanges?: string[]) => {
     setLoading(true);
     try {
       const { getCredentials } = useBrokerStore.getState();
@@ -47,7 +47,7 @@ export function usePositionsFeed(onOrderUpdate?: () => void) {
       return;
     }
 
-    const params = new URLSearchParams({ exchange: "NFO,BFO" });
+    const params = new URLSearchParams();
     if (hasUpstox)  params.set("upstoxToken",  upstoxToken!);
     if (hasZerodha) { params.set("zerodhaToken", zerodhaToken!); params.set("zerodhaApiKey", zerodhaApiKey!); }
 
@@ -105,7 +105,7 @@ export function usePositionsFeed(onOrderUpdate?: () => void) {
       .then(() => setIsLive(true))
       .catch(() => {
         setIsLive(false);
-        load(["NFO", "BFO"]).catch(() => {});
+        load().catch(() => {});
       });
 
     connectionRef.current = conn;
