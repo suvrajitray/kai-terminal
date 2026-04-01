@@ -11,7 +11,7 @@ interface MarginEstimate {
  * Use this in By Chain tab where instrument keys are already known.
  * Debounced 600 ms. Reacts to changes in instrument keys, quantities, or direction.
  */
-export function useDirectMarginEstimate(instruments: MarginInstrument[] | null): MarginEstimate {
+export function useDirectMarginEstimate(instruments: MarginInstrument[] | null, broker: "upstox" | "zerodha" = "upstox"): MarginEstimate {
   const [margin, setMargin] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -33,7 +33,7 @@ export function useDirectMarginEstimate(instruments: MarginInstrument[] | null):
     debounceRef.current = setTimeout(async () => {
       setLoading(true);
       try {
-        const result = await fetchMargin(instruments);
+        const result = await fetchMargin(instruments, broker);
         setMargin(result.requiredMargin);
       } catch {
         setMargin(null);

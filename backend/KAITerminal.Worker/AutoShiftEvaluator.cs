@@ -1,5 +1,7 @@
 using KAITerminal.Broker;
+using KAITerminal.Contracts;
 using KAITerminal.Contracts.Domain;
+using KAITerminal.Contracts.Options;
 using KAITerminal.Contracts.Notifications;
 using KAITerminal.MarketData.Models;
 using KAITerminal.MarketData.Services;
@@ -136,7 +138,7 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
     {
         // CE seller: higher strike = further OTM → positive gap
         // PE seller: lower strike  = further OTM → negative gap
-        var strikeGap = contract.InstrumentType.Equals("CE", StringComparison.OrdinalIgnoreCase)
+        var strikeGap = OptionInstrumentType.IsCe(contract.InstrumentType)
             ? config.AutoShiftStrikeGap
             : -config.AutoShiftStrikeGap;
 
@@ -210,7 +212,7 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
         Contracts.Domain.BrokerPosition position, string brokerType,
         IReadOnlyList<ZerodhaOptionContract> contracts)
     {
-        if (brokerType.Equals("zerodha", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(brokerType, BrokerNames.Zerodha, StringComparison.OrdinalIgnoreCase))
         {
             return contracts.FirstOrDefault(c =>
                 c.TradingSymbol.Equals(position.InstrumentToken, StringComparison.OrdinalIgnoreCase));
@@ -227,7 +229,7 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
 
     private static string BuildCloseToken(Contracts.Domain.BrokerPosition position, string brokerType)
     {
-        if (brokerType.Equals("zerodha", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(brokerType, BrokerNames.Zerodha, StringComparison.OrdinalIgnoreCase))
         {
             // ZerodhaOrderService expects "{exchange}|{tradingSymbol}"
             return string.IsNullOrEmpty(position.Exchange)
@@ -243,7 +245,7 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
         string upstoxKey, string brokerType,
         IReadOnlyList<ZerodhaOptionContract> contracts)
     {
-        if (brokerType.Equals("upstox", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(brokerType, BrokerNames.Upstox, StringComparison.OrdinalIgnoreCase))
             return upstoxKey;
 
         // Zerodha: derive exchange_token from the Upstox key, look up the trading symbol

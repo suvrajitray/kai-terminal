@@ -1,3 +1,4 @@
+using KAITerminal.Contracts;
 using KAITerminal.Contracts.Broker;
 using KAITerminal.Contracts.Options;
 using KAITerminal.Infrastructure.Services;
@@ -32,9 +33,9 @@ public sealed class MasterDataService(
 
         var credsByBroker = new Dictionary<string, (string Token, string? ApiKey)>(StringComparer.OrdinalIgnoreCase);
         if (!string.IsNullOrEmpty(upstoxAnalyticsToken))
-            credsByBroker["upstox"] = (upstoxAnalyticsToken, null);
+            credsByBroker[BrokerNames.Upstox] = (upstoxAnalyticsToken, null);
         if (!string.IsNullOrEmpty(zerodhaToken))
-            credsByBroker["zerodha"] = (zerodhaToken, zerodhaApiKey);
+            credsByBroker[BrokerNames.Zerodha] = (zerodhaToken, zerodhaApiKey);
 
         if (credsByBroker.Count == 0)
             return [];

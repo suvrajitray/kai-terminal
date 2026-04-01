@@ -1,3 +1,4 @@
+using KAITerminal.Contracts;
 using KAITerminal.Contracts.Broker;
 using KAITerminal.MarketData.Services;
 
@@ -15,7 +16,7 @@ public sealed class ZerodhaTokenMappingProvider : ITokenMappingProvider
     public ZerodhaTokenMappingProvider(IZerodhaInstrumentService instruments)
         => _instruments = instruments;
 
-    public string BrokerType => "zerodha";
+    public string BrokerType => BrokerNames.Zerodha;
 
     public async Task<IReadOnlyList<NativeContractKey>> GetNativeContractKeysAsync(
         string accessToken, string? apiKey, CancellationToken ct)

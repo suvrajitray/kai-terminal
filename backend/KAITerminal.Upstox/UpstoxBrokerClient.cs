@@ -1,4 +1,5 @@
 using KAITerminal.Broker;
+using KAITerminal.Contracts;
 using KAITerminal.Contracts.Domain;
 
 namespace KAITerminal.Upstox;
@@ -20,7 +21,7 @@ public sealed class UpstoxBrokerClient : IBrokerClient
         _accessToken = accessToken;
     }
 
-    public string BrokerType => "upstox";
+    public string BrokerType => BrokerNames.Upstox;
 
     public IDisposable UseToken() => UpstoxTokenContext.Use(_accessToken);
 

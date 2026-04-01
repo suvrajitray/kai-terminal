@@ -1,4 +1,5 @@
 using KAITerminal.Broker;
+using KAITerminal.Contracts;
 using KAITerminal.Contracts.Domain;
 
 namespace KAITerminal.Zerodha;
@@ -23,7 +24,7 @@ public sealed class ZerodhaBrokerClient : IBrokerClient
         _accessToken = accessToken;
     }
 
-    public string BrokerType => "zerodha";
+    public string BrokerType => BrokerNames.Zerodha;
 
     public IDisposable UseToken() => ZerodhaTokenContext.Use(_apiKey, _accessToken);
 

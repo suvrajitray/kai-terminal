@@ -1,3 +1,4 @@
+using KAITerminal.Contracts;
 using KAITerminal.Contracts.Broker;
 using KAITerminal.Contracts.Options;
 using KAITerminal.Infrastructure.Services;
@@ -29,7 +30,7 @@ internal sealed class UpstoxOptionContractProvider : IOptionContractProvider
         _scopeFactory = scopeFactory;
     }
 
-    public string BrokerType => "upstox";
+    public string BrokerType => BrokerNames.Upstox;
 
     public async Task<IReadOnlyList<IndexContracts>> GetContractsAsync(
         string accessToken, string? apiKey, CancellationToken ct)

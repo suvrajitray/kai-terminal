@@ -1,5 +1,6 @@
 using KAITerminal.Api.Services;
 using KAITerminal.Broker;
+using KAITerminal.Contracts;
 using KAITerminal.Contracts.Streaming;
 using KAITerminal.MarketData.Services;
 using Microsoft.AspNetCore.SignalR;
@@ -50,8 +51,8 @@ public sealed class PositionsHub : Hub
         }
 
         var brokers = new List<IBrokerClient>();
-        if (hasUpstox)  brokers.Add(_brokerFactory.Create("upstox",  upstoxToken!));
-        if (hasZerodha) brokers.Add(_brokerFactory.Create("zerodha", zerodhaToken!, zerodhaApiKey!));
+        if (hasUpstox)  brokers.Add(_brokerFactory.Create(BrokerNames.Upstox,  upstoxToken!));
+        if (hasZerodha) brokers.Add(_brokerFactory.Create(BrokerNames.Zerodha, zerodhaToken!, zerodhaApiKey!));
 
         var exchangeFilter = ParseExchanges(qs?["exchange"].ToString());
         var connectionId   = Context.ConnectionId;

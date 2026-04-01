@@ -157,7 +157,7 @@ export function ByChainTab({ broker, underlying, expiry, product, quantity, isAc
       ]
     : null;
 
-  const { margin, loading: marginLoading } = useDirectMarginEstimate(marginInstruments);
+  const { margin, loading: marginLoading } = useDirectMarginEstimate(marginInstruments, broker);
 
   async function execute(action: ActionType) {
     if (broker === "zerodha") { toast.info("Zerodha chain orders coming soon"); return; }

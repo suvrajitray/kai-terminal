@@ -1,4 +1,5 @@
 using KAITerminal.Contracts.Options;
+using static KAITerminal.Contracts.Options.OptionInstrumentType;
 
 namespace KAITerminal.MarketData.Services;
 
@@ -26,7 +27,7 @@ public sealed class OptionStrikeService(IOptionChainProvider chain)
     {
         var entries = await chain.GetChainAsync(underlyingKey, expiry, ct);
 
-        var isCe = instrumentType.Equals("CE", StringComparison.OrdinalIgnoreCase);
+        var isCe = IsCe(instrumentType);
 
         var sides = entries
             .Select(e => new { e.StrikePrice, Side = isCe ? e.CallOptions : e.PutOptions })
@@ -59,7 +60,7 @@ public sealed class OptionStrikeService(IOptionChainProvider chain)
     {
         var entries = await chain.GetChainAsync(underlyingKey, expiry, ct);
 
-        var isCe = instrumentType.Equals("CE", StringComparison.OrdinalIgnoreCase);
+        var isCe = IsCe(instrumentType);
 
         var candidates = entries
             .Select(e => isCe ? e.CallOptions : e.PutOptions)

@@ -1,3 +1,4 @@
+using KAITerminal.Contracts;
 using KAITerminal.Contracts.Broker;
 using KAITerminal.Contracts.Options;
 using KAITerminal.MarketData.Services;
@@ -18,7 +19,7 @@ public sealed class ZerodhaOptionContractProvider : IOptionContractProvider
     public ZerodhaOptionContractProvider(IZerodhaInstrumentService instruments)
         => _instruments = instruments;
 
-    public string BrokerType => "zerodha";
+    public string BrokerType => BrokerNames.Zerodha;
 
     public async Task<IReadOnlyList<IndexContracts>> GetContractsAsync(
         string accessToken, string? apiKey, CancellationToken ct)

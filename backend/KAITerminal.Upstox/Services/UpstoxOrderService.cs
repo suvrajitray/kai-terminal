@@ -35,13 +35,7 @@ internal sealed class UpstoxOrderService : IBrokerOrderService, IUpstoxHftServic
         var orderType = request.OrderType.Equals("LIMIT", StringComparison.OrdinalIgnoreCase)
             ? OrderType.Limit : OrderType.Market;
 
-        var product = request.Product.ToUpperInvariant() switch
-        {
-            "D" or "CNC" or "DELIVERY" => Product.Delivery,
-            "MTF"                       => Product.MTF,
-            "CO"                        => Product.CoverOrder,
-            _                           => Product.Intraday,
-        };
+        var product = UpstoxProductMap.ToEnum(request.Product);
 
         var result = await _http.PlaceOrderV3Async(new PlaceOrderRequest
         {

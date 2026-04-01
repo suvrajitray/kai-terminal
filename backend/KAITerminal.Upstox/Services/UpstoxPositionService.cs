@@ -1,4 +1,5 @@
 using KAITerminal.Broker;
+using KAITerminal.Contracts;
 using KAITerminal.Contracts.Constants;
 using KAITerminal.Contracts.Domain;
 using KAITerminal.Upstox.Exceptions;
@@ -91,7 +92,7 @@ internal sealed class UpstoxPositionService : IBrokerPositionService
             throw new UpstoxException($"Position for {instrumentToken}/{oldProduct} is already closed (quantity = 0).");
 
         var newProduct      = string.Equals(oldProduct, "I", StringComparison.OrdinalIgnoreCase) ? "D" : "I";
-        var transactionType = position.Quantity >= 0 ? "BUY" : "SELL";
+        var transactionType = PositionHelper.ConvertTransactionType(position.Quantity);
 
         await _http.ConvertPositionAsync(instrumentToken, oldProduct.ToUpperInvariant(), newProduct, transactionType, quantity, ct);
     }
@@ -100,7 +101,8 @@ internal sealed class UpstoxPositionService : IBrokerPositionService
 
     private async Task<string> ExitSingleAsync(BrokerPosition position, CancellationToken ct)
     {
-        var txType = position.Quantity > 0 ? TransactionType.Sell : TransactionType.Buy;
+        var txStr  = PositionHelper.CloseTransactionType(position.Quantity);
+        var txType = txStr == "SELL" ? TransactionType.Sell : TransactionType.Buy;
 
         var request = new PlaceOrderRequest
         {
@@ -108,21 +110,13 @@ internal sealed class UpstoxPositionService : IBrokerPositionService
             Quantity        = Math.Abs(position.Quantity),
             TransactionType = txType,
             OrderType       = OrderType.Market,
-            Product         = ParseProduct(position.Product),
+            Product         = UpstoxProductMap.ToEnum(position.Product),
             Tag             = "EXIT"
         };
 
         var result = await _http.PlaceOrderV3Async(request, ct);
         return result.OrderIds.FirstOrDefault()!;
     }
-
-    private static Models.Enums.Product ParseProduct(string product) => product.ToUpperInvariant() switch
-    {
-        "D" or "NRML" => Models.Enums.Product.Delivery,
-        "MTF"         => Models.Enums.Product.MTF,
-        "CO"          => Models.Enums.Product.CoverOrder,
-        _             => Models.Enums.Product.Intraday
-    };
 
     private static BrokerPosition Map(Models.Responses.Position p) => new()
     {
@@ -144,6 +138,6 @@ internal sealed class UpstoxPositionService : IBrokerPositionService
         Realised        = p.Realised,
         BuyValue        = p.BuyValue,
         SellValue       = p.SellValue,
-        Broker          = "upstox",
+        Broker          = BrokerNames.Upstox,
     };
 }

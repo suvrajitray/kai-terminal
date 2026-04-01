@@ -1,5 +1,6 @@
 using KAITerminal.Api.Mapping;
 using KAITerminal.Broker;
+using KAITerminal.Contracts;
 using KAITerminal.Contracts.Streaming;
 using KAITerminal.MarketData.Services;
 using Microsoft.AspNetCore.SignalR;
@@ -120,7 +121,7 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
     {
         // Upstox: instrument token IS the feed token
         var newUpstoxTokens = allPositions
-            .Where(p => (p.Broker ?? "").Equals("upstox", StringComparison.OrdinalIgnoreCase)
+            .Where(p => string.Equals(p.Broker ?? "", BrokerNames.Upstox, StringComparison.OrdinalIgnoreCase)
                      && p.IsOpen
                      && !string.IsNullOrEmpty(p.InstrumentToken))
             .Select(p => p.InstrumentToken!)
@@ -138,7 +139,7 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
 
         // Zerodha: map native tokens → feed tokens via exchange_token
         var openZerodha = allPositions
-            .Where(p => (p.Broker ?? "").Equals("zerodha", StringComparison.OrdinalIgnoreCase)
+            .Where(p => string.Equals(p.Broker ?? "", BrokerNames.Zerodha, StringComparison.OrdinalIgnoreCase)
                      && p.IsOpen
                      && !string.IsNullOrEmpty(p.InstrumentToken))
             .ToList();

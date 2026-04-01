@@ -18,7 +18,8 @@ internal sealed class ZerodhaMarginService : IBrokerMarginService
             var parts    = i.InstrumentToken.Split('|', 2);
             var exchange = parts.Length == 2 ? parts[0] : "NFO";
             var symbol   = parts.Length == 2 ? parts[1] : i.InstrumentToken;
-            return new ZerodhaMarginOrderItem(symbol, exchange, i.TransactionType, i.Product, i.Quantity);
+            var product  = ZerodhaProductMap.ToKite(i.Product, exchange);
+            return new ZerodhaMarginOrderItem(symbol, exchange, i.TransactionType, product, i.Quantity);
         });
         var r = await _http.GetRequiredMarginAsync(kiteItems, ct);
         return new BrokerMarginResult(r.RequiredMargin, r.FinalMargin);

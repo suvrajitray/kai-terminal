@@ -1,3 +1,5 @@
+using KAITerminal.Contracts;
+
 namespace KAITerminal.RiskEngine.Models;
 
 /// <summary>Per-user identity, access token, and risk thresholds. Immutable after construction.</summary>
@@ -5,7 +7,7 @@ public sealed record UserConfig
 {
     public string UserId { get; init; } = "";
     /// <summary>Broker type — "upstox" | "zerodha". Used by IBrokerClientFactory.</summary>
-    public string BrokerType { get; init; } = "upstox";
+    public string BrokerType { get; init; } = BrokerNames.Upstox;
     public string AccessToken { get; init; } = "";
     /// <summary>API key — required for Zerodha (used in auth header and token exchange).</summary>
     public string? ApiKey { get; init; }

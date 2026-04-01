@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using KAITerminal.Contracts;
 using KAITerminal.Contracts.Domain;
 using KAITerminal.Zerodha.Services;
 
@@ -239,7 +240,7 @@ public sealed class ZerodhaHttpClient
         Exchange        = p.Exchange ?? "",
         InstrumentToken = p.TradingSymbol ?? "",
         TradingSymbol   = p.TradingSymbol ?? "",
-        Product         = MapProduct(p.Product),
+        Product         = ZerodhaProductMap.ToUnified(p.Product),
         Quantity        = p.Quantity,
         AveragePrice    = p.AveragePrice,
         Ltp             = p.LastPrice,
@@ -250,16 +251,7 @@ public sealed class ZerodhaHttpClient
         SellPrice       = p.SellPrice,
         BuyQuantity     = p.DayBuyQuantity,
         SellQuantity    = p.DaySellQuantity,
-        Broker          = "zerodha",
-    };
-
-    /// <summary>Normalise Zerodha product codes to unified broker codes.</summary>
-    private static string MapProduct(string? zerodhaProduct) => zerodhaProduct?.ToUpperInvariant() switch
-    {
-        "MIS"  => "I",
-        "CNC"  => "D",
-        "NRML" => "NRML",
-        _      => zerodhaProduct ?? "",
+        Broker          = BrokerNames.Zerodha,
     };
 
     // ── Private DTOs (Kite Connect response shapes) ────────────────────────────

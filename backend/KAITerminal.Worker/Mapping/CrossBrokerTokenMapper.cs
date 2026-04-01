@@ -1,3 +1,4 @@
+using KAITerminal.Contracts;
 using KAITerminal.Contracts.Broker;
 using KAITerminal.Contracts.Streaming;
 using Microsoft.Extensions.Logging;
@@ -149,5 +150,5 @@ public sealed class CrossBrokerTokenMapper : ITokenMapper
         => DateOnly.FromDateTime(DateTime.UtcNow.AddHours(5.5));
 
     private static bool IsUpstox(string brokerType)
-        => brokerType.Equals("upstox", StringComparison.OrdinalIgnoreCase);
+        => string.Equals(brokerType, BrokerNames.Upstox, StringComparison.OrdinalIgnoreCase);
 }

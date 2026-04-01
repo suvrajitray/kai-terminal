@@ -2,7 +2,9 @@ using System.Security.Claims;
 using KAITerminal.Api.Mapping;
 using KAITerminal.Api.Models;
 using KAITerminal.Api.Services;
+using KAITerminal.Contracts;
 using KAITerminal.Contracts.Domain;
+using KAITerminal.Contracts.Options;
 using KAITerminal.MarketData.Services;
 using KAITerminal.Zerodha;
 using KAITerminal.Zerodha.Services;
@@ -52,7 +54,7 @@ public static class ZerodhaEndpoints
             if (!string.IsNullOrEmpty(userEmail))
             {
                 await credentials.UpsertAsync(userEmail, new SaveBrokerCredentialRequest(
-                    BrokerName:  "zerodha",
+                    BrokerName:  BrokerNames.Zerodha,
                     ApiKey:      request.ApiKey,
                     ApiSecret:   request.ApiSecret,
                     AccessToken: accessToken));
@@ -127,7 +129,7 @@ public static class ZerodhaEndpoints
             ILoggerFactory lf,
             CancellationToken ct) =>
         {
-            bool isCe = request.InstrumentType.Equals("CE", StringComparison.OrdinalIgnoreCase);
+            bool isCe = OptionInstrumentType.IsCe(request.InstrumentType);
             var strikeGap = isCe
                 ? (request.Direction == "down" ? request.StrikeGap : -request.StrikeGap)
                 : (request.Direction == "up"   ? request.StrikeGap : -request.StrikeGap);
@@ -282,12 +284,20 @@ public static class ZerodhaEndpoints
         // ── Margin ────────────────────────────────────────────────────────────
 
         group.MapPost("/margin", async (
-            [FromBody] ZerodhaMarginRequest request,
+            [FromBody] MarginRequest request,
             ZerodhaClient zerodha,
+            IZerodhaInstrumentService zerodhaInstruments,
             CancellationToken ct) =>
         {
-            var items = request.Instruments.Select(i =>
-                new BrokerMarginOrderItem($"{i.Exchange}|{i.TradingSymbol}", i.Quantity, i.Product, i.TransactionType));
+            var contracts = await zerodhaInstruments.GetAllCurrentYearContractsAsync(ct);
+            var items = new List<BrokerMarginOrderItem>();
+            foreach (var i in request.Instruments)
+            {
+                var exchangeToken = i.InstrumentToken.Contains('|') ? i.InstrumentToken.Split('|')[1] : i.InstrumentToken;
+                var match = contracts.FirstOrDefault(c => c.ExchangeToken == exchangeToken);
+                if (match is null) continue;
+                items.Add(new BrokerMarginOrderItem($"{match.Exchange}|{match.TradingSymbol}", i.Quantity, i.Product, i.TransactionType));
+            }
             var margin = await zerodha.Margin.GetRequiredMarginAsync(items, ct);
             return Results.Ok(new { requiredMargin = margin.RequiredMargin, finalMargin = margin.FinalMargin });
         });
@@ -333,13 +343,4 @@ public static class ZerodhaEndpoints
         string   OrderType,
         decimal? Price = null);
 
-    private sealed record ZerodhaMarginRequest(
-        IReadOnlyList<ZerodhaMarginInstrument> Instruments);
-
-    private sealed record ZerodhaMarginInstrument(
-        string TradingSymbol,
-        string Exchange,
-        string TransactionType,
-        string Product,
-        int    Quantity);
 }

@@ -1,5 +1,6 @@
 using KAITerminal.Api.Contracts.Enums;
 using KAITerminal.Api.Contracts.Responses;
+using KAITerminal.Contracts;
 
 namespace KAITerminal.Api.Mapping;
 
@@ -26,7 +27,7 @@ internal static class PositionMapper
             SellPrice       = p.SellPrice,
             BuyValue        = p.BuyValue,
             SellValue       = p.SellValue,
-            Broker          = p.Broker ?? "upstox",
+            Broker          = p.Broker ?? BrokerNames.Upstox,
             IsOpen          = p.IsOpen,
         };
 

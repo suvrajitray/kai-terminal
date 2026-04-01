@@ -1,4 +1,5 @@
 using KAITerminal.Api.Services;
+using KAITerminal.Contracts;
 using KAITerminal.Broker;
 using KAITerminal.MarketData.Services;
 using KAITerminal.MarketData.Extensions;
@@ -23,11 +24,11 @@ public static class BrokerExtensions
                 StringComparer.OrdinalIgnoreCase);
 
             var upstox = sp.GetRequiredService<UpstoxClient>();
-            creators["upstox"] = (token, _) => new UpstoxBrokerClient(upstox, token);
+            creators[BrokerNames.Upstox] = (token, _) => new UpstoxBrokerClient(upstox, token);
 
             var zerodha = sp.GetService<ZerodhaClient>();
             if (zerodha is not null)
-                creators["zerodha"] = (token, apiKey) =>
+                creators[BrokerNames.Zerodha] = (token, apiKey) =>
                     new ZerodhaBrokerClient(zerodha, apiKey!, token);
 
             return new BrokerClientFactory(creators);

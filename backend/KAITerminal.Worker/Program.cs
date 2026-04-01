@@ -1,4 +1,5 @@
 using KAITerminal.Broker;
+using KAITerminal.Contracts;
 using Serilog;
 using KAITerminal.Contracts.Notifications;
 using KAITerminal.Contracts.Broker;
@@ -57,11 +58,11 @@ builder.Services.AddSingleton<IBrokerClientFactory>(sp =>
         StringComparer.OrdinalIgnoreCase);
 
     var upstox = sp.GetRequiredService<UpstoxClient>();
-    creators["upstox"] = (token, _) => new UpstoxBrokerClient(upstox, token);
+    creators[BrokerNames.Upstox] = (token, _) => new UpstoxBrokerClient(upstox, token);
 
     var zerodha = sp.GetService<ZerodhaClient>();
     if (zerodha is not null)
-        creators["zerodha"] = (token, apiKey) =>
+        creators[BrokerNames.Zerodha] = (token, apiKey) =>
             new ZerodhaBrokerClient(zerodha, apiKey!, token);
 
     return new BrokerClientFactory(creators);

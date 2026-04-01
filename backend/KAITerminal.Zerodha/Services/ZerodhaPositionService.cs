@@ -51,10 +51,10 @@ internal sealed class ZerodhaPositionService : IBrokerPositionService
         var longs  = openList.Where(p => p.Quantity > 0).ToList();
 
         await Task.WhenAll(shorts.Select(p => _http.PlaceOrderAsync(
-            p.TradingSymbol, p.Exchange, "BUY", MapProductBack(p.Product), "MARKET", Math.Abs(p.Quantity), null, ct)));
+            p.TradingSymbol, p.Exchange, "BUY", ZerodhaProductMap.ToKite(p.Product, p.Exchange), "MARKET", Math.Abs(p.Quantity), null, ct)));
 
         await Task.WhenAll(longs.Select(p => _http.PlaceOrderAsync(
-            p.TradingSymbol, p.Exchange, "SELL", MapProductBack(p.Product), "MARKET", Math.Abs(p.Quantity), null, ct)));
+            p.TradingSymbol, p.Exchange, "SELL", ZerodhaProductMap.ToKite(p.Product, p.Exchange), "MARKET", Math.Abs(p.Quantity), null, ct)));
 
         return [];
     }
@@ -68,9 +68,9 @@ internal sealed class ZerodhaPositionService : IBrokerPositionService
 
         if (pos is null || pos.Quantity == 0) return string.Empty;
 
-        var txType      = pos.Quantity > 0 ? "SELL" : "BUY";
+        var txType      = PositionHelper.CloseTransactionType(pos.Quantity);
         var quantity    = Math.Abs(pos.Quantity);
-        var kiteProduct = MapProductBack(pos.Product);
+        var kiteProduct = ZerodhaProductMap.ToKite(pos.Product, pos.Exchange);
         await _http.PlaceOrderAsync(pos.TradingSymbol, pos.Exchange, txType, kiteProduct, "MARKET", quantity, null, ct);
         return string.Empty;
     }
@@ -84,8 +84,8 @@ internal sealed class ZerodhaPositionService : IBrokerPositionService
 
         if (pos is null || pos.Quantity == 0) return;
 
-        var txType   = pos.Quantity >= 0 ? "BUY" : "SELL";
-        var kiteOld  = MapProductBack(pos.Product);
+        var txType   = PositionHelper.ConvertTransactionType(pos.Quantity);
+        var kiteOld  = ZerodhaProductMap.ToKite(pos.Product, pos.Exchange);
         var isFo     = pos.Exchange.Equals("NFO", StringComparison.OrdinalIgnoreCase)
                     || pos.Exchange.Equals("BFO", StringComparison.OrdinalIgnoreCase);
         var kiteNew  = kiteOld == "MIS" ? (isFo ? "NRML" : "CNC") : "MIS";
@@ -105,12 +105,5 @@ internal sealed class ZerodhaPositionService : IBrokerPositionService
             pos.TradingSymbol, pos.Exchange, txType, posType, kiteOld, kiteNew, Math.Abs(quantity), ct);
     }
 
-    /// <summary>Map unified product codes back to Kite product codes for order placement.</summary>
-    private static string MapProductBack(string product) => product.ToUpperInvariant() switch
-    {
-        "I" or "MIS" or "INTRADAY"       => "MIS",
-        "D" or "CNC" or "DELIVERY"       => "CNC",
-        "NRML"                           => "NRML",
-        _                                => "NRML",
-    };
+
 }

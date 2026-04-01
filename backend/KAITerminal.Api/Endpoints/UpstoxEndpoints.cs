@@ -2,7 +2,9 @@ using System.Security.Claims;
 using KAITerminal.Api.Mapping;
 using KAITerminal.Api.Models;
 using KAITerminal.Api.Services;
+using KAITerminal.Contracts;
 using KAITerminal.Contracts.Domain;
+using KAITerminal.Contracts.Options;
 using KAITerminal.MarketData.Services;
 using KAITerminal.Upstox;
 using KAITerminal.Upstox.Exceptions;
@@ -103,7 +105,7 @@ public static class UpstoxEndpoints
             ILoggerFactory lf,
             CancellationToken ct) =>
         {
-            bool isCe = request.InstrumentType.Equals("CE", StringComparison.OrdinalIgnoreCase);
+            bool isCe = OptionInstrumentType.IsCe(request.InstrumentType);
             var strikeGap = isCe
                 ? (request.Direction == "down" ? request.StrikeGap : -request.StrikeGap)
                 : (request.Direction == "up"   ? request.StrikeGap : -request.StrikeGap);
@@ -116,13 +118,7 @@ public static class UpstoxEndpoints
 
             var closeTxn = request.IsShort ? TransactionType.Buy  : TransactionType.Sell;
             var openTxn  = request.IsShort ? TransactionType.Sell : TransactionType.Buy;
-            var product  = request.Product switch
-            {
-                "Delivery" or "D" or "NRML" => Product.Delivery,
-                "Mtf"      or "MTF"          => Product.MTF,
-                "CoverOrder" or "CO"         => Product.CoverOrder,
-                _                            => Product.Intraday,
-            };
+            var product = UpstoxProductMap.ToEnum(request.Product);
 
             var closeOrder = new PlaceOrderRequest
             {

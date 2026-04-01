@@ -115,8 +115,9 @@ export interface MarginInstrument {
 
 export async function fetchMargin(
   instruments: MarginInstrument[],
+  broker: "upstox" | "zerodha" = "upstox",
 ): Promise<{ requiredMargin: number; finalMargin: number }> {
-  const res = await apiClient.post<{ requiredMargin: number; finalMargin: number }>("/api/upstox/margin", {
+  const res = await apiClient.post<{ requiredMargin: number; finalMargin: number }>(`/api/${broker}/margin`, {
     instruments,
   });
   return res.data;

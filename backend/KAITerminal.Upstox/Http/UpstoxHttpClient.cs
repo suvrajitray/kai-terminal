@@ -66,7 +66,7 @@ internal sealed class UpstoxHttpClient
         var dto = new PlaceOrderDtoV3
         {
             Quantity = req.Quantity,
-            Product = ToProductString(req.Product),
+            Product = UpstoxProductMap.FromEnum(req.Product),
             Validity = ToValidityString(req.Validity),
             Price = req.Price,
             Tag = req.Tag,
@@ -303,16 +303,7 @@ internal sealed class UpstoxHttpClient
         _ => throw new ArgumentOutOfRangeException(nameof(t), t, null)
     };
 
-    internal static string ToProductString(Product p) => p switch
-    {
-        Product.Intraday => "I",
-        Product.Delivery => "D",
-        Product.MTF => "MTF",
-        Product.CoverOrder => "CO",
-        _ => throw new ArgumentOutOfRangeException(nameof(p), p, null)
-    };
-
-    internal static string ToValidityString(Validity v) => v switch
+internal static string ToValidityString(Validity v) => v switch
     {
         Validity.Day => "DAY",
         Validity.IOC => "IOC",
