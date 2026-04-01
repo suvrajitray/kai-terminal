@@ -49,7 +49,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ZerodhaHttpClient>();
         services.AddSingleton<IBrokerAuthService,         ZerodhaAuthService>();
         services.AddSingleton<IBrokerPositionService,     ZerodhaPositionService>();
-        services.AddSingleton<IZerodhaOrderService,      ZerodhaOrderService>();
+        services.AddSingleton<IBrokerOrderService,        ZerodhaOrderService>();
         services.AddSingleton<IBrokerFundsService,        ZerodhaFundsService>();
         services.AddSingleton<IBrokerMarginService,       ZerodhaMarginService>();
 

@@ -1,6 +1,5 @@
 using KAITerminal.Broker;
 using KAITerminal.Contracts.Domain;
-using KAITerminal.Zerodha.Services;
 using KAITerminal.Zerodha.Streaming;
 
 
@@ -14,7 +13,7 @@ public sealed class ZerodhaClient
 {
     private readonly IBrokerAuthService         _auth;
     private readonly IBrokerPositionService     _positions;
-    private readonly IZerodhaOrderService      _orders;
+    private readonly IBrokerOrderService        _orders;
     private readonly IBrokerFundsService        _funds;
     private readonly IBrokerMarginService       _margin;
     private readonly Func<KiteTickerStreamer> _marketDataStreamerFactory;
@@ -22,7 +21,7 @@ public sealed class ZerodhaClient
     public ZerodhaClient(
         IBrokerAuthService        auth,
         IBrokerPositionService    positions,
-        IZerodhaOrderService      orders,
+        IBrokerOrderService       orders,
         IBrokerFundsService       funds,
         IBrokerMarginService      margin,
         Func<KiteTickerStreamer>   marketDataStreamerFactory)
@@ -68,6 +67,9 @@ public sealed class ZerodhaClient
 
     public Task<string> PlaceOrderAsync(BrokerOrderRequest request, CancellationToken ct = default)
         => _orders.PlaceOrderAsync(request, ct);
+
+    public Task<string> CancelOrderAsync(string orderId, CancellationToken ct = default)
+        => _orders.CancelOrderAsync(orderId, ct);
 
     // ── Funds ─────────────────────────────────────────────────────────────────
 

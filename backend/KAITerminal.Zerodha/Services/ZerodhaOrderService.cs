@@ -1,9 +1,10 @@
+using KAITerminal.Broker;
 using KAITerminal.Contracts.Domain;
 using KAITerminal.Zerodha.Http;
 
 namespace KAITerminal.Zerodha.Services;
 
-internal sealed class ZerodhaOrderService : IZerodhaOrderService
+internal sealed class ZerodhaOrderService : IBrokerOrderService
 {
     private readonly ZerodhaHttpClient _http;
 
@@ -39,4 +40,11 @@ internal sealed class ZerodhaOrderService : IZerodhaOrderService
             request.Price,
             ct);
     }
+
+    public Task<string> CancelOrderAsync(string orderId, CancellationToken ct = default)
+        => _http.CancelOrderAsync(orderId, ct);
+
+    // Zerodha order history not yet implemented, so cancellable orders cannot be determined.
+    public Task<IReadOnlyList<string>> CancelAllPendingOrdersAsync(CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<string>>([]);
 }

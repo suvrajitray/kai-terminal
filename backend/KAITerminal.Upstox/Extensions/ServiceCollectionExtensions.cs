@@ -63,11 +63,17 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<UpstoxHttpClient>();
         services.AddSingleton<IBrokerAuthService, UpstoxAuthService>();
         services.AddSingleton<IBrokerPositionService, UpstoxPositionService>();
-        services.AddSingleton<IUpstoxOrderService, UpstoxOrderService>();
+        services.AddSingleton<IBrokerOrderService, UpstoxOrderService>();
         services.AddSingleton<IBrokerMarginService, UpstoxMarginService>();
         services.AddSingleton<IBrokerFundsService, UpstoxFundsService>();
 
-        services.AddSingleton<UpstoxClient>();
+        services.AddSingleton<UpstoxClient>(sp => new UpstoxClient(
+            sp.GetRequiredService<IBrokerAuthService>(),
+            sp.GetRequiredService<IBrokerPositionService>(),
+            sp.GetRequiredService<IBrokerOrderService>(),
+            sp.GetRequiredService<IBrokerMarginService>(),
+            sp.GetRequiredService<IBrokerFundsService>(),
+            sp.GetRequiredService<UpstoxHttpClient>()));
 
         return services;
     }

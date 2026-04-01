@@ -133,6 +133,23 @@ public sealed class ZerodhaHttpClient
         return result.Data?.OrderId ?? "";
     }
 
+    public async Task<string> CancelOrderAsync(string orderId, CancellationToken ct = default)
+    {
+        var http = _httpFactory.CreateClient("ZerodhaApi");
+        var response = await http.DeleteAsync($"/orders/regular/{Uri.EscapeDataString(orderId)}", ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(ct);
+            throw new HttpRequestException($"Zerodha cancel order failed ({(int)response.StatusCode}): {body}");
+        }
+
+        var result = await response.Content.ReadFromJsonAsync<KiteEnvelope<KiteOrderData>>(_json, ct)
+            ?? throw new InvalidOperationException("Null response cancelling Zerodha order");
+
+        EnsureSuccess(result);
+        return result.Data?.OrderId ?? orderId;
+    }
+
     // ── Position conversion ───────────────────────────────────────────────────
 
     public async Task ConvertPositionAsync(

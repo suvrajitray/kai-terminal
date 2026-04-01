@@ -1,7 +1,7 @@
 using KAITerminal.Broker;
+using KAITerminal.Upstox.Http;
 using KAITerminal.Upstox.Models.Requests;
 using KAITerminal.Upstox.Models.Responses;
-using KAITerminal.Upstox.Services;
 using BrokerFunds = KAITerminal.Contracts.Domain.BrokerFunds;
 using BrokerMarginOrderItem = KAITerminal.Contracts.Domain.BrokerMarginOrderItem;
 using BrokerMarginResult = KAITerminal.Contracts.Domain.BrokerMarginResult;
@@ -16,30 +16,34 @@ namespace KAITerminal.Upstox;
 /// </summary>
 public sealed class UpstoxClient
 {
-    private readonly IBrokerAuthService _auth;
+    private readonly IBrokerAuthService     _auth;
     private readonly IBrokerPositionService _positions;
-    private readonly IUpstoxOrderService _orders;
-    private readonly IBrokerMarginService _margin;
-    private readonly IBrokerFundsService _funds;
+    private readonly IBrokerOrderService    _orders;
+    private readonly IBrokerMarginService   _margin;
+    private readonly IBrokerFundsService    _funds;
+    private readonly UpstoxHttpClient       _http;
 
-    public UpstoxClient(
-        IBrokerAuthService auth,
+    internal UpstoxClient(
+        IBrokerAuthService     auth,
         IBrokerPositionService positions,
-        IUpstoxOrderService orders,
-        IBrokerMarginService margin,
-        IBrokerFundsService funds)
+        IBrokerOrderService    orders,
+        IBrokerMarginService   margin,
+        IBrokerFundsService    funds,
+        UpstoxHttpClient       http)
     {
         ArgumentNullException.ThrowIfNull(auth);
         ArgumentNullException.ThrowIfNull(positions);
         ArgumentNullException.ThrowIfNull(orders);
         ArgumentNullException.ThrowIfNull(margin);
         ArgumentNullException.ThrowIfNull(funds);
+        ArgumentNullException.ThrowIfNull(http);
 
-        _auth = auth;
+        _auth      = auth;
         _positions = positions;
-        _orders = orders;
-        _margin = margin;
-        _funds  = funds;
+        _orders    = orders;
+        _margin    = margin;
+        _funds     = funds;
+        _http      = http;
     }
 
     // ═══════════════════════════════════════════════════════
@@ -148,7 +152,7 @@ public sealed class UpstoxClient
     /// </summary>
     public Task<PlaceOrderV3Result> PlaceOrderV3Async(
         PlaceOrderRequest request, CancellationToken cancellationToken = default)
-        => _orders.PlaceOrderV3Async(request, cancellationToken);
+        => _http.PlaceOrderV3Async(request, cancellationToken);
 
     // ═══════════════════════════════════════════════════════
     // Additional helpers exposed for convenience
@@ -157,12 +161,12 @@ public sealed class UpstoxClient
     /// <summary>Retrieve all orders placed during the current trading day.</summary>
     public Task<IReadOnlyList<Order>> GetAllOrdersAsync(
         CancellationToken cancellationToken = default)
-        => _orders.GetAllOrdersAsync(cancellationToken);
+        => _http.GetAllOrdersAsync(cancellationToken);
 
     /// <summary>Cancel a single order by ID (v3 HFT). Returns order ID and latency in ms.</summary>
     public Task<(string OrderId, int Latency)> CancelOrderV3Async(
         string orderId, CancellationToken cancellationToken = default)
-        => _orders.CancelOrderV3Async(orderId, cancellationToken);
+        => _http.CancelOrderV3Async(orderId, cancellationToken);
 
     // ═══════════════════════════════════════════════════════
     // Margin
@@ -184,5 +188,4 @@ public sealed class UpstoxClient
     /// </summary>
     public Task<BrokerFunds> GetFundsAsync(CancellationToken cancellationToken = default)
         => _funds.GetFundsAsync(cancellationToken);
-
 }
