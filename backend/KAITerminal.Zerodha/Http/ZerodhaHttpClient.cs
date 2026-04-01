@@ -116,6 +116,9 @@ public sealed class ZerodhaHttpClient
         if (orderType.Equals("LIMIT", StringComparison.OrdinalIgnoreCase) && price.HasValue)
             form["price"] = price.Value.ToString("F2");
 
+        if (orderType.Equals("MARKET", StringComparison.OrdinalIgnoreCase))
+            form["market_protection"] = "1";
+
         var response = await http.PostAsync("/orders/regular", new FormUrlEncodedContent(form), ct);
         if (!response.IsSuccessStatusCode)
         {
