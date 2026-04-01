@@ -10,6 +10,7 @@ import { useProfitProtection } from "./use-profit-protection";
 import { useRiskConfig } from "@/hooks/use-risk-config";
 import { useOptionContractsPrefetch } from "@/hooks/use-option-contracts-prefetch";
 import { exitAllPositions, exitAllZerodhaPositions } from "@/services/trading-api";
+import { OptionChainPanel } from "@/components/panels/option-chain-panel";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
 import { useBrokerStore } from "@/stores/broker-store";
 import { isBrokerTokenExpired } from "@/lib/token-utils";
@@ -50,6 +51,7 @@ function TerminalPageInner() {
   const [ordersHeight, setOrdersHeight] = useState(MIN_HEIGHT);
   const [ordersExpanded, setOrdersExpanded] = useState(false);
   const [ppOpen, setPpOpen] = useState(false);
+  const [chainOpen, setChainOpen] = useState(true);
   const [exitAllConfirmOpen, setExitAllConfirmOpen] = useState(false);
   const dragStartY = useRef<number | null>(null);
   const dragStartHeight = useRef<number>(DEFAULT_ORDERS_HEIGHT);
@@ -146,53 +148,61 @@ function TerminalPageInner() {
   }, {});
 
   return (
-    <div className="relative flex h-[calc(100svh-3.5rem)] flex-col overflow-hidden">
-      {/* Stats bar */}
-      <StatsBar
-        positions={positions}
-        isLive={isLive}
-        loading={loading}
-        acting={acting}
-        onRefresh={load}
-        onExitAll={() => setExitAllConfirmOpen(true)}
-        onOpenProfitProtection={() => setPpOpen(true)}
-        mtmByBroker={mtmByBroker}
-        ppBrokers={[
-          upstoxPp.enabled ? { broker: "upstox",  target: upstoxPp.mtmTarget, currentSl: upstoxSl,  trailing: upstoxPp.trailingEnabled } : null,
-          zerodhaP.enabled ? { broker: "zerodha", target: zerodhaP.mtmTarget, currentSl: zerodhasl, trailing: zerodhaP.trailingEnabled } : null,
-          dhanPp.enabled   ? { broker: "dhan",    target: dhanPp.mtmTarget,   currentSl: dhanSl,    trailing: dhanPp.trailingEnabled }   : null,
-        ].filter((x): x is NonNullable<typeof x> => x !== null)}
-      />
-
-      {/* Positions — flex-1, scrollable */}
-      <div className="flex-1 overflow-hidden" style={{ paddingBottom: ordersHeight }}>
-        <PositionsPanel
+    <div className="flex h-[calc(100svh-3.5rem)] overflow-hidden">
+      {/* Left column — positions + orders */}
+      <div className="relative flex flex-1 min-w-0 flex-col overflow-hidden">
+        {/* Stats bar */}
+        <StatsBar
           positions={positions}
-          setPositions={setPositions}
-          loading={loading}
           isLive={isLive}
-          load={load}
+          loading={loading}
+          acting={acting}
+          onRefresh={load}
+          onExitAll={() => setExitAllConfirmOpen(true)}
+          onOpenProfitProtection={() => setPpOpen(true)}
+          mtmByBroker={mtmByBroker}
+          onToggleChain={() => setChainOpen((v) => !v)}
+          chainOpen={chainOpen}
+          ppBrokers={[
+            upstoxPp.enabled ? { broker: "upstox",  target: upstoxPp.mtmTarget, currentSl: upstoxSl,  trailing: upstoxPp.trailingEnabled } : null,
+            zerodhaP.enabled ? { broker: "zerodha", target: zerodhaP.mtmTarget, currentSl: zerodhasl, trailing: zerodhaP.trailingEnabled } : null,
+            dhanPp.enabled   ? { broker: "dhan",    target: dhanPp.mtmTarget,   currentSl: dhanSl,    trailing: dhanPp.trailingEnabled }   : null,
+          ].filter((x): x is NonNullable<typeof x> => x !== null)}
         />
+
+        {/* Positions — flex-1, scrollable */}
+        <div className="flex-1 overflow-hidden" style={{ paddingBottom: ordersHeight }}>
+          <PositionsPanel
+            positions={positions}
+            setPositions={setPositions}
+            loading={loading}
+            isLive={isLive}
+            load={load}
+          />
+        </div>
+
+        {/* Orders — pinned bottom, resizable */}
+        <div
+          className="absolute bottom-0 left-0 right-0 border-t border-border bg-background"
+          style={{ height: ordersHeight }}
+        >
+          <div
+            className="group absolute -top-2 left-0 right-0 h-4 cursor-row-resize z-10 flex items-center justify-center"
+            onMouseDown={onDragStart}
+            title="Drag to resize"
+          >
+            <div className="h-1 w-8 rounded-full bg-border/40 transition-colors group-hover:bg-primary/50 group-active:bg-primary/70" />
+          </div>
+          <OrdersPanel
+            expanded={ordersExpanded}
+            onToggle={handleOrdersToggle}
+            onRegisterRefresh={(fn) => { loadOrdersRef.current = fn; }}
+          />
+        </div>
       </div>
 
-      {/* Orders — pinned bottom, resizable */}
-      <div
-        className="absolute bottom-0 left-0 right-0 border-t border-border bg-background"
-        style={{ height: ordersHeight }}
-      >
-        <div
-          className="group absolute -top-2 left-0 right-0 h-4 cursor-row-resize z-10 flex items-center justify-center"
-          onMouseDown={onDragStart}
-          title="Drag to resize"
-        >
-          <div className="h-1 w-8 rounded-full bg-border/40 transition-colors group-hover:bg-primary/50 group-active:bg-primary/70" />
-        </div>
-        <OrdersPanel
-          expanded={ordersExpanded}
-          onToggle={handleOrdersToggle}
-          onRegisterRefresh={(fn) => { loadOrdersRef.current = fn; }}
-        />
-      </div>
+      {/* Right column — option chain panel */}
+      {chainOpen && <OptionChainPanel onClose={() => setChainOpen(false)} />}
 
       {/* Profit Protection config dialog */}
       <ProfitProtectionPanel

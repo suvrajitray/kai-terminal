@@ -57,6 +57,7 @@ if (!string.IsNullOrWhiteSpace(redisConnStr))
 builder.Services.AddSingleton<IRiskEventNotifier, SignalRRiskEventNotifier>();
 builder.Services.AddSingleton<PositionStreamManager>();
 builder.Services.AddSingleton<IndexStreamManager>();
+builder.Services.AddSingleton<OptionChainStreamManager>();
 builder.Services.AddScoped<UserTradingSettingsService>();
 builder.Services.AddSingleton<MasterDataService>();
 
@@ -145,6 +146,7 @@ app.MapAdminEndpoints();
 app.MapHub<PositionsHub>("/hubs/positions");
 app.MapHub<IndexHub>("/hubs/indices");
 app.MapHub<RiskHub>("/hubs/risk");
+app.MapHub<OptionChainHub>("/hubs/option-chain");
 
 if (app.Environment.IsDevelopment())
     app.MapDiagnosticsEndpoints();

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { RefreshCw, LogOut, Wifi, WifiOff, ShieldCheck, Wallet, Eye, EyeOff } from "lucide-react";
+import { RefreshCw, LogOut, Wifi, WifiOff, ShieldCheck, Wallet, Eye, EyeOff, LayoutTemplate } from "lucide-react";
 import { useFunds } from "@/hooks/use-funds";
 import { SessionTimer } from "./session-timer";
 import { MtmDisplay } from "./mtm-display";
@@ -32,6 +32,8 @@ interface StatsBarProps {
   onOpenProfitProtection: () => void;
   ppBrokers: PpBrokerEntry[];
   mtmByBroker: Record<string, number>;
+  onToggleChain: () => void;
+  chainOpen: boolean;
 }
 
 export function StatsBar({
@@ -44,6 +46,8 @@ export function StatsBar({
   onOpenProfitProtection,
   ppBrokers,
   mtmByBroker,
+  onToggleChain,
+  chainOpen,
 }: StatsBarProps) {
   const connectedBrokers = useBrokerStore(useShallow((s) => BROKERS.filter((b) => s.isAuthenticated(b.id))));
   const multipleConnected = connectedBrokers.length > 1;
@@ -286,6 +290,15 @@ export function StatsBar({
           <RefreshCw className={cn("size-3", loading && "animate-spin")} />
         </Button>
         <KeyboardShortcutsHelp />
+        <Button
+          size="icon"
+          variant="ghost"
+          className={cn("size-6", chainOpen && "text-primary bg-primary/10")}
+          onClick={onToggleChain}
+          title={chainOpen ? "Hide option chain" : "Show option chain"}
+        >
+          <LayoutTemplate className="size-3" />
+        </Button>
       </div>
     </div>
   );
