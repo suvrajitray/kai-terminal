@@ -18,7 +18,6 @@ public static class ZerodhaEndpoints
 
         // ── Auth ──────────────────────────────────────────────────────────────
 
-        /// <summary>Returns the Kite Connect login URL for the given api_key.</summary>
         group.MapGet("/auth-url", ([FromQuery] string apiKey) =>
         {
             if (string.IsNullOrWhiteSpace(apiKey))
@@ -26,10 +25,6 @@ public static class ZerodhaEndpoints
             return Results.Ok(new { loginUrl = $"https://kite.zerodha.com/connect/login?api_key={apiKey}&v=3" });
         });
 
-        /// <summary>
-        /// Exchanges a Kite <c>request_token</c> (returned in the OAuth callback) for a daily
-        /// <c>access_token</c>. Optionally persists the token to BrokerCredentials.
-        /// </summary>
         group.MapPost("/access-token", async (
             [FromBody] ZerodhaTokenRequest request,
             ZerodhaClient zerodha,
@@ -48,10 +43,9 @@ public static class ZerodhaEndpoints
                 });
             }
 
-            var accessToken = await zerodha.GenerateTokenAsync(
-                request.ApiKey, request.ApiSecret, request.RequestToken, ct);
+            var accessToken = await zerodha.Auth.GenerateTokenAsync(
+                request.ApiKey, request.ApiSecret, request.RequestToken, ct: ct);
 
-            // Persist to DB (upsert) so the risk Worker can pick it up on next tick
             var userEmail = ctx.User.FindFirst(
                 System.Security.Claims.ClaimTypes.Email)?.Value ?? "";
 
@@ -72,13 +66,12 @@ public static class ZerodhaEndpoints
 
         // ── Positions ─────────────────────────────────────────────────────────
 
-        /// <summary>Returns net positions, optionally filtered by a comma-separated exchange list.</summary>
         group.MapGet("/positions", async (
             ZerodhaClient zerodha,
             [FromQuery] string? exchange,
             CancellationToken ct) =>
         {
-            var positions = await zerodha.GetAllPositionsAsync(ct);
+            var positions = await zerodha.Positions.GetAllPositionsAsync(ct);
             if (!string.IsNullOrWhiteSpace(exchange))
             {
                 var exchanges = exchange.Split(',')
@@ -103,7 +96,7 @@ public static class ZerodhaEndpoints
                 : exchange.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                           .ToList()
                           .AsReadOnly();
-            await zerodha.ExitAllPositionsAsync(exchanges, ct);
+            await zerodha.Positions.ExitAllPositionsAsync(exchanges, ct);
             lf.CreateLogger("ZerodhaEndpoints").LogInformation(
                 "Exit all positions — {User}", user.FindFirstValue(ClaimTypes.Email) ?? "unknown");
             return Results.Ok();
@@ -117,7 +110,7 @@ public static class ZerodhaEndpoints
             ILoggerFactory lf,
             CancellationToken ct) =>
         {
-            await zerodha.ConvertPositionAsync(instrumentToken, request.OldProduct, request.Quantity, ct);
+            await zerodha.Positions.ConvertPositionAsync(instrumentToken, request.OldProduct, request.Quantity, ct);
             lf.CreateLogger("ZerodhaEndpoints").LogInformation(
                 "Convert position — {User} — {Token} qty={Qty} from {OldProduct}",
                 user.FindFirstValue(ClaimTypes.Email) ?? "unknown",
@@ -134,14 +127,10 @@ public static class ZerodhaEndpoints
             ILoggerFactory lf,
             CancellationToken ct) =>
         {
-            // "down" = lower premium (safer for sellers).
-            // CE: lower premium = higher strike → positive gap for "down".
-            // PE: lower premium = lower strike  → negative gap for "down".
             bool isCe = request.InstrumentType.Equals("CE", StringComparison.OrdinalIgnoreCase);
             var strikeGap = isCe
                 ? (request.Direction == "down" ? request.StrikeGap : -request.StrikeGap)
                 : (request.Direction == "up"   ? request.StrikeGap : -request.StrikeGap);
-            // OptionStrikeService returns the Upstox instrument key (format: "{exchange}|{exchange_token}")
             var upstoxKey = await strikeSvc.FindByStrikeGapAsync(
                 request.UnderlyingKey, request.Expiry, request.InstrumentType,
                 request.CurrentStrike, strikeGap, ct);
@@ -149,7 +138,6 @@ public static class ZerodhaEndpoints
             if (upstoxKey is null)
                 return Results.Problem("No matching strike found in option chain.");
 
-            // Derive exchange_token from Upstox key, look up Zerodha trading symbol
             var exchangeToken = upstoxKey.Contains('|') ? upstoxKey.Split('|')[1] : upstoxKey;
             var contracts     = await zerodhaInstruments.GetAllCurrentYearContractsAsync(ct);
             var match         = contracts.FirstOrDefault(c => c.ExchangeToken == exchangeToken);
@@ -157,9 +145,6 @@ public static class ZerodhaEndpoints
             if (match is null)
                 return Results.Problem($"Zerodha trading symbol not found for exchange token {exchangeToken}.");
 
-            // Prefix both tokens with exchange so ZerodhaOrderService parses correctly.
-            // Close uses the exchange from the request (position's exchange e.g. "NFO", "BFO").
-            // Open uses the exchange from the matched contract.
             var closeToken = string.IsNullOrEmpty(request.Exchange)
                 ? request.InstrumentToken
                 : $"{request.Exchange}|{request.InstrumentToken}";
@@ -178,10 +163,10 @@ public static class ZerodhaEndpoints
             // Long:  open first (maintains hedge), then close old long — avoids margin spike on shorts.
             if (request.IsShort)
             {
-                await zerodha.PlaceOrderAsync(closeOrder, ct);
+                await zerodha.Orders.PlaceOrderAsync(closeOrder, ct);
                 try
                 {
-                    await zerodha.PlaceOrderAsync(openOrder, ct);
+                    await zerodha.Orders.PlaceOrderAsync(openOrder, ct);
                 }
                 catch (Exception ex)
                 {
@@ -194,10 +179,10 @@ public static class ZerodhaEndpoints
             }
             else
             {
-                await zerodha.PlaceOrderAsync(openOrder, ct);
+                await zerodha.Orders.PlaceOrderAsync(openOrder, ct);
                 try
                 {
-                    await zerodha.PlaceOrderAsync(closeOrder, ct);
+                    await zerodha.Orders.PlaceOrderAsync(closeOrder, ct);
                 }
                 catch (Exception ex)
                 {
@@ -224,7 +209,7 @@ public static class ZerodhaEndpoints
             [FromQuery] string product = "NRML",
             CancellationToken ct = default) =>
         {
-            await zerodha.ExitPositionAsync(instrumentToken, product, ct);
+            await zerodha.Positions.ExitPositionAsync(instrumentToken, product, ct);
             lf.CreateLogger("ZerodhaEndpoints").LogInformation(
                 "Exit position — {User} — {Token}",
                 user.FindFirstValue(ClaimTypes.Email) ?? "unknown", instrumentToken);
@@ -234,7 +219,7 @@ public static class ZerodhaEndpoints
         // ── Orders ────────────────────────────────────────────────────────────
 
         group.MapGet("/orders", async (ZerodhaClient zerodha, CancellationToken ct) =>
-            Results.Ok(await zerodha.GetAllOrdersAsync(ct)));
+            Results.Ok(await zerodha.Orders.GetAllOrdersAsync(ct)));
 
         group.MapPost("/orders/v3", async (
             [FromBody] ZerodhaOrderRequest request,
@@ -250,7 +235,7 @@ public static class ZerodhaEndpoints
                 request.Product,
                 request.OrderType,
                 request.Price);
-            var orderId = await zerodha.PlaceOrderAsync(brokerRequest, ct);
+            var orderId = await zerodha.Orders.PlaceOrderAsync(brokerRequest, ct);
             lf.CreateLogger("ZerodhaEndpoints").LogInformation(
                 "Order placed — {User} — {Token} qty={Qty} {Side} — order {OrderId}",
                 user.FindFirstValue(ClaimTypes.Email) ?? "unknown",
@@ -283,7 +268,7 @@ public static class ZerodhaEndpoints
 
             var orderToken = $"{match.Exchange}|{match.TradingSymbol}";
             var brokerRequest = new BrokerOrderRequest(orderToken, request.Qty, request.TransactionType, request.Product, "MARKET");
-            await zerodha.PlaceOrderAsync(brokerRequest, ct);
+            await zerodha.Orders.PlaceOrderAsync(brokerRequest, ct);
 
             lf.CreateLogger("ZerodhaEndpoints").LogInformation(
                 "By-price order — {User} — {Underlying} {Expiry} {Type} qty={Qty} {Side} target=₹{Premium} → {Token}",
@@ -296,7 +281,6 @@ public static class ZerodhaEndpoints
 
         // ── Margin ────────────────────────────────────────────────────────────
 
-        /// <summary>Calculates required margin for a basket of hypothetical Zerodha orders.</summary>
         group.MapPost("/margin", async (
             [FromBody] ZerodhaMarginRequest request,
             ZerodhaClient zerodha,
@@ -304,18 +288,17 @@ public static class ZerodhaEndpoints
         {
             var items = request.Instruments.Select(i =>
                 new BrokerMarginOrderItem($"{i.Exchange}|{i.TradingSymbol}", i.Quantity, i.Product, i.TransactionType));
-            var margin = await zerodha.GetRequiredMarginAsync(items, ct);
+            var margin = await zerodha.Margin.GetRequiredMarginAsync(items, ct);
             return Results.Ok(new { requiredMargin = margin.RequiredMargin, finalMargin = margin.FinalMargin });
         });
 
         // ── Funds ─────────────────────────────────────────────────────────────
 
-        /// <summary>Returns available and used margin for the Zerodha equity/F&amp;O segment.</summary>
         group.MapGet("/funds", async (ZerodhaClient zerodha, CancellationToken ct) =>
         {
             try
             {
-                var funds = await zerodha.GetFundsAsync(ct);
+                var funds = await zerodha.Funds.GetFundsAsync(ct);
                 return Results.Ok(new
                 {
                     availableMargin = funds.Available,
@@ -325,7 +308,6 @@ public static class ZerodhaEndpoints
             }
             catch
             {
-                // Return null fields if funds API is unavailable (same pattern as Upstox endpoint)
                 return Results.Ok(new
                 {
                     availableMargin = (decimal?)null,

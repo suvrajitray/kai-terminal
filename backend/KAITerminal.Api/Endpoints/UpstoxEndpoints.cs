@@ -26,7 +26,7 @@ public static class UpstoxEndpoints
             ClaimsPrincipal user,
             ILoggerFactory lf) =>
         {
-            var accessToken = await upstox.GenerateTokenAsync(
+            var accessToken = await upstox.Auth.GenerateTokenAsync(
                 request.ApiKey, request.ApiSecret, request.Code, request.RedirectUri);
             lf.CreateLogger("UpstoxEndpoints").LogInformation(
                 "Upstox access token generated — {User}", user.FindFirstValue(ClaimTypes.Email) ?? "unknown");
@@ -39,7 +39,7 @@ public static class UpstoxEndpoints
             UpstoxClient upstox,
             [FromQuery] string? exchange = null) =>
         {
-            var positions = await upstox.GetAllPositionsAsync();
+            var positions = await upstox.Positions.GetAllPositionsAsync();
             return Results.Ok(FilterByExchange(positions, exchange).Select(p => p.ToResponse()));
         });
 
@@ -59,7 +59,7 @@ public static class UpstoxEndpoints
                 : exchange.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                           .ToList()
                           .AsReadOnly();
-            var ids = await upstox.ExitAllPositionsAsync(exchanges);
+            var ids = await upstox.Positions.ExitAllPositionsAsync(exchanges);
 
             logger.LogInformation(
                 "Exit all complete — {User} — {Count} order(s) placed", email, ids.Count);
@@ -73,7 +73,7 @@ public static class UpstoxEndpoints
             ILoggerFactory lf,
             [FromQuery] string product = "I") =>
         {
-            var id = await upstox.ExitPositionAsync(instrumentToken, product);
+            var id = await upstox.Positions.ExitPositionAsync(instrumentToken, product);
             lf.CreateLogger("UpstoxEndpoints").LogInformation(
                 "Exit position — {User} — {Token} ({Product}) — order {OrderId}",
                 user.FindFirstValue(ClaimTypes.Email) ?? "unknown", instrumentToken, product, id);
@@ -87,7 +87,7 @@ public static class UpstoxEndpoints
             ClaimsPrincipal user,
             ILoggerFactory lf) =>
         {
-            await upstox.ConvertPositionAsync(instrumentToken, request.OldProduct, request.Quantity);
+            await upstox.Positions.ConvertPositionAsync(instrumentToken, request.OldProduct, request.Quantity);
             lf.CreateLogger("UpstoxEndpoints").LogInformation(
                 "Convert position — {User} — {Token} qty={Qty} from {OldProduct}",
                 user.FindFirstValue(ClaimTypes.Email) ?? "unknown",
@@ -103,9 +103,6 @@ public static class UpstoxEndpoints
             ILoggerFactory lf,
             CancellationToken ct) =>
         {
-            // "down" = lower premium (safer for sellers).
-            // CE: lower premium = higher strike → positive gap for "down".
-            // PE: lower premium = lower strike  → negative gap for "down".
             bool isCe = request.InstrumentType.Equals("CE", StringComparison.OrdinalIgnoreCase);
             var strikeGap = isCe
                 ? (request.Direction == "down" ? request.StrikeGap : -request.StrikeGap)
@@ -151,10 +148,10 @@ public static class UpstoxEndpoints
             // Long:  open first (maintains hedge), then close old long — avoids margin spike on shorts.
             if (request.IsShort)
             {
-                await upstox.PlaceOrderV3Async(closeOrder);
+                await upstox.Hft.PlaceOrderV3Async(closeOrder);
                 try
                 {
-                    await upstox.PlaceOrderV3Async(openOrder);
+                    await upstox.Hft.PlaceOrderV3Async(openOrder);
                 }
                 catch (Exception ex)
                 {
@@ -167,10 +164,10 @@ public static class UpstoxEndpoints
             }
             else
             {
-                await upstox.PlaceOrderV3Async(openOrder);
+                await upstox.Hft.PlaceOrderV3Async(openOrder);
                 try
                 {
-                    await upstox.PlaceOrderV3Async(closeOrder);
+                    await upstox.Hft.PlaceOrderV3Async(closeOrder);
                 }
                 catch (Exception ex)
                 {
@@ -192,7 +189,7 @@ public static class UpstoxEndpoints
         // ── Orders ────────────────────────────────────────────────────────────
 
         group.MapGet("/orders", async (UpstoxClient upstox) =>
-            Results.Ok((await upstox.GetAllOrdersAsync()).Select(o => o.ToResponse())));
+            Results.Ok((await upstox.Hft.GetAllOrdersAsync()).Select(o => o.ToResponse())));
 
         group.MapPost("/orders/v3", async (
             [FromBody] PlaceOrderRequest request,
@@ -200,7 +197,7 @@ public static class UpstoxEndpoints
             ClaimsPrincipal user,
             ILoggerFactory lf) =>
         {
-            var result = await upstox.PlaceOrderV3Async(request);
+            var result = await upstox.Hft.PlaceOrderV3Async(request);
             lf.CreateLogger("UpstoxEndpoints").LogInformation(
                 "Order placed — {User} — qty={Qty} {Symbol} {Side} @ {Price} — ids=[{OrderIds}] latency={Latency}ms",
                 user.FindFirstValue(ClaimTypes.Email) ?? "unknown",
@@ -214,7 +211,7 @@ public static class UpstoxEndpoints
             ClaimsPrincipal user,
             ILoggerFactory lf) =>
         {
-            var ids = await upstox.CancelAllPendingOrdersAsync();
+            var ids = await upstox.Orders.CancelAllPendingOrdersAsync();
             lf.CreateLogger("UpstoxEndpoints").LogInformation(
                 "Cancel all pending orders — {User} — {Count} order(s) cancelled",
                 user.FindFirstValue(ClaimTypes.Email) ?? "unknown", ids.Count);
@@ -227,7 +224,7 @@ public static class UpstoxEndpoints
             ClaimsPrincipal user,
             ILoggerFactory lf) =>
         {
-            var (id, latency) = await upstox.CancelOrderV3Async(orderId);
+            var (id, latency) = await upstox.Hft.CancelOrderV3Async(orderId);
             lf.CreateLogger("UpstoxEndpoints").LogInformation(
                 "Order cancelled — {User} — {OrderId} — latency {Latency}ms",
                 user.FindFirstValue(ClaimTypes.Email) ?? "unknown", id, latency);
@@ -258,7 +255,7 @@ public static class UpstoxEndpoints
                 _                            => Product.Intraday,
             };
 
-            await upstox.PlaceOrderV3Async(new PlaceOrderRequest
+            await upstox.Hft.PlaceOrderV3Async(new PlaceOrderRequest
             {
                 InstrumentToken = key,
                 Quantity        = request.Qty,
@@ -282,7 +279,7 @@ public static class UpstoxEndpoints
         {
             try
             {
-                var funds = await upstox.GetFundsAsync(ct);
+                var funds = await upstox.Funds.GetFundsAsync(ct);
                 return Results.Ok(new
                 {
                     availableMargin = funds.Available,
@@ -306,7 +303,7 @@ public static class UpstoxEndpoints
         {
             var items = request.Instruments.Select(i =>
                 new BrokerMarginOrderItem(i.InstrumentToken, i.Quantity, i.Product, i.TransactionType));
-            var margin = await upstox.GetRequiredMarginAsync(items);
+            var margin = await upstox.Margin.GetRequiredMarginAsync(items);
             return Results.Ok(new { requiredMargin = margin.RequiredMargin, finalMargin = margin.FinalMargin });
         });
     }

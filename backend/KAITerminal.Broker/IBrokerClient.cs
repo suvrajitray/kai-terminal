@@ -40,6 +40,12 @@ public interface IBrokerClient
     /// <summary>Place an order using broker-agnostic request parameters.</summary>
     Task PlaceOrderAsync(BrokerOrderRequest request, CancellationToken ct = default);
 
+    /// <summary>Cancel a single order by ID.</summary>
+    Task<string> CancelOrderAsync(string orderId, CancellationToken ct = default);
+
+    /// <summary>Cancel every open/pending order. Returns cancelled order IDs.</summary>
+    Task<IReadOnlyList<string>> CancelAllPendingOrdersAsync(CancellationToken ct = default);
+
     // ── Funds ────────────────────────────────────────────────────────────────
 
     /// <summary>Fetch available and used margin for the equity/F&amp;O segment.</summary>

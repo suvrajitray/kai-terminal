@@ -47,17 +47,34 @@ public static class ServiceCollectionExtensions
         });
 
         services.AddSingleton<ZerodhaHttpClient>();
-        services.AddSingleton<IBrokerAuthService,         ZerodhaAuthService>();
-        services.AddSingleton<IBrokerPositionService,     ZerodhaPositionService>();
-        services.AddSingleton<IBrokerOrderService,        ZerodhaOrderService>();
-        services.AddSingleton<IBrokerFundsService,        ZerodhaFundsService>();
-        services.AddSingleton<IBrokerMarginService,       ZerodhaMarginService>();
+
+        // Register each service under its concrete type first, then alias to the common interface.
+        // This ensures ZerodhaClient always gets Zerodha implementations regardless of registration order.
+        services.AddSingleton<ZerodhaAuthService>();
+        services.AddSingleton<IBrokerAuthService>(sp => sp.GetRequiredService<ZerodhaAuthService>());
+
+        services.AddSingleton<ZerodhaPositionService>();
+        services.AddSingleton<IBrokerPositionService>(sp => sp.GetRequiredService<ZerodhaPositionService>());
+
+        services.AddSingleton<ZerodhaOrderService>();
+        services.AddSingleton<IBrokerOrderService>(sp => sp.GetRequiredService<ZerodhaOrderService>());
+
+        services.AddSingleton<ZerodhaFundsService>();
+        services.AddSingleton<IBrokerFundsService>(sp => sp.GetRequiredService<ZerodhaFundsService>());
+
+        services.AddSingleton<ZerodhaMarginService>();
+        services.AddSingleton<IBrokerMarginService>(sp => sp.GetRequiredService<ZerodhaMarginService>());
 
         // KiteTickerStreamer is stateful — Transient gives each caller its own independent instance
         services.AddTransient<KiteTickerStreamer>();
         services.AddSingleton<Func<KiteTickerStreamer>>(sp => () => sp.GetRequiredService<KiteTickerStreamer>());
 
-        services.AddSingleton<ZerodhaClient>();
+        services.AddSingleton<ZerodhaClient>(sp => new ZerodhaClient(
+            sp.GetRequiredService<ZerodhaAuthService>(),
+            sp.GetRequiredService<ZerodhaPositionService>(),
+            sp.GetRequiredService<ZerodhaOrderService>(),
+            sp.GetRequiredService<ZerodhaFundsService>(),
+            sp.GetRequiredService<ZerodhaMarginService>()));
 
         return services;
     }

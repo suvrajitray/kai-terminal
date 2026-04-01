@@ -3,16 +3,19 @@ using KAITerminal.Contracts.Domain;
 using KAITerminal.Upstox.Http;
 using KAITerminal.Upstox.Models.Enums;
 using KAITerminal.Upstox.Models.Requests;
+using KAITerminal.Upstox.Models.Responses;
 
 namespace KAITerminal.Upstox.Services;
 
-internal sealed class UpstoxOrderService : IBrokerOrderService
+internal sealed class UpstoxOrderService : IBrokerOrderService, IUpstoxHftService
 {
     private readonly UpstoxHttpClient _http;
 
     public UpstoxOrderService(UpstoxHttpClient http) => _http = http;
 
-    public async Task<IReadOnlyList<BrokerOrder>> GetAllOrdersAsync(CancellationToken ct = default)
+    // ── IBrokerOrderService ───────────────────────────────────────────────────
+
+    async Task<IReadOnlyList<BrokerOrder>> IBrokerOrderService.GetAllOrdersAsync(CancellationToken ct)
     {
         var orders = await _http.GetAllOrdersAsync(ct);
         return orders.Select(o => new BrokerOrder
@@ -73,4 +76,15 @@ internal sealed class UpstoxOrderService : IBrokerOrderService
         var results = await Task.WhenAll(tasks);
         return results.AsReadOnly();
     }
+
+    // ── IUpstoxHftService ─────────────────────────────────────────────────────
+
+    Task<IReadOnlyList<Order>> IUpstoxHftService.GetAllOrdersAsync(CancellationToken ct)
+        => _http.GetAllOrdersAsync(ct);
+
+    Task<PlaceOrderV3Result> IUpstoxHftService.PlaceOrderV3Async(PlaceOrderRequest request, CancellationToken ct)
+        => _http.PlaceOrderV3Async(request, ct);
+
+    Task<(string OrderId, int Latency)> IUpstoxHftService.CancelOrderV3Async(string orderId, CancellationToken ct)
+        => _http.CancelOrderV3Async(orderId, ct);
 }

@@ -1,5 +1,4 @@
 using KAITerminal.Broker;
-using KAITerminal.Broker.Adapters;
 using Serilog;
 using KAITerminal.Contracts.Notifications;
 using KAITerminal.Contracts.Broker;

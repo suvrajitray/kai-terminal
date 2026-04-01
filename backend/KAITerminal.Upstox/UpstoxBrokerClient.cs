@@ -1,15 +1,11 @@
 using KAITerminal.Broker;
 using KAITerminal.Contracts.Domain;
-using KAITerminal.Upstox;
-using KAITerminal.Upstox.Models.Enums;
-using KAITerminal.Upstox.Models.Requests;
 
-namespace KAITerminal.Broker.Adapters;
+namespace KAITerminal.Upstox;
 
 /// <summary>
 /// Adapts <see cref="UpstoxClient"/> to the broker-agnostic <see cref="IBrokerClient"/> interface.
 /// Each instance is token-scoped — wraps every call in <c>UpstoxTokenContext.Use(token)</c>.
-/// Maps Upstox-internal types to <see cref="KAITerminal.Contracts"/> types at the boundary.
 /// </summary>
 public sealed class UpstoxBrokerClient : IBrokerClient
 {
@@ -31,74 +27,54 @@ public sealed class UpstoxBrokerClient : IBrokerClient
     public async Task<IReadOnlyList<BrokerPosition>> GetAllPositionsAsync(CancellationToken ct = default)
     {
         using var _ = UseToken();
-        return await _upstox.GetAllPositionsAsync(ct);
+        return await _upstox.Positions.GetAllPositionsAsync(ct);
     }
 
     public async Task<decimal> GetTotalMtmAsync(CancellationToken ct = default)
     {
         using var _ = UseToken();
-        return await _upstox.GetTotalMtmAsync(ct);
+        return await _upstox.Positions.GetTotalMtmAsync(ct);
     }
 
     public async Task ExitAllPositionsAsync(IReadOnlyCollection<string>? exchanges = null, CancellationToken ct = default)
     {
         using var _ = UseToken();
-        await _upstox.ExitAllPositionsAsync(exchanges, ct);
+        await _upstox.Positions.ExitAllPositionsAsync(exchanges, ct);
     }
 
     public async Task ExitPositionAsync(string instrumentToken, string product, CancellationToken ct = default)
     {
         using var _ = UseToken();
-        await _upstox.ExitPositionAsync(instrumentToken, product, ct);
+        await _upstox.Positions.ExitPositionAsync(instrumentToken, product, ct);
     }
 
     public async Task<IReadOnlyList<BrokerOrder>> GetAllOrdersAsync(CancellationToken ct = default)
     {
         using var _ = UseToken();
-        var orders = await _upstox.GetAllOrdersAsync(ct);
-        return orders.Select(o => new BrokerOrder
-        {
-            OrderId       = o.OrderId,
-            TradingSymbol = o.TradingSymbol,
-            Status        = o.Status,
-            StatusMessage = o.StatusMessage,
-        }).ToList().AsReadOnly();
+        return await _upstox.Orders.GetAllOrdersAsync(ct);
     }
 
     public async Task PlaceOrderAsync(BrokerOrderRequest request, CancellationToken ct = default)
     {
         using var _ = UseToken();
+        await _upstox.Orders.PlaceOrderAsync(request, ct);
+    }
 
-        var txType = request.TransactionType.Equals("BUY", StringComparison.OrdinalIgnoreCase)
-            ? TransactionType.Buy : TransactionType.Sell;
+    public async Task<string> CancelOrderAsync(string orderId, CancellationToken ct = default)
+    {
+        using var _ = UseToken();
+        return await _upstox.Orders.CancelOrderAsync(orderId, ct);
+    }
 
-        var orderType = request.OrderType.Equals("LIMIT", StringComparison.OrdinalIgnoreCase)
-            ? OrderType.Limit : OrderType.Market;
-
-        var product = request.Product.ToUpperInvariant() switch
-        {
-            "D" or "CNC" or "DELIVERY" => Product.Delivery,
-            "MTF"                       => Product.MTF,
-            "CO"                        => Product.CoverOrder,
-            _                           => Product.Intraday,   // "I", "MIS", "NRML" etc.
-        };
-
-        await _upstox.PlaceOrderV3Async(new PlaceOrderRequest
-        {
-            InstrumentToken = request.InstrumentToken,
-            Quantity        = request.Quantity,
-            TransactionType = txType,
-            OrderType       = orderType,
-            Product         = product,
-            Price           = request.Price ?? 0,
-            Slice           = true,
-        }, ct);
+    public async Task<IReadOnlyList<string>> CancelAllPendingOrdersAsync(CancellationToken ct = default)
+    {
+        using var _ = UseToken();
+        return await _upstox.Orders.CancelAllPendingOrdersAsync(ct);
     }
 
     public async Task<BrokerFunds> GetFundsAsync(CancellationToken ct = default)
     {
         using var _ = UseToken();
-        return await _upstox.GetFundsAsync(ct);
+        return await _upstox.Funds.GetFundsAsync(ct);
     }
-
 }

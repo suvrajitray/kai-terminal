@@ -61,19 +61,31 @@ public static class ServiceCollectionExtensions
         }).AddHttpMessageHandler<UpstoxAuthHandler>();
 
         services.AddSingleton<UpstoxHttpClient>();
-        services.AddSingleton<IBrokerAuthService, UpstoxAuthService>();
-        services.AddSingleton<IBrokerPositionService, UpstoxPositionService>();
-        services.AddSingleton<IBrokerOrderService, UpstoxOrderService>();
-        services.AddSingleton<IBrokerMarginService, UpstoxMarginService>();
-        services.AddSingleton<IBrokerFundsService, UpstoxFundsService>();
+
+        // Register each service under its concrete type first, then alias to the common interface.
+        // This ensures UpstoxClient always gets Upstox implementations regardless of registration order.
+        services.AddSingleton<UpstoxAuthService>();
+        services.AddSingleton<IBrokerAuthService>(sp => sp.GetRequiredService<UpstoxAuthService>());
+
+        services.AddSingleton<UpstoxPositionService>();
+        services.AddSingleton<IBrokerPositionService>(sp => sp.GetRequiredService<UpstoxPositionService>());
+
+        services.AddSingleton<UpstoxOrderService>();
+        services.AddSingleton<IBrokerOrderService>(sp => sp.GetRequiredService<UpstoxOrderService>());
+        services.AddSingleton<IUpstoxHftService>(sp => sp.GetRequiredService<UpstoxOrderService>());
+
+        services.AddSingleton<UpstoxMarginService>();
+        services.AddSingleton<IBrokerMarginService>(sp => sp.GetRequiredService<UpstoxMarginService>());
+
+        services.AddSingleton<UpstoxFundsService>();
+        services.AddSingleton<IBrokerFundsService>(sp => sp.GetRequiredService<UpstoxFundsService>());
 
         services.AddSingleton<UpstoxClient>(sp => new UpstoxClient(
-            sp.GetRequiredService<IBrokerAuthService>(),
-            sp.GetRequiredService<IBrokerPositionService>(),
-            sp.GetRequiredService<IBrokerOrderService>(),
-            sp.GetRequiredService<IBrokerMarginService>(),
-            sp.GetRequiredService<IBrokerFundsService>(),
-            sp.GetRequiredService<UpstoxHttpClient>()));
+            sp.GetRequiredService<UpstoxAuthService>(),
+            sp.GetRequiredService<UpstoxPositionService>(),
+            sp.GetRequiredService<UpstoxOrderService>(),
+            sp.GetRequiredService<UpstoxMarginService>(),
+            sp.GetRequiredService<UpstoxFundsService>()));
 
         return services;
     }

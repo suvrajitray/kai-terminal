@@ -30,43 +30,54 @@ public sealed class ZerodhaBrokerClient : IBrokerClient
     public async Task<IReadOnlyList<BrokerPosition>> GetAllPositionsAsync(CancellationToken ct = default)
     {
         using var _ = UseToken();
-        return await _zerodha.GetAllPositionsAsync(ct);
+        return await _zerodha.Positions.GetAllPositionsAsync(ct);
     }
 
     public async Task<decimal> GetTotalMtmAsync(CancellationToken ct = default)
     {
         using var _ = UseToken();
-        return await _zerodha.GetTotalMtmAsync(ct);
+        return await _zerodha.Positions.GetTotalMtmAsync(ct);
     }
 
     public async Task ExitAllPositionsAsync(IReadOnlyCollection<string>? exchanges = null, CancellationToken ct = default)
     {
         using var _ = UseToken();
-        await _zerodha.ExitAllPositionsAsync(exchanges, ct);
+        await _zerodha.Positions.ExitAllPositionsAsync(exchanges, ct);
     }
 
     public async Task ExitPositionAsync(string instrumentToken, string product, CancellationToken ct = default)
     {
         using var _ = UseToken();
-        await _zerodha.ExitPositionAsync(instrumentToken, product, ct);
+        await _zerodha.Positions.ExitPositionAsync(instrumentToken, product, ct);
     }
 
     public async Task<IReadOnlyList<BrokerOrder>> GetAllOrdersAsync(CancellationToken ct = default)
     {
         using var _ = UseToken();
-        return await _zerodha.GetAllOrdersAsync(ct);
+        return await _zerodha.Orders.GetAllOrdersAsync(ct);
     }
 
     public async Task PlaceOrderAsync(BrokerOrderRequest request, CancellationToken ct = default)
     {
         using var _ = UseToken();
-        await _zerodha.PlaceOrderAsync(request, ct);
+        await _zerodha.Orders.PlaceOrderAsync(request, ct);
+    }
+
+    public async Task<string> CancelOrderAsync(string orderId, CancellationToken ct = default)
+    {
+        using var _ = UseToken();
+        return await _zerodha.Orders.CancelOrderAsync(orderId, ct);
+    }
+
+    public async Task<IReadOnlyList<string>> CancelAllPendingOrdersAsync(CancellationToken ct = default)
+    {
+        using var _ = UseToken();
+        return await _zerodha.Orders.CancelAllPendingOrdersAsync(ct);
     }
 
     public async Task<BrokerFunds> GetFundsAsync(CancellationToken ct = default)
     {
         using var _ = UseToken();
-        return await _zerodha.GetFundsAsync(ct);
+        return await _zerodha.Funds.GetFundsAsync(ct);
     }
-
 }
