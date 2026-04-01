@@ -243,13 +243,7 @@ public static class UpstoxEndpoints
                 return Results.Problem("No matching strike found in option chain.");
 
             var txn = request.TransactionType == "Buy" ? TransactionType.Buy : TransactionType.Sell;
-            var product = request.Product switch
-            {
-                "Delivery" or "D" or "NRML" => Product.Delivery,
-                "Mtf"      or "MTF"          => Product.MTF,
-                "CoverOrder" or "CO"         => Product.CoverOrder,
-                _                            => Product.Intraday,
-            };
+            var product = UpstoxProductMap.ToEnum(request.Product);
 
             await upstox.Hft.PlaceOrderV3Async(new PlaceOrderRequest
             {
