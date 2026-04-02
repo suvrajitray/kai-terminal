@@ -1,6 +1,6 @@
-import { useEffect } from "react";
-import { motion } from "motion/react";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { AlertCircle, CheckCircle2, ChevronDown, KeyRound, LogIn, PlugZap, Copy, Check } from "lucide-react";
 import { BROKERS } from "@/lib/constants";
 import { BrokerCard } from "@/components/brokers/broker-card";
 import { useBrokerStore } from "@/stores/broker-store";
@@ -19,6 +19,122 @@ function getBrokerStatus(
   const token = getCredentials(brokerId)?.accessToken;
   if (isBrokerTokenExpired(brokerId, token)) return token ? "expired" : "missing";
   return "active";
+}
+
+function CopyUrl({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <div className="mt-1.5 flex items-center gap-1.5 rounded border border-border/40 bg-muted/30 px-2.5 py-1.5">
+      <span className="flex-1 truncate font-mono text-[11px] text-foreground/80">{url}</span>
+      <button
+        onClick={copy}
+        className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+        title="Copy redirect URL"
+      >
+        {copied ? <Check className="size-3 text-green-500" /> : <Copy className="size-3" />}
+      </button>
+    </div>
+  );
+}
+
+function HowToConnect() {
+  const [open, setOpen] = useState(false);
+  const [tab, setTab]   = useState<"upstox" | "zerodha">("upstox");
+
+  const redirectUrl = (broker: string) => `${window.location.origin}/redirect/${broker}`;
+
+  const steps = [
+    {
+      icon: KeyRound,
+      title: "Get API credentials",
+      upstox: "Go to Upstox Developer → My Apps → create an app. Set the redirect URL below, then copy the API Key and Secret.",
+      zerodha: "Go to Kite Connect → Your Apps → create an app. Set the redirect URL below, then copy the API Key and Secret.",
+      showRedirect: true,
+    },
+    {
+      icon: PlugZap,
+      title: "Enter credentials",
+      upstox: 'Click "Connect" on the Upstox card and paste your API Key and Secret.',
+      zerodha: 'Click "Connect" on the Zerodha card and paste your API Key and Secret.',
+      showRedirect: false,
+    },
+    {
+      icon: LogIn,
+      title: "Authenticate daily",
+      upstox: "Click \"Authenticate\" → log in with your Upstox account → you'll be redirected back automatically.",
+      zerodha: "Click \"Authenticate\" → log in with your Zerodha account → you'll be redirected back automatically.",
+      showRedirect: false,
+    },
+  ];
+
+  return (
+    <div className="rounded-lg border border-border/40 bg-muted/10">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <span>How to connect a broker?</span>
+        <ChevronDown className={cn("size-4 transition-transform duration-200", open && "rotate-180")} />
+      </button>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="border-t border-border/40 px-4 pb-4 pt-3 space-y-4">
+              {/* Broker tab toggle */}
+              <div className="flex gap-1 rounded-lg border border-border/40 bg-background p-0.5 w-fit">
+                {(["upstox", "zerodha"] as const).map((b) => (
+                  <button
+                    key={b}
+                    onClick={() => setTab(b)}
+                    className={cn(
+                      "rounded-md px-4 py-1 text-xs font-semibold capitalize transition-all",
+                      tab === b
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {b === "upstox" ? "Upstox" : "Zerodha"}
+                  </button>
+                ))}
+              </div>
+
+              {/* Steps */}
+              <ol className="space-y-4">
+                {steps.map((step, i) => (
+                  <li key={i} className="flex gap-3">
+                    <div className="flex size-6 shrink-0 items-center justify-center rounded-full border border-border/60 bg-muted/40 text-[11px] font-bold text-muted-foreground">
+                      {i + 1}
+                    </div>
+                    <div className="flex-1 space-y-0.5 pt-0.5">
+                      <p className="text-xs font-semibold text-foreground">{step.title}</p>
+                      <p className="text-xs text-muted-foreground">{step[tab]}</p>
+                      {step.showRedirect && <CopyUrl url={redirectUrl(tab)} />}
+                    </div>
+                  </li>
+                ))}
+              </ol>
+
+              <p className="text-[11px] text-muted-foreground/60 border-t border-border/30 pt-3">
+                Broker sessions expire daily. Re-authenticate each morning before trading.
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
 }
 
 export function ConnectBrokersPage() {
@@ -66,6 +182,8 @@ export function ConnectBrokersPage() {
             : "Link your brokerage accounts to start trading."}
         </p>
       </div>
+
+      <HowToConnect />
 
       {anyNeedsReAuth && (
         <motion.div
