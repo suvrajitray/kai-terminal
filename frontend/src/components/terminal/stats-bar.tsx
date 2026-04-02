@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { RefreshCw, LogOut, Wifi, WifiOff, ShieldCheck, Wallet, Eye, EyeOff, LayoutTemplate } from "lucide-react";
+import { RefreshCw, LogOut, Wifi, WifiOff, ShieldCheck, Wallet, Eye, EyeOff, PanelRight } from "lucide-react";
 import { useFunds } from "@/hooks/use-funds";
 import { SessionTimer } from "./session-timer";
 import { MtmDisplay } from "./mtm-display";
@@ -297,7 +297,7 @@ export function StatsBar({
           onClick={onToggleChain}
           title={chainOpen ? "Hide option chain" : "Show option chain"}
         >
-          <LayoutTemplate className="size-3" />
+          <PanelRight className="size-3" />
         </Button>
       </div>
     </div>

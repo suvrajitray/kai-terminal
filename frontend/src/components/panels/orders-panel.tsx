@@ -9,6 +9,8 @@ import { fetchOrders, cancelAllOrders, cancelOrder } from "@/services/trading-ap
 import { OptionTypeBadge } from "@/components/panels/positions-panel/option-type-badge";
 import { isBrokerTokenExpired } from "@/lib/token-utils";
 import { useBrokerStore } from "@/stores/broker-store";
+import { BROKERS } from "@/lib/constants";
+import { BrokerBadge } from "@/components/ui/broker-badge";
 import type { Order } from "@/types";
 
 const TERMINAL_STATUSES = new Set(["complete", "rejected", "cancelled"]);
@@ -107,12 +109,17 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
   const [tab, setTab] = useState<Tab>("open");
 
   const load = useCallback(async () => {
-    const upstoxToken = useBrokerStore.getState().getCredentials("upstox")?.accessToken;
-    if (isBrokerTokenExpired("upstox", upstoxToken)) return;
+    const activeBrokers = BROKERS
+      .map((b) => b.id)
+      .filter((id) => {
+        const token = useBrokerStore.getState().getCredentials(id)?.accessToken;
+        return !isBrokerTokenExpired(id, token);
+      });
+    if (activeBrokers.length === 0) return;
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchOrders();
+      const data = await fetchOrders(activeBrokers);
       setOrders([...data].reverse());
     } catch (e) {
       setError((e as Error).message);
@@ -289,14 +296,18 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
                               {parsed.underlying} {parsed.strike}
                               <OptionTypeBadge type={parsed.type} />
                             </div>
-                            <div className="text-[11px] text-muted-foreground">
+                            <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                              {o.broker && <BrokerBadge brokerId={o.broker} size={12} />}
                               {o.exchange} {parsed.expiryLabel} · {productLabel(o.product)}
                             </div>
                           </>
                         ) : (
                           <>
                             <div className="font-medium">{o.tradingSymbol}</div>
-                            <div className="text-[11px] text-muted-foreground">{o.exchange} · {productLabel(o.product)}</div>
+                            <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                              {o.broker && <BrokerBadge brokerId={o.broker} size={12} />}
+                              {o.exchange} · {productLabel(o.product)}
+                            </div>
                           </>
                         );
                       })()}

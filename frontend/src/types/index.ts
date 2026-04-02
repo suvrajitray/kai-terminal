@@ -61,9 +61,19 @@ export interface OptionMarketData {
   askQty: number;
 }
 
+export interface OptionGreeks {
+  iv: number;
+  delta: number;
+  theta: number;
+  gamma: number;
+  vega: number;
+  pop: number;
+}
+
 export interface OptionSide {
   instrumentKey: string;
   marketData?: OptionMarketData;
+  optionGreeks?: OptionGreeks;
 }
 
 export interface OptionChainEntry {
@@ -120,6 +130,7 @@ export interface RiskEvent {
 
 // CamelCase matches the unified KAI Terminal OrderResponse DTO from the backend
 export interface Order {
+  broker?: string;
   orderId: string;
   exchangeOrderId: string;
   exchange: string;

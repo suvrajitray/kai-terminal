@@ -1,12 +1,14 @@
 import { cn } from "@/lib/utils";
 import type { OptionChainEntry } from "@/types";
+import type { OrderIntent } from "./option-chain-order-dialog";
 
 interface Props {
   entry: OptionChainEntry;
-  maxCallOi: number;
-  maxPutOi: number;
   isAtm: boolean;
   isLive: boolean;
+  spotPrice: number;
+  underlying: string;
+  onOrder: (intent: OrderIntent) => void;
 }
 
 function formatLtp(ltp: number | undefined): string {
@@ -14,73 +16,113 @@ function formatLtp(ltp: number | undefined): string {
   return ltp.toFixed(2);
 }
 
-function formatOi(oi: number | undefined): string {
-  if (!oi) return "—";
-  if (oi >= 100_000) return `${(oi / 100_000).toFixed(1)}L`;
-  if (oi >= 1_000) return `${(oi / 1_000).toFixed(0)}K`;
-  return String(oi);
+function formatDelta(delta: number | undefined): string {
+  if (delta === undefined || delta === 0) return "—";
+  return delta.toFixed(2);
 }
 
-export function OptionChainRow({ entry, maxCallOi, maxPutOi, isAtm, isLive }: Props) {
-  const callLtp = entry.callOptions?.marketData?.ltp;
-  const callOi  = entry.callOptions?.marketData?.oi ?? 0;
-  const putLtp  = entry.putOptions?.marketData?.ltp;
-  const putOi   = entry.putOptions?.marketData?.oi ?? 0;
+export function OptionChainRow({ entry, isAtm, isLive, spotPrice, underlying, onOrder }: Props) {
+  const callLtp   = entry.callOptions?.marketData?.ltp;
+  const putLtp    = entry.putOptions?.marketData?.ltp;
+  const callDelta = entry.callOptions?.optionGreeks?.delta;
+  const putDelta  = entry.putOptions?.optionGreeks?.delta;
 
-  const callOiPct = maxCallOi > 0 ? Math.round((callOi / maxCallOi) * 100) : 0;
-  const putOiPct  = maxPutOi  > 0 ? Math.round((putOi  / maxPutOi)  * 100) : 0;
+  const callItm = spotPrice > 0 && entry.strikePrice < spotPrice;
+  const putItm  = spotPrice > 0 && entry.strikePrice > spotPrice;
+
+  function triggerOrder(side: "CE" | "PE", transactionType: "Buy" | "Sell") {
+    const opt = side === "CE" ? entry.callOptions : entry.putOptions;
+    const ltp = opt?.marketData?.ltp ?? 0;
+    const key = opt?.instrumentKey;
+    if (!key) return;
+    onOrder({ instrumentKey: key, side, transactionType, ltp, strike: entry.strikePrice, underlying });
+  }
 
   return (
     <tr
       className={cn(
-        "border-b border-border/30 text-xs transition-colors",
+        "group border-b border-border/30 text-sm transition-colors",
         isAtm ? "bg-muted/50" : "hover:bg-muted/20",
         !isLive && "[&>td]:opacity-55",
       )}
     >
-      {/* Call OI bar — fills from right toward strike */}
-      <td className="w-10 px-1 py-1">
-        <div className="relative h-2.5 w-full overflow-hidden rounded-sm bg-muted/20">
-          <div
-            className="absolute right-0 h-full rounded-sm bg-red-500/40 transition-[width]"
-            style={{ width: `${callOiPct}%` }}
-          />
-        </div>
+      {/* Call Delta — shows S + B on hover */}
+      <td className={cn(
+        "px-2 py-1.5 text-right font-mono tabular-nums text-xs",
+        callItm ? "bg-red-500/10 text-muted-foreground/70" : "text-muted-foreground/30",
+      )}>
+        <span className="group-hover:hidden">{formatDelta(callDelta)}</span>
+        <span className="hidden group-hover:inline-flex items-center justify-end gap-1 w-full">
+          <button
+            onClick={() => triggerOrder("CE", "Sell")}
+            className={cn(
+              "h-6 w-10 cursor-pointer rounded text-[11px] font-bold text-white",
+              callItm ? "bg-red-900/70 text-red-300/60 hover:bg-red-900" : "bg-red-600 hover:bg-red-500",
+            )}
+          >
+            S
+          </button>
+          <button
+            onClick={() => triggerOrder("CE", "Buy")}
+            className={cn(
+              "h-6 w-10 cursor-pointer rounded text-[11px] font-bold text-white",
+              callItm ? "bg-green-900/70 text-green-300/60 hover:bg-green-900" : "bg-green-600 hover:bg-green-500",
+            )}
+          >
+            B
+          </button>
+        </span>
       </td>
 
-      {/* Call OI */}
-      <td className="w-14 px-1 py-1 text-right font-mono text-muted-foreground tabular-nums">
-        {formatOi(callOi)}
-      </td>
-
-      {/* Call LTP */}
-      <td className={cn("w-14 px-1 py-1 text-right font-mono tabular-nums font-medium", callLtp ? "text-red-400" : "text-muted-foreground/50")}>
+      {/* Call LTP — always visible */}
+      <td className={cn(
+        "px-3 py-3 text-right font-mono tabular-nums font-medium",
+        callItm ? "bg-red-500/10" : "opacity-40",
+        callLtp ? "text-red-400" : "text-muted-foreground/50",
+      )}>
         {formatLtp(callLtp)}
       </td>
 
       {/* Strike */}
-      <td className={cn("w-16 px-1 py-1 text-center font-mono tabular-nums", isAtm ? "font-bold text-foreground" : "text-muted-foreground")}>
+      <td className={cn("px-3 py-3 text-center font-mono tabular-nums", isAtm ? "font-bold text-foreground" : "text-muted-foreground")}>
         {entry.strikePrice.toLocaleString("en-IN")}
       </td>
 
-      {/* Put LTP */}
-      <td className={cn("w-14 px-1 py-1 text-left font-mono tabular-nums font-medium", putLtp ? "text-green-400" : "text-muted-foreground/50")}>
+      {/* Put LTP — always visible */}
+      <td className={cn(
+        "px-3 py-3 text-left font-mono tabular-nums font-medium",
+        putItm ? "bg-green-500/10" : "opacity-40",
+        putLtp ? "text-green-400" : "text-muted-foreground/50",
+      )}>
         {formatLtp(putLtp)}
       </td>
 
-      {/* Put OI */}
-      <td className="w-14 px-1 py-1 text-left font-mono text-muted-foreground tabular-nums">
-        {formatOi(putOi)}
-      </td>
-
-      {/* Put OI bar — fills from left toward strike */}
-      <td className="w-10 px-1 py-1">
-        <div className="relative h-2.5 w-full overflow-hidden rounded-sm bg-muted/20">
-          <div
-            className="absolute left-0 h-full rounded-sm bg-green-500/40 transition-[width]"
-            style={{ width: `${putOiPct}%` }}
-          />
-        </div>
+      {/* Put Delta — shows B + S on hover */}
+      <td className={cn(
+        "px-2 py-1.5 text-left font-mono tabular-nums text-xs",
+        putItm ? "bg-green-500/10 text-muted-foreground/70" : "text-muted-foreground/30",
+      )}>
+        <span className="group-hover:hidden">{formatDelta(putDelta)}</span>
+        <span className="hidden group-hover:inline-flex items-center justify-start gap-1 w-full">
+          <button
+            onClick={() => triggerOrder("PE", "Buy")}
+            className={cn(
+              "h-6 w-10 cursor-pointer rounded text-[11px] font-bold text-white",
+              putItm ? "bg-green-900/70 text-green-300/60 hover:bg-green-900" : "bg-green-600 hover:bg-green-500",
+            )}
+          >
+            B
+          </button>
+          <button
+            onClick={() => triggerOrder("PE", "Sell")}
+            className={cn(
+              "h-6 w-10 cursor-pointer rounded text-[11px] font-bold text-white",
+              putItm ? "bg-red-900/70 text-red-300/60 hover:bg-red-900" : "bg-red-600 hover:bg-red-500",
+            )}
+          >
+            S
+          </button>
+        </span>
       </td>
     </tr>
   );

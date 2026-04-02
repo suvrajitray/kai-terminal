@@ -56,9 +56,11 @@ export async function convertPosition(
   }
 }
 
-export async function fetchOrders(): Promise<Order[]> {
-  const res = await apiClient.get<Order[]>("/api/upstox/orders");
-  return res.data;
+export async function fetchOrders(brokers: string[] = ["upstox"]): Promise<Order[]> {
+  const results = await Promise.allSettled(
+    brokers.map((b) => apiClient.get<Order[]>(`/api/${b}/orders`).then((r) => r.data.map((o) => ({ ...o, broker: b }))))
+  );
+  return results.flatMap((r) => r.status === "fulfilled" ? r.value : []);
 }
 
 export async function cancelAllOrders(): Promise<void> {

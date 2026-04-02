@@ -6,7 +6,9 @@ import { useOptionContractsStore } from "@/stores/option-contracts-store";
 import { UNDERLYING_KEYS } from "@/lib/shift-config";
 import type { OptionChainEntry } from "@/types";
 
-const LIVE_WINDOW_SIZE = 20; // OTM rows on each side of ATM
+const LIVE_WINDOW_SIZE = 20; // OTM rows on each side of ATM (for SignalR subscriptions)
+const VISIBLE_INITIAL = 20; // rows shown on first load
+const VISIBLE_STEP = 10;    // rows revealed per "load more"
 
 export function useOptionChain() {
   const getExpiries = useOptionContractsStore((s) => s.getExpiries);
@@ -17,7 +19,7 @@ export function useOptionChain() {
   const [liveStrikeSet, setLiveStrikeSet] = useState<Set<number>>(new Set());
   const [atmStrike, setAtmStrike] = useState<number>(0);
   const [spotPrice, setSpotPrice] = useState<number>(0);
-  const [showExtra, setShowExtra] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(VISIBLE_INITIAL);
   const [loading, setLoading] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
@@ -67,14 +69,14 @@ export function useOptionChain() {
     setLoading(true);
     try {
       const chain = await fetchOptionChain(underlyingKey, exp);
-      const sorted = [...chain].sort((a, b) => b.strikePrice - a.strikePrice);
+      const sorted = [...chain].sort((a, b) => a.strikePrice - b.strikePrice);
       const { liveSet, atm, spot } = buildLiveWindow(sorted);
       setAllChain(sorted);
       setLiveStrikeSet(liveSet);
       setAtmStrike(atm);
       setSpotPrice(spot);
       setLastRefreshed(new Date());
-      setShowExtra(false);
+      setVisibleCount(VISIBLE_INITIAL);
       subscribeLiveTokens(sorted, liveSet);
     } finally {
       setLoading(false);
@@ -137,9 +139,47 @@ export function useOptionChain() {
     if (underlying && expiry) fetchAndSubscribe(underlying, expiry);
   }, [underlying, expiry, fetchAndSubscribe]);
 
-  const liveRows = allChain.filter((e) => liveStrikeSet.has(e.strikePrice));
-  const extraRows = allChain.filter((e) => !liveStrikeSet.has(e.strikePrice));
-  const visibleRows = showExtra ? allChain : liveRows;
+  // ATM IV — average of call and put IV at ATM strike
+  const atmEntry = atmStrike > 0 ? allChain.find((e) => e.strikePrice === atmStrike) : undefined;
+  const callIv = atmEntry?.callOptions?.optionGreeks?.iv ?? 0;
+  const putIv  = atmEntry?.putOptions?.optionGreeks?.iv  ?? 0;
+  const atmIv  = callIv > 0 && putIv > 0 ? (callIv + putIv) / 2
+               : callIv > 0 ? callIv
+               : putIv  > 0 ? putIv
+               : null;
+
+  // Max Pain — strike that minimises total in-the-money payout from option writers
+  const maxPain = (() => {
+    if (allChain.length === 0) return null;
+    let minPain = Infinity;
+    let mpStrike = 0;
+    for (const row of allChain) {
+      const S = row.strikePrice;
+      let pain = 0;
+      for (const r of allChain) {
+        const K = r.strikePrice;
+        const callOi = r.callOptions?.marketData?.oi ?? 0;
+        const putOi  = r.putOptions?.marketData?.oi  ?? 0;
+        if (K <= S) pain += (S - K) * callOi;
+        if (K >= S) pain += (K - S) * putOi;
+      }
+      if (pain < minPain) { minPain = pain; mpStrike = S; }
+    }
+    return mpStrike > 0 ? mpStrike : null;
+  })();
+
+  // Slice visibleCount rows centered around ATM
+  const atmIdx = allChain.findIndex((e) => e.strikePrice === atmStrike);
+  const half = Math.floor(visibleCount / 2);
+  const rawStart = atmIdx >= 0 ? Math.max(0, atmIdx - half) : 0;
+  // Clamp so we always show visibleCount rows when possible
+  const clampedStart = Math.min(rawStart, Math.max(0, allChain.length - visibleCount));
+  const visibleRows = allChain.slice(clampedStart, clampedStart + visibleCount);
+  const hasMore = visibleCount < allChain.length;
+
+  const loadMore = useCallback(() => {
+    setVisibleCount((c) => c + VISIBLE_STEP);
+  }, []);
 
   // Overall PCR from the first entry (same across all entries)
   const pcr = allChain[0]?.pcr ?? null;
@@ -149,12 +189,14 @@ export function useOptionChain() {
     expiry, setExpiry,
     expiries,
     visibleRows,
-    extraRows,
+    hasMore,
+    loadMore,
     liveStrikeSet,
     atmStrike,
     spotPrice,
     pcr,
-    showExtra, setShowExtra,
+    atmIv,
+    maxPain,
     loading,
     lastRefreshed,
     refresh,
