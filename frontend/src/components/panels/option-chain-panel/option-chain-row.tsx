@@ -85,7 +85,7 @@ export function OptionChainRow({ entry, isAtm, isLive, spotPrice, underlying, on
 
       {/* Strike */}
       <td className={cn("px-3 py-1 text-center font-mono tabular-nums", isAtm ? "font-bold text-foreground" : "text-muted-foreground")}>
-        {entry.strikePrice.toLocaleString("en-IN")}
+        {entry.strikePrice}
       </td>
 
       {/* Put LTP — always visible */}

@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { QuickTradeQtyInput, type QtyMode } from "./quick-trade-qty-input";
+import { QtyInput, type QtyMode } from "@/components/ui/qty-input";
 import { ByChainTab } from "./by-chain-tab";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -298,7 +298,7 @@ function ByPriceContent({
         </div>
         <div className="space-y-2">
           <Label className="text-xs text-muted-foreground uppercase tracking-wider">Quantity</Label>
-          <QuickTradeQtyInput
+          <QtyInput
             value={qtyValue}
             mode={qtyMode}
             lotSize={lotSize}

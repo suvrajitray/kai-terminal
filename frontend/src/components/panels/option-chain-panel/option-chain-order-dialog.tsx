@@ -2,21 +2,14 @@ import { useState } from "react";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { QtyInput } from "@/components/ui/qty-input";
+import { ArrowRightLeft, Zap } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { placeOrder } from "@/services/trading-api";
 import { useBrokerStore } from "@/stores/broker-store";
 import { useOptionContractsStore } from "@/stores/option-contracts-store";
@@ -25,12 +18,12 @@ import { BROKERS } from "@/lib/constants";
 import { isBrokerTokenExpired } from "@/lib/token-utils";
 
 export interface OrderIntent {
-  instrumentKey: string;   // Upstox key e.g. "NSE_FO|37590"
+  instrumentKey: string;
   side: "CE" | "PE";
   transactionType: "Buy" | "Sell";
   ltp: number;
   strike: number;
-  underlying: string;      // e.g. "NIFTY"
+  underlying: string;
 }
 
 interface Props {
@@ -39,22 +32,36 @@ interface Props {
 }
 
 export function OptionChainOrderDialog({ intent, onClose }: Props) {
-  const credentials       = useBrokerStore((s) => s.credentials);
+  const credentials        = useBrokerStore((s) => s.credentials);
   const getByInstrumentKey = useOptionContractsStore((s) => s.getByInstrumentKey);
 
   const activeBrokers = BROKERS.filter(
     (b) => !isBrokerTokenExpired(b.id, credentials[b.id]?.accessToken),
   );
 
-  const [broker, setBroker]   = useState<string>(() => activeBrokers[0]?.id ?? "upstox");
-  const [lots, setLots]       = useState(1);
-  const [product, setProduct] = useState("Intraday");
-  const [placing, setPlacing] = useState(false);
+  const [broker, setBroker]     = useState<string>(() => activeBrokers[0]?.id ?? "upstox");
+  const [qtyValue, setQtyValue] = useState("1");
+  const [qtyMode, setQtyMode]   = useState<"qty" | "lot">("lot");
+  const [product, setProduct]   = useState<"Intraday" | "Delivery">("Intraday");
+  const [placing, setPlacing]   = useState(false);
 
   if (!intent) return null;
 
-  const lotSize  = getLotSize(intent.underlying);
-  const qty      = lots * lotSize;
+  const lotSize = getLotSize(intent.underlying);
+  const parsed  = parseInt(qtyValue, 10);
+  const qty     = isNaN(parsed) || parsed <= 0 ? lotSize
+                : qtyMode === "lot" ? parsed * lotSize : parsed;
+
+  const toggleMode = () => {
+    setQtyMode((prev) => {
+      const next = prev === "lot" ? "qty" : "lot";
+      const cur  = parseInt(qtyValue, 10);
+      if (!isNaN(cur) && cur > 0)
+        setQtyValue(next === "qty" ? String(cur * lotSize) : String(Math.max(1, Math.round(cur / lotSize))));
+      return next;
+    });
+  };
+
   const contract = getByInstrumentKey(intent.instrumentKey);
 
   async function handlePlace() {
@@ -74,75 +81,103 @@ export function OptionChainOrderDialog({ intent, onClose }: Props) {
     }
   }
 
-  const isBuy  = intent.transactionType === "Buy";
-  const label  = `${intent.transactionType} ${intent.underlying} ${intent.strike.toLocaleString("en-IN")} ${intent.side}`;
+  const isBuy = intent.transactionType === "Buy";
 
   return (
     <Dialog open={!!intent} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-xs">
+      <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle className={cn("text-base", isBuy ? "text-blue-400" : "text-red-400")}>
-            {label}
+          <DialogTitle className={cn("text-lg font-bold", isBuy ? "text-green-400" : "text-red-400")}>
+            {intent.transactionType} {intent.underlying} {intent.strike} {intent.side}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-3 pt-1">
-          {/* LTP reference */}
-          <p className="text-xs text-muted-foreground">
-            LTP <span className="font-mono font-medium text-foreground">{intent.ltp.toFixed(2)}</span>
-            {" · "}Market order · {qty} qty ({lots} lot{lots > 1 ? "s" : ""})
-          </p>
+        <div className="space-y-4 pt-1">
+          {/* LTP badge */}
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>LTP <span className="font-mono font-semibold text-foreground">{intent.ltp.toFixed(2)}</span></span>
+            <span className="text-border">|</span>
+            <span>Market order</span>
+          </div>
 
-          {/* Broker */}
+          {/* Broker toggle — only when multiple brokers connected */}
           {activeBrokers.length > 1 && (
-            <div className="space-y-1">
-              <Label className="text-xs">Broker</Label>
-              <Select value={broker} onValueChange={setBroker}>
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {activeBrokers.map((b) => (
-                    <SelectItem key={b.id} value={b.id} className="text-xs capitalize">{b.id}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/20 px-3 py-2">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <ArrowRightLeft className="size-3.5" />
+                <span>Route via</span>
+              </div>
+              <div className="flex items-center gap-1 rounded-md border border-border/40 bg-background p-0.5">
+                {activeBrokers.map((b) => (
+                  <button
+                    key={b.id}
+                    onClick={() => setBroker(b.id)}
+                    className={cn(
+                      "rounded px-3 py-1 text-xs font-semibold transition-all capitalize",
+                      broker === b.id
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {b.id === "upstox" ? "Upstox" : "Zerodha"}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
-          {/* Lots */}
-          <div className="space-y-1">
-            <Label className="text-xs">Lots (1 lot = {lotSize})</Label>
-            <Input
-              type="number"
-              min={1}
-              value={lots}
-              onChange={(e) => setLots(Math.max(1, parseInt(e.target.value) || 1))}
-              className="h-8 text-xs"
-            />
-          </div>
+          {/* Quantity + Product row */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Quantity
+              </p>
+              <QtyInput
+                value={qtyValue}
+                mode={qtyMode}
+                lotSize={lotSize}
+                onChange={setQtyValue}
+                onToggleMode={toggleMode}
+              />
+            </div>
 
-          {/* Product */}
-          <div className="space-y-1">
-            <Label className="text-xs">Product</Label>
-            <Select value={product} onValueChange={setProduct}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Intraday" className="text-xs">Intraday (MIS)</SelectItem>
-                <SelectItem value="Delivery" className="text-xs">NRML</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Product
+              </p>
+              <div className="flex h-9 items-center gap-1 rounded-lg border border-border/40 bg-muted/20 p-1">
+                {(["Intraday", "Delivery"] as const).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setProduct(p)}
+                    className={cn(
+                      "flex-1 h-full rounded-md text-xs font-semibold transition-all",
+                      product === p
+                        ? "bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {p === "Intraday" ? "Intraday" : "Delivery"}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Place button */}
           <Button
-            className={cn("w-full", isBuy ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700")}
+            className={cn(
+              "h-11 w-full text-base font-bold text-white",
+              isBuy ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700",
+            )}
             onClick={handlePlace}
             disabled={placing}
           >
-            {placing ? "Placing…" : `${intent.transactionType} ${qty} qty`}
+            {placing ? (
+              <><Zap className="mr-2 size-4 animate-pulse" />Placing…</>
+            ) : (
+              `${intent.transactionType} ${qty} qty`
+            )}
           </Button>
         </div>
       </DialogContent>

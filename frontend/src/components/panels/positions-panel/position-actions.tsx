@@ -86,8 +86,9 @@ export function PositionActions({
       <QtyInput
         value={qtyValue}
         mode={qtyMode}
-        multiplier={multiplier}
-        positionQty={positionQty}
+        lotSize={multiplier}
+        fillQty={positionQty}
+        hintPosition="left"
         onChange={onQtyChange}
         onToggleMode={onToggleMode}
       />

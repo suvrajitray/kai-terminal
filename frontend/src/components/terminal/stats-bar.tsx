@@ -153,18 +153,20 @@ export function StatsBar({
               </>
             ) : (
               ppBrokers.map((b, i) => (
-                <span key={b.broker} className="flex items-center gap-1">
-                  {i > 0 && <span className="text-muted-foreground/60">·</span>}
-                  <BrokerBadge brokerId={b.broker} />
-                  <span className="text-muted-foreground">TGT</span>
-                  <span className="font-mono font-medium tabular-nums text-green-500">
-                    ₹{b.target.toLocaleString("en-IN")}
+                <>
+                  {i > 0 && <div key={`sep-${i}`} className="h-4 w-px bg-border" />}
+                  <span key={b.broker} className="flex items-center gap-1">
+                    <BrokerBadge brokerId={b.broker} />
+                    <span className="text-muted-foreground">TGT</span>
+                    <span className="font-mono font-medium tabular-nums text-green-500">
+                      ₹{b.target.toLocaleString("en-IN")}
+                    </span>
+                    <span className="text-muted-foreground">SL</span>
+                    <span className="font-mono font-medium tabular-nums text-red-500">
+                      ₹{b.currentSl.toLocaleString("en-IN")}
+                    </span>
                   </span>
-                  <span className="text-muted-foreground">SL</span>
-                  <span className="font-mono font-medium tabular-nums text-red-500">
-                    ₹{b.currentSl.toLocaleString("en-IN")}
-                  </span>
-                </span>
+                </>
               ))
             )}
           </span>
@@ -186,7 +188,7 @@ export function StatsBar({
                 ₹{allFunds.upstox.availableMargin.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
               </span>
             </span>
-            <span className="text-muted-foreground/60">·</span>
+            <div className="h-4 w-px bg-border" />
             <span className="flex items-center gap-1">
               <BrokerBadge brokerId="zerodha" />
               <span className="font-mono font-semibold tabular-nums text-foreground">

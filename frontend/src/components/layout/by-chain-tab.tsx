@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { UNDERLYING_KEYS } from "@/lib/shift-config";
 import { fetchOptionChain, placeMarketOrder, type MarginInstrument } from "@/services/trading-api";
 import { useDirectMarginEstimate } from "./use-margin-estimate";
-import { QuickTradeQtyInput, type QtyMode } from "./quick-trade-qty-input";
+import { QtyInput, type QtyMode } from "@/components/ui/qty-input";
 import type { OptionChainEntry } from "@/types";
 
 const INR = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
@@ -405,7 +405,7 @@ export function ByChainTab({ broker, underlying, expiry, product, quantity, isAc
       {/* Buy/Sell + Qty + Margin row */}
       <div className="grid gap-3" style={{ gridTemplateColumns: "1fr auto auto" }}>
         {/* Buy / Sell rectangular pill */}
-        <QuickTradeQtyInput
+        <QtyInput
           value={qtyValue}
           mode={qtyMode}
           lotSize={lotSize}
