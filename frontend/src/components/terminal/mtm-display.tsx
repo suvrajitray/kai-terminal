@@ -22,7 +22,7 @@ export function MtmDisplay({ value }: MtmDisplayProps) {
       }}
       transition={{ duration: flash ? 0.1 : 0.5 }}
     >
-      MTM <PnlCell value={value} />
+      MTM <PnlCell value={value} noDecimal />
     </motion.span>
   );
 }

@@ -161,7 +161,6 @@ function TerminalPageInner() {
           onRefresh={load}
           onExitAll={() => setExitAllConfirmOpen(true)}
           onOpenProfitProtection={() => setPpOpen(true)}
-          mtmByBroker={mtmByBroker}
           onToggleChain={() => setChainOpen((v) => !v)}
           chainOpen={chainOpen}
           ppBrokers={[
@@ -179,6 +178,7 @@ function TerminalPageInner() {
             loading={loading}
             isLive={isLive}
             load={load}
+            mtmByBroker={mtmByBroker}
           />
         </div>
 

@@ -163,9 +163,13 @@ public static class ZerodhaEndpoints
 
             // Short: close first (buying back releases margin), then open new short.
             // Long:  open first (maintains hedge), then close old long — avoids margin spike on shorts.
+            // Delay between orders gives Zerodha time to process the execution and reflect the
+            // released margin before the next order is placed — without this the open order hits
+            // a margin check before the close order is settled.
             if (request.IsShort)
             {
                 await zerodha.Orders.PlaceOrderAsync(closeOrder, ct);
+                await Task.Delay(1000, ct);
                 try
                 {
                     await zerodha.Orders.PlaceOrderAsync(openOrder, ct);

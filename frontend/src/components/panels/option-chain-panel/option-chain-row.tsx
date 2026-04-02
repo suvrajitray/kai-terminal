@@ -41,7 +41,7 @@ export function OptionChainRow({ entry, isAtm, isLive, spotPrice, underlying, on
   return (
     <tr
       className={cn(
-        "group border-b border-border/30 text-sm transition-colors",
+        "group h-9 border-b border-border/30 text-sm transition-colors",
         isAtm ? "bg-muted/50" : "hover:bg-muted/20",
         !isLive && "[&>td]:opacity-55",
       )}
@@ -76,7 +76,7 @@ export function OptionChainRow({ entry, isAtm, isLive, spotPrice, underlying, on
 
       {/* Call LTP — always visible */}
       <td className={cn(
-        "px-3 py-3 text-right font-mono tabular-nums font-medium",
+        "px-3 py-1 text-right font-mono tabular-nums font-medium",
         callItm ? "bg-red-500/10" : "opacity-40",
         callLtp ? "text-red-400" : "text-muted-foreground/50",
       )}>
@@ -84,13 +84,13 @@ export function OptionChainRow({ entry, isAtm, isLive, spotPrice, underlying, on
       </td>
 
       {/* Strike */}
-      <td className={cn("px-3 py-3 text-center font-mono tabular-nums", isAtm ? "font-bold text-foreground" : "text-muted-foreground")}>
+      <td className={cn("px-3 py-1 text-center font-mono tabular-nums", isAtm ? "font-bold text-foreground" : "text-muted-foreground")}>
         {entry.strikePrice.toLocaleString("en-IN")}
       </td>
 
       {/* Put LTP — always visible */}
       <td className={cn(
-        "px-3 py-3 text-left font-mono tabular-nums font-medium",
+        "px-3 py-1 text-left font-mono tabular-nums font-medium",
         putItm ? "bg-green-500/10" : "opacity-40",
         putLtp ? "text-green-400" : "text-muted-foreground/50",
       )}>

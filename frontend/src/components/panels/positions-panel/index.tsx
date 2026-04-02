@@ -22,11 +22,12 @@ interface PositionsPanelProps {
   loading: boolean;
   isLive: boolean;
   load: () => void;
+  mtmByBroker?: Record<string, number>;
 }
 
 const selKey = (p: Position) => `${p.instrumentToken}|${p.product}`;
 
-export function PositionsPanel({ positions, loading, load }: PositionsPanelProps) {
+export function PositionsPanel({ positions, loading, load, mtmByBroker = {} }: PositionsPanelProps) {
   const [acting, setActing] = useState<string | null>(null);
   const [qtys, setQtys] = useState<Record<string, string>>({});
   const [qtyMode, setQtyMode] = useState<QtyMode>("qty");
@@ -235,7 +236,7 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
   return (
     <div className="flex h-full flex-col">
       {showFilter && (
-        <div className="flex shrink-0 items-center gap-1 border-b border-border/40 bg-muted/20 px-3 py-1.5">
+        <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border/40 bg-muted/20 px-3">
           <button
             onClick={() => setBrokerFilter(null)}
             className={cn(
@@ -247,21 +248,29 @@ export function PositionsPanel({ positions, loading, load }: PositionsPanelProps
           >
             All
           </button>
-          {brokersInPositions.map((bId) => (
-            <button
-              key={bId}
-              onClick={() => setBrokerFilter(brokerFilter === bId ? null : bId)}
-              className={cn(
-                "flex cursor-pointer items-center gap-1.5 rounded px-2 py-0.5 text-[11px] font-medium transition-colors",
-                brokerFilter === bId
-                  ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <BrokerBadge brokerId={bId} size={12} />
-              {bId.charAt(0).toUpperCase() + bId.slice(1)}
-            </button>
-          ))}
+          {brokersInPositions.map((bId) => {
+            const pnl = mtmByBroker[bId];
+            return (
+              <button
+                key={bId}
+                onClick={() => setBrokerFilter(brokerFilter === bId ? null : bId)}
+                className={cn(
+                  "flex cursor-pointer items-center gap-1.5 rounded px-2 py-0.5 text-[11px] font-medium transition-colors",
+                  brokerFilter === bId
+                    ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <BrokerBadge brokerId={bId} size={12} />
+                {bId.charAt(0).toUpperCase() + bId.slice(1)}
+                {pnl !== undefined && (
+                  <span className={cn("font-mono tabular-nums", pnl >= 0 ? "text-green-500" : "text-red-500")}>
+                    {pnl >= 0 ? "+" : "-"}₹{Math.abs(pnl).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
       <div className="flex-1 overflow-auto">

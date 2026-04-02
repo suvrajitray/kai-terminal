@@ -55,7 +55,7 @@ if $DEPLOY_FRONTEND; then
   ok "Build complete → frontend/dist/"
 
   step "Deploying frontend to server"
-  rsync -az --delete --progress \
+  rsync -azO --delete --progress \
     "$REPO_ROOT/frontend/dist/" \
     "$SERVER:$REMOTE_WEB_DIR/"
   ok "Synced to $REMOTE_WEB_DIR"
@@ -69,7 +69,7 @@ if $DEPLOY_BACKEND; then
   ok "Published → /tmp/kai-api-publish"
 
   step "Deploying API to server"
-  rsync -az --delete --progress \
+  rsync -azO --delete --progress --rsync-path="sudo rsync" \
     /tmp/kai-api-publish/ \
     "$SERVER:$REMOTE_APP_DIR/api/"
   ssh "$SERVER" "sudo chown -R kaiterm:kaiterm $REMOTE_APP_DIR/api"
@@ -80,7 +80,7 @@ if $DEPLOY_BACKEND; then
   ok "Published → /tmp/kai-worker-publish"
 
   step "Deploying Worker to server"
-  rsync -az --delete --progress \
+  rsync -azO --delete --progress --rsync-path="sudo rsync" \
     /tmp/kai-worker-publish/ \
     "$SERVER:$REMOTE_APP_DIR/worker/"
   ssh "$SERVER" "sudo chown -R kaiterm:kaiterm $REMOTE_APP_DIR/worker"

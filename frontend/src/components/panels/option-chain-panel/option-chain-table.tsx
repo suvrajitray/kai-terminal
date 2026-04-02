@@ -14,8 +14,8 @@ interface Props {
 export function OptionChainTable({ rows, atmStrike, spotPrice, underlying, liveStrikeSet, onOrder }: Props) {
   return (
     <table className="w-full table-fixed border-collapse">
-      <thead>
-        <tr className="h-9 border-b border-border bg-muted/30 text-[10px] text-muted-foreground">
+      <thead className="sticky top-0 z-10 bg-muted/20 backdrop-blur-sm">
+        <tr className="h-9 border-b border-border text-[10px] text-muted-foreground">
           <th className="py-1.5 text-center font-medium text-muted-foreground/50">Δ</th>
           <th className="py-1.5 text-center font-medium text-red-400/80 tracking-wider">CALL</th>
           <th className="py-1.5 text-center font-medium text-muted-foreground">Strike</th>

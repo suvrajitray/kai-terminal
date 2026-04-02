@@ -31,7 +31,6 @@ interface StatsBarProps {
   onExitAll: () => void;
   onOpenProfitProtection: () => void;
   ppBrokers: PpBrokerEntry[];
-  mtmByBroker: Record<string, number>;
   onToggleChain: () => void;
   chainOpen: boolean;
 }
@@ -45,7 +44,6 @@ export function StatsBar({
   onExitAll,
   onOpenProfitProtection,
   ppBrokers,
-  mtmByBroker,
   onToggleChain,
   chainOpen,
 }: StatsBarProps) {
@@ -58,7 +56,7 @@ export function StatsBar({
   const ppEnabled      = ppBrokers.length > 0;
   const { funds, allFunds, loading: fundsLoading } = useFunds();
   const [fundsVisible, setFundsVisible] = useState(
-    () => localStorage.getItem("kai-terminal-funds-visible") !== "false"
+    () => localStorage.getItem("kai-terminal-funds-visible") === "true"
   );
 
   const openCount = positions.filter((p) => p.quantity !== 0).length;
@@ -108,24 +106,7 @@ export function StatsBar({
         <>
           <MtmDisplay value={totalPnl} />
 
-          {multipleConnected && Object.keys(mtmByBroker).length > 1 && (
-            <span className="flex items-center gap-1.5 text-xs">
-              {connectedBrokers.map((b, i) => {
-                const val = mtmByBroker[b.id] ?? 0;
-                return (
-                  <span key={b.id} className="flex items-center gap-1">
-                    {i > 0 && <span className="text-muted-foreground/60">·</span>}
-                    <BrokerBadge brokerId={b.id} />
-                    <span className={cn("font-mono tabular-nums font-medium", val >= 0 ? "text-green-500" : "text-red-500")}>
-                      {val >= 0 ? "+" : "-"}₹{Math.abs(val).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                    </span>
-                  </span>
-                );
-              })}
-            </span>
-          )}
-
-          <PositionCountBadges openCount={openCount} closedCount={closedCount} />
+<PositionCountBadges openCount={openCount} closedCount={closedCount} />
 
           {/* Peak / Trough — hidden below 2xl */}
           {(maxProfit !== null || maxLoss !== null) && (
@@ -136,7 +117,7 @@ export function StatsBar({
                   <span className="flex items-center gap-1">
                     <span className="text-muted-foreground">Peak</span>
                     <span className={cn("font-mono tabular-nums font-medium", maxProfit >= 0 ? "text-green-500" : "text-red-500")}>
-                      {maxProfit >= 0 ? "+" : "-"}₹{Math.abs(maxProfit).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      {maxProfit >= 0 ? "+" : "-"}₹{Math.abs(maxProfit).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
                     </span>
                   </span>
                 )}
@@ -144,7 +125,7 @@ export function StatsBar({
                   <span className="flex items-center gap-1">
                     <span className="text-muted-foreground">Trough</span>
                     <span className={cn("font-mono tabular-nums font-medium", maxLoss >= 0 ? "text-green-500" : "text-red-500")}>
-                      {maxLoss >= 0 ? "+" : "-"}₹{Math.abs(maxLoss).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      {maxLoss >= 0 ? "+" : "-"}₹{Math.abs(maxLoss).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
                     </span>
                   </span>
                 )}

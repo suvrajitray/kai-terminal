@@ -7,8 +7,8 @@ import { UNDERLYING_KEYS } from "@/lib/shift-config";
 import type { OptionChainEntry } from "@/types";
 
 const LIVE_WINDOW_SIZE = 20; // OTM rows on each side of ATM (for SignalR subscriptions)
-const VISIBLE_INITIAL = 20; // rows shown on first load
-const VISIBLE_STEP = 10;    // rows revealed per "load more"
+const VISIBLE_SIDE = 10;    // OTM rows shown on each side of ATM initially
+const VISIBLE_STEP = 10;    // extra rows revealed per "load more" (each side)
 
 export function useOptionChain() {
   const getExpiries = useOptionContractsStore((s) => s.getExpiries);
@@ -19,7 +19,7 @@ export function useOptionChain() {
   const [liveStrikeSet, setLiveStrikeSet] = useState<Set<number>>(new Set());
   const [atmStrike, setAtmStrike] = useState<number>(0);
   const [spotPrice, setSpotPrice] = useState<number>(0);
-  const [visibleCount, setVisibleCount] = useState(VISIBLE_INITIAL);
+  const [visibleSide, setVisibleSide] = useState(VISIBLE_SIDE);
   const [loading, setLoading] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
@@ -76,7 +76,7 @@ export function useOptionChain() {
       setAtmStrike(atm);
       setSpotPrice(spot);
       setLastRefreshed(new Date());
-      setVisibleCount(VISIBLE_INITIAL);
+      setVisibleSide(VISIBLE_SIDE);
       subscribeLiveTokens(sorted, liveSet);
     } finally {
       setLoading(false);
@@ -168,17 +168,15 @@ export function useOptionChain() {
     return mpStrike > 0 ? mpStrike : null;
   })();
 
-  // Slice visibleCount rows centered around ATM
+  // Slice ATM ± visibleSide rows (8 OTM each side initially)
   const atmIdx = allChain.findIndex((e) => e.strikePrice === atmStrike);
-  const half = Math.floor(visibleCount / 2);
-  const rawStart = atmIdx >= 0 ? Math.max(0, atmIdx - half) : 0;
-  // Clamp so we always show visibleCount rows when possible
-  const clampedStart = Math.min(rawStart, Math.max(0, allChain.length - visibleCount));
-  const visibleRows = allChain.slice(clampedStart, clampedStart + visibleCount);
-  const hasMore = visibleCount < allChain.length;
+  const sliceStart = atmIdx >= 0 ? Math.max(0, atmIdx - visibleSide) : 0;
+  const sliceEnd   = atmIdx >= 0 ? Math.min(allChain.length, atmIdx + visibleSide + 1) : allChain.length;
+  const visibleRows = allChain.slice(sliceStart, sliceEnd);
+  const hasMore = sliceStart > 0 || sliceEnd < allChain.length;
 
   const loadMore = useCallback(() => {
-    setVisibleCount((c) => c + VISIBLE_STEP);
+    setVisibleSide((s) => s + VISIBLE_STEP);
   }, []);
 
   // Overall PCR from the first entry (same across all entries)
