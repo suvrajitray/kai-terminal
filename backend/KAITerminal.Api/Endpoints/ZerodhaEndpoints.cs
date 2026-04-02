@@ -221,7 +221,7 @@ public static class ZerodhaEndpoints
         // ── Orders ────────────────────────────────────────────────────────────
 
         group.MapGet("/orders", async (ZerodhaClient zerodha, CancellationToken ct) =>
-            Results.Ok(await zerodha.Orders.GetAllOrdersAsync(ct)));
+            Results.Ok((await zerodha.Orders.GetAllOrdersAsync(ct)).Select(o => o.ToResponse())));
 
         group.MapPost("/orders/v3", async (
             [FromBody] ZerodhaOrderRequest request,

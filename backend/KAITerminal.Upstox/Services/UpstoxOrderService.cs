@@ -20,10 +20,23 @@ internal sealed class UpstoxOrderService : IBrokerOrderService, IUpstoxHftServic
         var orders = await _http.GetAllOrdersAsync(ct);
         return orders.Select(o => new BrokerOrder
         {
-            OrderId       = o.OrderId,
-            TradingSymbol = o.TradingSymbol,
-            Status        = o.Status,
-            StatusMessage = o.StatusMessage,
+            OrderId         = o.OrderId,
+            ExchangeOrderId = o.ExchangeOrderId,
+            Exchange        = o.Exchange,
+            TradingSymbol   = o.TradingSymbol,
+            Product         = o.Product,
+            OrderType       = o.OrderType,
+            TransactionType = o.TransactionType,
+            Validity        = o.Validity,
+            Status          = o.Status,
+            StatusMessage   = o.StatusMessage,
+            Price           = o.Price,
+            AveragePrice    = o.AveragePrice,
+            Quantity        = o.Quantity,
+            FilledQuantity  = o.FilledQuantity,
+            PendingQuantity = o.PendingQuantity,
+            Tag             = o.Tag,
+            OrderTimestamp  = o.OrderTimestamp,
         }).ToList().AsReadOnly();
     }
 

@@ -184,8 +184,8 @@ public static class UpstoxEndpoints
 
         // ── Orders ────────────────────────────────────────────────────────────
 
-        group.MapGet("/orders", async (UpstoxClient upstox) =>
-            Results.Ok((await upstox.Hft.GetAllOrdersAsync()).Select(o => o.ToResponse())));
+        group.MapGet("/orders", async (UpstoxClient upstox, CancellationToken ct) =>
+            Results.Ok((await upstox.Orders.GetAllOrdersAsync(ct)).Select(o => o.ToResponse())));
 
         group.MapPost("/orders/v3", async (
             [FromBody] PlaceOrderRequest request,

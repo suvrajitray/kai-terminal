@@ -31,9 +31,9 @@ internal static class PositionMapper
             IsOpen          = p.IsOpen,
         };
 
-    /// <summary>Maps an Upstox-specific order to the unified API response DTO.</summary>
+    /// <summary>Maps a broker-agnostic domain order to the unified API response DTO.</summary>
     internal static OrderResponse ToResponse(
-        this KAITerminal.Upstox.Models.Responses.Order o)
+        this KAITerminal.Contracts.Domain.BrokerOrder o)
         => new()
         {
             OrderId         = o.OrderId,

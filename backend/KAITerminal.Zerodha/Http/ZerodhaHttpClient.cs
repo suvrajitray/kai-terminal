@@ -92,6 +92,15 @@ public sealed class ZerodhaHttpClient
 
     // ── Orders ────────────────────────────────────────────────────────────────
 
+    internal async Task<IReadOnlyList<KiteOrder>> GetOrdersAsync(CancellationToken ct = default)
+    {
+        var http     = _httpFactory.CreateClient("ZerodhaApi");
+        var response = await http.GetAsync("/orders", ct);
+        if (!response.IsSuccessStatusCode) return [];
+        var result = await response.Content.ReadFromJsonAsync<KiteEnvelope<List<KiteOrder>>>(_json, ct);
+        return result?.Data ?? [];
+    }
+
     public async Task<string> PlaceOrderAsync(
         string tradingSymbol,
         string exchange,
@@ -320,6 +329,27 @@ public sealed class ZerodhaHttpClient
     private sealed class KiteOrderData
     {
         [JsonPropertyName("order_id")] public string? OrderId { get; init; }
+    }
+
+    internal sealed class KiteOrder
+    {
+        [JsonPropertyName("order_id")]          public string?  OrderId          { get; init; }
+        [JsonPropertyName("exchange_order_id")] public string?  ExchangeOrderId  { get; init; }
+        [JsonPropertyName("exchange")]          public string?  Exchange         { get; init; }
+        [JsonPropertyName("tradingsymbol")]     public string?  TradingSymbol    { get; init; }
+        [JsonPropertyName("product")]           public string?  Product          { get; init; }
+        [JsonPropertyName("order_type")]        public string?  OrderType        { get; init; }
+        [JsonPropertyName("transaction_type")]  public string?  TransactionType  { get; init; }
+        [JsonPropertyName("validity")]          public string?  Validity         { get; init; }
+        [JsonPropertyName("status")]            public string?  Status           { get; init; }
+        [JsonPropertyName("status_message")]    public string?  StatusMessage    { get; init; }
+        [JsonPropertyName("price")]             public decimal  Price            { get; init; }
+        [JsonPropertyName("average_price")]     public decimal  AveragePrice     { get; init; }
+        [JsonPropertyName("quantity")]          public int      Quantity         { get; init; }
+        [JsonPropertyName("filled_quantity")]   public int      FilledQuantity   { get; init; }
+        [JsonPropertyName("pending_quantity")]  public int      PendingQuantity  { get; init; }
+        [JsonPropertyName("tag")]               public string?  Tag              { get; init; }
+        [JsonPropertyName("order_timestamp")]   public string?  OrderTimestamp   { get; init; }
     }
 
     private sealed class KiteSessionData
