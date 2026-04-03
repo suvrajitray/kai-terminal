@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { UNDERLYING_KEYS } from "@/lib/shift-config";
 import { fetchOptionChain, placeMarketOrder, type MarginInstrument } from "@/services/trading-api";
+import { useOptionContractsStore } from "@/stores/option-contracts-store";
 import { useDirectMarginEstimate } from "./use-margin-estimate";
 import { QtyInput, type QtyMode } from "@/components/ui/qty-input";
 import type { OptionChainEntry } from "@/types";
@@ -109,8 +110,10 @@ export function ByChainTab({ broker, underlying, expiry, product, quantity, isAc
   const atmRowRef  = useRef<HTMLTableRowElement | null>(null);
   const scrollRef  = useRef<HTMLDivElement | null>(null);
 
-  const underlyingKey = UNDERLYING_KEYS[underlying];
-  const spotPrice     = chain[0]?.underlyingSpotPrice ?? 0;
+  const underlyingKey      = UNDERLYING_KEYS[underlying];
+  const spotPrice          = chain[0]?.underlyingSpotPrice ?? 0;
+  const exchange           = underlyingKey?.startsWith("BSE_") ? "BFO" : "NFO";
+  const getByInstrumentKey = useOptionContractsStore((s) => s.getByInstrumentKey);
 
   const { rows, atmStrike } = buildRows(chain, spotPrice, mode);
 
@@ -159,8 +162,13 @@ export function ByChainTab({ broker, underlying, expiry, product, quantity, isAc
 
   const { margin, loading: marginLoading } = useDirectMarginEstimate(marginInstruments, broker);
 
+  function resolveToken(upstoxKey: string): string | null {
+    if (broker === "upstox") return upstoxKey;
+    const lookup = getByInstrumentKey(upstoxKey);
+    return lookup?.contract.zerodhaToken || null;
+  }
+
   async function execute(action: ActionType) {
-    if (broker === "zerodha") { toast.info("Zerodha chain orders coming soon"); return; }
     if (!selected) { toast.error("Select a row first"); return; }
 
     const { ceKey, peKey } = selected;
@@ -172,9 +180,20 @@ export function ByChainTab({ broker, underlying, expiry, product, quantity, isAc
       toast.error("PE instrument not available"); return;
     }
 
+    const ceToken = ceKey ? resolveToken(ceKey) : null;
+    const peToken = peKey ? resolveToken(peKey) : null;
+
+    if ((action === "CE" || action === "BOTH") && !ceToken) {
+      toast.error("CE contract not found"); return;
+    }
+    if ((action === "PE" || action === "BOTH") && !peToken) {
+      toast.error("PE contract not found"); return;
+    }
+
+    const zerodhaExchange = broker === "zerodha" ? exchange : undefined;
     const orders: Promise<void>[] = [];
-    if (action === "CE"   || action === "BOTH") orders.push(placeMarketOrder(ceKey!, quantity, direction, product));
-    if (action === "PE"   || action === "BOTH") orders.push(placeMarketOrder(peKey!, quantity, direction, product));
+    if (action === "CE" || action === "BOTH") orders.push(placeMarketOrder(ceToken!, quantity, direction, product, broker, zerodhaExchange));
+    if (action === "PE" || action === "BOTH") orders.push(placeMarketOrder(peToken!, quantity, direction, product, broker, zerodhaExchange));
 
     setActing(action);
     try {
