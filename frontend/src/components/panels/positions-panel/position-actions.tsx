@@ -1,4 +1,4 @@
-import { Plus, Minus, ArrowUp, ArrowDown, LogOut, MoreHorizontal, TrendingDown, TrendingUp, RefreshCw, ShieldAlert } from "lucide-react";
+import { Plus, Minus, ArrowUp, ArrowDown, MoreHorizontal, TrendingDown, TrendingUp, RefreshCw, ShieldAlert, LogOut } from "lucide-react";
 import { QtyInput, type QtyMode } from "./qty-input";
 import { cn } from "@/lib/utils";
 import {
@@ -25,7 +25,6 @@ interface PositionActionsProps {
   onReduce: () => void;
   onShiftUp: () => void;
   onShiftDown: () => void;
-  onExit: () => void;
   onExitDialog: () => void;
   onSellMore: () => void;
   onConvert: () => void;
@@ -74,7 +73,6 @@ export function PositionActions({
   onReduce,
   onShiftUp,
   onShiftDown,
-  onExit,
   onExitDialog,
   onSellMore,
   onConvert,
@@ -116,13 +114,6 @@ export function PositionActions({
         <div className="w-px bg-border/50" />
         <ActionBtn onClick={onShiftDown} disabled={qtyDisabled} title="Shift Down" className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10">
           <ArrowDown className="size-3.5" />
-        </ActionBtn>
-
-        <div className="w-px bg-border/50 mx-0.5" />
-
-        {/* Exit */}
-        <ActionBtn onClick={onExit} disabled={disabled || !hasOpenQty} title="Exit" className="text-red-500 hover:text-red-400 hover:bg-red-500/10">
-          <LogOut className="size-3.5" />
         </ActionBtn>
 
         <div className="w-px bg-border/50 mx-0.5" />

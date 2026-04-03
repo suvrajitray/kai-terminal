@@ -161,7 +161,6 @@ export function PositionRow({
             onReduce={onReduce}
             onShiftUp={onShiftUp}
             onShiftDown={onShiftDown}
-            onExit={onExit}
             onExitDialog={() => setDialog("exit")}
             onSellMore={() => setDialog("more")}
             onConvert={() => setDialog("convert")}
