@@ -208,6 +208,11 @@ export function ExitPositionDialog({
     }
   }, [open]);
 
+  function handleOrderModeChange(m: OrderMode) {
+    if (m === "limit" && orderMode === "market") setLimitPrice(position.ltp.toFixed(2));
+    setOrderMode(m);
+  }
+
   const canConfirm =
     qty > 0 && (orderMode === "market" || (!!limitPrice && parseFloat(limitPrice) > 0));
 
@@ -229,7 +234,7 @@ export function ExitPositionDialog({
         <div className="space-y-4 pt-1">
           <SymbolChip position={position} />
 
-          <OrderTypeRow ltp={position.ltp} orderMode={orderMode} onOrderModeChange={setOrderMode} />
+          <OrderTypeRow ltp={position.ltp} orderMode={orderMode} onOrderModeChange={handleOrderModeChange} />
 
           <div className="grid grid-cols-2 gap-4">
             <PriceInput orderMode={orderMode} value={limitPrice} onChange={setLimitPrice} />
@@ -288,6 +293,11 @@ export function SellBuyMoreDialog({ open, onOpenChange, position }: MoreDialogPr
     }
   }, [open]);
 
+  function handleOrderModeChange(m: OrderMode) {
+    if (m === "limit" && orderMode === "market") setLimitPrice(position.ltp.toFixed(2));
+    setOrderMode(m);
+  }
+
   const label = isSell ? "Sell More" : "Buy More";
   const Icon  = isSell ? TrendingDown : TrendingUp;
   const color = isSell ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700";
@@ -331,7 +341,7 @@ export function SellBuyMoreDialog({ open, onOpenChange, position }: MoreDialogPr
         <div className="space-y-4 pt-1">
           <SymbolChip position={position} />
 
-          <OrderTypeRow ltp={position.ltp} orderMode={orderMode} onOrderModeChange={setOrderMode} />
+          <OrderTypeRow ltp={position.ltp} orderMode={orderMode} onOrderModeChange={handleOrderModeChange} />
 
           <div className="grid grid-cols-2 gap-4">
             <PriceInput orderMode={orderMode} value={limitPrice} onChange={setLimitPrice} />

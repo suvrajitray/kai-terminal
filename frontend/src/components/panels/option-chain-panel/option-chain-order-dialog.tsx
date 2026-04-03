@@ -106,7 +106,10 @@ export function OptionChainOrderDialog({ intent, onClose }: Props) {
               {(["market", "limit"] as const).map((t) => (
                 <button
                   key={t}
-                  onClick={() => setOrderType(t)}
+                  onClick={() => {
+                    if (t === "limit" && orderType === "market") setLimitPrice(intent.ltp.toFixed(2));
+                    setOrderType(t);
+                  }}
                   className={cn(
                     "rounded px-2.5 py-0.5 text-xs font-semibold capitalize transition-all",
                     orderType === t
