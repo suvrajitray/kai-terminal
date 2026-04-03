@@ -40,6 +40,7 @@ export function OptionChainRow({ entry, isAtm, isLive, spotPrice, underlying, on
 
   return (
     <tr
+      data-atm={isAtm ? "true" : undefined}
       className={cn(
         "group h-9 border-b border-border/30 text-sm transition-colors",
         isAtm ? "bg-muted/50" : "hover:bg-muted/20",

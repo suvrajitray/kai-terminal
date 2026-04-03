@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { RefreshCw, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -19,8 +19,10 @@ export function OptionChainPanel({ width, onResize, onClose }: Props) {
     expiry, setExpiry,
     expiries,
     visibleRows,
-    hasMore,
-    loadMore,
+    hasMoreLow,
+    hasMoreHigh,
+    loadMoreLow,
+    loadMoreHigh,
     liveStrikeSet,
     atmStrike,
     spotPrice,
@@ -32,7 +34,22 @@ export function OptionChainPanel({ width, onResize, onClose }: Props) {
   } = useOptionChain();
 
   const [orderIntent, setOrderIntent] = useState<OrderIntent | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const underlyings = Object.keys(UNDERLYING_KEYS);
+
+  // Scroll ATM row to vertical center after chain loads
+  useEffect(() => {
+    if (loading || atmStrike === 0) return;
+    const container = scrollRef.current;
+    if (!container) return;
+    // Wait one frame for the DOM to paint the rows
+    const id = requestAnimationFrame(() => {
+      const atm = container.querySelector<HTMLElement>('[data-atm="true"]');
+      if (!atm) return;
+      container.scrollTop = atm.offsetTop - container.clientHeight / 2 + atm.offsetHeight / 2;
+    });
+    return () => cancelAnimationFrame(id);
+  }, [loading, atmStrike]);
 
   return (
     <>
@@ -111,7 +128,7 @@ export function OptionChainPanel({ width, onResize, onClose }: Props) {
       </div>
 
       {/* Chain table — scrollable */}
-      <div className="flex-1 overflow-y-auto">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto">
         {loading && visibleRows.length === 0 ? (
           <div className="flex items-center justify-center py-12 text-xs text-muted-foreground">
             Loading…
@@ -121,32 +138,48 @@ export function OptionChainPanel({ width, onResize, onClose }: Props) {
             No data
           </div>
         ) : (
-          <OptionChainTable
-            rows={visibleRows}
-            atmStrike={atmStrike}
-            spotPrice={spotPrice}
-            underlying={underlying}
-            liveStrikeSet={liveStrikeSet}
-            onOrder={setOrderIntent}
-          />
-        )}
+          <>
+            {/* Load more — top (lower strikes) */}
+            <div className="border-b border-border/30 px-3 py-2">
+              {hasMoreLow ? (
+                <button
+                  onClick={loadMoreLow}
+                  className="w-full rounded border border-border/40 py-1.5 text-xs text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+                >
+                  Load 15 more strikes
+                </button>
+              ) : (
+                <p className="text-center text-[10px] text-muted-foreground/50">
+                  All lower strikes loaded
+                </p>
+              )}
+            </div>
 
-        {/* Load more */}
-        {!loading && visibleRows.length > 0 && (
-          <div className="border-t border-border/30 px-3 py-2">
-            {hasMore ? (
-              <button
-                onClick={loadMore}
-                className="w-full rounded border border-border/40 py-1.5 text-xs text-muted-foreground transition-colors hover:border-border hover:text-foreground"
-              >
-                Load 10 more strikes
-              </button>
-            ) : (
-              <p className="text-center text-[10px] text-muted-foreground/50">
-                All strikes loaded — click ↻ to refresh
-              </p>
-            )}
-          </div>
+            <OptionChainTable
+              rows={visibleRows}
+              atmStrike={atmStrike}
+              spotPrice={spotPrice}
+              underlying={underlying}
+              liveStrikeSet={liveStrikeSet}
+              onOrder={setOrderIntent}
+            />
+
+            {/* Load more — bottom (higher strikes) */}
+            <div className="border-t border-border/30 px-3 py-2">
+              {hasMoreHigh ? (
+                <button
+                  onClick={loadMoreHigh}
+                  className="w-full rounded border border-border/40 py-1.5 text-xs text-muted-foreground transition-colors hover:border-border hover:text-foreground"
+                >
+                  Load 15 more strikes
+                </button>
+              ) : (
+                <p className="text-center text-[10px] text-muted-foreground/50">
+                  All higher strikes loaded
+                </p>
+              )}
+            </div>
+          </>
         )}
       </div>
 

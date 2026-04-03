@@ -7,8 +7,8 @@ import { UNDERLYING_KEYS } from "@/lib/shift-config";
 import type { OptionChainEntry } from "@/types";
 
 const LIVE_WINDOW_SIZE = 20; // OTM rows on each side of ATM (for SignalR subscriptions)
-const VISIBLE_SIDE = 10;    // OTM rows shown on each side of ATM initially
-const VISIBLE_STEP = 10;    // extra rows revealed per "load more" (each side)
+const VISIBLE_SIDE = 20;    // OTM rows shown on each side of ATM initially
+const VISIBLE_STEP = 15;    // extra rows revealed per "load more" (each side)
 
 export function useOptionChain() {
   const getExpiries = useOptionContractsStore((s) => s.getExpiries);
@@ -19,7 +19,8 @@ export function useOptionChain() {
   const [liveStrikeSet, setLiveStrikeSet] = useState<Set<number>>(new Set());
   const [atmStrike, setAtmStrike] = useState<number>(0);
   const [spotPrice, setSpotPrice] = useState<number>(0);
-  const [visibleSide, setVisibleSide] = useState(VISIBLE_SIDE);
+  const [visibleLow, setVisibleLow]   = useState(VISIBLE_SIDE); // strikes below ATM
+  const [visibleHigh, setVisibleHigh] = useState(VISIBLE_SIDE); // strikes above ATM
   const [loading, setLoading] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
 
@@ -76,7 +77,8 @@ export function useOptionChain() {
       setAtmStrike(atm);
       setSpotPrice(spot);
       setLastRefreshed(new Date());
-      setVisibleSide(VISIBLE_SIDE);
+      setVisibleLow(VISIBLE_SIDE);
+      setVisibleHigh(VISIBLE_SIDE);
       subscribeLiveTokens(sorted, liveSet);
     } finally {
       setLoading(false);
@@ -168,16 +170,16 @@ export function useOptionChain() {
     return mpStrike > 0 ? mpStrike : null;
   })();
 
-  // Slice ATM ± visibleSide rows (8 OTM each side initially)
+  // Slice ATM ± visibleLow/High rows independently
   const atmIdx = allChain.findIndex((e) => e.strikePrice === atmStrike);
-  const sliceStart = atmIdx >= 0 ? Math.max(0, atmIdx - visibleSide) : 0;
-  const sliceEnd   = atmIdx >= 0 ? Math.min(allChain.length, atmIdx + visibleSide + 1) : allChain.length;
-  const visibleRows = allChain.slice(sliceStart, sliceEnd);
-  const hasMore = sliceStart > 0 || sliceEnd < allChain.length;
+  const sliceStart = atmIdx >= 0 ? Math.max(0, atmIdx - visibleLow)  : 0;
+  const sliceEnd   = atmIdx >= 0 ? Math.min(allChain.length, atmIdx + visibleHigh + 1) : allChain.length;
+  const visibleRows    = allChain.slice(sliceStart, sliceEnd);
+  const hasMoreLow  = sliceStart > 0;
+  const hasMoreHigh = sliceEnd < allChain.length;
 
-  const loadMore = useCallback(() => {
-    setVisibleSide((s) => s + VISIBLE_STEP);
-  }, []);
+  const loadMoreLow  = useCallback(() => setVisibleLow((s)  => s + VISIBLE_STEP), []);
+  const loadMoreHigh = useCallback(() => setVisibleHigh((s) => s + VISIBLE_STEP), []);
 
   // Overall PCR from the first entry (same across all entries)
   const pcr = allChain[0]?.pcr ?? null;
@@ -187,8 +189,10 @@ export function useOptionChain() {
     expiry, setExpiry,
     expiries,
     visibleRows,
-    hasMore,
-    loadMore,
+    hasMoreLow,
+    hasMoreHigh,
+    loadMoreLow,
+    loadMoreHigh,
     liveStrikeSet,
     atmStrike,
     spotPrice,
