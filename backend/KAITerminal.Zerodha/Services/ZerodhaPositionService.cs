@@ -22,6 +22,8 @@ internal sealed class ZerodhaPositionService : IBrokerPositionService
         var positions = await _http.GetPositionsAsync(ct);
         return positions
             .Where(p => ExchangeConstants.OptionsExchanges.Contains(p.Exchange))
+            .Where(p => ExchangeConstants.IndexUnderlyings.Any(idx =>
+                p.TradingSymbol.StartsWith(idx, StringComparison.OrdinalIgnoreCase)))
             .ToList()
             .AsReadOnly();
     }

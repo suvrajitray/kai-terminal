@@ -23,6 +23,8 @@ internal sealed class UpstoxPositionService : IBrokerPositionService
         var raw = await _http.GetPositionsAsync(ct);
         return raw
             .Where(p => ExchangeConstants.OptionsExchanges.Contains(p.Exchange))
+            .Where(p => ExchangeConstants.IndexUnderlyings.Any(idx =>
+                p.TradingSymbol.StartsWith(idx, StringComparison.OrdinalIgnoreCase)))
             .Select(Map)
             .ToList()
             .AsReadOnly();
