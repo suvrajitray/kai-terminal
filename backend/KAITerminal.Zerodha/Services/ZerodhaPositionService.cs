@@ -53,10 +53,10 @@ internal sealed class ZerodhaPositionService : IBrokerPositionService
         var longs  = openList.Where(p => p.Quantity > 0).ToList();
 
         await Task.WhenAll(shorts.Select(p => _http.PlaceOrderAsync(
-            p.TradingSymbol, p.Exchange, "BUY", ZerodhaProductMap.ToKite(p.Product, p.Exchange), "MARKET", Math.Abs(p.Quantity), null, ct)));
+            p.TradingSymbol, p.Exchange, "BUY", ZerodhaProductMap.ToKite(p.Product, p.Exchange), "MARKET", Math.Abs(p.Quantity), null, null, ct)));
 
         await Task.WhenAll(longs.Select(p => _http.PlaceOrderAsync(
-            p.TradingSymbol, p.Exchange, "SELL", ZerodhaProductMap.ToKite(p.Product, p.Exchange), "MARKET", Math.Abs(p.Quantity), null, ct)));
+            p.TradingSymbol, p.Exchange, "SELL", ZerodhaProductMap.ToKite(p.Product, p.Exchange), "MARKET", Math.Abs(p.Quantity), null, null, ct)));
 
         return [];
     }
@@ -73,7 +73,7 @@ internal sealed class ZerodhaPositionService : IBrokerPositionService
         var txType      = PositionHelper.CloseTransactionType(pos.Quantity);
         var quantity    = Math.Abs(pos.Quantity);
         var kiteProduct = ZerodhaProductMap.ToKite(pos.Product, pos.Exchange);
-        await _http.PlaceOrderAsync(pos.TradingSymbol, pos.Exchange, txType, kiteProduct, "MARKET", quantity, null, ct);
+        await _http.PlaceOrderAsync(pos.TradingSymbol, pos.Exchange, txType, kiteProduct, "MARKET", quantity, null, null, ct);
         return string.Empty;
     }
 

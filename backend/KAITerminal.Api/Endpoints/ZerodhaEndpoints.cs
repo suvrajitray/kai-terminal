@@ -240,7 +240,8 @@ public static class ZerodhaEndpoints
                 request.TransactionType,
                 request.Product,
                 request.OrderType,
-                request.Price);
+                request.Price,
+                request.TriggerPrice);
             var orderId = await zerodha.Orders.PlaceOrderAsync(brokerRequest, ct);
             lf.CreateLogger("ZerodhaEndpoints").LogInformation(
                 "Order placed — {User} — {Token} qty={Qty} {Side} — order {OrderId}",
@@ -345,6 +346,7 @@ public static class ZerodhaEndpoints
         string   TransactionType,
         string   Product,
         string   OrderType,
-        decimal? Price = null);
+        decimal? Price        = null,
+        decimal? TriggerPrice = null);
 
 }

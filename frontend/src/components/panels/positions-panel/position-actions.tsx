@@ -1,4 +1,4 @@
-import { Plus, Minus, ArrowUp, ArrowDown, LogOut, MoreHorizontal, TrendingDown, TrendingUp, RefreshCw } from "lucide-react";
+import { Plus, Minus, ArrowUp, ArrowDown, LogOut, MoreHorizontal, TrendingDown, TrendingUp, RefreshCw, ShieldAlert } from "lucide-react";
 import { QtyInput, type QtyMode } from "./qty-input";
 import { cn } from "@/lib/utils";
 import {
@@ -29,6 +29,7 @@ interface PositionActionsProps {
   onExitDialog: () => void;
   onSellMore: () => void;
   onConvert: () => void;
+  onAddStoploss: () => void;
 }
 
 interface ActionBtnProps {
@@ -77,6 +78,7 @@ export function PositionActions({
   onExitDialog,
   onSellMore,
   onConvert,
+  onAddStoploss,
 }: PositionActionsProps) {
   const disabled    = !!acting;
   const qtyDisabled = disabled || actualQty === 0;
@@ -155,6 +157,12 @@ export function PositionActions({
             >
               <LogOut className="size-3.5" />
               <span>Exit position</span>
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={onAddStoploss} className="gap-2 cursor-pointer text-amber-400 focus:text-amber-400 focus:bg-amber-500/10">
+              <ShieldAlert className="size-3.5" />
+              <span>Add stoploss</span>
             </DropdownMenuItem>
 
             {showConvert && (

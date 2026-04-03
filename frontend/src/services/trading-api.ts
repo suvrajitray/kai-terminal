@@ -240,3 +240,36 @@ export async function placeOrder(
     });
   }
 }
+
+export async function placeStoplossOrder(
+  instrumentToken: string,
+  quantity: number,
+  transactionType: "Buy" | "Sell",
+  product: string,
+  triggerPrice: number,
+  broker: string,
+  exchange?: string,
+): Promise<void> {
+  if (broker === "zerodha") {
+    const token = exchange ? `${exchange}|${instrumentToken}` : instrumentToken;
+    await apiClient.post("/api/zerodha/orders/v3", {
+      instrumentToken: token,
+      quantity,
+      transactionType,
+      product,
+      orderType: "SL-M",
+      triggerPrice,
+    });
+  } else {
+    await apiClient.post("/api/upstox/orders/v3", {
+      instrumentToken,
+      quantity,
+      transactionType: transactionType === "Buy" ? 0 : 1,
+      orderType: 3, // SLM
+      triggerPrice,
+      price: 0,
+      product: productToEnum(product),
+      slice: true,
+    });
+  }
+}

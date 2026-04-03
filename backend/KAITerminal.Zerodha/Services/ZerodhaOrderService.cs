@@ -49,6 +49,7 @@ internal sealed class ZerodhaOrderService : IBrokerOrderService
             request.OrderType.ToUpperInvariant(),
             request.Quantity,
             request.Price,
+            request.TriggerPrice,
             ct);
     }
 

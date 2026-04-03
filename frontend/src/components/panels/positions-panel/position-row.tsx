@@ -11,6 +11,7 @@ import {
   ExitPositionDialog,
   SellBuyMoreDialog,
   ConvertPositionDialog,
+  AddStoplossDialog,
 } from "./position-action-dialogs";
 import type { Position } from "@/types";
 
@@ -41,7 +42,7 @@ export function PnlCell({ value, pct, noDecimal }: { value: number; pct?: number
   );
 }
 
-type DialogType = "exit" | "more" | "convert" | null;
+type DialogType = "exit" | "more" | "convert" | "stoploss" | null;
 
 interface PositionRowProps {
   position: Position;
@@ -164,6 +165,7 @@ export function PositionRow({
             onExitDialog={() => setDialog("exit")}
             onSellMore={() => setDialog("more")}
             onConvert={() => setDialog("convert")}
+            onAddStoploss={() => setDialog("stoploss")}
           />
         </td>
       </tr>
@@ -182,6 +184,11 @@ export function PositionRow({
       />
       <ConvertPositionDialog
         open={dialog === "convert"}
+        onOpenChange={(open) => !open && setDialog(null)}
+        position={p}
+      />
+      <AddStoplossDialog
+        open={dialog === "stoploss"}
         onOpenChange={(open) => !open && setDialog(null)}
         position={p}
       />

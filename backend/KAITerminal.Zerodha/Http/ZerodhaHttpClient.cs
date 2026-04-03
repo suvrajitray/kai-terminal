@@ -109,6 +109,7 @@ public sealed class ZerodhaHttpClient
         string orderType,
         int quantity,
         decimal? price,
+        decimal? triggerPrice = null,
         CancellationToken ct = default)
     {
         var http = _httpFactory.CreateClient("ZerodhaApi");
@@ -128,6 +129,13 @@ public sealed class ZerodhaHttpClient
 
         if (orderType.Equals("MARKET", StringComparison.OrdinalIgnoreCase))
             form["market_protection"] = "1";
+
+        if ((orderType.Equals("SL", StringComparison.OrdinalIgnoreCase) ||
+             orderType.Equals("SL-M", StringComparison.OrdinalIgnoreCase)) && triggerPrice.HasValue)
+            form["trigger_price"] = triggerPrice.Value.ToString("F2");
+
+        if (orderType.Equals("SL", StringComparison.OrdinalIgnoreCase) && price.HasValue)
+            form["price"] = price.Value.ToString("F2");
 
         var response = await http.PostAsync("/orders/regular", new FormUrlEncodedContent(form), ct);
         if (!response.IsSuccessStatusCode)
