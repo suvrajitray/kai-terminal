@@ -36,11 +36,17 @@ A full-stack options trading terminal built for **options sellers** in Indian eq
 ## Features
 
 - **Live positions** — WebSocket-driven LTP + P&L updates via SignalR; live Wifi/WifiOff indicator
-- **Profit Protection** — backend Worker monitors MTM per user and fires exits on hard SL, target, or trailing SL
+- **Profit Protection** — backend Worker monitors MTM per user and fires exits on hard SL, target, auto square-off, or trailing SL
+- **Auto square-off** — configurable time-based exit (IST, 24h); set in Settings → Trading Settings; evaluated as check #3 in the risk engine
 - **Auto Shift** — risk engine automatically shifts sell positions further OTM when premium rises by a configured %; exits the position after a configurable max number of shifts
-- **Risk event alerts** — every risk trigger (SL hit, target hit, TSL activated/raised/fired, square-off, auto-shift) delivered as a browser toast in real time via a dedicated SignalR hub
+- **Risk event alerts** — every risk trigger (SL hit, target hit, auto square-off, TSL activated/raised/fired, square-off, auto-shift) delivered as a browser toast in real time via a dedicated SignalR hub
 - **Position shift** — manually shift any sell position up or down by a configurable strike gap; ↓ always means lower premium (safer/further OTM) for both CE and PE
 - **Quick Trade** — place options orders by premium or by chain (straddle/strangle), for both Upstox and Zerodha, with live margin preview
+- **Portfolio Greeks** — net delta (Δ) and theta (Θ/day) aggregated across all open positions; refreshed every 60s from option chain; seller-oriented coloring in the stats bar
+- **P&L at expiry payoff chart** — visualises combined P&L at expiry per expiry group; each group gets a distinct colored curve; live spot price dot and breakeven annotations
+- **Breakeven column** — positions table shows per-leg B/E strike (CE: strike + avg price; PE: strike − avg price)
+- **Bulk exit by type** — "Exit CEs" / "Exit PEs" buttons in the positions toolbar for quick leg-type exits
+- **Margin utilization gauge** — color bar beside available margin in stats bar; green ≤ 50%, amber ≤ 80%, red > 80%
 - **AI Signals** — GPT-4o, Grok, Gemini, and Claude analyse the market in parallel every 15 minutes
 - **Multi-broker** — unified position/order DTOs regardless of broker; add a new broker by implementing two interfaces
 - **Option contracts** — live merged contract list from all connected brokers; cached daily until 8:15 AM IST
@@ -500,6 +506,7 @@ The Worker process monitors every enabled user's MTM and fires exit orders autom
 |---|---|
 | MTM Stop Loss | Exit all if MTM ≤ this value (e.g. `−5000`) |
 | MTM Target | Exit all if MTM ≥ this value (e.g. `25000`) |
+| Auto Square-Off | Exit all at a configured IST time (set in Settings → Trading Settings) |
 | Trailing SL enabled | Turn on the trailing stop loss |
 | Activate at | TSL activates when MTM first reaches this level |
 | Lock profit at | Floor is set to this value when TSL first activates |
@@ -510,7 +517,7 @@ The Worker process monitors every enabled user's MTM and fires exit orders autom
 | Max shifts | Exit the position after this many auto-shifts (e.g. `2`) |
 | Strike gap | Number of strikes to move further OTM per shift (e.g. `1`) |
 
-Checks run in order: **Hard SL → Target → Trailing SL → Auto Shift** (per sell position).
+Checks run in order: **Hard SL → Target → Auto Square-Off → Trailing SL → Auto Shift** (per sell position).
 
 ### Trailing SL Example
 

@@ -79,6 +79,8 @@ builder.Services.AddSingleton<IAutoShiftEvaluator, AutoShiftEvaluator>();
 
 builder.Services.AddRiskEngine<DbUserTokenSource>(builder.Configuration);
 
+builder.Services.AddHostedService<IvSnapshotJob>();
+
 var host = builder.Build();
 host.Run();
 

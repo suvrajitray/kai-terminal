@@ -23,11 +23,15 @@ interface PositionsPanelProps {
   isLive: boolean;
   load: () => void;
   mtmByBroker?: Record<string, number>;
+  netDelta?: number;
+  thetaPerDay?: number;
+  netGamma?: number;
+  netVega?: number;
 }
 
 const selKey = (p: Position) => `${p.instrumentToken}|${p.product}`;
 
-export function PositionsPanel({ positions, loading, load, mtmByBroker = {} }: PositionsPanelProps) {
+export function PositionsPanel({ positions, loading, load, mtmByBroker = {}, netDelta, thetaPerDay = 0, netGamma = 0, netVega = 0 }: PositionsPanelProps) {
   const [acting, setActing] = useState<string | null>(null);
   const [qtys, setQtys] = useState<Record<string, string>>({});
   const [qtyMode, setQtyMode] = useState<QtyMode>("qty");
@@ -196,6 +200,18 @@ export function PositionsPanel({ positions, loading, load, mtmByBroker = {} }: P
 
   const selectedCount = allOpenKeys.filter((k) => selected.has(k)).length;
 
+  const thetaEarnedToday = (() => {
+    if (!thetaPerDay) return 0;
+    const now = new Date();
+    const ist = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Kolkata" }));
+    const totalMins = ist.getHours() * 60 + ist.getMinutes();
+    if (totalMins < 9 * 60 + 15) return 0;
+    const elapsed = Math.min(totalMins - (9 * 60 + 15), 375);
+    return thetaPerDay * (elapsed / 375);
+  })();
+
+  const showGreeks = netDelta !== undefined && openPositions.length > 0 && (netDelta !== 0 || thetaPerDay !== 0);
+
   const cols = (
     <tr className="border-b border-border text-muted-foreground h-9">
       <th className="pl-3 py-1.5 w-7">
@@ -211,43 +227,105 @@ export function PositionsPanel({ positions, loading, load, mtmByBroker = {} }: P
       <th className="px-3 py-1.5 text-right font-medium">LTP</th>
       <th className="px-3 py-1.5 text-right font-medium">P&amp;L</th>
       <th className="px-3 py-1.5 text-right font-medium">B/E</th>
-      <th className="px-3 py-1.5 text-right">
-        {selectedCount > 0 ? (
-          <div className="flex items-center justify-end gap-2">
-            <span className="text-[10px] text-muted-foreground">{selectedCount} selected</span>
-            <Button
-              size="sm"
-              variant="destructive"
-              className="h-5 px-2 text-[10px]"
-              disabled={acting === "selected"}
-              onClick={handleExitSelected}
-            >
-              <LogOut className="mr-1 size-2.5" />
-              {acting === "selected" ? "Exiting…" : `Exit ${selectedCount}`}
-            </Button>
-          </div>
-        ) : (
-          <div className="flex items-center justify-end gap-1">
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-5 px-2 text-[10px] text-red-500 hover:bg-red-500/10 hover:text-red-500"
-              disabled={!!acting}
-              onClick={handleExitByType("CE")}
-            >
-              Exit CEs
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-5 px-2 text-[10px] text-green-600 hover:bg-green-500/10 hover:text-green-600"
-              disabled={!!acting}
-              onClick={handleExitByType("PE")}
-            >
-              Exit PEs
-            </Button>
-          </div>
-        )}
+      <th className="px-3 py-1.5">
+        <div className="flex items-center justify-end gap-2">
+          {/* Portfolio Greeks */}
+          {showGreeks && (
+            <span className="flex items-center gap-2.5 text-[10px] font-normal">
+              <span
+                className="flex items-center gap-0.5"
+                title={`Net delta — sellers aim for 0. ${Math.abs(netDelta!) > 0.5 ? "High directional exposure." : "Roughly balanced."}`}
+              >
+                <span className="text-muted-foreground">Δ</span>
+                <span className={cn(
+                  "font-mono tabular-nums font-medium",
+                  Math.abs(netDelta!) <= 0.1 ? "text-green-500" :
+                  Math.abs(netDelta!) <= 0.5 ? "text-amber-500" : "text-red-500",
+                )}>
+                  {netDelta! >= 0 ? "+" : ""}{netDelta!.toFixed(2)}
+                </span>
+              </span>
+              {netGamma !== 0 && (
+                <span
+                  className="flex items-center gap-0.5"
+                  title="Net gamma — sellers want near-zero. Large negative = delta swings wildly."
+                >
+                  <span className="text-muted-foreground">Γ</span>
+                  <span className={cn(
+                    "font-mono tabular-nums font-medium",
+                    Math.abs(netGamma) <= 0.002 ? "text-green-500" :
+                    Math.abs(netGamma) <= 0.01  ? "text-amber-500" : "text-red-500",
+                  )}>
+                    {netGamma.toFixed(4)}
+                  </span>
+                </span>
+              )}
+              <span
+                className="flex items-center gap-0.5"
+                title={`Theta ₹${Math.round(thetaPerDay)}/day — ₹${Math.round(thetaEarnedToday)} earned so far today.`}
+              >
+                <span className="text-muted-foreground">Θ</span>
+                <span className={cn("font-mono tabular-nums font-medium", thetaPerDay > 0 ? "text-green-500" : "text-red-500")}>
+                  {thetaEarnedToday !== 0
+                    ? <>{thetaEarnedToday > 0 ? "+" : ""}₹{Math.round(thetaEarnedToday)} <span className="text-muted-foreground/50 font-normal">/ ₹{Math.round(thetaPerDay)}</span></>
+                    : <>{thetaPerDay >= 0 ? "+" : ""}₹{Math.round(thetaPerDay)}/d</>
+                  }
+                </span>
+              </span>
+              {netVega !== 0 && (
+                <span
+                  className="flex items-center gap-0.5"
+                  title={`Net vega ₹${Math.round(netVega)} — P&L change per 1% IV move. Negative is normal for sellers.`}
+                >
+                  <span className="text-muted-foreground">V</span>
+                  <span className={cn("font-mono tabular-nums font-medium", netVega <= 0 ? "text-green-500" : "text-red-500")}>
+                    {netVega >= 0 ? "+" : ""}₹{Math.round(netVega)}
+                  </span>
+                </span>
+              )}
+            </span>
+          )}
+
+          {showGreeks && <span className="text-muted-foreground/30">|</span>}
+
+          {/* Actions */}
+          {selectedCount > 0 ? (
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-muted-foreground">{selectedCount} selected</span>
+              <Button
+                size="sm"
+                variant="destructive"
+                className="h-5 px-2 text-[10px]"
+                disabled={acting === "selected"}
+                onClick={handleExitSelected}
+              >
+                <LogOut className="mr-1 size-2.5" />
+                {acting === "selected" ? "Exiting…" : `Exit ${selectedCount}`}
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-5 px-2 text-[10px] text-red-500 hover:bg-red-500/10 hover:text-red-500"
+                disabled={!!acting}
+                onClick={handleExitByType("CE")}
+              >
+                Exit CEs
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-5 px-2 text-[10px] text-green-600 hover:bg-green-500/10 hover:text-green-600"
+                disabled={!!acting}
+                onClick={handleExitByType("PE")}
+              >
+                Exit PEs
+              </Button>
+            </div>
+          )}
+        </div>
       </th>
     </tr>
   );

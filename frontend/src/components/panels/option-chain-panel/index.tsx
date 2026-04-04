@@ -6,14 +6,16 @@ import { UNDERLYING_KEYS } from "@/lib/shift-config";
 import { useOptionChain } from "./use-option-chain";
 import { OptionChainTable } from "./option-chain-table";
 import { OptionChainOrderDialog, type OrderIntent } from "./option-chain-order-dialog";
+import { useOptionContractsStore } from "@/stores/option-contracts-store";
 
 interface Props {
   width: number;
   onResize?: (width: number) => void;
   onClose?: () => void;
+  netDelta?: number;
 }
 
-export function OptionChainPanel({ width, onResize, onClose }: Props) {
+export function OptionChainPanel({ width, onResize, onClose, netDelta }: Props) {
   const {
     underlying, setUnderlying,
     expiry, setExpiry,
@@ -29,6 +31,11 @@ export function OptionChainPanel({ width, onResize, onClose }: Props) {
     pcr,
     atmIv,
     maxPain,
+    expectedMovePct,
+    expectedMovePts,
+    ivRank,
+    ivPercentile,
+    ivHistoryDays,
     loading,
     refresh,
   } = useOptionChain();
@@ -36,6 +43,37 @@ export function OptionChainPanel({ width, onResize, onClose }: Props) {
   const [orderIntent, setOrderIntent] = useState<OrderIntent | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const underlyings = Object.keys(UNDERLYING_KEYS);
+
+  const getContracts = useOptionContractsStore((s) => s.getContracts);
+  const lotSize = getContracts(underlying)[0]?.lotSize ?? 75;
+
+  const hedgeSuggestion = (() => {
+    if (netDelta === undefined || atmStrike === 0 || visibleRows.length === 0) return null;
+    const threshold = lotSize * 0.15; // ignore if less than 0.15 delta per lot
+    if (Math.abs(netDelta) < threshold) return null;
+
+    const needPositiveDelta = netDelta < 0;
+    const side = needPositiveDelta ? "PE" : "CE";
+
+    // Find the strike with delta closest to |netDelta| / lotSize (ideal per-share delta per lot)
+    const targetDeltaPerShare = Math.abs(netDelta) / lotSize;
+    const candidates = visibleRows
+      .map((row) => {
+        const opt = needPositiveDelta ? row.putOptions : row.callOptions;
+        const delta = Math.abs(opt?.optionGreeks?.delta ?? 0);
+        const ltp = opt?.marketData?.ltp ?? 0;
+        return { strike: row.strikePrice, delta, ltp };
+      })
+      .filter((c) => c.delta >= 0.15 && c.delta <= 0.65);
+
+    if (candidates.length === 0) return null;
+    const best = candidates.reduce((prev, curr) =>
+      Math.abs(curr.delta - targetDeltaPerShare) < Math.abs(prev.delta - targetDeltaPerShare) ? curr : prev
+    );
+    const lots = Math.max(1, Math.round(Math.abs(netDelta) / (best.delta * lotSize)));
+    const residualDelta = netDelta + (needPositiveDelta ? 1 : -1) * best.delta * lots * lotSize;
+    return { side, strike: best.strike, lots, ltp: best.ltp, residualDelta };
+  })();
 
   // Scroll ATM row to vertical center after chain loads
   useEffect(() => {
@@ -183,58 +221,170 @@ export function OptionChainPanel({ width, onResize, onClose }: Props) {
         )}
       </div>
 
-      {/* Stats footer — h-8 matching orders panel header */}
-      <div className="flex h-8 shrink-0 items-center gap-3 border-t border-border bg-muted/40 px-3 text-[11px]">
-        <span className="flex items-center gap-1">
-          <span className="text-muted-foreground">Spot</span>
-          <span className="font-mono font-medium tabular-nums text-foreground">
-            {spotPrice > 0 ? spotPrice.toLocaleString("en-IN", { maximumFractionDigits: 2 }) : "—"}
+      {/* Stats footer — two rows */}
+      <div className="flex shrink-0 flex-col border-t border-border bg-muted/40 text-[11px]">
+        {/* Row 1: Spot · ATM · IV · PCR */}
+        <div className="flex h-7 items-center gap-3 border-b border-border/40 px-3">
+          <span className="flex items-center gap-1">
+            <span className="text-muted-foreground">Spot</span>
+            <span className="font-mono font-medium tabular-nums text-foreground">
+              {spotPrice > 0 ? spotPrice.toFixed(1) : "—"}
+            </span>
           </span>
-        </span>
-        <span className="text-muted-foreground/30">·</span>
-        <span className="flex items-center gap-1">
-          <span className="text-muted-foreground">ATM</span>
-          <span className="font-mono font-medium tabular-nums text-foreground">
-            {atmStrike > 0 ? atmStrike.toLocaleString("en-IN") : "—"}
+          <span className="text-muted-foreground/30">|</span>
+          <span className="flex items-center gap-1">
+            <span className="text-muted-foreground">ATM</span>
+            <span className="font-mono font-medium tabular-nums text-foreground">
+              {atmStrike > 0 ? atmStrike : "—"}
+            </span>
           </span>
-        </span>
-        {atmIv !== null && (
-          <>
-            <span className="text-muted-foreground/30">·</span>
-            <span className="flex items-center gap-1">
-              <span className="text-muted-foreground">IV</span>
-              <span className="font-mono font-medium tabular-nums text-amber-400">
-                {atmIv.toFixed(1)}%
+          {atmIv !== null && (
+            <>
+              <span className="text-muted-foreground/30">|</span>
+              <span className="flex items-center gap-1">
+                <span className="text-muted-foreground">IV</span>
+                <span className="font-mono font-medium tabular-nums text-amber-400">
+                  {atmIv.toFixed(1)}%
+                </span>
+              </span>
+            </>
+          )}
+          {pcr !== null && (
+            <>
+              <span className="text-muted-foreground/30">|</span>
+              <span className="flex items-center gap-1">
+                <span className="text-muted-foreground">PCR</span>
+                <span className={cn("font-mono font-medium tabular-nums", pcr >= 1 ? "text-green-400" : "text-red-400")}>
+                  {pcr.toFixed(2)}
+                </span>
+              </span>
+            </>
+          )}
+          {ivRank !== null && ivHistoryDays >= 10 && (
+            <>
+              <span className="text-muted-foreground/30">|</span>
+              <span
+                className="flex items-center gap-1"
+                title={`IV Rank ${ivRank.toFixed(0)}/100 — current IV is higher than ${ivPercentile?.toFixed(0)}% of the past ${ivHistoryDays} days`}
+              >
+                <span className="text-muted-foreground">IVR</span>
+                <span className={cn(
+                  "font-mono font-medium tabular-nums",
+                  ivRank >= 50 ? "text-green-400" :
+                  ivRank >= 30 ? "text-amber-400" :
+                  "text-red-400",
+                )}>
+                  {ivRank.toFixed(0)}
+                </span>
+              </span>
+            </>
+          )}
+          {ivHistoryDays > 0 && ivHistoryDays < 10 && (
+            <>
+              <span className="text-muted-foreground/30">|</span>
+              <span className="text-[10px] text-muted-foreground/40">IVR collecting…</span>
+            </>
+          )}
+        </div>
+        {/* Row 2: Expected Move · Max Pain distance */}
+        <div className="flex h-7 items-center gap-3 border-b border-border/40 px-3">
+          {expectedMovePct !== null && expectedMovePts !== null ? (
+            <span
+              className="flex items-center gap-1"
+              title="Implied expected move to expiry = ATM straddle price ÷ spot. Market's own estimate of the range."
+            >
+              <span className="text-muted-foreground">±Move</span>
+              <span className="font-mono font-medium tabular-nums text-sky-400">
+                {expectedMovePct.toFixed(2)}%
+              </span>
+              <span className="text-muted-foreground/50">
+                ({Math.round(expectedMovePts)} pts)
               </span>
             </span>
-          </>
-        )}
-        {pcr !== null && (
-          <>
-            <span className="text-muted-foreground/30">·</span>
-            <span className="flex items-center gap-1">
-              <span className="text-muted-foreground">PCR</span>
-              <span className={cn("font-mono font-medium tabular-nums", pcr >= 1 ? "text-green-400" : "text-red-400")}>
-                {pcr.toFixed(2)}
+          ) : (
+            <span className="text-muted-foreground/40">Expected move —</span>
+          )}
+          {maxPain !== null && (
+            <>
+              <span className="text-muted-foreground/30">|</span>
+              <MaxPainStat maxPain={maxPain} spotPrice={spotPrice} />
+            </>
+          )}
+        </div>
+        {/* Row 3: Delta-neutral hedge suggestion */}
+        {netDelta !== undefined && (
+          <div className="flex h-7 items-center gap-2 px-3">
+            <span className="text-muted-foreground">ΔHedge</span>
+            {hedgeSuggestion === null ? (
+              <span className="font-mono text-[10px] text-green-400/70">
+                {netDelta === 0 ? "Balanced" : `${netDelta > 0 ? "+" : ""}${netDelta.toFixed(1)} — Balanced`}
               </span>
-            </span>
-          </>
-        )}
-        {maxPain !== null && (
-          <>
-            <span className="text-muted-foreground/30">·</span>
-            <span className="flex items-center gap-1">
-              <span className="text-muted-foreground">Pain</span>
-              <span className="font-mono font-medium tabular-nums text-foreground">
-                {maxPain.toLocaleString("en-IN")}
-              </span>
-            </span>
-          </>
+            ) : (
+              <>
+                <span className={cn("font-mono font-medium tabular-nums text-[10px]", netDelta < 0 ? "text-red-400" : "text-amber-400")}>
+                  {netDelta > 0 ? "+" : ""}{netDelta.toFixed(1)}
+                </span>
+                <span className="text-muted-foreground/30">→</span>
+                <span className="font-mono text-[10px] text-foreground">
+                  Sell {hedgeSuggestion.lots}L {underlying} {hedgeSuggestion.strike}{" "}
+                  <span className={hedgeSuggestion.side === "PE" ? "text-green-400" : "text-red-400"}>
+                    {hedgeSuggestion.side}
+                  </span>
+                </span>
+                {hedgeSuggestion.ltp > 0 && (
+                  <span className="text-muted-foreground/50 text-[10px]">
+                    @ {hedgeSuggestion.ltp.toFixed(1)}
+                  </span>
+                )}
+                <span className="text-muted-foreground/30">→</span>
+                <span className={cn(
+                  "font-mono text-[10px]",
+                  Math.abs(hedgeSuggestion.residualDelta) < 5 ? "text-green-400/70" : "text-amber-400/70"
+                )}>
+                  Δ {hedgeSuggestion.residualDelta > 0 ? "+" : ""}{hedgeSuggestion.residualDelta.toFixed(1)}
+                </span>
+              </>
+            )}
+          </div>
         )}
       </div>
     </div>
 
     <OptionChainOrderDialog intent={orderIntent} onClose={() => setOrderIntent(null)} />
     </>
+  );
+}
+
+interface MaxPainStatProps {
+  maxPain: number;
+  spotPrice: number;
+}
+
+function MaxPainStat({ maxPain, spotPrice }: MaxPainStatProps) {
+  const distance = spotPrice > 0 ? Math.round(maxPain - spotPrice) : null;
+  // Positive = spot below max pain (price needs to rise to max pain — PEs safer)
+  // Negative = spot above max pain (price needs to fall to max pain — CEs safer)
+  const absDist = distance !== null ? Math.abs(distance) : null;
+  const arrow = distance === null ? "" : distance > 0 ? "↑" : "↓";
+  const saferSide = distance === null ? null : distance > 0 ? "CE safe" : "PE safe";
+
+  return (
+    <span
+      className="flex items-center gap-1"
+      title={`Max Pain ₹${maxPain}. ${saferSide ?? ""}. Market gravitates here by expiry.`}
+    >
+      <span className="text-muted-foreground">Pain</span>
+      <span className="font-mono font-medium tabular-nums text-foreground">
+        {maxPain}
+      </span>
+      {absDist !== null && absDist > 0 && (
+        <span className={cn(
+          "text-[10px] font-mono",
+          distance! > 0 ? "text-green-400/70" : "text-red-400/70",
+        )}>
+          {arrow}{absDist} pts
+        </span>
+      )}
+    </span>
   );
 }

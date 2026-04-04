@@ -148,7 +148,7 @@ export function PositionRow({
         <td className="px-3 py-1.5 text-right font-mono tabular-nums text-muted-foreground">
           {contract ? (
             <span title="Breakeven strike price">
-              ₹{INR_INT.format(
+              ₹{Math.round(
                 contract.instrumentType === "CE"
                   ? contract.strikePrice + p.averagePrice
                   : contract.strikePrice - p.averagePrice

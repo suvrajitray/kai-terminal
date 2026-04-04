@@ -54,6 +54,7 @@ export interface OptionMarketData {
   ltp: number;
   volume: number;
   oi: number;
+  prevOi: number;
   closePrice: number;
   bidPrice: number;
   bidQty: number;
@@ -74,6 +75,14 @@ export interface OptionSide {
   instrumentKey: string;
   marketData?: OptionMarketData;
   optionGreeks?: OptionGreeks;
+}
+
+export interface IvSnapshot {
+  date: string;
+  atmIv: number;
+  spotPrice: number;
+  atmCallLtp: number;
+  atmPutLtp: number;
 }
 
 export interface OptionChainEntry {

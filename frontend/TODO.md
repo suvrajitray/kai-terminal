@@ -16,6 +16,9 @@
 
 ## Stats Bar
 
+- [x] **Portfolio Greeks (Δ/Θ)** — `usePortfolioGreeks` hook; net delta + theta per day shown at 2xl+; seller-oriented coloring.
+- [x] **Margin utilization gauge** — color bar beside available margin; only shown when both available + used margins are non-null.
+- [x] **P&L at expiry payoff chart** — `PayoffChartDialog`; positions grouped by expiry, one colored curve per group, live spot dot, breakeven annotations, per-expiry summary.
 - [ ] **Open/closed count badges** — replace `3 open · 1 closed` plain text with small styled pills.
 - [ ] **MTM sparkline** — tiny inline chart showing MTM trajectory over the session.
 
@@ -49,3 +52,6 @@
 - [x] Broker status chips in header — green/muted dot per connected broker, popover with margin + Disconnect (`broker-status-chips.tsx`)
 - [x] Quick Trade broker selector — "Route via: Upstox / Zerodha" pill selector shown when both brokers connected; Zerodha shows info toast (pending backend endpoint)
 - [x] Zerodha OAuth redirect handling — `BrokerRedirectPage` reads `request_token` for Zerodha, `code` for Upstox
+- [x] Breakeven (B/E) column in positions table — CE = strike + avg price; PE = strike − avg price
+- [x] Bulk exit by type — "Exit CEs" (red) / "Exit PEs" (green) buttons in positions toolbar when no rows selected
+- [x] Auto square-off setting — Switch + time input in `UserTradingSettingsDialog`; stored in `UserTradingSettings` DB table; evaluated in RiskEvaluator as check #3

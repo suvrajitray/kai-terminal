@@ -1,5 +1,5 @@
 import { apiClient } from "@/lib/api-client";
-import type { Position, Order, IndexContracts, OptionChainEntry } from "@/types";
+import type { Position, Order, IndexContracts, OptionChainEntry, IvSnapshot } from "@/types";
 
 export async function fetchPositions(exchanges?: string[]): Promise<Position[]> {
   const params = exchanges?.length ? { exchange: exchanges.join(",") } : undefined;
@@ -105,6 +105,13 @@ export async function fetchOptionChain(
 
 export async function fetchMasterContracts(): Promise<IndexContracts[]> {
   const res = await apiClient.get<IndexContracts[]>("/api/masterdata/contracts");
+  return res.data;
+}
+
+export async function fetchIvHistory(underlying: string): Promise<IvSnapshot[]> {
+  const res = await apiClient.get<IvSnapshot[]>("/api/masterdata/iv-history", {
+    params: { underlying },
+  });
   return res.data;
 }
 

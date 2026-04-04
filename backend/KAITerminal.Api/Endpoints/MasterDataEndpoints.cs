@@ -1,6 +1,8 @@
 using KAITerminal.Api.Services;
 using KAITerminal.Contracts.Options;
+using KAITerminal.Infrastructure.Data;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace KAITerminal.Api.Endpoints;
 
@@ -28,6 +30,26 @@ public static class MasterDataEndpoints
             if (string.IsNullOrEmpty(underlyingKey) || string.IsNullOrEmpty(expiryDate))
                 return Results.BadRequest(new { error = "underlyingKey and expiryDate are required." });
             return Results.Ok(await chainProvider.GetChainAsync(underlyingKey, expiryDate, ct));
+        });
+
+        group.MapGet("/iv-history", async (
+            [FromQuery] string? underlying,
+            [FromQuery] int lookbackDays,
+            AppDbContext db,
+            CancellationToken ct) =>
+        {
+            if (string.IsNullOrEmpty(underlying))
+                return Results.BadRequest(new { error = "underlying is required." });
+            if (lookbackDays <= 0) lookbackDays = 252;
+
+            var rows = await db.IvSnapshots
+                .Where(s => s.Underlying == underlying.ToUpperInvariant())
+                .OrderByDescending(s => s.Date)
+                .Take(lookbackDays)
+                .Select(s => new { s.Date, s.AtmIv, s.SpotPrice, s.AtmCallLtp, s.AtmPutLtp })
+                .ToListAsync(ct);
+
+            return Results.Ok(rows.OrderBy(r => r.Date));
         });
     }
 }

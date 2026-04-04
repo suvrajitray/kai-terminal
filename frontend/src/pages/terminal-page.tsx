@@ -9,6 +9,7 @@ import { usePositionsFeed } from "@/components/panels/positions-panel/use-positi
 import { useProfitProtection } from "./use-profit-protection";
 import { useRiskConfig } from "@/hooks/use-risk-config";
 import { useOptionContractsPrefetch } from "@/hooks/use-option-contracts-prefetch";
+import { usePortfolioGreeks } from "@/hooks/use-portfolio-greeks";
 import { exitAllPositions, exitAllZerodhaPositions } from "@/services/trading-api";
 import { OptionChainPanel } from "@/components/panels/option-chain-panel";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
@@ -89,6 +90,7 @@ function TerminalPageInner() {
   };
 
   useOptionContractsPrefetch();
+  const { netDelta, thetaPerDay, netGamma, netVega } = usePortfolioGreeks(positions);
 
   // Hooks must be called unconditionally — one set per known broker in BROKERS.
   // When adding a new broker (e.g. "dhan"), add useRiskConfig, useProfitProtection,
@@ -179,6 +181,10 @@ function TerminalPageInner() {
             isLive={isLive}
             load={load}
             mtmByBroker={mtmByBroker}
+            netDelta={netDelta}
+            thetaPerDay={thetaPerDay}
+            netGamma={netGamma}
+            netVega={netVega}
           />
         </div>
 
@@ -203,7 +209,7 @@ function TerminalPageInner() {
       </div>
 
       {/* Right column — option chain panel */}
-      {chainOpen && <OptionChainPanel width={chainWidth} onResize={setChainWidth} onClose={() => setChainOpen(false)} />}
+      {chainOpen && <OptionChainPanel width={chainWidth} onResize={setChainWidth} onClose={() => setChainOpen(false)} netDelta={netDelta} />}
 
       {/* Profit Protection config dialog */}
       <ProfitProtectionPanel

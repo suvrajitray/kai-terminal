@@ -7,9 +7,11 @@ import type { Position } from "@/types";
 export interface PortfolioGreeks {
   netDelta: number;
   thetaPerDay: number;
+  netGamma: number;
+  netVega: number;
 }
 
-type GreeksMap = Map<string, { delta: number; theta: number }>;
+type GreeksMap = Map<string, { delta: number; theta: number; gamma: number; vega: number }>;
 type GroupMap  = Map<string, { underlyingKey: string; expiry: string }>;
 
 // Re-fetch greeks every 60s — delta changes continuously as spot moves
@@ -38,8 +40,8 @@ export function usePortfolioGreeks(positions: Position[]): PortfolioGreeks {
           for (const side of [entry.callOptions, entry.putOptions]) {
             if (!side?.instrumentKey || !side.optionGreeks) continue;
             const existing = next.get(side.instrumentKey);
-            const next_ = { delta: side.optionGreeks.delta, theta: side.optionGreeks.theta };
-            if (existing?.delta !== next_.delta || existing?.theta !== next_.theta) {
+            const next_ = { delta: side.optionGreeks.delta, theta: side.optionGreeks.theta, gamma: side.optionGreeks.gamma, vega: side.optionGreeks.vega };
+            if (existing?.delta !== next_.delta || existing?.theta !== next_.theta || existing?.gamma !== next_.gamma || existing?.vega !== next_.vega) {
               next.set(side.instrumentKey, next_);
               changed = true;
             }
@@ -85,6 +87,8 @@ export function usePortfolioGreeks(positions: Position[]): PortfolioGreeks {
   // Aggregate greeks weighted by signed position quantity
   let netDelta = 0;
   let thetaPerDay = 0;
+  let netGamma = 0;
+  let netVega = 0;
 
   for (const p of positions.filter((pos) => pos.quantity !== 0)) {
     const lookup = getByInstrumentKey(p.instrumentToken, p.tradingSymbol);
@@ -95,7 +99,9 @@ export function usePortfolioGreeks(positions: Position[]): PortfolioGreeks {
     if (!g) continue;
     netDelta    += g.delta * p.quantity;
     thetaPerDay += g.theta * p.quantity;
+    netGamma    += g.gamma * p.quantity;
+    netVega     += g.vega  * p.quantity;
   }
 
-  return { netDelta, thetaPerDay };
+  return { netDelta, thetaPerDay, netGamma, netVega };
 }

@@ -109,7 +109,8 @@ Zero deps on Upstox/Zerodha SDKs. `UpstoxMarketDataHttpClient` takes an explicit
 
 1. MTM SL (`MtmSl`) → exit all
 2. MTM target (`MtmTarget`) → exit all
-3. Trailing SL: activates at `TrailingActivateAt`; floor locked at `LockProfitAt`; raised by `IncreaseTrailingBy` every `WhenProfitIncreasesBy`; fires when MTM ≤ floor
+3. Auto square-off: `AutoSquareOffEnabled` + `AutoSquareOffTime` (IST, 24h) from `UserTradingSettings` → exit all when current IST time ≥ configured time
+4. Trailing SL: activates at `TrailingActivateAt`; floor locked at `LockProfitAt`; raised by `IncreaseTrailingBy` every `WhenProfitIncreasesBy`; fires when MTM ≤ floor
 
 `InMemoryRiskRepository` state **resets on host restart**. `IRiskEventNotifier` — `NullRiskEventNotifier` is default; hosts override before calling `AddRiskEngine`.
 
@@ -121,12 +122,12 @@ Zero deps on Upstox/Zerodha SDKs. `UpstoxMarketDataHttpClient` takes an explicit
 
 PostgreSQL via Neon. Tables auto-created on first start; **new tables require manual `CREATE TABLE` on Neon**.
 
-| Table                 | Purpose                                                   |
-| --------------------- | --------------------------------------------------------- |
-| `BrokerCredentials`   | Per-user credentials. Unique on `(Username, BrokerName)`. |
-| `UserTradingSettings` | Per-user trading preferences                              |
-| `AppUsers`            | `Email`, `Name`, `IsActive`, `IsAdmin`                    |
-| `UserRiskConfigs`     | PP/risk config. Unique on `(Username, BrokerType)`.       |
+| Table                 | Purpose                                                                                                      |
+| --------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `BrokerCredentials`   | Per-user credentials. Unique on `(Username, BrokerName)`.                                                    |
+| `UserTradingSettings` | Per-user trading preferences. Includes `AutoSquareOffEnabled` (bool) + `AutoSquareOffTime` (varchar "HH:mm"). **Requires manual migration — see `TODO.md`.** |
+| `AppUsers`            | `Email`, `Name`, `IsActive`, `IsAdmin`                                                                       |
+| `UserRiskConfigs`     | PP/risk config. Unique on `(Username, BrokerType)`.                                                          |
 
 Option contracts: not in DB. `MasterDataService` caches in `IMemoryCache`, expires at **8:15 AM IST** daily. Multi-broker merge joins on `ExchangeToken`.
 
@@ -157,6 +158,12 @@ Use `dotnet user-secrets` for all real tokens. `Api:InternalKey` must match in b
 - **PP toggle** — optimistic update. `useProfitProtection` is display-only; actual exits fired by the Worker.
 - **Always use shadcn components** over native HTML. Add new ones with `npx shadcn add <component>`.
 - **Supported indices**: NIFTY, SENSEX, BANKNIFTY, FINNIFTY, BANKEX. Upstox keys: `NSE_INDEX|Nifty 50`, `BSE_INDEX|SENSEX`, `NSE_INDEX|Nifty Bank`, `NSE_INDEX|Nifty Fin Service`, `BSE_INDEX|BANKEX`.
+- **Portfolio Greeks** (`use-portfolio-greeks.ts`) — `usePortfolioGreeks(positions)` groups open positions by `(underlying, expiry)`, fetches option chain per group via `fetchOptionChain`, re-fetches every 60 s. Returns `{ netDelta, thetaPerDay }`. Delta coloring for sellers: `|Δ|≤0.1` green, `|Δ|≤0.5` amber, `|Δ|>0.5` red. Theta: positive = green (earning decay), negative = red.
+- **Payoff chart** (`payoff-chart-dialog.tsx`) — P&L at expiry, grouped by expiry date. Each expiry gets its own colored curve (cyan, amber, violet, emerald). Uses the live spot price from `useIndicesFeed`. Spot dot and summary rows per expiry group. Separate `legs/indexName` memo (no feed dependency) vs. spot read inline.
+- **Breakeven column** — positions panel shows a `B/E` column. CE breakeven = strike + avg price; PE breakeven = strike − avg price.
+- **Bulk exit by type** — when no rows are selected, "Exit CEs" (red) and "Exit PEs" (green) buttons appear in the positions toolbar.
+- **Margin utilization gauge** — `MarginEntry` in stats bar shows a color gauge only when both `availableMargin` and `usedMargin` are non-null. Green ≤ 50%, amber ≤ 80%, red > 80%.
+- **Auto square-off settings** — `UserTradingSettingsDialog` has a Switch + time Input. Backend stores in `UserTradingSettings`; `DbUserTokenSource` joins and populates `UserConfig`; evaluated in `RiskEvaluator` as check #3.
 
 ---
 

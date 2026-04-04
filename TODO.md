@@ -28,6 +28,37 @@ CREATE UNIQUE INDEX IF NOT EXISTS "ix_userriskconfigs_username_brokertype"
 > Without step 1, `DbUserTokenSource` will fail to join `BrokerCredentials` on `BrokerType`.
 > Without steps 2–3, inserting a second broker config for the same user will be rejected.
 
+```sql
+-- 4. Add auto square-off columns to UserTradingSettings
+ALTER TABLE "UserTradingSettings"
+  ADD COLUMN IF NOT EXISTS "AutoSquareOffEnabled" boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS "AutoSquareOffTime" varchar(5) NOT NULL DEFAULT '15:20';
+```
+
+> Without this, the auto square-off feature silently does nothing — `DbUserTokenSource` reads a null `ts` and defaults `AutoSquareOffEnabled = false`.
+
+```sql
+-- 5. Create IvSnapshots table (IV Rank historical data)
+CREATE TABLE IF NOT EXISTS "IvSnapshots" (
+    "Id"         serial      PRIMARY KEY,
+    "Date"       date        NOT NULL,
+    "Underlying" text        NOT NULL,
+    "Expiry"     text        NOT NULL,
+    "AtmStrike"  numeric     NOT NULL,
+    "AtmIv"      numeric     NOT NULL,
+    "AtmCallLtp" numeric     NOT NULL,
+    "AtmPutLtp"  numeric     NOT NULL,
+    "SpotPrice"  numeric     NOT NULL,
+    "CreatedAt"  timestamp   NOT NULL,
+    CONSTRAINT "uq_ivsnapshots_date_underlying_expiry"
+        UNIQUE ("Date", "Underlying", "Expiry")
+);
+CREATE INDEX IF NOT EXISTS "ix_ivsnapshots_underlying_date"
+    ON "IvSnapshots" ("Underlying", "Date" DESC);
+```
+
+> Without this, `IvSnapshotJob` will fail to save snapshots and the IVR widget will never show data.
+
 ---
 
 ### Backend

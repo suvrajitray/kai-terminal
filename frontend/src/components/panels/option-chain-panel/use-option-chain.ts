@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import * as signalR from "@microsoft/signalr";
-import { fetchOptionChain } from "@/services/trading-api";
+import { fetchOptionChain, fetchIvHistory } from "@/services/trading-api";
 import { API_BASE_URL } from "@/lib/constants";
 import { useOptionContractsStore } from "@/stores/option-contracts-store";
 import { UNDERLYING_KEYS } from "@/lib/shift-config";
-import type { OptionChainEntry } from "@/types";
+import type { OptionChainEntry, IvSnapshot } from "@/types";
 
 const LIVE_WINDOW_SIZE = 20; // OTM rows on each side of ATM (for SignalR subscriptions)
 const VISIBLE_SIDE = 20;    // OTM rows shown on each side of ATM initially
@@ -23,9 +23,11 @@ export function useOptionChain() {
   const [visibleHigh, setVisibleHigh] = useState(VISIBLE_SIDE); // strikes above ATM
   const [loading, setLoading] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+  const [ivHistory, setIvHistory] = useState<IvSnapshot[]>([]);
 
-  const connectionRef = useRef<signalR.HubConnection | null>(null);
-  const liveTokensRef = useRef<string[]>([]);
+  const connectionRef  = useRef<signalR.HubConnection | null>(null);
+  const liveTokensRef  = useRef<string[]>([]);
+  const ivHistoryCache = useRef<Record<string, IvSnapshot[]>>({});
 
   const expiries = getExpiries(underlying);
 
@@ -89,6 +91,13 @@ export function useOptionChain() {
     if (underlying && expiry) fetchAndSubscribe(underlying, expiry);
   }, [underlying, expiry, fetchAndSubscribe]);
 
+  // Auto-refresh Greeks (delta, IV) every 60s — LTP streams via SignalR but greeks don't
+  useEffect(() => {
+    if (!underlying || !expiry) return;
+    const id = setInterval(() => fetchAndSubscribe(underlying, expiry), 60_000);
+    return () => clearInterval(id);
+  }, [underlying, expiry, fetchAndSubscribe]);
+
   // SignalR connection — one per panel mount, dedicated option-chain hub
   useEffect(() => {
     const conn = new signalR.HubConnectionBuilder()
@@ -141,14 +150,32 @@ export function useOptionChain() {
     if (underlying && expiry) fetchAndSubscribe(underlying, expiry);
   }, [underlying, expiry, fetchAndSubscribe]);
 
-  // ATM IV — average of call and put IV at ATM strike
-  const atmEntry = atmStrike > 0 ? allChain.find((e) => e.strikePrice === atmStrike) : undefined;
-  const callIv = atmEntry?.callOptions?.optionGreeks?.iv ?? 0;
-  const putIv  = atmEntry?.putOptions?.optionGreeks?.iv  ?? 0;
-  const atmIv  = callIv > 0 && putIv > 0 ? (callIv + putIv) / 2
-               : callIv > 0 ? callIv
-               : putIv  > 0 ? putIv
-               : null;
+  // Fetch IV history when underlying changes (cached — doesn't need expiry)
+  useEffect(() => {
+    if (!underlying) return;
+    const cached = ivHistoryCache.current[underlying];
+    if (cached) { setIvHistory(cached); return; }
+    fetchIvHistory(underlying)
+      .then((data) => {
+        ivHistoryCache.current[underlying] = data;
+        setIvHistory(data);
+      })
+      .catch(() => {});
+  }, [underlying]);
+
+  // ATM IV + Expected Move — computed from ATM straddle price
+  const atmEntry    = atmStrike > 0 ? allChain.find((e) => e.strikePrice === atmStrike) : undefined;
+  const callIv      = atmEntry?.callOptions?.optionGreeks?.iv ?? 0;
+  const putIv       = atmEntry?.putOptions?.optionGreeks?.iv  ?? 0;
+  const atmIv       = callIv > 0 && putIv > 0 ? (callIv + putIv) / 2
+                    : callIv > 0 ? callIv
+                    : putIv  > 0 ? putIv
+                    : null;
+  const atmCallLtp  = atmEntry?.callOptions?.marketData?.ltp ?? 0;
+  const atmPutLtp   = atmEntry?.putOptions?.marketData?.ltp  ?? 0;
+  const straddlePremium  = atmCallLtp > 0 && atmPutLtp > 0 ? atmCallLtp + atmPutLtp : 0;
+  const expectedMovePct  = spotPrice > 0 && straddlePremium > 0 ? (straddlePremium / spotPrice) * 100 : null;
+  const expectedMovePts  = straddlePremium > 0 ? straddlePremium : null;
 
   // Max Pain — strike that minimises total in-the-money payout from option writers
   const maxPain = (() => {
@@ -181,8 +208,24 @@ export function useOptionChain() {
   const loadMoreLow  = useCallback(() => setVisibleLow((s)  => s + VISIBLE_STEP), []);
   const loadMoreHigh = useCallback(() => setVisibleHigh((s) => s + VISIBLE_STEP), []);
 
-  // Overall PCR from the first entry (same across all entries)
-  const pcr = allChain[0]?.pcr ?? null;
+  // Compute PCR from total OI across all strikes (more reliable than Upstox's per-row pcr field)
+  const pcr = (() => {
+    const totalCallOi = allChain.reduce((s, e) => s + (e.callOptions?.marketData?.oi ?? 0), 0);
+    const totalPutOi  = allChain.reduce((s, e) => s + (e.putOptions?.marketData?.oi  ?? 0), 0);
+    return totalCallOi > 0 ? totalPutOi / totalCallOi : null;
+  })();
+
+  // IV Rank + IV Percentile from historical snapshots
+  const ivHistoryDays = ivHistory.length;
+  const { ivRank, ivPercentile } = (() => {
+    if (ivHistoryDays < 2 || atmIv === null) return { ivRank: null, ivPercentile: null };
+    const ivs = ivHistory.map((s) => s.atmIv);
+    const lo  = Math.min(...ivs);
+    const hi  = Math.max(...ivs);
+    const ivRank      = hi > lo ? ((atmIv - lo) / (hi - lo)) * 100 : null;
+    const ivPercentile = (ivs.filter((v) => v < atmIv).length / ivs.length) * 100;
+    return { ivRank, ivPercentile };
+  })();
 
   return {
     underlying, setUnderlying,
@@ -199,6 +242,11 @@ export function useOptionChain() {
     pcr,
     atmIv,
     maxPain,
+    expectedMovePct,
+    expectedMovePts,
+    ivRank,
+    ivPercentile,
+    ivHistoryDays,
     loading,
     lastRefreshed,
     refresh,

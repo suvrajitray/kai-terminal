@@ -8,11 +8,12 @@ interface Props {
   isLive: boolean;
   spotPrice: number;
   underlying: string;
+  maxOi: number;
   onOrder: (intent: OrderIntent) => void;
 }
 
 function formatLtp(ltp: number | undefined): string {
-  if (ltp === undefined || ltp === 0) return "—";
+  if (!ltp) return "—";
   return ltp.toFixed(2);
 }
 
@@ -21,14 +22,40 @@ function formatDelta(delta: number | undefined): string {
   return delta.toFixed(2);
 }
 
-export function OptionChainRow({ entry, isAtm, isLive, spotPrice, underlying, onOrder }: Props) {
-  const callLtp   = entry.callOptions?.marketData?.ltp;
-  const putLtp    = entry.putOptions?.marketData?.ltp;
-  const callDelta = entry.callOptions?.optionGreeks?.delta;
-  const putDelta  = entry.putOptions?.optionGreeks?.delta;
+function formatOi(oi: number | undefined): string {
+  if (!oi) return "—";
+  if (oi >= 100_000) return `${(oi / 100_000).toFixed(1)}L`;
+  if (oi >= 1_000)   return `${(oi / 1_000).toFixed(0)}K`;
+  return String(oi);
+}
+
+function formatOiChange(change: number): string {
+  if (change === 0) return "";
+  const abs = Math.abs(change);
+  const str = abs >= 100_000 ? `${(abs / 100_000).toFixed(1)}L`
+             : abs >= 1_000   ? `${(abs / 1_000).toFixed(0)}K`
+             : String(abs);
+  return (change > 0 ? "+" : "−") + str;
+}
+
+
+export function OptionChainRow({ entry, isAtm, isLive, spotPrice, underlying, maxOi, onOrder }: Props) {
+  const callLtp      = entry.callOptions?.marketData?.ltp;
+  const putLtp       = entry.putOptions?.marketData?.ltp;
+  const callDelta    = entry.callOptions?.optionGreeks?.delta;
+  const putDelta     = entry.putOptions?.optionGreeks?.delta;
+  const callOi       = entry.callOptions?.marketData?.oi;
+  const putOi        = entry.putOptions?.marketData?.oi;
+  const callPrevOi   = entry.callOptions?.marketData?.prevOi ?? 0;
+  const putPrevOi    = entry.putOptions?.marketData?.prevOi  ?? 0;
+  const callOiChange = callOi !== undefined ? callOi - callPrevOi : 0;
+  const putOiChange  = putOi  !== undefined ? putOi  - putPrevOi  : 0;
 
   const callItm = spotPrice > 0 && entry.strikePrice < spotPrice;
   const putItm  = spotPrice > 0 && entry.strikePrice > spotPrice;
+
+  const callBarPct = maxOi > 0 && callOi ? (callOi / maxOi) * 100 : 0;
+  const putBarPct  = maxOi > 0 && putOi  ? (putOi  / maxOi) * 100 : 0;
 
   function triggerOrder(side: "CE" | "PE", transactionType: "Buy" | "Sell") {
     const opt = side === "CE" ? entry.callOptions : entry.putOptions;
@@ -42,32 +69,36 @@ export function OptionChainRow({ entry, isAtm, isLive, spotPrice, underlying, on
     <tr
       data-atm={isAtm ? "true" : undefined}
       className={cn(
-        "group h-9 border-b border-border/30 text-sm transition-colors",
+        "group h-9 border-b border-border/30 text-[10px] transition-colors",
         isAtm ? "bg-muted/50" : "hover:bg-muted/20",
         !isLive && "[&>td]:opacity-55",
       )}
     >
-      {/* Call Delta — shows S + B on hover */}
+      {/* Call OI + ΔOI → B button on hover */}
       <td className={cn(
-        "px-2 py-1.5 text-right font-mono tabular-nums text-xs",
-        callItm ? "bg-red-500/10 text-muted-foreground/70" : "text-muted-foreground/30",
+        "relative px-1 py-1 text-right font-mono tabular-nums overflow-hidden",
+        callItm ? "bg-red-500/10" : "",
       )}>
-        <span className="group-hover:hidden">{formatDelta(callDelta)}</span>
-        <span className="hidden group-hover:inline-flex items-center justify-end gap-1 w-full">
-          <button
-            onClick={() => triggerOrder("CE", "Sell")}
-            className={cn(
-              "h-6 w-10 cursor-pointer rounded text-[11px] font-bold text-white",
-              callItm ? "bg-red-900/70 text-red-300/60 hover:bg-red-900" : "bg-red-600 hover:bg-red-500",
-            )}
-          >
-            S
-          </button>
+        {callBarPct > 0 && (
+          <span
+            className="absolute right-0 top-0 bottom-0 bg-red-500/15 pointer-events-none"
+            style={{ width: `${callBarPct}%` }}
+          />
+        )}
+        <span className="relative group-hover:hidden flex flex-col items-end leading-none gap-0.5">
+          <span className="text-muted-foreground/70">{formatOi(callOi)}</span>
+          {callOiChange !== 0 && (
+            <span className={cn("text-[9px]", callOiChange > 0 ? "text-green-400/80" : "text-red-400/80")}>
+              {formatOiChange(callOiChange)}
+            </span>
+          )}
+        </span>
+        <span className="relative hidden group-hover:flex w-full justify-end">
           <button
             onClick={() => triggerOrder("CE", "Buy")}
             className={cn(
-              "h-6 w-10 cursor-pointer rounded text-[11px] font-bold text-white",
-              callItm ? "bg-green-900/70 text-green-300/60 hover:bg-green-900" : "bg-green-600 hover:bg-green-500",
+              "h-6 w-full cursor-pointer rounded text-[10px] font-bold text-white",
+              callItm ? "bg-green-900/70 hover:bg-green-900" : "bg-green-600 hover:bg-green-500",
             )}
           >
             B
@@ -75,9 +106,28 @@ export function OptionChainRow({ entry, isAtm, isLive, spotPrice, underlying, on
         </span>
       </td>
 
-      {/* Call LTP — always visible */}
+      {/* Call Δ → S button on hover */}
       <td className={cn(
-        "px-3 py-1 text-right font-mono tabular-nums font-medium",
+        "px-1 py-1 text-right font-mono tabular-nums",
+        callItm ? "bg-red-500/10 text-muted-foreground/70" : "text-muted-foreground/40",
+      )}>
+        <span className="group-hover:hidden">{formatDelta(callDelta)}</span>
+        <span className="hidden group-hover:flex w-full justify-end">
+          <button
+            onClick={() => triggerOrder("CE", "Sell")}
+            className={cn(
+              "h-6 w-full cursor-pointer rounded text-[10px] font-bold text-white",
+              callItm ? "bg-red-900/70 hover:bg-red-900" : "bg-red-600 hover:bg-red-500",
+            )}
+          >
+            S
+          </button>
+        </span>
+      </td>
+
+      {/* Call LTP */}
+      <td className={cn(
+        "px-1 py-1 text-right font-mono tabular-nums font-medium text-[11px]",
         callItm ? "bg-red-500/10" : "opacity-40",
         callLtp ? "text-red-400" : "text-muted-foreground/50",
       )}>
@@ -85,43 +135,66 @@ export function OptionChainRow({ entry, isAtm, isLive, spotPrice, underlying, on
       </td>
 
       {/* Strike */}
-      <td className={cn("px-3 py-1 text-center font-mono tabular-nums", isAtm ? "font-bold text-foreground" : "text-muted-foreground")}>
+      <td className={cn("px-1 py-1 text-center font-mono tabular-nums text-[11px]", isAtm ? "font-bold text-foreground" : "text-muted-foreground")}>
         {entry.strikePrice}
       </td>
 
-      {/* Put LTP — always visible */}
+      {/* Put LTP */}
       <td className={cn(
-        "px-3 py-1 text-left font-mono tabular-nums font-medium",
+        "px-1 py-1 text-left font-mono tabular-nums font-medium text-[11px]",
         putItm ? "bg-green-500/10" : "opacity-40",
         putLtp ? "text-green-400" : "text-muted-foreground/50",
       )}>
         {formatLtp(putLtp)}
       </td>
 
-      {/* Put Delta — shows B + S on hover */}
+      {/* Put Δ → S button on hover */}
       <td className={cn(
-        "px-2 py-1.5 text-left font-mono tabular-nums text-xs",
-        putItm ? "bg-green-500/10 text-muted-foreground/70" : "text-muted-foreground/30",
+        "px-1 py-1 text-left font-mono tabular-nums",
+        putItm ? "bg-green-500/10 text-muted-foreground/70" : "text-muted-foreground/40",
       )}>
         <span className="group-hover:hidden">{formatDelta(putDelta)}</span>
-        <span className="hidden group-hover:inline-flex items-center justify-start gap-1 w-full">
-          <button
-            onClick={() => triggerOrder("PE", "Buy")}
-            className={cn(
-              "h-6 w-10 cursor-pointer rounded text-[11px] font-bold text-white",
-              putItm ? "bg-green-900/70 text-green-300/60 hover:bg-green-900" : "bg-green-600 hover:bg-green-500",
-            )}
-          >
-            B
-          </button>
+        <span className="hidden group-hover:flex w-full justify-start">
           <button
             onClick={() => triggerOrder("PE", "Sell")}
             className={cn(
-              "h-6 w-10 cursor-pointer rounded text-[11px] font-bold text-white",
-              putItm ? "bg-red-900/70 text-red-300/60 hover:bg-red-900" : "bg-red-600 hover:bg-red-500",
+              "h-6 w-full cursor-pointer rounded text-[10px] font-bold text-white",
+              putItm ? "bg-red-900/70 hover:bg-red-900" : "bg-red-600 hover:bg-red-500",
             )}
           >
             S
+          </button>
+        </span>
+      </td>
+
+      {/* Put OI + ΔOI → B button on hover */}
+      <td className={cn(
+        "relative px-1 py-1 text-left font-mono tabular-nums overflow-hidden",
+        putItm ? "bg-green-500/10" : "",
+      )}>
+        {putBarPct > 0 && (
+          <span
+            className="absolute left-0 top-0 bottom-0 bg-green-500/15 pointer-events-none"
+            style={{ width: `${putBarPct}%` }}
+          />
+        )}
+        <span className="relative group-hover:hidden flex flex-col items-start leading-none gap-0.5">
+          <span className="text-muted-foreground/70">{formatOi(putOi)}</span>
+          {putOiChange !== 0 && (
+            <span className={cn("text-[9px]", putOiChange > 0 ? "text-green-400/80" : "text-red-400/80")}>
+              {formatOiChange(putOiChange)}
+            </span>
+          )}
+        </span>
+        <span className="relative hidden group-hover:flex w-full justify-start">
+          <button
+            onClick={() => triggerOrder("PE", "Buy")}
+            className={cn(
+              "h-6 w-full cursor-pointer rounded text-[10px] font-bold text-white",
+              putItm ? "bg-green-900/70 hover:bg-green-900" : "bg-green-600 hover:bg-green-500",
+            )}
+          >
+            B
           </button>
         </span>
       </td>
