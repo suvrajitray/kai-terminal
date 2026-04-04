@@ -24,6 +24,7 @@ export function useOptionChain() {
   const [loading, setLoading] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [ivHistory, setIvHistory] = useState<IvSnapshot[]>([]);
+  const [scrollSignal, setScrollSignal] = useState(0);
 
   const connectionRef  = useRef<signalR.HubConnection | null>(null);
   const liveTokensRef  = useRef<string[]>([]);
@@ -66,7 +67,7 @@ export function useOptionChain() {
     if (tokens.length > 0) conn.invoke("SubscribeToInstruments", tokens).catch(() => {});
   }, []);
 
-  const fetchAndSubscribe = useCallback(async (u: string, exp: string) => {
+  const fetchAndSubscribe = useCallback(async (u: string, exp: string, scrollAtm = false) => {
     const underlyingKey = UNDERLYING_KEYS[u];
     if (!underlyingKey || !exp) return;
     setLoading(true);
@@ -82,19 +83,21 @@ export function useOptionChain() {
       setVisibleLow(VISIBLE_SIDE);
       setVisibleHigh(VISIBLE_SIDE);
       subscribeLiveTokens(sorted, liveSet);
+      if (scrollAtm) setScrollSignal((s) => s + 1);
     } finally {
       setLoading(false);
     }
   }, [buildLiveWindow, subscribeLiveTokens]);
 
   const refresh = useCallback(() => {
-    if (underlying && expiry) fetchAndSubscribe(underlying, expiry);
+    if (underlying && expiry) fetchAndSubscribe(underlying, expiry, true);
   }, [underlying, expiry, fetchAndSubscribe]);
 
   // Auto-refresh Greeks (delta, IV) every 60s — LTP streams via SignalR but greeks don't
+  // scrollAtm=false so the user's scroll position is preserved during background refresh
   useEffect(() => {
     if (!underlying || !expiry) return;
-    const id = setInterval(() => fetchAndSubscribe(underlying, expiry), 60_000);
+    const id = setInterval(() => fetchAndSubscribe(underlying, expiry, false), 60_000);
     return () => clearInterval(id);
   }, [underlying, expiry, fetchAndSubscribe]);
 
@@ -145,9 +148,9 @@ export function useOptionChain() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Fetch chain when underlying/expiry changes
+  // Fetch chain when underlying/expiry changes — always scroll to ATM on these triggers
   useEffect(() => {
-    if (underlying && expiry) fetchAndSubscribe(underlying, expiry);
+    if (underlying && expiry) fetchAndSubscribe(underlying, expiry, true);
   }, [underlying, expiry, fetchAndSubscribe]);
 
   // Fetch IV history when underlying changes (cached — doesn't need expiry)
@@ -250,5 +253,6 @@ export function useOptionChain() {
     loading,
     lastRefreshed,
     refresh,
+    scrollSignal,
   };
 }

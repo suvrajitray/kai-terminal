@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { RefreshCw, LogOut, Wifi, WifiOff, ShieldCheck, Wallet, Eye, EyeOff, PanelRight, BarChart2 } from "lucide-react";
-import { useFunds } from "@/hooks/use-funds";
+import { RefreshCw, LogOut, Wifi, WifiOff, ShieldCheck, PanelRight, BarChart2 } from "lucide-react";
 import { PayoffChartDialog } from "./payoff-chart-dialog";
 import { SessionTimer } from "./session-timer";
 import { MtmDisplay } from "./mtm-display";
@@ -55,10 +54,6 @@ export function StatsBar({
   const singleBroker   = connectedBrokers[0]?.id ?? "upstox";
   const { setEnabled } = useRiskConfig(singleBroker);
   const ppEnabled      = ppBrokers.length > 0;
-  const { funds, allFunds, loading: fundsLoading } = useFunds();
-  const [fundsVisible, setFundsVisible] = useState(
-    () => localStorage.getItem("kai-terminal-funds-visible") === "true"
-  );
   const [payoffOpen, setPayoffOpen] = useState(false);
 
   const openCount = positions.filter((p) => p.quantity !== 0).length;
@@ -175,37 +170,7 @@ export function StatsBar({
         </>
       )}
 
-      {/* Available Margin + Utilization Gauge */}
-      <div className="ml-auto flex shrink-0 items-center gap-1 rounded px-2 py-1 text-xs">
-        <Wallet className="size-3.5 text-muted-foreground" />
-        {fundsLoading ? (
-          <span className="animate-pulse tabular-nums text-muted-foreground/60 ml-1">…</span>
-        ) : !fundsVisible ? (
-          <span className="font-semibold tabular-nums text-muted-foreground/40 ml-1 tracking-widest">••••••</span>
-        ) : allFunds.upstox?.availableMargin != null && allFunds.zerodha?.availableMargin != null ? (
-          <span className="flex items-center gap-2 ml-1">
-            <MarginEntry brokerId="upstox" funds={allFunds.upstox} />
-            <div className="h-4 w-px bg-border" />
-            <MarginEntry brokerId="zerodha" funds={allFunds.zerodha} />
-          </span>
-        ) : funds?.availableMargin != null ? (
-          <MarginEntry funds={funds} />
-        ) : (
-          <span className="text-muted-foreground/40 ml-1">—</span>
-        )}
-        <button
-          onClick={() => setFundsVisible((v) => {
-            localStorage.setItem("kai-terminal-funds-visible", String(!v));
-            return !v;
-          })}
-          title={fundsVisible ? "Hide balance" : "Show balance"}
-          className="ml-0.5 cursor-pointer rounded p-0.5 text-muted-foreground/50 hover:text-muted-foreground transition-colors active:scale-95"
-        >
-          {fundsVisible ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
-        </button>
-      </div>
-
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="ml-auto flex shrink-0 items-center gap-2">
         {/* Profit Protection — text hidden below xl, icon always visible */}
         <button
           onClick={onOpenProfitProtection}
@@ -294,39 +259,3 @@ export function StatsBar({
   );
 }
 
-interface MarginEntryProps {
-  brokerId?: string;
-  funds: { availableMargin: number | null; usedMargin: number | null };
-}
-
-function MarginEntry({ brokerId, funds }: MarginEntryProps) {
-  const available = funds.availableMargin;
-  const used      = funds.usedMargin;
-  const total     = available != null && used != null ? available + used : null;
-  const utilizationPct = total != null && total > 0 ? (used! / total) * 100 : null;
-  const gaugeColor =
-    utilizationPct == null ? "bg-green-500" :
-    utilizationPct > 80    ? "bg-red-500"   :
-    utilizationPct > 50    ? "bg-amber-500" :
-                             "bg-green-500";
-
-  return (
-    <span className="flex items-center gap-1.5">
-      {brokerId && <BrokerBadge brokerId={brokerId} />}
-      <span className="font-mono font-semibold tabular-nums text-foreground">
-        ₹{(available ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-      </span>
-      {utilizationPct != null && (
-        <span
-          className="flex h-3.5 w-12 overflow-hidden rounded-full bg-muted/60 border border-border/40"
-          title={`Used: ₹${used!.toLocaleString("en-IN", { maximumFractionDigits: 0 })} (${utilizationPct.toFixed(0)}%)`}
-        >
-          <span
-            className={cn("h-full rounded-full transition-all", gaugeColor)}
-            style={{ width: `${utilizationPct}%` }}
-          />
-        </span>
-      )}
-    </span>
-  );
-}

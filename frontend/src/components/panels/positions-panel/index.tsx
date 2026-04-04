@@ -13,6 +13,7 @@ import { PositionRow } from "./position-row";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { QtyMode } from "./qty-input";
 import type { Position } from "@/types";
 
@@ -232,56 +233,120 @@ export function PositionsPanel({ positions, loading, load, mtmByBroker = {}, net
           {/* Portfolio Greeks */}
           {showGreeks && (
             <span className="flex items-center gap-2.5 text-[10px] font-normal">
-              <span
-                className="flex items-center gap-0.5"
-                title={`Net delta — sellers aim for 0. ${Math.abs(netDelta!) > 0.5 ? "High directional exposure." : "Roughly balanced."}`}
-              >
-                <span className="text-muted-foreground">Δ</span>
-                <span className={cn(
-                  "font-mono tabular-nums font-medium",
-                  Math.abs(netDelta!) <= 0.1 ? "text-green-500" :
-                  Math.abs(netDelta!) <= 0.5 ? "text-amber-500" : "text-red-500",
-                )}>
-                  {netDelta! >= 0 ? "+" : ""}{netDelta!.toFixed(2)}
-                </span>
-              </span>
-              {netGamma !== 0 && (
-                <span
-                  className="flex items-center gap-0.5"
-                  title="Net gamma — sellers want near-zero. Large negative = delta swings wildly."
-                >
-                  <span className="text-muted-foreground">Γ</span>
-                  <span className={cn(
-                    "font-mono tabular-nums font-medium",
-                    Math.abs(netGamma) <= 0.002 ? "text-green-500" :
-                    Math.abs(netGamma) <= 0.01  ? "text-amber-500" : "text-red-500",
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="flex cursor-default items-center gap-0.5">
+                    <span className="text-muted-foreground">Δ</span>
+                    <span className={cn(
+                      "font-mono tabular-nums font-medium",
+                      Math.abs(netDelta!) <= 0.1 ? "text-green-500" :
+                      Math.abs(netDelta!) <= 0.5 ? "text-amber-500" : "text-red-500",
+                    )}>
+                      {netDelta! >= 0 ? "+" : ""}{netDelta!.toFixed(2)}
+                    </span>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-[240px] space-y-1 text-xs">
+                  <p className="font-semibold">Net Delta (Δ)</p>
+                  <p className="text-muted-foreground">
+                    How much your portfolio moves per ₹1 rise in the underlying. <span className="text-foreground">+{netDelta!.toFixed(1)}</span> means you gain ₹{netDelta!.toFixed(1)} for every ₹1 rise.
+                  </p>
+                  <p className={cn("font-medium",
+                    Math.abs(netDelta!) <= 0.1 ? "text-green-400" :
+                    Math.abs(netDelta!) <= 0.5 ? "text-amber-400" : "text-red-400"
                   )}>
-                    {netGamma.toFixed(4)}
-                  </span>
-                </span>
+                    {Math.abs(netDelta!) <= 0.1
+                      ? "Balanced — ideal for sellers."
+                      : Math.abs(netDelta!) <= 0.5
+                      ? "Slight directional bias — watch it."
+                      : netDelta! > 0
+                      ? "Bullish skew — consider selling CEs or buying PEs to hedge."
+                      : "Bearish skew — consider selling PEs or buying CEs to hedge."}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+
+              {netGamma !== 0 && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="flex cursor-default items-center gap-0.5">
+                      <span className="text-muted-foreground">Γ</span>
+                      <span className={cn(
+                        "font-mono tabular-nums font-medium",
+                        Math.abs(netGamma) <= 0.002 ? "text-green-500" :
+                        Math.abs(netGamma) <= 0.01  ? "text-amber-500" : "text-red-500",
+                      )}>
+                        {netGamma.toFixed(4)}
+                      </span>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-[240px] space-y-1 text-xs">
+                    <p className="font-semibold">Net Gamma (Γ)</p>
+                    <p className="text-muted-foreground">
+                      How fast your delta changes per ₹1 move. A delta of {netDelta!.toFixed(1)} with gamma {netGamma.toFixed(4)} means after a ₹10 move, delta shifts by ~{(netGamma * 10).toFixed(2)}.
+                    </p>
+                    <p className={cn("font-medium",
+                      Math.abs(netGamma) <= 0.002 ? "text-green-400" :
+                      Math.abs(netGamma) <= 0.01  ? "text-amber-400" : "text-red-400"
+                    )}>
+                      {netGamma < 0
+                        ? Math.abs(netGamma) > 0.01
+                          ? "High negative gamma — big moves hurt you, especially near expiry."
+                          : "Moderate negative gamma — normal for short options."
+                        : "Positive gamma — you benefit from large moves (long options)."}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
               )}
-              <span
-                className="flex items-center gap-0.5"
-                title={`Theta ₹${Math.round(thetaPerDay)}/day — ₹${Math.round(thetaEarnedToday)} earned so far today.`}
-              >
-                <span className="text-muted-foreground">Θ</span>
-                <span className={cn("font-mono tabular-nums font-medium", thetaPerDay > 0 ? "text-green-500" : "text-red-500")}>
-                  {thetaEarnedToday !== 0
-                    ? <>{thetaEarnedToday > 0 ? "+" : ""}₹{Math.round(thetaEarnedToday)} <span className="text-muted-foreground/50 font-normal">/ ₹{Math.round(thetaPerDay)}</span></>
-                    : <>{thetaPerDay >= 0 ? "+" : ""}₹{Math.round(thetaPerDay)}/d</>
-                  }
-                </span>
-              </span>
-              {netVega !== 0 && (
-                <span
-                  className="flex items-center gap-0.5"
-                  title={`Net vega ₹${Math.round(netVega)} — P&L change per 1% IV move. Negative is normal for sellers.`}
-                >
-                  <span className="text-muted-foreground">V</span>
-                  <span className={cn("font-mono tabular-nums font-medium", netVega <= 0 ? "text-green-500" : "text-red-500")}>
-                    {netVega >= 0 ? "+" : ""}₹{Math.round(netVega)}
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="flex cursor-default items-center gap-0.5">
+                    <span className="text-muted-foreground">Θ</span>
+                    <span className={cn("font-mono tabular-nums font-medium", thetaPerDay > 0 ? "text-green-500" : "text-red-500")}>
+                      {thetaEarnedToday !== 0
+                        ? <>{thetaEarnedToday > 0 ? "+" : ""}₹{Math.round(thetaEarnedToday)} <span className="text-muted-foreground/50 font-normal">/ ₹{Math.round(thetaPerDay)}</span></>
+                        : <>{thetaPerDay >= 0 ? "+" : ""}₹{Math.round(thetaPerDay)}/d</>
+                      }
+                    </span>
                   </span>
-                </span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-[240px] space-y-1 text-xs">
+                  <p className="font-semibold">Net Theta (Θ) — Time Decay</p>
+                  <p className="text-muted-foreground">
+                    Premium your portfolio earns (or loses) per day from time decay alone.
+                    {thetaEarnedToday !== 0 && <> Today so far: <span className="text-foreground">₹{Math.round(thetaEarnedToday)}</span> out of a ₹{Math.round(thetaPerDay)}/day total.</>}
+                  </p>
+                  <p className={cn("font-medium", thetaPerDay > 0 ? "text-green-400" : "text-red-400")}>
+                    {thetaPerDay > 0
+                      ? "Positive theta — time works in your favour (short options)."
+                      : "Negative theta — you're paying decay (long options)."}
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+
+              {netVega !== 0 && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="flex cursor-default items-center gap-0.5">
+                      <span className="text-muted-foreground">V</span>
+                      <span className={cn("font-mono tabular-nums font-medium", netVega <= 0 ? "text-green-500" : "text-red-500")}>
+                        {netVega >= 0 ? "+" : ""}₹{Math.round(netVega)}
+                      </span>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-[240px] space-y-1 text-xs">
+                    <p className="font-semibold">Net Vega (V) — IV Sensitivity</p>
+                    <p className="text-muted-foreground">
+                      P&L change for every 1% rise in implied volatility. If IV rises 1%, your portfolio changes by <span className="text-foreground">₹{Math.round(netVega)}</span>.
+                    </p>
+                    <p className={cn("font-medium", netVega <= 0 ? "text-green-400" : "text-red-400")}>
+                      {netVega < 0
+                        ? "Negative vega — you profit when IV falls (normal for sellers). A volatility crush is your friend."
+                        : "Positive vega — you profit when IV rises (long options / net buyer)."}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
               )}
             </span>
           )}

@@ -2,5 +2,10 @@
 BANKEX
 BANKNIFTY
 FINNIFTY
+Intraday
+invokable
+lookback
 MIDCPNIFTY
+Realised
 SENSEX
+Unrealised

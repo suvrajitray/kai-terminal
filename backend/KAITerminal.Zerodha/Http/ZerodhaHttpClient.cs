@@ -51,7 +51,7 @@ public sealed class ZerodhaHttpClient
         EnsureSuccess(root);
 
         var equity = root.Data?.Equity;
-        var available = equity?.Available?.LiveBalance ?? 0;
+        var available = equity?.Net ?? 0;
         var used = (equity?.Utilised?.M2mUnrealised ?? 0)
                  + (equity?.Utilised?.Debits ?? 0)
                  + (equity?.Utilised?.Exposure ?? 0)

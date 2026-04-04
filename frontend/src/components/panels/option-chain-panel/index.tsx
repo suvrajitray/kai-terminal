@@ -38,6 +38,7 @@ export function OptionChainPanel({ width, onResize, onClose, netDelta }: Props) 
     ivHistoryDays,
     loading,
     refresh,
+    scrollSignal,
   } = useOptionChain();
 
   const [orderIntent, setOrderIntent] = useState<OrderIntent | null>(null);
@@ -75,19 +76,19 @@ export function OptionChainPanel({ width, onResize, onClose, netDelta }: Props) 
     return { side, strike: best.strike, lots, ltp: best.ltp, residualDelta };
   })();
 
-  // Scroll ATM row to vertical center after chain loads
+  // Scroll ATM row to vertical center only on initial load, underlying/expiry change,
+  // or manual refresh — NOT on the 60s auto-refresh (scrollSignal won't change then)
   useEffect(() => {
-    if (loading || atmStrike === 0) return;
+    if (scrollSignal === 0 || atmStrike === 0) return;
     const container = scrollRef.current;
     if (!container) return;
-    // Wait one frame for the DOM to paint the rows
     const id = requestAnimationFrame(() => {
       const atm = container.querySelector<HTMLElement>('[data-atm="true"]');
       if (!atm) return;
       container.scrollTop = atm.offsetTop - container.clientHeight / 2 + atm.offsetHeight / 2;
     });
     return () => cancelAnimationFrame(id);
-  }, [loading, atmStrike]);
+  }, [scrollSignal, atmStrike]);
 
   return (
     <>
