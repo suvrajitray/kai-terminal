@@ -37,10 +37,10 @@ public sealed class UserRiskState
 
     // ── Auto-shift counts ────────────────────────────────────────────────────
     /// <summary>
-    /// Tracks how many auto-shifts have been performed per sell position chain.
-    /// Key format: "{underlying}_{expiry}_{optionType}" e.g. "NIFTY_2026-04-17_PE".
-    /// Using the chain key (not instrument token) means the count persists across strike changes
-    /// so the total shifts across the entire expiry/type chain is capped at AutoShiftMaxCount.
+    /// Tracks how many auto-shifts have been performed per original position leg.
+    /// Key format: "{underlying}_{expiry}_{optionType}_{strike}" e.g. "NIFTY_2026-04-17_PE_22000".
+    /// Each original leg has its own independent counter so multiple shorts of the same
+    /// type/expiry do not share a shift pool.
     /// </summary>
     private Dictionary<string, int> _autoShiftCounts = new(StringComparer.Ordinal);
 
@@ -53,4 +53,19 @@ public sealed class UserRiskState
         _autoShiftCounts[chainKey] = next;
         return next;
     }
+
+    // ── Auto-shift origin map ─────────────────────────────────────────────────
+    /// <summary>
+    /// Maps an instrument token to the chain key of the original position it was shifted from.
+    /// Allows the shift counter to follow a position across strike changes while keeping
+    /// each original leg's allowance independent.
+    /// Key: instrument token of the shifted-into position.
+    /// Value: originalChainKey (format: "{underlying}_{expiry}_{type}_{strike}").
+    /// </summary>
+    private Dictionary<string, string> _shiftOriginMap = new(StringComparer.Ordinal);
+
+    public IReadOnlyDictionary<string, string> ShiftOriginMap => _shiftOriginMap;
+
+    public void MapShiftOrigin(string newToken, string originalChainKey) =>
+        _shiftOriginMap[newToken] = originalChainKey;
 }

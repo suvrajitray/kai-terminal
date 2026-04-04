@@ -74,13 +74,25 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
         // Contracts are loaded lazily — only when at least one position crosses the threshold
         IReadOnlyList<ZerodhaOptionContract>? allContracts = null;
 
+        _logger.LogDebug(
+            "AutoShift tick — {UserId} ({Broker}) evaluating {Count} sell position(s)",
+            userId, broker.BrokerType, sellPositions.Count);
+
         foreach (var position in sellPositions)
         {
             var ltp       = _cache.GetEffectiveLtp(stateKey, position.InstrumentToken, position.Ltp);
             var threshold = position.AveragePrice * (1 + config.AutoShiftThresholdPct / 100m);
 
+            _logger.LogDebug(
+                "AutoShift check — {Token} | avg={Avg:F2} threshold={Threshold:F2} ltp={Ltp:F2} ({Broker})",
+                position.InstrumentToken, position.AveragePrice, threshold, ltp, broker.BrokerType);
+
             if (ltp < threshold)
                 continue;
+
+            _logger.LogInformation(
+                "AutoShift TRIGGERED — {Token} ltp={Ltp:F2} crossed threshold={Threshold:F2} ({Pct}% above avg={Avg:F2}) [{Broker} / {UserId}]",
+                position.InstrumentToken, ltp, threshold, config.AutoShiftThresholdPct, position.AveragePrice, broker.BrokerType, userId);
 
             allContracts ??= await _zerodhaInstruments.GetAllCurrentYearContractsAsync(ct);
 
@@ -93,16 +105,27 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
                 continue;
             }
 
-            var chainKey   = $"{contract.Name}_{contract.Expiry}_{contract.InstrumentType}";
-            var shiftCount = state.AutoShiftCounts.GetValueOrDefault(chainKey, 0);
+            // If this token was created by a previous shift, inherit the original leg's chain key
+            // so the counter continues. Otherwise start a new key scoped to this specific strike,
+            // giving each original position leg its own independent shift allowance.
+            var isShiftedPosition = state.ShiftOriginMap.TryGetValue(position.InstrumentToken, out var mapped);
+            var effectiveChainKey = isShiftedPosition
+                ? mapped!
+                : $"{contract.Name}_{contract.Expiry}_{contract.InstrumentType}_{contract.Strike}";
+
+            var shiftCount = state.AutoShiftCounts.GetValueOrDefault(effectiveChainKey, 0);
+
+            _logger.LogInformation(
+                "AutoShift state — chain={ChainKey} shifts={ShiftCount}/{MaxShifts} isShiftedLeg={IsShifted} [{Broker} / {UserId}]",
+                effectiveChainKey, shiftCount, config.AutoShiftMaxCount, isShiftedPosition, broker.BrokerType, userId);
 
             if (shiftCount >= config.AutoShiftMaxCount)
             {
-                await ExitExhaustedPositionAsync(userId, stateKey, position, broker, state, shiftCount, ct);
+                await ExitExhaustedPositionAsync(userId, stateKey, position, broker, state, shiftCount, config.AutoShiftMaxCount, ct);
             }
             else
             {
-                await ShiftPositionAsync(userId, stateKey, position, contract, chainKey, broker, state, config, ct);
+                await ShiftPositionAsync(userId, stateKey, position, contract, effectiveChainKey, broker, state, config, ct);
             }
         }
     }
@@ -111,15 +134,19 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
 
     private async Task ExitExhaustedPositionAsync(
         string userId, string cacheKey, Contracts.Domain.BrokerPosition position, IBrokerClient broker,
-        RiskEngine.Models.UserRiskState state, int shiftCount, CancellationToken ct)
+        RiskEngine.Models.UserRiskState state, int shiftCount, int maxCount, CancellationToken ct)
     {
         var exitToken = BuildCloseToken(position, broker.BrokerType);
 
         _logger.LogWarning(
-            "AutoShift exhausted for {UserId} ({Broker}) — exiting {Token} after {Count} shifts",
-            userId, broker.BrokerType, exitToken, shiftCount);
+            "AutoShift EXHAUSTED — {UserId} ({Broker}) | token={Token} has used all {MaxCount} shift(s) — placing exit order now",
+            userId, broker.BrokerType, exitToken, maxCount);
 
         await broker.ExitPositionAsync(exitToken, position.Product, ct);
+
+        _logger.LogInformation(
+            "AutoShift EXHAUSTED exit order placed — {Token} exited after {Count}/{MaxCount} shift(s) [{Broker} / {UserId}]",
+            exitToken, shiftCount, maxCount, broker.BrokerType, userId);
 
         await _notifier.NotifyAsync(new RiskNotification(
             UserId:          userId,
@@ -144,9 +171,15 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
 
         if (!UnderlyingKeys.TryGetValue(contract.Name, out var underlyingKey))
         {
-            _logger.LogWarning("AutoShift — unknown underlying '{Name}' — skipping", contract.Name);
+            _logger.LogWarning(
+                "AutoShift — unknown underlying '{Name}' for chain {ChainKey} — skipping [{Broker} / {UserId}]",
+                contract.Name, chainKey, broker.BrokerType, userId);
             return;
         }
+
+        _logger.LogInformation(
+            "AutoShift SHIFTING — chain={ChainKey} current strike={Strike} moving {Gap} strike(s) OTM [{Broker} / {UserId}]",
+            chainKey, contract.Strike, config.AutoShiftStrikeGap, broker.BrokerType, userId);
 
         var newUpstoxKey = await _strikeSvc.FindByStrikeGapAsync(
             underlyingKey, contract.Expiry, contract.InstrumentType,
@@ -155,8 +188,8 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
         if (newUpstoxKey is null)
         {
             _logger.LogWarning(
-                "AutoShift — no target strike found for {ChainKey} (gap {Gap}) — skipping",
-                chainKey, strikeGap);
+                "AutoShift — no target strike found for chain={ChainKey} gap={Gap} — skipping [{Broker} / {UserId}]",
+                chainKey, strikeGap, broker.BrokerType, userId);
             return;
         }
 
@@ -167,8 +200,8 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
         if (openToken is null)
         {
             _logger.LogWarning(
-                "AutoShift — could not resolve open token for {UpstoxKey} ({Broker}) — skipping",
-                newUpstoxKey, broker.BrokerType);
+                "AutoShift — could not resolve open token for upstoxKey={UpstoxKey} chain={ChainKey} ({Broker}) — skipping [{UserId}]",
+                newUpstoxKey, chainKey, broker.BrokerType, userId);
             return;
         }
 
@@ -176,26 +209,41 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
         var closeOrder = new BrokerOrderRequest(closeToken, qty, "BUY",  position.Product, "MARKET");
         var openOrder  = new BrokerOrderRequest(openToken,  qty, "SELL", position.Product, "MARKET");
 
+        var currentCount = state.AutoShiftCounts.GetValueOrDefault(chainKey, 0);
         _logger.LogInformation(
-            "AutoShift {ChainKey}: shift {Count}+1 — closing {Close}, opening {Open} for {UserId}",
-            chainKey, state.AutoShiftCounts.GetValueOrDefault(chainKey, 0), closeToken, openToken, userId);
+            "AutoShift placing orders — chain={ChainKey} shift {From}→{To} | close={CloseToken} qty={Qty} | open={OpenToken} qty={Qty} [{Broker} / {UserId}]",
+            chainKey, currentCount, currentCount + 1, closeToken, qty, openToken, qty, broker.BrokerType, userId);
 
         // Short: close first (releases margin) then open the new short
         await broker.PlaceOrderAsync(closeOrder, ct);
+        _logger.LogInformation(
+            "AutoShift close order placed — {CloseToken} qty={Qty} [{Broker} / {UserId}]",
+            closeToken, qty, broker.BrokerType, userId);
+
         try
         {
             await broker.PlaceOrderAsync(openOrder, ct);
+            _logger.LogInformation(
+                "AutoShift open order placed — {OpenToken} qty={Qty} [{Broker} / {UserId}]",
+                openToken, qty, broker.BrokerType, userId);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex,
-                "AutoShift PARTIAL — close {Close} succeeded but open {Open} failed for {UserId}. Manual intervention required.",
-                closeToken, openToken, userId);
+                "AutoShift PARTIAL FAILURE — close={CloseToken} succeeded but open={OpenToken} FAILED for chain={ChainKey} [{Broker} / {UserId}]. Manual intervention required.",
+                closeToken, openToken, chainKey, broker.BrokerType, userId);
             throw;
         }
 
         var newCount = state.IncrementAutoShiftCount(chainKey);
+        // Map the new position's token → original chain key so its counter is inherited on the next tick.
+        state.MapShiftOrigin(openToken, chainKey);
         await _repo.UpdateAsync(stateKey, state);
+
+        _logger.LogInformation(
+            "AutoShift COMPLETE — chain={ChainKey} shift {NewCount}/{MaxCount} done | {OldStrike}→{NewToken} | remaining shifts={Remaining} [{Broker} / {UserId}]",
+            chainKey, newCount, config.AutoShiftMaxCount, contract.Strike, openToken,
+            config.AutoShiftMaxCount - newCount, broker.BrokerType, userId);
 
         await _notifier.NotifyAsync(new RiskNotification(
             UserId:          userId,

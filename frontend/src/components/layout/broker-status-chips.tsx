@@ -30,7 +30,7 @@ export function BrokerStatusChips() {
             <PopoverTrigger asChild>
               <button
                 className={cn(
-                  "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
+                  "flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
                   isAuthed
                     ? "border-green-500/30 bg-green-500/10 text-green-500 hover:bg-green-500/20"
                     : "border-border/40 bg-muted/30 text-muted-foreground hover:bg-muted/60",
