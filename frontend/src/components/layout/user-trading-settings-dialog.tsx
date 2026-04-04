@@ -4,6 +4,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useUserTradingSettingsStore } from "@/stores/user-trading-settings-store";
 import { saveUserTradingSettings, type UserTradingSettings } from "@/services/user-settings-api";
@@ -30,6 +32,8 @@ export function UserTradingSettingsDialog({ open, onClose }: Props) {
     finniftyShiftOffset: store.finniftyShiftOffset,
     bankexShiftOffset: store.bankexShiftOffset,
     indexChangeMode: store.indexChangeMode,
+    autoSquareOffEnabled: store.autoSquareOffEnabled,
+    autoSquareOffTime: store.autoSquareOffTime,
   }));
   const [saving, setSaving] = useState(false);
 
@@ -43,6 +47,8 @@ export function UserTradingSettingsDialog({ open, onClose }: Props) {
       finniftyShiftOffset: store.finniftyShiftOffset,
       bankexShiftOffset: store.bankexShiftOffset,
       indexChangeMode: store.indexChangeMode,
+      autoSquareOffEnabled: store.autoSquareOffEnabled,
+      autoSquareOffTime: store.autoSquareOffTime,
     });
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -135,6 +141,36 @@ export function UserTradingSettingsDialog({ open, onClose }: Props) {
                 </div>
               ))}
             </div>
+          </div>
+
+          <Separator />
+
+          {/* Auto Square-Off */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Auto Square-Off</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Automatically exit all positions at the specified time.
+                </p>
+              </div>
+              <Switch
+                checked={draft.autoSquareOffEnabled}
+                onCheckedChange={(v) => setDraft((d) => ({ ...d, autoSquareOffEnabled: v }))}
+              />
+            </div>
+            {draft.autoSquareOffEnabled && (
+              <div className="flex items-center gap-3 rounded-lg border border-border/40 bg-muted/20 px-3 py-2">
+                <Label className="text-xs text-muted-foreground shrink-0">Square-off time</Label>
+                <Input
+                  type="time"
+                  value={draft.autoSquareOffTime}
+                  onChange={(e) => setDraft((d) => ({ ...d, autoSquareOffTime: e.target.value }))}
+                  className="h-7 w-28 text-xs"
+                />
+                <span className="text-[11px] text-muted-foreground">IST</span>
+              </div>
+            )}
           </div>
         </div>
 

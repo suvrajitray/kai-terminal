@@ -12,7 +12,9 @@ public class UserTradingSettingsService(AppDbContext db)
         BankniftyShiftOffset: 1,
         FinniftyShiftOffset: 1,
         BankexShiftOffset: 1,
-        IndexChangeMode: "prevClose");
+        IndexChangeMode: "prevClose",
+        AutoSquareOffEnabled: false,
+        AutoSquareOffTime: "15:20");
 
     public async Task<UserTradingSettingsResponse> GetAsync(string username)
     {
@@ -27,7 +29,9 @@ public class UserTradingSettingsService(AppDbContext db)
             settings.BankniftyShiftOffset,
             settings.FinniftyShiftOffset,
             settings.BankexShiftOffset,
-            settings.IndexChangeMode);
+            settings.IndexChangeMode,
+            settings.AutoSquareOffEnabled,
+            settings.AutoSquareOffTime);
     }
 
     public async Task SaveAsync(string username, SaveUserTradingSettingsRequest request)
@@ -43,6 +47,8 @@ public class UserTradingSettingsService(AppDbContext db)
             existing.FinniftyShiftOffset = request.FinniftyShiftOffset;
             existing.BankexShiftOffset = request.BankexShiftOffset;
             existing.IndexChangeMode = request.IndexChangeMode;
+            existing.AutoSquareOffEnabled = request.AutoSquareOffEnabled;
+            existing.AutoSquareOffTime = request.AutoSquareOffTime;
             existing.UpdatedAt = DateTime.UtcNow;
         }
         else
@@ -56,6 +62,8 @@ public class UserTradingSettingsService(AppDbContext db)
                 FinniftyShiftOffset = request.FinniftyShiftOffset,
                 BankexShiftOffset = request.BankexShiftOffset,
                 IndexChangeMode = request.IndexChangeMode,
+                AutoSquareOffEnabled = request.AutoSquareOffEnabled,
+                AutoSquareOffTime = request.AutoSquareOffTime,
                 UpdatedAt = DateTime.UtcNow,
             });
         }

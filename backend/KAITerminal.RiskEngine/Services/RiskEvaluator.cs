@@ -19,6 +19,7 @@ public sealed class RiskEvaluator
     private readonly IRiskRepository     _repo;
     private readonly IRiskEventNotifier  _notifier;
     private readonly RiskEngineConfig    _cfg;
+    private readonly TimeZoneInfo        _tz;
     private readonly ILogger<RiskEvaluator> _logger;
 
     public RiskEvaluator(
@@ -30,6 +31,7 @@ public sealed class RiskEvaluator
         _repo     = repo;
         _notifier = notifier;
         _cfg      = cfg.Value;
+        _tz       = TimeZoneInfo.FindSystemTimeZoneById(_cfg.TradingTimeZone);
         _logger   = logger;
     }
 
@@ -100,7 +102,25 @@ public sealed class RiskEvaluator
             return;
         }
 
-        // ── 3. Trailing stop loss ────────────────────────────────────────────
+        // ── 3. Auto square-off at configured time ────────────────────────────
+        if (config.AutoSquareOffEnabled)
+        {
+            var nowIst = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, _tz).TimeOfDay;
+            if (nowIst >= config.AutoSquareOffTime)
+            {
+                _logger.LogWarning(
+                    "AUTO SQUARE-OFF — {UserId} ({Broker})  time {Now} ≥ configured {Cfg} — exiting all",
+                    userId, config.BrokerType,
+                    nowIst.ToString(@"HH\:mm"), config.AutoSquareOffTime.ToString(@"HH\:mm"));
+                await _notifier.NotifyAsync(new RiskNotification(
+                    userId, config.BrokerType, RiskNotificationType.AutoSquareOff,
+                    mtm, Timestamp: DateTimeOffset.UtcNow), ct);
+                await SquareOffAsync(userId, config.BrokerType, stateKey, mtm, state, broker, ct);
+                return;
+            }
+        }
+
+        // ── 4. Trailing stop loss ────────────────────────────────────────────
         if (!config.TrailingEnabled) return;
 
         if (!state.TrailingActive)

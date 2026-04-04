@@ -26,4 +26,8 @@ public sealed record UserConfig
     public decimal AutoShiftThresholdPct { get; init; } = 30m;
     public int     AutoShiftMaxCount     { get; init; } = 2;
     public int     AutoShiftStrikeGap    { get; init; } = 1;
+
+    // Auto square-off config
+    public bool     AutoSquareOffEnabled { get; init; } = false;
+    public TimeSpan AutoSquareOffTime    { get; init; } = new TimeSpan(15, 20, 0);
 }

@@ -145,6 +145,17 @@ export function PositionRow({
         <td className="px-3 py-1.5 text-right">
           <PnlCell value={p.pnl} pct={toPct(p.pnl)} />
         </td>
+        <td className="px-3 py-1.5 text-right font-mono tabular-nums text-muted-foreground">
+          {contract ? (
+            <span title="Breakeven strike price">
+              ₹{INR_INT.format(
+                contract.instrumentType === "CE"
+                  ? contract.strikePrice + p.averagePrice
+                  : contract.strikePrice - p.averagePrice
+              )}
+            </span>
+          ) : "—"}
+        </td>
         <td className="px-3 py-1.5 text-right">
           <PositionActions
             qtyValue={qtyValue}

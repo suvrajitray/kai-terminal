@@ -179,7 +179,9 @@ public sealed class StreamingRiskWorker : BackgroundService
         old.TrailingActivateAt    != next.TrailingActivateAt    ||
         old.LockProfitAt          != next.LockProfitAt          ||
         old.WhenProfitIncreasesBy != next.WhenProfitIncreasesBy ||
-        old.IncreaseTrailingBy    != next.IncreaseTrailingBy;
+        old.IncreaseTrailingBy    != next.IncreaseTrailingBy    ||
+        old.AutoSquareOffEnabled  != next.AutoSquareOffEnabled  ||
+        old.AutoSquareOffTime     != next.AutoSquareOffTime;
 
     // ── Per-user session ─────────────────────────────────────────────────────
 

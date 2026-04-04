@@ -34,4 +34,5 @@ public enum RiskNotificationType
     SquareOffFailed,
     AutoShiftTriggered,   // sell position shifted further OTM automatically
     AutoShiftExhausted,   // max auto-shifts reached — position exited
+    AutoSquareOff,        // auto square-off triggered at configured time
 }

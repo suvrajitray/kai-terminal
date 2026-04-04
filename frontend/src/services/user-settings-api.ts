@@ -7,6 +7,8 @@ export interface UserTradingSettings {
   finniftyShiftOffset: number;
   bankexShiftOffset: number;
   indexChangeMode: "open" | "prevClose";
+  autoSquareOffEnabled: boolean;
+  autoSquareOffTime: string;
 }
 
 export const DEFAULT_TRADING_SETTINGS: UserTradingSettings = {
@@ -16,6 +18,8 @@ export const DEFAULT_TRADING_SETTINGS: UserTradingSettings = {
   finniftyShiftOffset: 1,
   bankexShiftOffset: 1,
   indexChangeMode: "prevClose",
+  autoSquareOffEnabled: false,
+  autoSquareOffTime: "15:20",
 };
 
 export async function fetchUserTradingSettings(): Promise<UserTradingSettings> {

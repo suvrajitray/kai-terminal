@@ -42,24 +42,37 @@ public sealed class DbUserTokenSource(
                      && x.c.UpdatedAt >= todayStartUtc)
             .ToListAsync(ct);
 
+        if (configs.Count == 0) return Array.Empty<UserConfig>();
+
+        var usernames = configs.Select(x => x.r.Username).Distinct().ToList();
+        var tradingSettings = await db.UserTradingSettings
+            .Where(s => usernames.Contains(s.Username))
+            .ToDictionaryAsync(s => s.Username, ct);
+
         return configs
-            .Select(x => new UserConfig
+            .Select(x =>
             {
-                UserId                = x.r.Username,
-                BrokerType            = x.r.BrokerType,
-                AccessToken           = x.c.AccessToken,
-                ApiKey                = x.c.ApiKey,
-                MtmTarget             = x.r.MtmTarget,
-                MtmSl                 = x.r.MtmSl,
-                TrailingEnabled       = x.r.TrailingEnabled,
-                TrailingActivateAt    = x.r.TrailingActivateAt,
-                LockProfitAt          = x.r.LockProfitAt,
-                WhenProfitIncreasesBy = x.r.IncreaseBy,
-                IncreaseTrailingBy    = x.r.TrailBy,
-                AutoShiftEnabled      = x.r.AutoShiftEnabled,
-                AutoShiftThresholdPct = x.r.AutoShiftThresholdPct,
-                AutoShiftMaxCount     = x.r.AutoShiftMaxCount,
-                AutoShiftStrikeGap    = x.r.AutoShiftStrikeGap,
+                var ts = tradingSettings.GetValueOrDefault(x.r.Username);
+                return new UserConfig
+                {
+                    UserId                = x.r.Username,
+                    BrokerType            = x.r.BrokerType,
+                    AccessToken           = x.c.AccessToken,
+                    ApiKey                = x.c.ApiKey,
+                    MtmTarget             = x.r.MtmTarget,
+                    MtmSl                 = x.r.MtmSl,
+                    TrailingEnabled       = x.r.TrailingEnabled,
+                    TrailingActivateAt    = x.r.TrailingActivateAt,
+                    LockProfitAt          = x.r.LockProfitAt,
+                    WhenProfitIncreasesBy = x.r.IncreaseBy,
+                    IncreaseTrailingBy    = x.r.TrailBy,
+                    AutoShiftEnabled      = x.r.AutoShiftEnabled,
+                    AutoShiftThresholdPct = x.r.AutoShiftThresholdPct,
+                    AutoShiftMaxCount     = x.r.AutoShiftMaxCount,
+                    AutoShiftStrikeGap    = x.r.AutoShiftStrikeGap,
+                    AutoSquareOffEnabled  = ts?.AutoSquareOffEnabled ?? false,
+                    AutoSquareOffTime     = TimeSpan.TryParse(ts?.AutoSquareOffTime, out var t) ? t : new TimeSpan(15, 20, 0),
+                };
             })
             .ToList()
             .AsReadOnly();

@@ -177,6 +177,23 @@ export function PositionsPanel({ positions, loading, load, mtmByBroker = {} }: P
     }
   };
 
+  const handleExitByType = (instrumentType: "CE" | "PE") => async () => {
+    const toExit = openPositions.filter((p) => {
+      const lookup = getByInstrumentKey(p.instrumentToken, p.tradingSymbol);
+      return lookup?.contract.instrumentType === instrumentType;
+    });
+    if (toExit.length === 0) return;
+    setActing(`type-${instrumentType}`);
+    try {
+      await Promise.all(toExit.map((p) => exitPosition(p.instrumentToken, p.product, p.broker ?? "upstox")));
+      await load();
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setActing(null);
+    }
+  };
+
   const selectedCount = allOpenKeys.filter((k) => selected.has(k)).length;
 
   const cols = (
@@ -193,8 +210,9 @@ export function PositionsPanel({ positions, loading, load, mtmByBroker = {} }: P
       <th className="px-3 py-1.5 text-right font-medium">Avg</th>
       <th className="px-3 py-1.5 text-right font-medium">LTP</th>
       <th className="px-3 py-1.5 text-right font-medium">P&amp;L</th>
+      <th className="px-3 py-1.5 text-right font-medium">B/E</th>
       <th className="px-3 py-1.5 text-right">
-        {selectedCount > 0 && (
+        {selectedCount > 0 ? (
           <div className="flex items-center justify-end gap-2">
             <span className="text-[10px] text-muted-foreground">{selectedCount} selected</span>
             <Button
@@ -206,6 +224,27 @@ export function PositionsPanel({ positions, loading, load, mtmByBroker = {} }: P
             >
               <LogOut className="mr-1 size-2.5" />
               {acting === "selected" ? "Exiting…" : `Exit ${selectedCount}`}
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-end gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-5 px-2 text-[10px] text-red-500 hover:bg-red-500/10 hover:text-red-500"
+              disabled={!!acting}
+              onClick={handleExitByType("CE")}
+            >
+              Exit CEs
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-5 px-2 text-[10px] text-green-600 hover:bg-green-500/10 hover:text-green-600"
+              disabled={!!acting}
+              onClick={handleExitByType("PE")}
+            >
+              Exit PEs
             </Button>
           </div>
         )}
@@ -289,6 +328,7 @@ export function PositionsPanel({ positions, loading, load, mtmByBroker = {} }: P
                   <td className="px-3 py-2"><Skeleton className="h-3.5 w-14" /></td>
                   <td className="px-3 py-2"><Skeleton className="h-3.5 w-14" /></td>
                   <td className="px-3 py-2"><Skeleton className="h-3.5 w-16" /></td>
+                  <td className="px-3 py-2"><Skeleton className="h-3.5 w-14" /></td>
                   <td className="px-3 py-2"><Skeleton className="ml-auto h-3.5 w-20" /></td>
                 </tr>
               ))}
@@ -303,7 +343,7 @@ export function PositionsPanel({ positions, loading, load, mtmByBroker = {} }: P
               {openPositions.map(renderRow)}
               {closedPositions.length > 0 && openPositions.length > 0 && (
                 <tr>
-                  <td colSpan={10} className="px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60 bg-muted/20">
+                  <td colSpan={11} className="px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60 bg-muted/20">
                     Closed
                   </td>
                 </tr>

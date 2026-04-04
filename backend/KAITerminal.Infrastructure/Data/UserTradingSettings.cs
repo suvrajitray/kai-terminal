@@ -10,5 +10,7 @@ public class UserTradingSettings
     public int FinniftyShiftOffset { get; set; } = 1;
     public int BankexShiftOffset { get; set; } = 1;
     public string IndexChangeMode { get; set; } = "prevClose";
+    public bool AutoSquareOffEnabled { get; set; } = false;
+    public string AutoSquareOffTime { get; set; } = "15:20";
     public DateTime UpdatedAt { get; set; }
 }

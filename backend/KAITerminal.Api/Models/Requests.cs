@@ -14,7 +14,9 @@ public record struct SaveUserTradingSettingsRequest(
     int BankniftyShiftOffset,
     int FinniftyShiftOffset = 5,
     int BankexShiftOffset = 10,
-    string IndexChangeMode = "prevClose");
+    string IndexChangeMode = "prevClose",
+    bool AutoSquareOffEnabled = false,
+    string AutoSquareOffTime = "15:20");
 
 public record struct SaveBrokerCredentialRequest(
     string BrokerName,

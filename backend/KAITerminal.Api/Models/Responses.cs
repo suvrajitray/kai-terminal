@@ -8,4 +8,6 @@ public record UserTradingSettingsResponse(
     int BankniftyShiftOffset,
     int FinniftyShiftOffset,
     int BankexShiftOffset,
-    string IndexChangeMode = "prevClose");
+    string IndexChangeMode = "prevClose",
+    bool AutoSquareOffEnabled = false,
+    string AutoSquareOffTime = "15:20");

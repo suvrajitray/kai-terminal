@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import { RefreshCw, LogOut, Wifi, WifiOff, ShieldCheck, Wallet, Eye, EyeOff, PanelRight } from "lucide-react";
+import { RefreshCw, LogOut, Wifi, WifiOff, ShieldCheck, Wallet, Eye, EyeOff, PanelRight, BarChart2 } from "lucide-react";
 import { useFunds } from "@/hooks/use-funds";
+import { usePortfolioGreeks } from "@/hooks/use-portfolio-greeks";
+import { PayoffChartDialog } from "./payoff-chart-dialog";
 import { SessionTimer } from "./session-timer";
 import { MtmDisplay } from "./mtm-display";
 import { PositionCountBadges } from "./position-count-badges";
@@ -58,10 +60,12 @@ export function StatsBar({
   const [fundsVisible, setFundsVisible] = useState(
     () => localStorage.getItem("kai-terminal-funds-visible") === "true"
   );
+  const [payoffOpen, setPayoffOpen] = useState(false);
 
   const openCount = positions.filter((p) => p.quantity !== 0).length;
   const closedCount = positions.filter((p) => p.quantity === 0).length;
   const totalPnl = positions.reduce((s, p) => s + p.pnl, 0);
+  const { netDelta, thetaPerDay } = usePortfolioGreeks(positions);
 
   const STORAGE_KEY = "kai-terminal-mtm-extremes";
 
@@ -135,6 +139,40 @@ export function StatsBar({
         </>
       )}
 
+      {/* Portfolio Greeks — hidden below 2xl */}
+      {openCount > 0 && (netDelta !== 0 || thetaPerDay !== 0) && (
+        <>
+          <div className="hidden 2xl:block h-4 w-px bg-border" />
+          <span className="hidden 2xl:flex items-center gap-3 text-xs">
+            {/* Delta: sellers want neutral (≈0). Color by absolute deviation from 0. */}
+            <span
+              className="flex items-center gap-1"
+              title={`Net delta ${netDelta.toFixed(2)} — sellers aim for 0 (neutral). ${Math.abs(netDelta) > 0.5 ? "High directional exposure." : "Roughly balanced."}`}
+            >
+              <span className="text-muted-foreground">Δ</span>
+              <span className={cn(
+                "font-mono tabular-nums font-medium",
+                Math.abs(netDelta) <= 0.1 ? "text-green-500" :
+                Math.abs(netDelta) <= 0.5 ? "text-amber-500" :
+                "text-red-500",
+              )}>
+                {netDelta >= 0 ? "+" : ""}{netDelta.toFixed(2)}
+              </span>
+            </span>
+            {/* Theta: positive = seller earns time decay = good. Negative = bad. */}
+            <span
+              className="flex items-center gap-1"
+              title={`Theta ₹${Math.round(thetaPerDay).toLocaleString("en-IN")}/day — ${thetaPerDay > 0 ? "time decay working in your favour" : "losing from time decay"}`}
+            >
+              <span className="text-muted-foreground">Θ</span>
+              <span className={cn("font-mono tabular-nums font-medium", thetaPerDay > 0 ? "text-green-500" : "text-red-500")}>
+                {thetaPerDay >= 0 ? "+" : ""}₹{Math.round(thetaPerDay).toLocaleString("en-IN")}
+              </span>
+            </span>
+          </span>
+        </>
+      )}
+
       {/* PP target / SL — abbreviated labels */}
       {ppBrokers.length > 0 && (
         <>
@@ -173,7 +211,7 @@ export function StatsBar({
         </>
       )}
 
-      {/* Available Margin — "Avail" label hidden below xl */}
+      {/* Available Margin + Utilization Gauge */}
       <div className="ml-auto flex shrink-0 items-center gap-1 rounded px-2 py-1 text-xs">
         <Wallet className="size-3.5 text-muted-foreground" />
         {fundsLoading ? (
@@ -182,24 +220,12 @@ export function StatsBar({
           <span className="font-semibold tabular-nums text-muted-foreground/40 ml-1 tracking-widest">••••••</span>
         ) : allFunds.upstox?.availableMargin != null && allFunds.zerodha?.availableMargin != null ? (
           <span className="flex items-center gap-2 ml-1">
-            <span className="flex items-center gap-1">
-              <BrokerBadge brokerId="upstox" />
-              <span className="font-mono font-semibold tabular-nums text-foreground">
-                ₹{allFunds.upstox.availableMargin.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-              </span>
-            </span>
+            <MarginEntry brokerId="upstox" funds={allFunds.upstox} />
             <div className="h-4 w-px bg-border" />
-            <span className="flex items-center gap-1">
-              <BrokerBadge brokerId="zerodha" />
-              <span className="font-mono font-semibold tabular-nums text-foreground">
-                ₹{allFunds.zerodha.availableMargin.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-              </span>
-            </span>
+            <MarginEntry brokerId="zerodha" funds={allFunds.zerodha} />
           </span>
         ) : funds?.availableMargin != null ? (
-          <span className="font-mono font-semibold tabular-nums text-foreground ml-1">
-            ₹{funds.availableMargin.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-          </span>
+          <MarginEntry funds={funds} />
         ) : (
           <span className="text-muted-foreground/40 ml-1">—</span>
         )}
@@ -272,6 +298,17 @@ export function StatsBar({
         >
           <RefreshCw className={cn("size-3", loading && "animate-spin")} />
         </Button>
+        {openCount > 0 && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-6"
+            onClick={() => setPayoffOpen(true)}
+            title="P&L at expiry payoff chart"
+          >
+            <BarChart2 className="size-3" />
+          </Button>
+        )}
         <KeyboardShortcutsHelp />
         <Button
           size="icon"
@@ -283,6 +320,49 @@ export function StatsBar({
           <PanelRight className="size-3" />
         </Button>
       </div>
+
+      <PayoffChartDialog
+        open={payoffOpen}
+        onOpenChange={setPayoffOpen}
+        positions={positions}
+      />
     </div>
+  );
+}
+
+interface MarginEntryProps {
+  brokerId?: string;
+  funds: { availableMargin: number | null; usedMargin: number | null };
+}
+
+function MarginEntry({ brokerId, funds }: MarginEntryProps) {
+  const available = funds.availableMargin;
+  const used      = funds.usedMargin;
+  const total     = available != null && used != null ? available + used : null;
+  const utilizationPct = total != null && total > 0 ? (used! / total) * 100 : null;
+  const gaugeColor =
+    utilizationPct == null ? "bg-green-500" :
+    utilizationPct > 80    ? "bg-red-500"   :
+    utilizationPct > 50    ? "bg-amber-500" :
+                             "bg-green-500";
+
+  return (
+    <span className="flex items-center gap-1.5">
+      {brokerId && <BrokerBadge brokerId={brokerId} />}
+      <span className="font-mono font-semibold tabular-nums text-foreground">
+        ₹{(available ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+      </span>
+      {utilizationPct != null && (
+        <span
+          className="flex h-3.5 w-12 overflow-hidden rounded-full bg-muted/60 border border-border/40"
+          title={`Used: ₹${used!.toLocaleString("en-IN", { maximumFractionDigits: 0 })} (${utilizationPct.toFixed(0)}%)`}
+        >
+          <span
+            className={cn("h-full rounded-full transition-all", gaugeColor)}
+            style={{ width: `${utilizationPct}%` }}
+          />
+        </span>
+      )}
+    </span>
   );
 }
