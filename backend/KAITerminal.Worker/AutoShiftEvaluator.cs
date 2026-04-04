@@ -121,7 +121,18 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
 
             if (shiftCount >= config.AutoShiftMaxCount)
             {
-                await ExitExhaustedPositionAsync(userId, stateKey, position, broker, state, shiftCount, config.AutoShiftMaxCount, ct);
+                // Guard: skip if we already placed an exhausted-exit order this session.
+                // The position stays in cache until the next poll; without this check the
+                // same exit order would fire on every LTP tick until the cache refreshes.
+                if (state.ExitedChainKeys.Contains(effectiveChainKey))
+                {
+                    _logger.LogDebug(
+                        "AutoShift — chain={ChainKey} exhausted exit already placed, skipping [{Broker} / {UserId}]",
+                        effectiveChainKey, broker.BrokerType, userId);
+                    continue;
+                }
+
+                await ExitExhaustedPositionAsync(userId, stateKey, position, broker, state, effectiveChainKey, shiftCount, config.AutoShiftMaxCount, ct);
             }
             else
             {
@@ -133,8 +144,8 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private async Task ExitExhaustedPositionAsync(
-        string userId, string cacheKey, Contracts.Domain.BrokerPosition position, IBrokerClient broker,
-        RiskEngine.Models.UserRiskState state, int shiftCount, int maxCount, CancellationToken ct)
+        string userId, string stateKey, Contracts.Domain.BrokerPosition position, IBrokerClient broker,
+        RiskEngine.Models.UserRiskState state, string chainKey, int shiftCount, int maxCount, CancellationToken ct)
     {
         var exitToken = BuildCloseToken(position, broker.BrokerType);
 
@@ -148,11 +159,19 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
             "AutoShift EXHAUSTED exit order placed — {Token} exited after {Count}/{MaxCount} shift(s) [{Broker} / {UserId}]",
             exitToken, shiftCount, maxCount, broker.BrokerType, userId);
 
+        // Mark this chain as exited so repeated ticks don't fire another order
+        // before the position poll removes the position from cache.
+        state.MarkChainExited(chainKey);
+        await _repo.UpdateAsync(stateKey, state);
+        _logger.LogInformation(
+            "AutoShift EXHAUSTED chain={ChainKey} marked exited — duplicate exits suppressed [{Broker} / {UserId}]",
+            chainKey, broker.BrokerType, userId);
+
         await _notifier.NotifyAsync(new RiskNotification(
             UserId:          userId,
             Broker:          broker.BrokerType,
             Type:            RiskNotificationType.AutoShiftExhausted,
-            Mtm:             _cache.GetMtm(cacheKey),
+            Mtm:             _cache.GetMtm(stateKey),
             InstrumentToken: position.InstrumentToken,
             ShiftCount:      shiftCount,
             Timestamp:       DateTimeOffset.UtcNow), ct);
@@ -236,8 +255,14 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
         }
 
         var newCount = state.IncrementAutoShiftCount(chainKey);
-        // Map the new position's token → original chain key so its counter is inherited on the next tick.
-        state.MapShiftOrigin(openToken, chainKey);
+        // Map new token → original chain key so the counter is inherited on the next tick.
+        // For Zerodha, openToken is "NFO|SYMBOL" but position.InstrumentToken is "SYMBOL" —
+        // strip the exchange prefix so the map key matches what we look up on future ticks.
+        var mapKey = string.Equals(broker.BrokerType, BrokerNames.Zerodha, StringComparison.OrdinalIgnoreCase)
+                     && openToken.Contains('|')
+            ? openToken.Split('|')[1]
+            : openToken;
+        state.MapShiftOrigin(mapKey, chainKey);
         await _repo.UpdateAsync(stateKey, state);
 
         _logger.LogInformation(

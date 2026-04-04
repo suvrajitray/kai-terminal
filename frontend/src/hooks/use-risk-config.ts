@@ -18,6 +18,7 @@ interface RiskConfigDto {
   autoShiftThresholdPct: number;
   autoShiftMaxCount: number;
   autoShiftStrikeGap: number;
+  watchedProducts: string;
 }
 
 function toDto(config: ProfitProtectionConfig): RiskConfigDto {
@@ -34,6 +35,7 @@ function toDto(config: ProfitProtectionConfig): RiskConfigDto {
     autoShiftThresholdPct: config.autoShiftThresholdPct,
     autoShiftMaxCount:     config.autoShiftMaxCount,
     autoShiftStrikeGap:    config.autoShiftStrikeGap,
+    watchedProducts:       config.watchedProducts,
   };
 }
 
@@ -44,7 +46,11 @@ export function useRiskConfig(brokerType: string = "upstox") {
     if (!isAuthenticated) return;
     const store = useProfitProtectionStore.getState();
     apiClient.get<RiskConfigDto>(`/api/risk-config?broker=${brokerType}`).then((res) => {
-      store.setConfig(brokerType, res.data);
+      const { watchedProducts, ...rest } = res.data;
+      store.setConfig(brokerType, {
+        ...rest,
+        watchedProducts: (watchedProducts as "All" | "Intraday" | "Delivery") ?? "All",
+      });
       store.markLoaded(brokerType);
     }).catch(() => {
       store.markLoaded(brokerType);

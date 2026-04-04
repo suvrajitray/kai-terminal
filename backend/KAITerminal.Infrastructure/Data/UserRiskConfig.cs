@@ -21,4 +21,7 @@ public class UserRiskConfig
     public decimal AutoShiftThresholdPct { get; set; } = 30m;  // 30 = trigger when LTP rises 30% from entry
     public int     AutoShiftMaxCount     { get; set; } = 2;    // after this many shifts, exit the position
     public int     AutoShiftStrikeGap    { get; set; } = 1;    // strikes to move per auto-shift
+
+    /// <summary>Product types the risk engine should watch. "All" | "Intraday" | "Delivery".</summary>
+    public string WatchedProducts { get; set; } = "All";
 }

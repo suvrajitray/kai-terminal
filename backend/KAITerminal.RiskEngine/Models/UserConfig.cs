@@ -30,4 +30,7 @@ public sealed record UserConfig
     // Auto square-off config
     public bool     AutoSquareOffEnabled { get; init; } = false;
     public TimeSpan AutoSquareOffTime    { get; init; } = new TimeSpan(15, 20, 0);
+
+    /// <summary>Product types the risk engine should evaluate. "All" | "Intraday" | "Delivery".</summary>
+    public string WatchedProducts { get; init; } = "All";
 }

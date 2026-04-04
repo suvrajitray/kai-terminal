@@ -21,6 +21,7 @@ interface ProfitProtectionPanelProps {
 
 interface Draft {
   enabled: boolean;
+  watchedProducts: "All" | "Intraday" | "Delivery";
   mtmTarget: string;
   mtmSl: string;
   trailingEnabled: boolean;
@@ -87,6 +88,7 @@ export function ProfitProtectionPanel({ open, onClose, mtmByBroker }: ProfitProt
     const brokerPp = useProfitProtectionStore.getState().getConfig(broker);
     return {
       enabled:               brokerPp.enabled,
+      watchedProducts:       brokerPp.watchedProducts,
       mtmTarget:             toStr(brokerPp.mtmTarget),
       mtmSl:                 toStr(brokerPp.mtmSl),
       trailingEnabled:       brokerPp.trailingEnabled,
@@ -140,6 +142,7 @@ export function ProfitProtectionPanel({ open, onClose, mtmByBroker }: ProfitProt
     if (hasInvalidNumbers || targetWarning || slWarning || activateAtWarning || lockProfitWarning) return;
     await save({
       enabled:               draft.enabled,
+      watchedProducts:       draft.watchedProducts,
       mtmTarget:             targetVal,
       mtmSl:                 slVal,
       trailingEnabled:       draft.trailingEnabled,
@@ -258,6 +261,34 @@ export function ProfitProtectionPanel({ open, onClose, mtmByBroker }: ProfitProt
 
             {/* ── Tab 1: Limits ──────────────────────────────────── */}
             <TabsContent value="limits" className="px-6 pt-4 pb-5 space-y-4">
+              {/* Watched products */}
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Watch positions</Label>
+                <div className="flex gap-1">
+                  {(["All", "Intraday", "Delivery"] as const).map((opt) => (
+                    <button
+                      key={opt}
+                      onClick={() => setDraft((d) => ({ ...d, watchedProducts: opt }))}
+                      className={cn(
+                        "flex-1 rounded-md border px-3 py-1.5 text-xs font-medium transition-all",
+                        draft.watchedProducts === opt
+                          ? "border-primary/60 bg-primary/10 text-primary"
+                          : "border-border/50 bg-muted/20 text-muted-foreground hover:border-border hover:text-foreground",
+                      )}
+                    >
+                      {opt === "All" ? "All positions" : opt === "Intraday" ? "MIS only" : "NRML only"}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {draft.watchedProducts === "All"
+                    ? "Risk engine evaluates all open positions"
+                    : draft.watchedProducts === "Intraday"
+                    ? "Risk engine only evaluates MIS / intraday positions — NRML positions are ignored"
+                    : "Risk engine only evaluates NRML / delivery positions — MIS positions are ignored"}
+                </p>
+              </div>
+
               <div className="grid grid-cols-2 gap-x-10 gap-y-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="mtm-target">MTM Target (₹)</Label>

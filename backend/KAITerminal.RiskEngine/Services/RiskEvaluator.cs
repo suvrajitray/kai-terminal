@@ -1,4 +1,6 @@
 using KAITerminal.Broker;
+using KAITerminal.Contracts;
+using KAITerminal.Contracts.Domain;
 using KAITerminal.Contracts.Notifications;
 using KAITerminal.RiskEngine.Abstractions;
 using KAITerminal.RiskEngine.Configuration;
@@ -16,15 +18,15 @@ namespace KAITerminal.RiskEngine.Services;
 /// </summary>
 public sealed class RiskEvaluator
 {
-    private readonly IRiskRepository     _repo;
-    private readonly IRiskEventNotifier  _notifier;
-    private readonly RiskEngineConfig    _cfg;
-    private readonly TimeZoneInfo        _tz;
+    private readonly IRiskRepository        _repo;
+    private readonly IRiskEventNotifier     _notifier;
+    private readonly RiskEngineConfig       _cfg;
+    private readonly TimeZoneInfo           _tz;
     private readonly ILogger<RiskEvaluator> _logger;
 
     public RiskEvaluator(
-        IRiskRepository repo,
-        IRiskEventNotifier notifier,
+        IRiskRepository        repo,
+        IRiskEventNotifier     notifier,
         IOptions<RiskEngineConfig> cfg,
         ILogger<RiskEvaluator> logger)
     {
@@ -46,7 +48,9 @@ public sealed class RiskEvaluator
         try
         {
             var positions = await broker.GetAllPositionsAsync(ct);
-            mtm = positions.Sum(p => p.Pnl);
+            mtm = positions
+                .Where(p => ProductTypeFilter.Matches(p.Product, config.WatchedProducts))
+                .Sum(p => p.Pnl);
         }
         catch (Exception ex)
         {
@@ -85,7 +89,7 @@ public sealed class RiskEvaluator
             await _notifier.NotifyAsync(new RiskNotification(
                 userId, config.BrokerType, RiskNotificationType.HardSlHit,
                 mtm, Sl: config.MtmSl, Timestamp: DateTimeOffset.UtcNow), ct);
-            await SquareOffAsync(userId, config.BrokerType, stateKey, mtm, state, broker, ct);
+            await SquareOffAsync(userId, config.BrokerType, stateKey, mtm, state, broker, config, ct);
             return;
         }
 
@@ -98,7 +102,7 @@ public sealed class RiskEvaluator
             await _notifier.NotifyAsync(new RiskNotification(
                 userId, config.BrokerType, RiskNotificationType.TargetHit,
                 mtm, Target: config.MtmTarget, Timestamp: DateTimeOffset.UtcNow), ct);
-            await SquareOffAsync(userId, config.BrokerType, stateKey, mtm, state, broker, ct);
+            await SquareOffAsync(userId, config.BrokerType, stateKey, mtm, state, broker, config, ct);
             return;
         }
 
@@ -115,7 +119,7 @@ public sealed class RiskEvaluator
                 await _notifier.NotifyAsync(new RiskNotification(
                     userId, config.BrokerType, RiskNotificationType.AutoSquareOff,
                     mtm, Timestamp: DateTimeOffset.UtcNow), ct);
-                await SquareOffAsync(userId, config.BrokerType, stateKey, mtm, state, broker, ct);
+                await SquareOffAsync(userId, config.BrokerType, stateKey, mtm, state, broker, config, ct);
                 return;
             }
         }
@@ -164,7 +168,7 @@ public sealed class RiskEvaluator
                 await _notifier.NotifyAsync(new RiskNotification(
                     userId, config.BrokerType, RiskNotificationType.TslHit,
                     mtm, TslFloor: state.TrailingStop, Timestamp: DateTimeOffset.UtcNow), ct);
-                await SquareOffAsync(userId, config.BrokerType, stateKey, mtm, state, broker, ct);
+                await SquareOffAsync(userId, config.BrokerType, stateKey, mtm, state, broker, config, ct);
             }
         }
     }
@@ -186,19 +190,62 @@ public sealed class RiskEvaluator
     }
 
     private async Task SquareOffAsync(
-        string userId, string brokerType, string stateKey, decimal mtm, UserRiskState state, IBrokerClient broker, CancellationToken ct)
+        string userId, string brokerType, string stateKey, decimal mtm,
+        UserRiskState state, IBrokerClient broker, UserConfig config, CancellationToken ct)
     {
         try
         {
-            await broker.ExitAllPositionsAsync(ct: ct);
+            // Fetch fresh positions (avoids stale cache if user manually closed some),
+            // filter to WatchedProducts, then exit sells before buys to avoid margin spikes.
+            var fresh = await broker.GetAllPositionsAsync(ct);
+            var toExit = fresh
+                .Where(p => p.IsOpen && ProductTypeFilter.Matches(p.Product, config.WatchedProducts))
+                .OrderBy(p => p.Quantity < 0 ? 0 : 1)   // sells first → releases margin
+                .ToList();
+
+            if (toExit.Count == 0)
+            {
+                _logger.LogWarning(
+                    "Square-off — {UserId} ({Broker}) filter={Filter} — no open positions found (already closed?)",
+                    userId, brokerType, config.WatchedProducts);
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "Square-off — {UserId} ({Broker}) filter={Filter} — {Count} position(s) to exit (sells first)",
+                    userId, brokerType, config.WatchedProducts, toExit.Count);
+            }
+
+            foreach (var pos in toExit)
+            {
+                var token = string.Equals(brokerType, BrokerNames.Zerodha, StringComparison.OrdinalIgnoreCase)
+                            && !string.IsNullOrEmpty(pos.Exchange)
+                    ? $"{pos.Exchange}|{pos.InstrumentToken}"
+                    : pos.InstrumentToken;
+                _logger.LogInformation(
+                    "  Exiting {Direction} {Token} qty={Qty} product={Product} [{Broker} / {UserId}]",
+                    pos.Quantity < 0 ? "SHORT" : "LONG", token, Math.Abs(pos.Quantity), pos.Product, brokerType, userId);
+                await broker.ExitPositionAsync(token, pos.Product, ct);
+            }
+
             state.IsSquaredOff = true;
             await _repo.UpdateAsync(stateKey, state);
-            _logger.LogWarning(
-                "Square-off complete — {UserId} ({Broker}) — all positions exited",
-                userId, brokerType);
-            await _notifier.NotifyAsync(new RiskNotification(
-                userId, brokerType, RiskNotificationType.SquareOffComplete,
-                mtm, Timestamp: DateTimeOffset.UtcNow), ct);
+
+            if (toExit.Count > 0)
+            {
+                _logger.LogWarning(
+                    "Square-off complete — {UserId} ({Broker}) — {Count} position(s) exited [{Filter}]",
+                    userId, brokerType, toExit.Count, config.WatchedProducts);
+                await _notifier.NotifyAsync(new RiskNotification(
+                    userId, brokerType, RiskNotificationType.SquareOffComplete,
+                    mtm, Timestamp: DateTimeOffset.UtcNow), ct);
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "Square-off skipped — {UserId} ({Broker}) — no open [{Filter}] positions found; already closed manually",
+                    userId, brokerType, config.WatchedProducts);
+            }
         }
         catch (Exception ex)
         {

@@ -72,6 +72,7 @@ public sealed class DbUserTokenSource(
                     AutoShiftStrikeGap    = x.r.AutoShiftStrikeGap,
                     AutoSquareOffEnabled  = ts?.AutoSquareOffEnabled ?? false,
                     AutoSquareOffTime     = TimeSpan.TryParse(ts?.AutoSquareOffTime, out var t) ? t : new TimeSpan(15, 20, 0),
+                    WatchedProducts       = x.r.WatchedProducts,
                 };
             })
             .ToList()

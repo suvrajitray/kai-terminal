@@ -13,6 +13,7 @@ export interface ProfitProtectionConfig {
   autoShiftThresholdPct: number;  // trigger when sell position LTP rises by this % from entry
   autoShiftMaxCount: number;      // after this many shifts, exit the position
   autoShiftStrikeGap: number;     // number of strikes to move per shift
+  watchedProducts: "All" | "Intraday" | "Delivery";  // which product types the risk engine evaluates
 }
 
 export const defaults: ProfitProtectionConfig = {
@@ -28,6 +29,7 @@ export const defaults: ProfitProtectionConfig = {
   autoShiftThresholdPct: 30,
   autoShiftMaxCount:     2,
   autoShiftStrikeGap:    1,
+  watchedProducts:       "All",
 };
 
 interface ProfitProtectionState {

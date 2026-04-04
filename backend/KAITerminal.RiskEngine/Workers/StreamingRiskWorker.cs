@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using KAITerminal.Broker;
+using KAITerminal.Contracts.Domain;
 using KAITerminal.Contracts.Notifications;
 using KAITerminal.Contracts.Streaming;
 using KAITerminal.RiskEngine.Abstractions;
@@ -203,7 +204,22 @@ public sealed class StreamingRiskWorker : BackgroundService
         var broker = _brokerFactory.Create(user.BrokerType, user.AccessToken, user.ApiKey);
 
         // ── Initial position fetch ────────────────────────────────────────
-        var positions = await broker.GetAllPositionsAsync(ct);
+        var rawPositions = await broker.GetAllPositionsAsync(ct);
+        var positions = user.WatchedProducts == "All"
+            ? rawPositions
+            : rawPositions
+                .Where(p => ProductTypeFilter.Matches(p.Product, user.WatchedProducts))
+                .ToList()
+                .AsReadOnly();
+        if (user.WatchedProducts == "All")
+            _logger.LogInformation(
+                "Positions loaded — {UserId} ({Broker}) | {Count} position(s) [all products]",
+                user.UserId, user.BrokerType, positions.Count);
+        else
+            _logger.LogInformation(
+                "Positions loaded — {UserId} ({Broker}) | {Watched}/{Total} position(s) [{Filter} only — {Excluded} excluded]",
+                user.UserId, user.BrokerType, positions.Count, rawPositions.Count,
+                user.WatchedProducts, rawPositions.Count - positions.Count);
         _cache.UpdatePositions(CacheKey(user), positions);  // also clears stale LTP
 
         var tokens = _cache.GetOpenInstrumentTokens(CacheKey(user));
@@ -307,7 +323,16 @@ public sealed class StreamingRiskWorker : BackgroundService
 
                 _logger.LogDebug("Polling positions — {UserId} ({Broker})", user.UserId, user.BrokerType);
 
-                var positions = await broker.GetAllPositionsAsync(ct);
+                var rawPositions = await broker.GetAllPositionsAsync(ct);
+                var positions = user.WatchedProducts == "All"
+                    ? rawPositions
+                    : rawPositions
+                        .Where(p => ProductTypeFilter.Matches(p.Product, user.WatchedProducts))
+                        .ToList()
+                        .AsReadOnly();
+                _logger.LogDebug(
+                    "Position poll — {UserId} ({Broker}) | {Watched}/{Total} [{Filter}]",
+                    user.UserId, user.BrokerType, positions.Count, rawPositions.Count, user.WatchedProducts);
                 _cache.UpdatePositions(CacheKey(user), positions);  // clears stale LTP
 
                 // Re-subscribe if open instruments changed

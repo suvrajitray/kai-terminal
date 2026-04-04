@@ -38,6 +38,7 @@ public sealed class RiskConfigService(AppDbContext db) : IRiskConfigService
             existing.AutoShiftThresholdPct = config.AutoShiftThresholdPct;
             existing.AutoShiftMaxCount    = config.AutoShiftMaxCount;
             existing.AutoShiftStrikeGap   = config.AutoShiftStrikeGap;
+            existing.WatchedProducts      = config.WatchedProducts;
             existing.UpdatedAt            = DateTime.UtcNow;
         }
 

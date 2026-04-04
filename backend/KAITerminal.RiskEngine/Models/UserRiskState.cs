@@ -42,7 +42,7 @@ public sealed class UserRiskState
     /// Each original leg has its own independent counter so multiple shorts of the same
     /// type/expiry do not share a shift pool.
     /// </summary>
-    private Dictionary<string, int> _autoShiftCounts = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> _autoShiftCounts = new(StringComparer.Ordinal);
 
     public IReadOnlyDictionary<string, int> AutoShiftCounts => _autoShiftCounts;
 
@@ -62,10 +62,22 @@ public sealed class UserRiskState
     /// Key: instrument token of the shifted-into position.
     /// Value: originalChainKey (format: "{underlying}_{expiry}_{type}_{strike}").
     /// </summary>
-    private Dictionary<string, string> _shiftOriginMap = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _shiftOriginMap = new(StringComparer.Ordinal);
 
     public IReadOnlyDictionary<string, string> ShiftOriginMap => _shiftOriginMap;
 
     public void MapShiftOrigin(string newToken, string originalChainKey) =>
         _shiftOriginMap[newToken] = originalChainKey;
+
+    // ── Exhausted-exit guard ──────────────────────────────────────────────────
+    /// <summary>
+    /// Chain keys for which an exhausted-exit order has already been placed this session.
+    /// Prevents duplicate exit orders being fired on repeated ticks before the position
+    /// poll updates the cache (market orders typically fill in &lt;1 s, but this is a safety guard).
+    /// </summary>
+    private readonly HashSet<string> _exitedChainKeys = new(StringComparer.Ordinal);
+
+    public IReadOnlySet<string> ExitedChainKeys => _exitedChainKeys;
+
+    public void MarkChainExited(string chainKey) => _exitedChainKeys.Add(chainKey);
 }

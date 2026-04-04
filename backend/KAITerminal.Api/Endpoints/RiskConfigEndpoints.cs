@@ -23,6 +23,7 @@ public static class RiskConfigEndpoints
         AutoShiftThresholdPct = 30m,
         AutoShiftMaxCount     = 2,
         AutoShiftStrikeGap    = 1,
+        WatchedProducts       = "All",
     };
 
     public static void MapRiskConfigEndpoints(this IEndpointRouteBuilder app)
