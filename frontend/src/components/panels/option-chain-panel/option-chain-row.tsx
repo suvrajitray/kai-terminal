@@ -1,3 +1,4 @@
+import React from "react";
 import { cn } from "@/lib/utils";
 import type { OptionChainEntry } from "@/types";
 import type { OrderIntent } from "./option-chain-order-dialog";
@@ -57,6 +58,29 @@ export function OptionChainRow({ entry, isAtm, isLive, spotPrice, underlying, ma
   const callBarPct = maxOi > 0 && callOi ? (callOi / maxOi) * 100 : 0;
   const putBarPct  = maxOi > 0 && putOi  ? (putOi  / maxOi) * 100 : 0;
 
+  // Full-row OI bars (Zerodha-style) — single 2px bar at row bottom per side.
+  // Call side anchored left (spans 41% of row width); put side anchored right.
+  const rowBgStyle: React.CSSProperties = {};
+  const images: string[] = [];
+  const sizes: string[] = [];
+  const positions: string[] = [];
+  if (callBarPct > 0) {
+    images.push('linear-gradient(rgba(239,68,68,0.4),rgba(239,68,68,0.4))');
+    sizes.push(`${(callBarPct * 0.41).toFixed(2)}% 2px`);
+    positions.push('left bottom');
+  }
+  if (putBarPct > 0) {
+    images.push('linear-gradient(rgba(34,197,94,0.4),rgba(34,197,94,0.4))');
+    sizes.push(`${(putBarPct * 0.41).toFixed(2)}% 2px`);
+    positions.push('right bottom');
+  }
+  if (images.length > 0) {
+    rowBgStyle.backgroundImage = images.join(',');
+    rowBgStyle.backgroundRepeat = 'no-repeat';
+    rowBgStyle.backgroundSize = sizes.join(',');
+    rowBgStyle.backgroundPosition = positions.join(',');
+  }
+
   function triggerOrder(side: "CE" | "PE", transactionType: "Buy" | "Sell") {
     const opt = side === "CE" ? entry.callOptions : entry.putOptions;
     const ltp = opt?.marketData?.ltp ?? 0;
@@ -73,19 +97,14 @@ export function OptionChainRow({ entry, isAtm, isLive, spotPrice, underlying, ma
         isAtm ? "bg-muted/50" : "hover:bg-muted/20",
         !isLive && "[&>td]:opacity-55",
       )}
+      style={rowBgStyle}
     >
       {/* Call OI + ΔOI → B button on hover */}
       <td className={cn(
-        "relative px-1 py-1 text-right font-mono tabular-nums overflow-hidden",
+        "px-1 py-1 text-right font-mono tabular-nums",
         callItm ? "bg-red-500/10" : "",
       )}>
-        {callBarPct > 0 && (
-          <span
-            className="absolute right-0 top-0 bottom-0 bg-red-500/15 pointer-events-none"
-            style={{ width: `${callBarPct}%` }}
-          />
-        )}
-        <span className="relative group-hover:hidden flex flex-col items-end leading-none gap-0.5">
+        <span className="group-hover:hidden flex flex-col items-end leading-none gap-0.5">
           <span className="text-muted-foreground/70">{formatOi(callOi)}</span>
           {callOiChange !== 0 && (
             <span className={cn("text-[9px]", callOiChange > 0 ? "text-green-400/80" : "text-red-400/80")}>
@@ -93,7 +112,7 @@ export function OptionChainRow({ entry, isAtm, isLive, spotPrice, underlying, ma
             </span>
           )}
         </span>
-        <span className="relative hidden group-hover:flex w-full justify-end">
+        <span className="hidden group-hover:flex w-full justify-end">
           <button
             onClick={() => triggerOrder("CE", "Buy")}
             className={cn(
@@ -169,16 +188,10 @@ export function OptionChainRow({ entry, isAtm, isLive, spotPrice, underlying, ma
 
       {/* Put OI + ΔOI → B button on hover */}
       <td className={cn(
-        "relative px-1 py-1 text-left font-mono tabular-nums overflow-hidden",
+        "px-1 py-1 text-left font-mono tabular-nums",
         putItm ? "bg-green-500/10" : "",
       )}>
-        {putBarPct > 0 && (
-          <span
-            className="absolute left-0 top-0 bottom-0 bg-green-500/15 pointer-events-none"
-            style={{ width: `${putBarPct}%` }}
-          />
-        )}
-        <span className="relative group-hover:hidden flex flex-col items-start leading-none gap-0.5">
+        <span className="group-hover:hidden flex flex-col items-start leading-none gap-0.5">
           <span className="text-muted-foreground/70">{formatOi(putOi)}</span>
           {putOiChange !== 0 && (
             <span className={cn("text-[9px]", putOiChange > 0 ? "text-green-400/80" : "text-red-400/80")}>
@@ -186,7 +199,7 @@ export function OptionChainRow({ entry, isAtm, isLive, spotPrice, underlying, ma
             </span>
           )}
         </span>
-        <span className="relative hidden group-hover:flex w-full justify-start">
+        <span className="hidden group-hover:flex w-full justify-start">
           <button
             onClick={() => triggerOrder("PE", "Buy")}
             className={cn(

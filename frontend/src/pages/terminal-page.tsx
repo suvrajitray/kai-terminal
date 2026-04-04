@@ -54,7 +54,7 @@ function TerminalPageInner() {
   const [ordersExpanded, setOrdersExpanded] = useState(false);
   const [ppOpen, setPpOpen] = useState(false);
   const [chainOpen, setChainOpen] = useState(true);
-  const [chainWidth, setChainWidth] = useState(460);
+  const [chainWidth, setChainWidth] = useState(400);
   const [exitAllConfirmOpen, setExitAllConfirmOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const dragStartY = useRef<number | null>(null);

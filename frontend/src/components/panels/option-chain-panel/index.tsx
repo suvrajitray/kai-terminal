@@ -102,7 +102,7 @@ export function OptionChainPanel({ width, onResize, onClose, netDelta }: Props) 
           const startW = width;
           const onMove = (ev: MouseEvent) => {
             const delta = startX - ev.clientX;
-            const next = Math.max(320, Math.min(700, startW + delta));
+            const next = Math.max(350, Math.min(550, startW + delta));
             onResize?.(next);
           };
           const onUp = () => {
@@ -113,57 +113,55 @@ export function OptionChainPanel({ width, onResize, onClose, netDelta }: Props) 
           window.addEventListener("mouseup", onUp);
         }}
       />
-      {/* Header — single h-9 row matching StatsBar height */}
-      <div className="flex h-9 shrink-0 items-center gap-1.5 border-b border-border bg-muted/40 px-2">
-        {/* Underlying selector */}
-        <select
-          value={underlying}
-          onChange={(e) => setUnderlying(e.target.value)}
-          className="h-6 rounded border border-border/60 bg-background px-1.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary/50"
-        >
-          {underlyings.map((u) => (
-            <option key={u} value={u}>{u}</option>
-          ))}
-        </select>
+      {/* Header — two rows below 2xl, one row at 2xl+; mirrors StatsBar layout */}
+      <div className="flex flex-col 2xl:flex-row shrink-0 border-b border-border bg-muted/40">
+        {/* Row 1 (2xl: left) — selectors */}
+        <div className="flex h-9 items-center gap-1.5 flex-1 px-2">
+          <select
+            value={underlying}
+            onChange={(e) => setUnderlying(e.target.value)}
+            className="h-6 rounded border border-border/60 bg-background px-1.5 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary/50"
+          >
+            {underlyings.map((u) => (
+              <option key={u} value={u}>{u}</option>
+            ))}
+          </select>
+          <select
+            value={expiry}
+            onChange={(e) => setExpiry(e.target.value)}
+            className="h-6 w-28 rounded border border-border/60 bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
+          >
+            {expiries.map((exp) => (
+              <option key={exp} value={exp}>{exp}</option>
+            ))}
+            {expiries.length === 0 && <option value="">—</option>}
+          </select>
+        </div>
 
-        {/* Expiry selector */}
-        <select
-          value={expiry}
-          onChange={(e) => setExpiry(e.target.value)}
-          className="h-6 w-28 rounded border border-border/60 bg-background px-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
-        >
-          {expiries.map((exp) => (
-            <option key={exp} value={exp}>{exp}</option>
-          ))}
-          {expiries.length === 0 && <option value="">—</option>}
-        </select>
-
-        <div className="flex-1" />
-
-        {/* Refresh */}
-        <Button
-          size="icon"
-          variant="ghost"
-          className="size-6 shrink-0"
-          onClick={refresh}
-          disabled={loading}
-          title="Refresh chain"
-        >
-          <RefreshCw className={cn("size-3", loading && "animate-spin")} />
-        </Button>
-
-        {/* Close */}
-        {onClose && (
+        {/* Row 2 (2xl: right) — controls; subtle top border only below 2xl */}
+        <div className="flex h-9 items-center gap-1.5 shrink-0 px-2 2xl:ml-auto border-t border-border/40 2xl:border-t-0">
           <Button
             size="icon"
             variant="ghost"
             className="size-6 shrink-0"
-            onClick={onClose}
-            title="Close option chain"
+            onClick={refresh}
+            disabled={loading}
+            title="Refresh chain"
           >
-            <X className="size-3" />
+            <RefreshCw className={cn("size-3", loading && "animate-spin")} />
           </Button>
-        )}
+          {onClose && (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-6 shrink-0"
+              onClick={onClose}
+              title="Close option chain"
+            >
+              <X className="size-3" />
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Chain table — scrollable */}
