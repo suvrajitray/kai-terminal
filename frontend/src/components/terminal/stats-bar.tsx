@@ -83,95 +83,91 @@ export function StatsBar({
   }, [totalPnl, positions.length]);
 
   return (
-    <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border bg-muted/40 px-3">
-      {/* Live indicator — icon only below xl */}
-      <span
-        title={isLive ? "Live" : "Offline"}
-        className={cn("flex shrink-0 items-center gap-1 text-xs font-medium", isLive ? "text-green-500" : "text-muted-foreground")}
-      >
-        {isLive ? <Wifi className="size-3.5" /> : <WifiOff className="size-3.5" />}
-        <span className="hidden xl:inline">{isLive ? "Live" : "Offline"}</span>
-      </span>
+    <div className="flex flex-col lg:flex-row shrink-0 border-b border-border bg-muted/40 px-3">
+      {/* Row 1 (lg: left) — live status, MTM, counts, peak/trough, PP targets */}
+      <div className="flex h-9 items-center gap-2 flex-1 min-w-0 overflow-hidden">
+        <span
+          title={isLive ? "Live" : "Offline"}
+          className={cn("flex shrink-0 items-center gap-1 text-xs font-medium", isLive ? "text-green-500" : "text-muted-foreground")}
+        >
+          {isLive ? <Wifi className="size-3.5" /> : <WifiOff className="size-3.5" />}
+          <span>{isLive ? "Live" : "Offline"}</span>
+        </span>
 
-      {/* Session timer — hidden below xl */}
-      <span className="hidden xl:flex">
         <SessionTimer />
-      </span>
 
-      {positions.length > 0 && (
-        <>
-          <MtmDisplay value={totalPnl} />
+        {positions.length > 0 && (
+          <>
+            <MtmDisplay value={totalPnl} />
+            <PositionCountBadges openCount={openCount} closedCount={closedCount} />
 
-<PositionCountBadges openCount={openCount} closedCount={closedCount} />
-
-          {/* Peak / Trough — hidden below 2xl */}
-          {(maxProfit !== null || maxLoss !== null) && (
-            <>
-              <div className="hidden 2xl:block h-4 w-px bg-border" />
-              <span className="hidden 2xl:flex items-center gap-3 text-xs">
-                {maxProfit !== null && (
-                  <span className="flex items-center gap-1">
-                    <span className="text-muted-foreground">Peak</span>
-                    <span className={cn("font-mono tabular-nums font-medium", maxProfit >= 0 ? "text-green-500" : "text-red-500")}>
-                      {maxProfit >= 0 ? "+" : "-"}₹{Math.abs(maxProfit).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                    </span>
-                  </span>
-                )}
-                {maxLoss !== null && maxLoss !== maxProfit && (
-                  <span className="flex items-center gap-1">
-                    <span className="text-muted-foreground">Trough</span>
-                    <span className={cn("font-mono tabular-nums font-medium", maxLoss >= 0 ? "text-green-500" : "text-red-500")}>
-                      {maxLoss >= 0 ? "+" : "-"}₹{Math.abs(maxLoss).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                    </span>
-                  </span>
-                )}
-              </span>
-            </>
-          )}
-        </>
-      )}
-
-
-      {/* PP target / SL — abbreviated labels */}
-      {ppBrokers.length > 0 && (
-        <>
-          <div className="h-4 w-px bg-border" />
-          <span className="flex items-center gap-1.5 text-xs">
-            {ppBrokers.length === 1 ? (
+            {(maxProfit !== null || maxLoss !== null) && (
               <>
-                <span className="text-muted-foreground">TGT</span>
-                <span className="font-mono font-medium tabular-nums text-green-500">
-                  ₹{ppBrokers[0].target.toLocaleString("en-IN")}
-                </span>
-                <span className="text-muted-foreground">SL</span>
-                <span className="font-mono font-medium tabular-nums text-red-500">
-                  ₹{ppBrokers[0].currentSl.toLocaleString("en-IN")}
+                <div className="h-4 w-px bg-border" />
+                <span className="flex items-center gap-3 text-xs" title="Session peak / trough MTM">
+                  {maxProfit !== null && (
+                    <span className="flex items-center gap-1">
+                      <span className="text-muted-foreground">↑</span>
+                      <span className={cn("font-mono tabular-nums font-medium", maxProfit >= 0 ? "text-green-500" : "text-red-500")}>
+                        {maxProfit >= 0 ? "+" : "-"}₹{Math.abs(maxProfit).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                      </span>
+                    </span>
+                  )}
+                  {maxLoss !== null && maxLoss !== maxProfit && (
+                    <span className="flex items-center gap-1">
+                      <span className="text-muted-foreground">↓</span>
+                      <span className={cn("font-mono tabular-nums font-medium", maxLoss >= 0 ? "text-green-500" : "text-red-500")}>
+                        {maxLoss >= 0 ? "+" : "-"}₹{Math.abs(maxLoss).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                      </span>
+                    </span>
+                  )}
                 </span>
               </>
-            ) : (
-              ppBrokers.map((b, i) => (
+            )}
+          </>
+        )}
+
+        {/* PP target / SL — abbreviated labels */}
+        {ppBrokers.length > 0 && (
+          <>
+            <div className="h-4 w-px bg-border" />
+            <span className="flex items-center gap-1.5 text-xs">
+              {ppBrokers.length === 1 ? (
                 <>
-                  {i > 0 && <div key={`sep-${i}`} className="h-4 w-px bg-border" />}
-                  <span key={b.broker} className="flex items-center gap-1">
-                    <BrokerBadge brokerId={b.broker} />
-                    <span className="text-muted-foreground">TGT</span>
-                    <span className="font-mono font-medium tabular-nums text-green-500">
-                      ₹{b.target.toLocaleString("en-IN")}
-                    </span>
-                    <span className="text-muted-foreground">SL</span>
-                    <span className="font-mono font-medium tabular-nums text-red-500">
-                      ₹{b.currentSl.toLocaleString("en-IN")}
-                    </span>
+                  <span className="text-muted-foreground">TGT</span>
+                  <span className="font-mono font-medium tabular-nums text-green-500">
+                    ₹{ppBrokers[0].target.toLocaleString("en-IN")}
+                  </span>
+                  <span className="text-muted-foreground">SL</span>
+                  <span className="font-mono font-medium tabular-nums text-red-500">
+                    ₹{ppBrokers[0].currentSl.toLocaleString("en-IN")}
                   </span>
                 </>
-              ))
-            )}
-          </span>
-        </>
-      )}
+              ) : (
+                ppBrokers.map((b, i) => (
+                  <>
+                    {i > 0 && <div key={`sep-${i}`} className="h-4 w-px bg-border" />}
+                    <span key={b.broker} className="flex items-center gap-1">
+                      <BrokerBadge brokerId={b.broker} />
+                      <span className="text-muted-foreground">TGT</span>
+                      <span className="font-mono font-medium tabular-nums text-green-500">
+                        ₹{b.target.toLocaleString("en-IN")}
+                      </span>
+                      <span className="text-muted-foreground">SL</span>
+                      <span className="font-mono font-medium tabular-nums text-red-500">
+                        ₹{b.currentSl.toLocaleString("en-IN")}
+                      </span>
+                    </span>
+                  </>
+                ))
+              )}
+            </span>
+          </>
+        )}
+      </div>
 
-      <div className="ml-auto flex shrink-0 items-center gap-2">
-        {/* Profit Protection — text hidden below xl, icon always visible */}
+      {/* Row 2 (lg: right) — actions; subtle top border only below lg */}
+      <div className="flex h-9 items-center gap-2 shrink-0 lg:ml-auto border-t border-border/40 lg:border-t-0">
         <button
           onClick={onOpenProfitProtection}
           className={cn(
@@ -183,7 +179,7 @@ export function StatsBar({
           title={ppEnabled ? "Profit Protection ON — click to configure" : "Click to configure Profit Protection"}
         >
           <ShieldCheck className="size-3.5" />
-          <span className="hidden xl:inline">Profit Protection</span>
+          <span>Profit Protection</span>
           {/* inline toggle — only shown for single-broker sessions */}
           {!multipleConnected && (
             <span
@@ -212,6 +208,7 @@ export function StatsBar({
             className="h-6 px-2 text-xs"
             onClick={onExitAll}
             disabled={acting === "all"}
+            title="Exit all open positions [E]"
           >
             <LogOut className="mr-1 size-3" />
             Exit All
@@ -223,7 +220,7 @@ export function StatsBar({
           className="size-6"
           onClick={onRefresh}
           disabled={loading}
-          title="Refresh"
+          title="Refresh [R]"
         >
           <RefreshCw className={cn("size-3", loading && "animate-spin")} />
         </Button>

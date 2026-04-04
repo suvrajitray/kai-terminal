@@ -227,7 +227,6 @@ export function PositionsPanel({ positions, loading, load, mtmByBroker = {}, net
       <th className="px-3 py-1.5 text-right font-medium">Avg</th>
       <th className="px-3 py-1.5 text-right font-medium">LTP</th>
       <th className="px-3 py-1.5 text-right font-medium">P&amp;L</th>
-      <th className="px-3 py-1.5 text-right font-medium">B/E</th>
       <th className="px-3 py-1.5">
         <div className="flex items-center justify-end gap-2">
           {/* Portfolio Greeks */}

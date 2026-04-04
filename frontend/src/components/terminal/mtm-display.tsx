@@ -12,7 +12,7 @@ const FLASH_BG: Record<"up" | "down", string> = {
 };
 
 export function MtmDisplay({ value }: MtmDisplayProps) {
-  const flash = useValueFlash(value);
+  const flash = useValueFlash(value, 1200);
 
   return (
     <motion.span
@@ -20,7 +20,7 @@ export function MtmDisplay({ value }: MtmDisplayProps) {
       animate={{
         backgroundColor: flash ? FLASH_BG[flash] : "rgba(0,0,0,0)",
       }}
-      transition={{ duration: flash ? 0.1 : 0.5 }}
+      transition={{ duration: flash ? 0.2 : 0.9 }}
     >
       MTM <PnlCell value={value} noDecimal />
     </motion.span>

@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { PositionsPanel } from "@/components/panels/positions-panel";
 import { OrdersPanel } from "@/components/panels/orders-panel";
@@ -55,6 +56,7 @@ function TerminalPageInner() {
   const [chainOpen, setChainOpen] = useState(true);
   const [chainWidth, setChainWidth] = useState(460);
   const [exitAllConfirmOpen, setExitAllConfirmOpen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const dragStartY = useRef<number | null>(null);
   const dragStartHeight = useRef<number>(DEFAULT_ORDERS_HEIGHT);
   const lastExpandedHeight = useRef<number>(DEFAULT_ORDERS_HEIGHT);
@@ -105,6 +107,8 @@ function TerminalPageInner() {
   const zerodhaP  = useProfitProtectionStore((s) => s.getConfig("zerodha"));
   const dhanPp    = useProfitProtectionStore((s) => s.getConfig("dhan"));
 
+  const openCount = positions.filter((p) => p.quantity !== 0).length;
+
   // Keyboard shortcuts: R = refresh, E = exit all (with confirm)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -112,7 +116,6 @@ function TerminalPageInner() {
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       if (e.key === "r" || e.key === "R") { e.preventDefault(); load(); }
       if (e.key === "e" || e.key === "E") {
-        const openCount = positions.filter((p) => p.quantity !== 0).length;
         if (openCount > 0) { e.preventDefault(); setExitAllConfirmOpen(true); }
       }
     };
@@ -124,6 +127,7 @@ function TerminalPageInner() {
     e.preventDefault();
     dragStartY.current = e.clientY;
     dragStartHeight.current = ordersHeight;
+    setIsDragging(true);
 
     const onMouseMove = (ev: MouseEvent) => {
       if (dragStartY.current === null) return;
@@ -135,6 +139,7 @@ function TerminalPageInner() {
 
     const onMouseUp = () => {
       dragStartY.current = null;
+      setIsDragging(false);
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
     };
@@ -173,7 +178,7 @@ function TerminalPageInner() {
         />
 
         {/* Positions — flex-1, scrollable */}
-        <div className="flex-1 overflow-hidden" style={{ paddingBottom: ordersHeight }}>
+        <div className={cn("flex-1 overflow-hidden", !isDragging && "transition-[padding-bottom] duration-200 ease-in-out")} style={{ paddingBottom: ordersHeight }}>
           <PositionsPanel
             positions={positions}
             setPositions={setPositions}
@@ -190,7 +195,7 @@ function TerminalPageInner() {
 
         {/* Orders — pinned bottom, resizable */}
         <div
-          className="absolute bottom-0 left-0 right-0 border-t border-border bg-background"
+          className={cn("absolute bottom-0 left-0 right-0 border-t border-border bg-background", !isDragging && "transition-[height] duration-200 ease-in-out")}
           style={{ height: ordersHeight }}
         >
           <div
@@ -198,7 +203,7 @@ function TerminalPageInner() {
             onMouseDown={onDragStart}
             title="Drag to resize"
           >
-            <div className="h-1 w-8 rounded-full bg-border/40 transition-colors group-hover:bg-primary/50 group-active:bg-primary/70" />
+            <div className="h-1 w-12 rounded-full bg-border/60 transition-colors group-hover:bg-primary/60 group-active:bg-primary" />
           </div>
           <OrdersPanel
             expanded={ordersExpanded}
@@ -222,9 +227,9 @@ function TerminalPageInner() {
       <AlertDialog open={exitAllConfirmOpen} onOpenChange={setExitAllConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Exit all positions?</AlertDialogTitle>
+            <AlertDialogTitle>Exit {openCount} open position{openCount !== 1 ? "s" : ""}?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will place market exit orders for all open positions. This action cannot be undone.
+              Market exit orders will be placed for all {openCount} open position{openCount !== 1 ? "s" : ""}. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
