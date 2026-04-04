@@ -221,129 +221,128 @@ export function OptionChainPanel({ width, onResize, onClose, netDelta }: Props) 
         )}
       </div>
 
-      {/* Stats footer — two rows */}
-      <div className="flex shrink-0 flex-col border-t border-border bg-muted/40 text-[11px]">
-        {/* Row 1: Spot · ATM · IV · PCR */}
-        <div className="flex h-7 items-center gap-3 border-b border-border/40 px-3">
-          <span className="flex items-center gap-1">
-            <span className="text-muted-foreground">Spot</span>
-            <span className="font-mono font-medium tabular-nums text-foreground">
-              {spotPrice > 0 ? spotPrice.toFixed(1) : "—"}
-            </span>
-          </span>
-          <span className="text-muted-foreground/30">|</span>
-          <span className="flex items-center gap-1">
-            <span className="text-muted-foreground">ATM</span>
-            <span className="font-mono font-medium tabular-nums text-foreground">
-              {atmStrike > 0 ? atmStrike : "—"}
-            </span>
-          </span>
+      {/* Stats footer */}
+      <div className="flex shrink-0 flex-col border-t border-border bg-background">
+        {/* Row 1: Spot · ATM · IV · PCR · IVR */}
+        <div className="flex h-8 items-center gap-3 border-b border-border/20 px-3">
+          <FooterStat label="Spot" value={spotPrice > 0 ? spotPrice.toFixed(1) : "—"} />
+          <Sep />
+          <FooterStat label="ATM" value={atmStrike > 0 ? String(atmStrike) : "—"} />
           {atmIv !== null && (
             <>
-              <span className="text-muted-foreground/30">|</span>
-              <span className="flex items-center gap-1">
-                <span className="text-muted-foreground">IV</span>
-                <span className="font-mono font-medium tabular-nums text-amber-400">
-                  {atmIv.toFixed(1)}%
-                </span>
-              </span>
+              <Sep />
+              <FooterStat label="IV" value={`${atmIv.toFixed(1)}%`} valueClass="text-amber-400" />
             </>
           )}
           {pcr !== null && (
             <>
-              <span className="text-muted-foreground/30">|</span>
-              <span className="flex items-center gap-1">
-                <span className="text-muted-foreground">PCR</span>
-                <span className={cn("font-mono font-medium tabular-nums", pcr >= 1 ? "text-green-400" : "text-red-400")}>
-                  {pcr.toFixed(2)}
-                </span>
-              </span>
+              <Sep />
+              <FooterStat
+                label="PCR"
+                value={pcr.toFixed(2)}
+                valueClass={pcr >= 1 ? "text-green-400" : "text-red-400"}
+              />
             </>
           )}
           {ivRank !== null && ivHistoryDays >= 10 && (
             <>
-              <span className="text-muted-foreground/30">|</span>
-              <span
-                className="flex items-center gap-1"
-                title={`IV Rank ${ivRank.toFixed(0)}/100 — current IV is higher than ${ivPercentile?.toFixed(0)}% of the past ${ivHistoryDays} days`}
-              >
-                <span className="text-muted-foreground">IVR</span>
-                <span className={cn(
-                  "font-mono font-medium tabular-nums",
-                  ivRank >= 50 ? "text-green-400" :
-                  ivRank >= 30 ? "text-amber-400" :
-                  "text-red-400",
-                )}>
-                  {ivRank.toFixed(0)}
-                </span>
-              </span>
+              <Sep />
+              <FooterStat
+                label="IVR"
+                value={ivRank.toFixed(0)}
+                valueClass={ivRank >= 50 ? "text-green-400" : ivRank >= 30 ? "text-amber-400" : "text-red-400"}
+                title={`IV Rank ${ivRank.toFixed(0)}/100 — higher than ${ivPercentile?.toFixed(0)}% of past ${ivHistoryDays} days`}
+              />
             </>
           )}
           {ivHistoryDays > 0 && ivHistoryDays < 10 && (
             <>
-              <span className="text-muted-foreground/30">|</span>
-              <span className="text-[10px] text-muted-foreground/40">IVR collecting…</span>
+              <Sep />
+              <span className="text-[9px] uppercase tracking-wider text-muted-foreground/30">IVR collecting…</span>
             </>
           )}
         </div>
-        {/* Row 2: Expected Move · Max Pain distance */}
-        <div className="flex h-7 items-center gap-3 border-b border-border/40 px-3">
+
+        {/* Row 2: Expected Move · Max Pain */}
+        <div className="flex h-8 items-center gap-3 border-b border-border/20 px-3">
           {expectedMovePct !== null && expectedMovePts !== null ? (
             <span
-              className="flex items-center gap-1"
-              title="Implied expected move to expiry = ATM straddle price ÷ spot. Market's own estimate of the range."
+              className="flex items-center gap-1.5"
+              title="ATM straddle price ÷ spot — market's implied range to expiry"
             >
-              <span className="text-muted-foreground">±Move</span>
-              <span className="font-mono font-medium tabular-nums text-sky-400">
+              <span className="text-[9px] uppercase tracking-wider text-muted-foreground/50">±Move</span>
+              <span className="font-mono text-[11px] font-semibold tabular-nums text-sky-400">
                 {expectedMovePct.toFixed(2)}%
               </span>
-              <span className="text-muted-foreground/50">
-                ({Math.round(expectedMovePts)} pts)
+              <span className="font-mono text-[10px] tabular-nums text-muted-foreground/40">
+                {Math.round(expectedMovePts)} pts
               </span>
             </span>
           ) : (
-            <span className="text-muted-foreground/40">Expected move —</span>
+            <span className="text-[9px] uppercase tracking-wider text-muted-foreground/30">Move —</span>
           )}
           {maxPain !== null && (
             <>
-              <span className="text-muted-foreground/30">|</span>
+              <Sep />
               <MaxPainStat maxPain={maxPain} spotPrice={spotPrice} />
             </>
           )}
         </div>
-        {/* Row 3: Delta-neutral hedge suggestion */}
+
+        {/* Row 3: Delta-neutral hedge */}
         {netDelta !== undefined && (
-          <div className="flex h-7 items-center gap-2 px-3">
-            <span className="text-muted-foreground">ΔHedge</span>
+          <div className="flex h-8 items-center gap-2 bg-muted/30 px-3">
+            <span className="text-[9px] uppercase tracking-wider text-muted-foreground/40 shrink-0">Δ Hedge</span>
+            <Sep />
             {hedgeSuggestion === null ? (
-              <span className="font-mono text-[10px] text-green-400/70">
-                {netDelta === 0 ? "Balanced" : `${netDelta > 0 ? "+" : ""}${netDelta.toFixed(1)} — Balanced`}
-              </span>
-            ) : (
-              <>
-                <span className={cn("font-mono font-medium tabular-nums text-[10px]", netDelta < 0 ? "text-red-400" : "text-amber-400")}>
+              <span className="flex items-center gap-1.5">
+                <span className={cn(
+                  "font-mono text-[11px] font-semibold tabular-nums",
+                  Math.abs(netDelta) < 1 ? "text-green-400" : "text-muted-foreground/60"
+                )}>
                   {netDelta > 0 ? "+" : ""}{netDelta.toFixed(1)}
                 </span>
-                <span className="text-muted-foreground/30">→</span>
-                <span className="font-mono text-[10px] text-foreground">
-                  Sell {hedgeSuggestion.lots}L {underlying} {hedgeSuggestion.strike}{" "}
+                <span className="text-[10px] text-green-400/60">Balanced</span>
+              </span>
+            ) : (
+              <span className="flex items-center gap-2 overflow-hidden">
+                {/* Current delta — problem */}
+                <span className={cn(
+                  "font-mono text-[11px] font-semibold tabular-nums shrink-0",
+                  netDelta < 0 ? "text-red-400" : "text-amber-400"
+                )}>
+                  {netDelta > 0 ? "+" : ""}{netDelta.toFixed(1)}
+                </span>
+                <span className="text-muted-foreground/30 shrink-0">→</span>
+                {/* Suggestion pill */}
+                <span className={cn(
+                  "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wide",
+                  hedgeSuggestion.side === "PE"
+                    ? "bg-green-500/15 text-green-400"
+                    : "bg-red-500/15 text-red-400"
+                )}>
+                  Sell {hedgeSuggestion.lots}L
+                </span>
+                <span className="font-mono text-[10px] text-foreground/80 shrink-0">
+                  {underlying} {hedgeSuggestion.strike}{" "}
                   <span className={hedgeSuggestion.side === "PE" ? "text-green-400" : "text-red-400"}>
                     {hedgeSuggestion.side}
                   </span>
                 </span>
                 {hedgeSuggestion.ltp > 0 && (
-                  <span className="text-muted-foreground/50 text-[10px]">
+                  <span className="font-mono text-[10px] text-muted-foreground/40 shrink-0">
                     @ {hedgeSuggestion.ltp.toFixed(1)}
                   </span>
                 )}
-                <span className="text-muted-foreground/30">→</span>
+                <span className="text-muted-foreground/30 shrink-0">→</span>
+                {/* Result delta */}
                 <span className={cn(
-                  "font-mono text-[10px]",
-                  Math.abs(hedgeSuggestion.residualDelta) < 5 ? "text-green-400/70" : "text-amber-400/70"
+                  "font-mono text-[10px] font-medium tabular-nums shrink-0",
+                  Math.abs(hedgeSuggestion.residualDelta) < 5 ? "text-green-400/80" : "text-amber-400/80"
                 )}>
                   Δ {hedgeSuggestion.residualDelta > 0 ? "+" : ""}{hedgeSuggestion.residualDelta.toFixed(1)}
                 </span>
-              </>
+              </span>
             )}
           </div>
         )}
@@ -352,6 +351,28 @@ export function OptionChainPanel({ width, onResize, onClose, netDelta }: Props) 
 
     <OptionChainOrderDialog intent={orderIntent} onClose={() => setOrderIntent(null)} />
     </>
+  );
+}
+
+function Sep() {
+  return <span className="text-muted-foreground/20 select-none">|</span>;
+}
+
+interface FooterStatProps {
+  label: string;
+  value: string;
+  valueClass?: string;
+  title?: string;
+}
+
+function FooterStat({ label, value, valueClass, title }: FooterStatProps) {
+  return (
+    <span className="flex items-center gap-1" title={title}>
+      <span className="text-[9px] uppercase tracking-wider text-muted-foreground/50">{label}</span>
+      <span className={cn("font-mono text-[11px] font-semibold tabular-nums text-foreground", valueClass)}>
+        {value}
+      </span>
+    </span>
   );
 }
 
@@ -370,16 +391,14 @@ function MaxPainStat({ maxPain, spotPrice }: MaxPainStatProps) {
 
   return (
     <span
-      className="flex items-center gap-1"
+      className="flex items-center gap-1.5"
       title={`Max Pain ₹${maxPain}. ${saferSide ?? ""}. Market gravitates here by expiry.`}
     >
-      <span className="text-muted-foreground">Pain</span>
-      <span className="font-mono font-medium tabular-nums text-foreground">
-        {maxPain}
-      </span>
+      <span className="text-[9px] uppercase tracking-wider text-muted-foreground/50">Pain</span>
+      <span className="font-mono text-[11px] font-semibold tabular-nums text-foreground">{maxPain}</span>
       {absDist !== null && absDist > 0 && (
         <span className={cn(
-          "text-[10px] font-mono",
+          "font-mono text-[10px]",
           distance! > 0 ? "text-green-400/70" : "text-red-400/70",
         )}>
           {arrow}{absDist} pts
