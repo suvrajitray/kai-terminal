@@ -43,7 +43,7 @@ public sealed class RedisLtpRelay : ISharedMarketDataService, IHostedService
     public Task SubscribeAsync(IReadOnlyCollection<string> tokens, FeedMode mode = FeedMode.Ltpc, CancellationToken ct = default)
     {
         if (tokens.Count == 0) return Task.CompletedTask;
-        _logger.LogInformation(
+        _logger.LogDebug(
             "RedisLtpRelay: forwarding subscription request for {Count} instrument(s) to Worker via ltp:sub-req — {Tokens}",
             tokens.Count, string.Join(", ", tokens));
         var payload = JsonSerializer.Serialize(tokens);

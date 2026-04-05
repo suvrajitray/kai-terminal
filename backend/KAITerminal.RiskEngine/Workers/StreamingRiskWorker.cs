@@ -182,7 +182,8 @@ public sealed class StreamingRiskWorker : BackgroundService
         old.WhenProfitIncreasesBy != next.WhenProfitIncreasesBy ||
         old.IncreaseTrailingBy    != next.IncreaseTrailingBy    ||
         old.AutoSquareOffEnabled  != next.AutoSquareOffEnabled  ||
-        old.AutoSquareOffTime     != next.AutoSquareOffTime;
+        old.AutoSquareOffTime     != next.AutoSquareOffTime     ||
+        old.WatchedProducts       != next.WatchedProducts;
 
     // ── Per-user session ─────────────────────────────────────────────────────
 

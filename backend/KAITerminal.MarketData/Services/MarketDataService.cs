@@ -92,7 +92,7 @@ public sealed class MarketDataService : ISharedMarketDataService, IHostedService
                 return;
             }
 
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "MarketDataService: subscribing {New} new instrument(s) to WebSocket (total subscribed: {Total}) — {Tokens}",
                 newTokens.Count, _subscribed.Count, string.Join(", ", newTokens));
 
@@ -126,7 +126,7 @@ public sealed class MarketDataService : ISharedMarketDataService, IHostedService
             var tokens = JsonSerializer.Deserialize<List<string>>(value.ToString());
             if (tokens is null || tokens.Count == 0) return;
 
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "MarketDataService: received subscription request from API for {Count} instrument(s) — forwarding to WebSocket",
                 tokens.Count);
 

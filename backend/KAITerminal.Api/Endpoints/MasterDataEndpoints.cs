@@ -34,18 +34,18 @@ public static class MasterDataEndpoints
 
         group.MapGet("/iv-history", async (
             [FromQuery] string? underlying,
-            [FromQuery] int lookbackDays,
+            [FromQuery] int? lookbackDays,
             AppDbContext db,
             CancellationToken ct) =>
         {
             if (string.IsNullOrEmpty(underlying))
                 return Results.BadRequest(new { error = "underlying is required." });
-            if (lookbackDays <= 0) lookbackDays = 252;
+            var days = lookbackDays is > 0 ? lookbackDays.Value : 252;
 
             var rows = await db.IvSnapshots
                 .Where(s => s.Underlying == underlying.ToUpperInvariant())
                 .OrderByDescending(s => s.Date)
-                .Take(lookbackDays)
+                .Take(days)
                 .Select(s => new { s.Date, s.AtmIv, s.SpotPrice, s.AtmCallLtp, s.AtmPutLtp })
                 .ToListAsync(ct);
 
