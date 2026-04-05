@@ -141,13 +141,15 @@ _sessions: Dictionary<"{userId}::{brokerType}", SessionEntry>
 
 ```
 UserRiskState {
-  LastSessionDate:      DateOnly                        // detects new trading day → auto-reset state
+  LastSessionDate:      DateOnly                              // detects new trading day → auto-reset state
   IsSquaredOff:         bool
   TrailingActive:       bool
-  TrailingStop:         decimal                         // current TSL floor (₹)
-  TrailingLastTrigger:  decimal                         // MTM at which TSL was last raised
+  TrailingStop:         decimal                               // current TSL floor (₹)
+  TrailingLastTrigger:  decimal                               // MTM at which TSL was last raised
   ReentryCounts:        IReadOnlyDictionary<tradingSymbol, int>
-  AutoShiftCounts:      IReadOnlyDictionary<chainKey, int>  // tracks auto-shift counts per chain
+  AutoShiftCounts:      IReadOnlyDictionary<chainKey, int>   // chainKey = "{underlying}_{expiry}_{type}_{strike}"
+  ShiftOriginMap:       IReadOnlyDictionary<token, chainKey> // maps shifted-into token → original leg's chain key
+  ExitedChainKeys:      IReadOnlySet<chainKey>               // guards against duplicate exhausted-exit orders
 }
 ```
 
