@@ -11,6 +11,8 @@ import { BrokerRedirectPage } from "@/pages/broker-redirect-page";
 import { TerminalPage } from "@/pages/terminal-page";
 import { NotFoundPage } from "@/pages/not-found-page";
 import { InactivePage } from "@/pages/inactive-page";
+import { AdminDashboardPage } from "@/pages/admin/admin-dashboard-page";
+import { AdminRiskLogsPage } from "@/pages/admin/admin-risk-logs-page";
 import { AdminUsersPage } from "@/pages/admin/admin-users-page";
 import { AdminSettingsPage } from "@/pages/admin/admin-settings-page";
 import { useRiskFeed } from "@/hooks/use-risk-feed";
@@ -34,7 +36,9 @@ function App() {
           <Route path="/connect-brokers" element={<ConnectBrokersPage />} />
           <Route path="/redirect/:brokerId" element={<BrokerRedirectPage />} />
           <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<Navigate to="/admin/users" replace />} />
+            <Route index element={<Navigate to="/admin/dashboard" replace />} />
+            <Route path="dashboard" element={<AdminDashboardPage />} />
+            <Route path="risk-logs" element={<AdminRiskLogsPage />} />
             <Route path="users"    element={<AdminUsersPage />} />
             <Route path="settings" element={<AdminSettingsPage />} />
           </Route>

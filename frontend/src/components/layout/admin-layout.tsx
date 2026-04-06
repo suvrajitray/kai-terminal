@@ -1,9 +1,11 @@
 import { Link, Navigate, Outlet, useLocation } from "react-router-dom";
-import { Users, Settings2, type LucideIcon } from "lucide-react";
+import { Users, Settings2, LayoutDashboard, ShieldAlert, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 
 const ADMIN_NAV: { label: string; path: string; icon: LucideIcon }[] = [
+  { label: "Dashboard",       path: "/admin/dashboard", icon: LayoutDashboard },
+  { label: "Risk Event Logs", path: "/admin/risk-logs", icon: ShieldAlert     },
   { label: "User Access",     path: "/admin/users",    icon: Users     },
   { label: "System Settings", path: "/admin/settings", icon: Settings2 },
 ];
