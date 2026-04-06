@@ -23,6 +23,12 @@ public interface IPositionCache
     decimal GetEffectiveLtp(string userId, string instrumentToken, decimal fallback);
 
     /// <summary>
+    /// Returns the live feed LTP for an instrument, or null if no validated tick has arrived yet.
+    /// Use this when falling back to stale broker data would produce incorrect results.
+    /// </summary>
+    decimal? TryGetLiveLtp(string userId, string instrumentToken);
+
+    /// <summary>
     /// Computes total MTM using cached positions and live LTP values.
     /// Formula per position: <c>pnl + quantity * (liveLtp - ltp)</c>.
     /// </summary>

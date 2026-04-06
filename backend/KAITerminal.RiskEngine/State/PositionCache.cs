@@ -68,6 +68,13 @@ public sealed class PositionCache : IPositionCache
         return fallback;
     }
 
+    public decimal? TryGetLiveLtp(string userId, string instrumentToken)
+    {
+        if (_data.TryGetValue(userId, out var e) && e.Ltp.TryGetValue(instrumentToken, out var ltp))
+            return ltp;
+        return null;
+    }
+
     public decimal GetMtm(string userId)
     {
         if (!_data.TryGetValue(userId, out var e)) return 0m;

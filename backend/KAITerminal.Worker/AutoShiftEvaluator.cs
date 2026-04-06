@@ -105,19 +105,30 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
 
         foreach (var position in sellPositions)
         {
-            var ltp       = _cache.GetEffectiveLtp(stateKey, position.InstrumentToken, position.Ltp);
+            // Only evaluate when a validated live feed tick is available.
+            // Falling back to the broker's last_price (position.Ltp) risks using stale
+            // data (e.g. Zerodha returns very old last_price) and triggering a false shift.
+            var ltp = _cache.TryGetLiveLtp(stateKey, position.InstrumentToken);
+            if (ltp is null)
+            {
+                _logger.LogDebug(
+                    "AutoShift — no live LTP yet for {Token}, skipping this tick ({Broker})",
+                    position.InstrumentToken, broker.BrokerType);
+                continue;
+            }
+
             var threshold = position.AveragePrice * (1 + config.AutoShiftThresholdPct / 100m);
 
             _logger.LogDebug(
                 "AutoShift check — {Token} | avg={Avg:F2} threshold={Threshold:F2} ltp={Ltp:F2} ({Broker})",
-                position.InstrumentToken, position.AveragePrice, threshold, ltp, broker.BrokerType);
+                position.InstrumentToken, position.AveragePrice, threshold, ltp.Value, broker.BrokerType);
 
-            if (ltp < threshold)
+            if (ltp.Value < threshold)
                 continue;
 
             _logger.LogInformation(
                 "AutoShift TRIGGERED — {Token} ltp={Ltp:F2} crossed threshold={Threshold:F2} ({Pct}% above avg={Avg:F2}) [{Broker} / {UserId}]",
-                position.InstrumentToken, ltp, threshold, config.AutoShiftThresholdPct, position.AveragePrice, broker.BrokerType, userId);
+                position.InstrumentToken, ltp.Value, threshold, config.AutoShiftThresholdPct, position.AveragePrice, broker.BrokerType, userId);
 
             allContracts ??= await _zerodhaInstruments.GetAllCurrentYearContractsAsync(ct);
 

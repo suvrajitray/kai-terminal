@@ -1,11 +1,13 @@
 import { useEffect } from "react";
 import { Inbox } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { BrokerBadge } from "@/components/ui/broker-badge";
 import { useRiskLogStore } from "@/stores/risk-log-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
-import { API_BASE_URL } from "@/lib/constants";
+import { useBrokerStore } from "@/stores/broker-store";
+import { API_BASE_URL, BROKERS } from "@/lib/constants";
 import type { RiskLogEntry, RiskNotificationType } from "@/types";
 
 function formatRupee(value: number): string {
@@ -21,7 +23,7 @@ function formatTime(iso: string): string {
       hour: "2-digit",
       minute: "2-digit",
       second: "2-digit",
-      hour12: false,
+      hour12: true,
     });
   } catch {
     return "--:--:--";
@@ -38,7 +40,7 @@ function buildMessage(entry: RiskLogEntry): string {
   const fmt = formatRupee;
   switch (entry.type) {
     case "SessionStarted":
-      return `Risk engine active (PnL ${fmt(entry.mtm)}) [${watch}]`;
+      return `Risk engine active — PnL ${fmt(entry.mtm)} | SL ${fmt(entry.sl ?? 0)} | Target ${fmt(entry.target ?? 0)} [${watch}]`;
     case "HardSlHit":
       return `Hard SL hit — PnL ${fmt(entry.mtm)}${entry.sl != null ? ` ≤ SL ${fmt(entry.sl)}` : ""} [${watch}]`;
     case "TargetHit":
@@ -91,8 +93,88 @@ function rowColor(type: RiskNotificationType): string {
   }
 }
 
+function Chip({ active, label, tooltip }: { active: boolean; label: string; tooltip: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className={cn(
+            "inline-flex cursor-default items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium leading-none",
+            active
+              ? "bg-green-500/10 text-green-400"
+              : "bg-muted/40 text-muted-foreground",
+          )}
+        >
+          <span
+            className={cn(
+              "size-1.5 rounded-full",
+              active ? "bg-green-400" : "bg-muted-foreground/40",
+            )}
+          />
+          {label}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" className="max-w-[220px] text-center text-[11px]">
+        {tooltip}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function BrokerStatusSection() {
+  const configs = useProfitProtectionStore((s) => s.configs);
+  const credentials = useBrokerStore((s) => s.credentials);
+
+  const activeBrokers = BROKERS.filter((b) => !!credentials[b.id]?.accessToken);
+
+  if (activeBrokers.length === 0) return null;
+
+  return (
+    <TooltipProvider delayDuration={300}>
+    <div className="shrink-0 border-b border-border/40 px-3 py-1.5 space-y-1.5">
+      {activeBrokers.map((broker) => {
+        const cfg = configs[broker.id];
+        const riskOn = cfg?.enabled ?? false;
+        const autoShift = cfg?.autoShiftEnabled ?? false;
+        const trailing = cfg?.trailingEnabled ?? false;
+        const watch = cfg?.watchedProducts ?? "All";
+        const watchLabel =
+          watch === "Intraday" ? "· Risk engine monitoring intraday (MIS) positions only" :
+          watch === "Delivery" ? "· Risk engine monitoring delivery (NRML) positions only" :
+          "· Risk engine monitoring all positions";
+
+        return (
+          <div key={broker.id} className="flex items-center gap-2">
+            <BrokerBadge brokerId={broker.id} size={14} />
+            <span className="text-[11px] font-medium text-foreground shrink-0">{broker.name}</span>
+            <span className="text-[10px] text-muted-foreground">{watchLabel}</span>
+            <div className="flex items-center gap-1 ml-auto">
+              <Chip
+                active={riskOn}
+                label="Risk"
+                tooltip={riskOn ? "Risk engine is active — monitoring MTM SL and target" : "Risk engine is off — no automatic exits will trigger"}
+              />
+              <Chip
+                active={trailing}
+                label="TSL"
+                tooltip={trailing ? "Trailing stop-loss is enabled — floor rises as profit increases" : "Trailing stop-loss is disabled"}
+              />
+              <Chip
+                active={autoShift}
+                label="Auto-shift"
+                tooltip={autoShift ? "Auto-shift is enabled — positions shift to a further strike when LTP rises past the threshold" : "Auto-shift is disabled"}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+    </TooltipProvider>
+  );
+}
+
 export function RiskActivityLog() {
-  const { entries, loaded, setAll, clear } = useRiskLogStore();
+  const { entries, loaded, setAll } = useRiskLogStore();
 
   useEffect(() => {
     if (loaded) return;
@@ -112,18 +194,8 @@ export function RiskActivityLog() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Sub-header */}
-      <div className="flex h-7 shrink-0 items-center justify-between border-b border-border/40 px-3">
-        <span className="text-xs font-medium text-muted-foreground">Today's Activity</span>
-        {entries.length > 0 && (
-          <button
-            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
-            onClick={clear}
-          >
-            Clear view
-          </button>
-        )}
-      </div>
+      {/* Broker status cards */}
+      <BrokerStatusSection />
 
       {/* Log rows */}
       <div className="flex-1 overflow-y-auto">
@@ -138,7 +210,7 @@ export function RiskActivityLog() {
               key={entry.id !== 0 ? entry.id : `${entry.timestamp}-${i}`}
               className="flex items-center gap-2 border-b border-border/20 px-3 py-1"
             >
-              <span className="w-14 shrink-0 font-mono tabular-nums text-[11px] text-muted-foreground">
+              <span className="w-20 shrink-0 whitespace-nowrap font-mono tabular-nums text-[11px] text-muted-foreground">
                 {formatTime(entry.timestamp)}
               </span>
               <BrokerBadge brokerId={entry.broker} size={13} />
