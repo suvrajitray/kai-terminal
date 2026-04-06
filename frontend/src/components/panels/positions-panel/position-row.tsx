@@ -25,6 +25,7 @@ const PRODUCT_LABEL: Record<string, string> = {
   CoverOrder: "Cover Order",
 };
 
+
 export function PnlCell({ value, pct, noDecimal }: { value: number; pct?: number; noDecimal?: boolean }) {
   const color = value > 0 ? "text-green-500" : value < 0 ? "text-red-500" : "text-muted-foreground";
   const fmt = noDecimal ? INR_INT : INR;

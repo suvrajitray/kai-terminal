@@ -139,9 +139,9 @@ function BrokerStatusSection() {
         const trailing = cfg?.trailingEnabled ?? false;
         const watch = cfg?.watchedProducts ?? "All";
         const watchLabel =
-          watch === "Intraday" ? "· Risk engine monitoring intraday (MIS) positions only" :
-          watch === "Delivery" ? "· Risk engine monitoring delivery (NRML) positions only" :
-          "· Risk engine monitoring all positions";
+          watch === "Intraday" ? "· Profit protection on intraday positions only" :
+          watch === "Delivery" ? "· Profit protection on delivery positions only" :
+          "· Profit protection on all positions";
 
         return (
           <div key={broker.id} className="flex items-center gap-2">

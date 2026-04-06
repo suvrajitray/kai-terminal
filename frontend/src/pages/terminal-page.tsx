@@ -56,6 +56,7 @@ function TerminalPageInner() {
   const [chainOpen, setChainOpen] = useState(true);
   const [chainWidth, setChainWidth] = useState(400);
   const [exitAllConfirmOpen, setExitAllConfirmOpen] = useState(false);
+  const [productFilter, setProductFilter] = useState<"Intraday" | "Delivery" | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragStartY = useRef<number | null>(null);
   const dragStartHeight = useRef<number>(DEFAULT_ORDERS_HEIGHT);
@@ -148,12 +149,6 @@ function TerminalPageInner() {
     window.addEventListener("mouseup", onMouseUp);
   }, [ordersHeight]);
 
-  // Per-broker MTM — positions are tagged with broker field; untagged positions fall under "upstox"
-  const mtmByBroker = positions.reduce<Record<string, number>>((acc, p) => {
-    const key = p.broker ?? "upstox";
-    acc[key] = (acc[key] ?? 0) + p.pnl;
-    return acc;
-  }, {});
 
   return (
     <div className="flex h-[calc(100svh-3.5rem)] overflow-hidden">
@@ -170,6 +165,7 @@ function TerminalPageInner() {
           onOpenProfitProtection={() => setPpOpen(true)}
           onToggleChain={() => setChainOpen((v) => !v)}
           chainOpen={chainOpen}
+          productFilter={productFilter}
           ppBrokers={[
             upstoxPp.enabled ? { broker: "upstox",  target: upstoxPp.mtmTarget, currentSl: upstoxSl,  trailing: upstoxPp.trailingEnabled } : null,
             zerodhaP.enabled ? { broker: "zerodha", target: zerodhaP.mtmTarget, currentSl: zerodhasl, trailing: zerodhaP.trailingEnabled } : null,
@@ -185,7 +181,8 @@ function TerminalPageInner() {
             loading={loading}
             isLive={isLive}
             load={load}
-            mtmByBroker={mtmByBroker}
+            productFilter={productFilter}
+            onProductFilterChange={setProductFilter}
             netDelta={netDelta}
             thetaPerDay={thetaPerDay}
             netGamma={netGamma}
@@ -220,7 +217,7 @@ function TerminalPageInner() {
       <ProfitProtectionPanel
         open={ppOpen}
         onClose={() => setPpOpen(false)}
-        mtmByBroker={mtmByBroker}
+        positions={positions}
       />
 
       {/* Exit All confirmation (triggered by E key or button) */}

@@ -23,16 +23,17 @@ interface PositionsPanelProps {
   loading: boolean;
   isLive: boolean;
   load: () => void;
-  mtmByBroker?: Record<string, number>;
   netDelta?: number;
   thetaPerDay?: number;
   netGamma?: number;
   netVega?: number;
+  productFilter: "Intraday" | "Delivery" | null;
+  onProductFilterChange: (v: "Intraday" | "Delivery" | null) => void;
 }
 
 const selKey = (p: Position) => `${p.instrumentToken}|${p.product}`;
 
-export function PositionsPanel({ positions, loading, load, mtmByBroker = {}, netDelta, thetaPerDay = 0, netGamma = 0, netVega = 0 }: PositionsPanelProps) {
+export function PositionsPanel({ positions, loading, load, netDelta, thetaPerDay = 0, netGamma = 0, netVega = 0, productFilter, onProductFilterChange }: PositionsPanelProps) {
   const [acting, setActing] = useState<string | null>(null);
   const [qtys, setQtys] = useState<Record<string, string>>({});
   const [qtyMode, setQtyMode] = useState<QtyMode>("qty");
@@ -138,9 +139,23 @@ export function PositionsPanel({ positions, loading, load, mtmByBroker = {}, net
 
   // Unique brokers present in positions — drives filter pills
   const brokersInPositions = Array.from(new Set(positions.map((p) => p.broker ?? "upstox")));
-  const showFilter = brokersInPositions.length > 1;
+  const showBrokerFilter = brokersInPositions.length > 1;
 
-  const filtered = brokerFilter ? positions.filter((p) => (p.broker ?? "upstox") === brokerFilter) : positions;
+  const productTypesInPositions = Array.from(new Set(positions.map((p) => p.product)));
+  const showProductFilter = productTypesInPositions.includes("Intraday") && productTypesInPositions.includes("Delivery");
+  const showFilter = showBrokerFilter || showProductFilter;
+
+  const filtered = positions
+    .filter((p) => !brokerFilter || (p.broker ?? "upstox") === brokerFilter)
+    .filter((p) => !productFilter || p.product === productFilter);
+
+  // MTM scoped to the current product filter — broker pills reflect filtered P&L
+  const filteredMtmByBroker = filtered.reduce<Record<string, number>>((acc, p) => {
+    const key = p.broker ?? "upstox";
+    acc[key] = (acc[key] ?? 0) + p.pnl;
+    return acc;
+  }, {});
+
   const openPositions = filtered.filter((p) => p.quantity !== 0);
   const closedPositions = filtered.filter((p) => p.quantity === 0);
   const sorted = [...openPositions, ...closedPositions];
@@ -417,41 +432,68 @@ export function PositionsPanel({ positions, loading, load, mtmByBroker = {}, net
   return (
     <div className="flex h-full flex-col">
       {showFilter && (
-        <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border/40 bg-muted/20 px-3">
-          <button
-            onClick={() => setBrokerFilter(null)}
-            className={cn(
-              "cursor-pointer rounded px-2 py-0.5 text-[11px] font-medium transition-colors",
-              brokerFilter === null
-                ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            All
-          </button>
-          {brokersInPositions.map((bId) => {
-            const pnl = mtmByBroker[bId];
-            return (
+        <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border/40 bg-muted/20 px-3">
+          {showBrokerFilter && (
+            <div className="flex items-center gap-1">
               <button
-                key={bId}
-                onClick={() => setBrokerFilter(brokerFilter === bId ? null : bId)}
+                onClick={() => setBrokerFilter(null)}
                 className={cn(
-                  "flex cursor-pointer items-center gap-1.5 rounded px-2 py-0.5 text-[11px] font-medium transition-colors",
-                  brokerFilter === bId
+                  "cursor-pointer rounded px-2 py-0.5 text-[11px] font-medium transition-colors",
+                  brokerFilter === null
                     ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
                     : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                <BrokerBadge brokerId={bId} size={12} />
-                {bId.charAt(0).toUpperCase() + bId.slice(1)}
-                {pnl !== undefined && (
-                  <span className={cn("font-mono tabular-nums", pnl >= 0 ? "text-green-500" : "text-red-500")}>
-                    {pnl >= 0 ? "+" : "-"}₹{Math.abs(pnl).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                  </span>
-                )}
+                All
               </button>
-            );
-          })}
+              {brokersInPositions.map((bId) => {
+                const pnl = filteredMtmByBroker[bId];
+                return (
+                  <button
+                    key={bId}
+                    onClick={() => setBrokerFilter(brokerFilter === bId ? null : bId)}
+                    className={cn(
+                      "flex cursor-pointer items-center gap-1.5 rounded px-2 py-0.5 text-[11px] font-medium transition-colors",
+                      brokerFilter === bId
+                        ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    <BrokerBadge brokerId={bId} size={12} />
+                    {bId.charAt(0).toUpperCase() + bId.slice(1)}
+                    {pnl !== undefined && (
+                      <span className={cn("font-mono tabular-nums", pnl >= 0 ? "text-green-500" : "text-red-500")}>
+                        {pnl >= 0 ? "+" : "-"}₹{Math.abs(pnl).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {showBrokerFilter && showProductFilter && (
+            <span className="text-border/60">|</span>
+          )}
+
+          {showProductFilter && (
+            <div className="flex items-center gap-1">
+              {([null, "Intraday", "Delivery"] as const).map((val) => (
+                <button
+                  key={val ?? "all"}
+                  onClick={() => onProductFilterChange(val)}
+                  className={cn(
+                    "cursor-pointer rounded px-2 py-0.5 text-[11px] font-medium transition-colors",
+                    productFilter === val
+                      ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {val === null ? "All" : val === "Intraday" ? "Intraday" : "Delivery"}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
       <div className="flex-1 overflow-auto">

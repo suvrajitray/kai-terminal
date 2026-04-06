@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { RefreshCw, LogOut, Wifi, WifiOff, ShieldCheck, PanelRight, BarChart2 } from "lucide-react";
+import { RefreshCw, LogOut, Wifi, WifiOff, ShieldCheck, PanelRight, BarChart2, Filter } from "lucide-react";
 import { PayoffChartDialog } from "./payoff-chart-dialog";
 import { SessionTimer } from "./session-timer";
 import { MtmDisplay } from "./mtm-display";
@@ -33,6 +33,7 @@ interface StatsBarProps {
   ppBrokers: PpBrokerEntry[];
   onToggleChain: () => void;
   chainOpen: boolean;
+  productFilter: "Intraday" | "Delivery" | null;
 }
 
 export function StatsBar({
@@ -46,6 +47,7 @@ export function StatsBar({
   ppBrokers,
   onToggleChain,
   chainOpen,
+  productFilter,
 }: StatsBarProps) {
   const connectedBrokers = useBrokerStore(useShallow((s) => BROKERS.filter((b) => s.isAuthenticated(b.id))));
   const multipleConnected = connectedBrokers.length > 1;
@@ -56,9 +58,12 @@ export function StatsBar({
   const ppEnabled      = ppBrokers.length > 0;
   const [payoffOpen, setPayoffOpen] = useState(false);
 
-  const openCount = positions.filter((p) => p.quantity !== 0).length;
-  const closedCount = positions.filter((p) => p.quantity === 0).length;
-  const totalPnl = positions.reduce((s, p) => s + p.pnl, 0);
+  const displayPositions = productFilter ? positions.filter((p) => p.product === productFilter) : positions;
+  const openCount = displayPositions.filter((p) => p.quantity !== 0).length;
+  const closedCount = displayPositions.filter((p) => p.quantity === 0).length;
+  const totalPnl = displayPositions.reduce((s, p) => s + p.pnl, 0);
+  // Always track session extremes from total MTM — independent of any active filter
+  const allPnl = positions.reduce((s, p) => s + p.pnl, 0);
   const STORAGE_KEY = "kai-terminal-mtm-extremes";
 
   const readStored = (): { maxProfit: number | null; maxLoss: number | null } => {
@@ -72,15 +77,15 @@ export function StatsBar({
   useEffect(() => {
     if (positions.length === 0) return;
     setMaxProfit((prevMax) => {
-      const nextMax = prevMax === null || totalPnl > prevMax ? totalPnl : prevMax;
+      const nextMax = prevMax === null || allPnl > prevMax ? allPnl : prevMax;
       setMaxLoss((prevMin) => {
-        const nextMin = prevMin === null || totalPnl < prevMin ? totalPnl : prevMin;
+        const nextMin = prevMin === null || allPnl < prevMin ? allPnl : prevMin;
         localStorage.setItem(STORAGE_KEY, JSON.stringify({ maxProfit: nextMax, maxLoss: nextMin }));
         return nextMin;
       });
       return nextMax;
     });
-  }, [totalPnl, positions.length]);
+  }, [allPnl, positions.length]);
 
   return (
     <div className="flex flex-col lg:flex-row shrink-0 border-b border-border bg-muted/40 px-3">
@@ -96,9 +101,15 @@ export function StatsBar({
 
         <SessionTimer />
 
-        {positions.length > 0 && (
+        {displayPositions.length > 0 && (
           <>
             <MtmDisplay value={totalPnl} />
+            {productFilter && (
+              <span className="flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-500" title={`Filtered: ${productFilter} only`}>
+                <Filter className="size-2.5" />
+                {productFilter}
+              </span>
+            )}
             <PositionCountBadges openCount={openCount} closedCount={closedCount} />
 
             {(maxProfit !== null || maxLoss !== null) && (

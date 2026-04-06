@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ShieldCheck, ShieldOff } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -12,11 +12,12 @@ import { useRiskConfig } from "@/hooks/use-risk-config";
 import { useBrokerStore } from "@/stores/broker-store";
 import { BROKERS } from "@/lib/constants";
 import { useShallow } from "zustand/react/shallow";
+import type { Position } from "@/types";
 
 interface ProfitProtectionPanelProps {
   open: boolean;
   onClose: () => void;
-  mtmByBroker: Record<string, number>;
+  positions: Position[];
 }
 
 interface Draft {
@@ -65,7 +66,7 @@ function Toggle({
   );
 }
 
-export function ProfitProtectionPanel({ open, onClose, mtmByBroker }: ProfitProtectionPanelProps) {
+export function ProfitProtectionPanel({ open, onClose, positions }: ProfitProtectionPanelProps) {
   const connectedBrokers = useBrokerStore(useShallow((s) => BROKERS.filter((b) => s.isAuthenticated(b.id))));
   const multipleConnected = connectedBrokers.length > 1;
 
@@ -130,7 +131,14 @@ export function ProfitProtectionPanel({ open, onClose, mtmByBroker }: ProfitProt
   const increaseByVal     = fromStr(draft.increaseBy);
   const trailByVal        = fromStr(draft.trailBy);
   const hasInvalidNumbers = isNaN(targetVal) || isNaN(slVal) || isNaN(activateAtVal) || isNaN(lockProfitAtVal);
-  const currentMtm        = mtmByBroker[activeBroker] ?? 0;
+
+  // Compute MTM scoped to the active broker + draft's watchedProducts so warnings
+  // are always accurate for what the risk engine will actually see after saving
+  const currentMtm = useMemo(() => positions
+    .filter((p) => (p.broker ?? "upstox") === activeBroker)
+    .filter((p) => draft.watchedProducts === "All" || p.product === draft.watchedProducts)
+    .reduce((sum, p) => sum + p.pnl, 0),
+  [positions, activeBroker, draft.watchedProducts]);
   const targetWarning     = !isNaN(targetVal) && targetVal <= currentMtm;
   const slWarning         = !isNaN(slVal) && slVal >= currentMtm;
   const activateAtWarning = draft.trailingEnabled && !isNaN(activateAtVal) && !isNaN(targetVal) && activateAtVal >= targetVal;
