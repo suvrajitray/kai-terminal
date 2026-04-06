@@ -92,6 +92,7 @@ export function usePositionsFeed(onOrderUpdate?: () => void) {
         );
       } else if (s === "complete") {
         toast.success(`Order filled: ${update.tradingSymbol}`);
+        load();   // refresh positions immediately on fill
       }
       onOrderUpdate?.();
     });

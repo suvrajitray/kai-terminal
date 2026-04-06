@@ -4,6 +4,7 @@ import { toast } from "@/lib/toast";
 import { API_BASE_URL } from "@/lib/constants";
 import { useAuthStore } from "@/stores/auth-store";
 import { useRiskStateStore } from "@/stores/risk-state-store";
+import { useRiskLogStore } from "@/stores/risk-log-store";
 import type { RiskEvent } from "@/types";
 
 function formatRupee(value: number): string {
@@ -15,6 +16,7 @@ function formatRupee(value: number): string {
 function brokerLabel(broker: string): string {
   return broker.charAt(0).toUpperCase() + broker.slice(1).toLowerCase();
 }
+
 
 function buildToastMessage(event: RiskEvent): string {
   const broker = brokerLabel(event.broker);
@@ -32,13 +34,17 @@ function buildToastMessage(event: RiskEvent): string {
     case "TslHit":
       return `[${broker}] TSL Hit — PnL ${formatRupee(event.mtm)}${event.tslFloor != null ? ` ≤ floor ${formatRupee(event.tslFloor)}` : ""}`;
     case "SquareOffComplete":
-      return `[${broker}] Square-off complete — all positions exited (PnL ${formatRupee(event.mtm)})`;
+      return `[${broker}] Square-off complete — positions exited (PnL ${formatRupee(event.mtm)})`;
     case "SquareOffFailed":
       return `[${broker}] Square-off FAILED — manual verification required`;
     case "AutoShiftTriggered":
       return `[${broker}] Auto-shifted ${event.instrumentToken ?? "position"} — shift #${event.shiftCount ?? ""}`;
     case "AutoShiftExhausted":
       return `[${broker}] Max auto-shifts reached for ${event.instrumentToken ?? "position"} — position exited`;
+    case "AutoShiftFailed":
+      return `[${broker}] Auto-shift FAILED for ${event.instrumentToken ?? "position"} — manual check required`;
+    case "AutoSquareOff":
+      return `[${broker}] Auto square-off — time limit reached (PnL ${formatRupee(event.mtm)})`;
     default:
       return `[${broker}] Risk engine event`;
   }
@@ -67,7 +73,23 @@ export function useRiskFeed(): void {
       else if (event.type === "TslHit" || event.type === "HardSlHit" || event.type === "TargetHit" || event.type === "SquareOffComplete")
         store.resetTsl(event.broker);
 
-      // Toast notifications
+      // Append to risk log store
+      useRiskLogStore.getState().prepend({
+        id:              0,  // sentinel — no DB id on real-time events
+        timestamp:       event.timestamp,
+        broker:          event.broker,
+        type:            event.type,
+        mtm:             event.mtm,
+        target:          event.target,
+        sl:              event.sl,
+        tslFloor:        event.tslFloor,
+        instrumentToken: event.instrumentToken,
+        shiftCount:      event.shiftCount,
+      });
+
+      // Toast notifications (StatusUpdate is silent)
+      if (event.type === "StatusUpdate") return;
+
       const message = buildToastMessage(event);
       switch (event.type) {
         case "HardSlHit":
@@ -86,7 +108,11 @@ export function useRiskFeed(): void {
           toast.info(message, { duration: 8000 });
           break;
         case "AutoShiftExhausted":
+        case "AutoSquareOff":
           toast.warning(message, { duration: 10000 });
+          break;
+        case "AutoShiftFailed":
+          toast.error(message, { duration: 10000 });
           break;
       }
     });

@@ -64,9 +64,15 @@ internal sealed class ZerodhaPositionService : IBrokerPositionService
     public async Task<string> ExitPositionAsync(
         string instrumentToken, string product, CancellationToken ct = default)
     {
+        // Callers may pass "{exchange}|{symbol}" (e.g. "NFO|NIFTY25JAN23000PE").
+        // Strip the prefix so lookup against InstrumentToken (= TradingSymbol) works correctly.
+        var symbol = instrumentToken.Contains('|')
+            ? instrumentToken.Split('|', 2)[1]
+            : instrumentToken;
+
         var positions = await GetAllPositionsAsync(ct);
         var pos = positions.FirstOrDefault(p =>
-            p.InstrumentToken.Equals(instrumentToken, StringComparison.OrdinalIgnoreCase));
+            p.InstrumentToken.Equals(symbol, StringComparison.OrdinalIgnoreCase));
 
         if (pos is null || pos.Quantity == 0) return string.Empty;
 

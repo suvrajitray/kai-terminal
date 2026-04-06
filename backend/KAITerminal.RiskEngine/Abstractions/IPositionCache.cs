@@ -30,4 +30,10 @@ public interface IPositionCache
 
     /// <summary>Returns instrument tokens of all open positions (quantity != 0).</summary>
     IReadOnlyList<string> GetOpenInstrumentTokens(string userId);
+
+    /// <summary>
+    /// Removes a position from the cache immediately after a shift/exit order is placed,
+    /// so subsequent LTP ticks do not re-trigger the same action before the next REST poll.
+    /// </summary>
+    void RemovePosition(string userId, string instrumentToken);
 }

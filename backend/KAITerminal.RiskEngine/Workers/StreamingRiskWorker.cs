@@ -181,6 +181,10 @@ public sealed class StreamingRiskWorker : BackgroundService
         old.LockProfitAt          != next.LockProfitAt          ||
         old.WhenProfitIncreasesBy != next.WhenProfitIncreasesBy ||
         old.IncreaseTrailingBy    != next.IncreaseTrailingBy    ||
+        old.AutoShiftEnabled      != next.AutoShiftEnabled      ||
+        old.AutoShiftThresholdPct != next.AutoShiftThresholdPct ||
+        old.AutoShiftMaxCount     != next.AutoShiftMaxCount     ||
+        old.AutoShiftStrikeGap    != next.AutoShiftStrikeGap    ||
         old.AutoSquareOffEnabled  != next.AutoSquareOffEnabled  ||
         old.AutoSquareOffTime     != next.AutoSquareOffTime     ||
         old.WatchedProducts       != next.WatchedProducts;
@@ -236,10 +240,22 @@ public sealed class StreamingRiskWorker : BackgroundService
             await _sharedMarketData.SubscribeAsync(feedTokens, FeedMode.Ltpc, ct);
         }
 
-        var openCount = tokens.Count;
-        _logger.LogInformation(
-            "Streams live — {UserId} ({Broker})  watching {Count} open instrument(s)",
-            user.UserId, user.BrokerType, openCount);
+        var openCount   = tokens.Count;
+        var totalCount  = rawPositions.Count(p => p.IsOpen);
+        var watchLabel  = user.WatchedProducts switch
+        {
+            "Intraday" => "Intraday",
+            "Delivery" => "Delivery",
+            _          => "Intraday + Delivery",
+        };
+        if (user.WatchedProducts == "All" || totalCount == openCount)
+            _logger.LogInformation(
+                "Streams live — {UserId} ({Broker})  watching {Count} open instrument(s) [{Watch}]",
+                user.UserId, user.BrokerType, openCount, watchLabel);
+        else
+            _logger.LogWarning(
+                "Streams live — {UserId} ({Broker})  watching {Watched}/{Total} open instrument(s) [{Watch} filter — {Excluded} excluded]",
+                user.UserId, user.BrokerType, openCount, totalCount, watchLabel, totalCount - openCount);
 
         if (openCount > 0)
         {
@@ -401,6 +417,12 @@ public sealed class StreamingRiskWorker : BackgroundService
         if (!CheckTradingWindow())
         {
             _logger.LogDebug("Outside trading hours — skipping evaluation for {UserId} ({Broker})", user.UserId, user.BrokerType);
+            return;
+        }
+
+        if (_cache.GetOpenInstrumentTokens(CacheKey(user)).Count == 0)
+        {
+            _logger.LogDebug("No open positions — skipping evaluation for {UserId} ({Broker})", user.UserId, user.BrokerType);
             return;
         }
 

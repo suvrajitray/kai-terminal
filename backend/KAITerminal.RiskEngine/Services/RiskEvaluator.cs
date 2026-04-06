@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using KAITerminal.Broker;
 using KAITerminal.Contracts;
 using KAITerminal.Contracts.Domain;
@@ -23,6 +24,7 @@ public sealed class RiskEvaluator
     private readonly RiskEngineConfig       _cfg;
     private readonly TimeZoneInfo           _tz;
     private readonly ILogger<RiskEvaluator> _logger;
+    private readonly ConcurrentDictionary<string, DateTimeOffset> _lastStatusPushed = new();
 
     public RiskEvaluator(
         IRiskRepository        repo,
@@ -78,7 +80,7 @@ public sealed class RiskEvaluator
             return;
         }
 
-        LogStatus(userId, mtm, state, config);
+        await LogStatusAsync(userId, mtm, state, config, ct);
 
         // ── 1. Hard stop loss ────────────────────────────────────────────────
         if (mtm <= config.MtmSl)
@@ -173,19 +175,39 @@ public sealed class RiskEvaluator
         }
     }
 
-    private void LogStatus(string userId, decimal mtm, UserRiskState state, UserConfig config)
+    private async Task LogStatusAsync(
+        string userId, decimal mtm, UserRiskState state, UserConfig config, CancellationToken ct)
     {
+        var watch = config.WatchedProducts switch
+        {
+            "Intraday" => "Intraday",
+            "Delivery" => "Delivery",
+            _          => "Intraday + Delivery",
+        };
         if (state.TrailingActive)
         {
             _logger.LogInformation(
-                "{UserId} ({Broker})  PnL ₹{Mtm:+#,##0;-#,##0}  |  Target ₹{Target:+#,##0}  |  TSL ₹{Stop:+#,##0;-#,##0}",
-                userId, config.BrokerType, mtm, config.MtmTarget, state.TrailingStop);
+                "{UserId} ({Broker})  PnL ₹{Mtm:+#,##0;-#,##0}  |  Target ₹{Target:+#,##0}  |  TSL ₹{Stop:+#,##0;-#,##0}  [{Watch}]",
+                userId, config.BrokerType, mtm, config.MtmTarget, state.TrailingStop, watch);
         }
         else
         {
             _logger.LogInformation(
-                "{UserId} ({Broker})  PnL ₹{Mtm:+#,##0;-#,##0}  |  SL ₹{Sl:+#,##0;-#,##0}  |  Target ₹{Target:+#,##0}  |  TSL off — activates at ₹{Threshold:+#,##0}",
-                userId, config.BrokerType, mtm, config.MtmSl, config.MtmTarget, config.TrailingActivateAt);
+                "{UserId} ({Broker})  PnL ₹{Mtm:+#,##0;-#,##0}  |  SL ₹{Sl:+#,##0;-#,##0}  |  Target ₹{Target:+#,##0}  |  TSL off — activates at ₹{Threshold:+#,##0}  [{Watch}]",
+                userId, config.BrokerType, mtm, config.MtmSl, config.MtmTarget, config.TrailingActivateAt, watch);
+        }
+
+        // Rate-limited StatusUpdate push to frontend (at most once per 15 min per broker)
+        var key = $"{userId}::{config.BrokerType}";
+        var now = DateTimeOffset.UtcNow;
+        if ((now - _lastStatusPushed.GetValueOrDefault(key, DateTimeOffset.MinValue)).TotalMinutes >= 15)
+        {
+            _lastStatusPushed[key] = now;
+            await _notifier.NotifyAsync(new RiskNotification(
+                userId, config.BrokerType, RiskNotificationType.StatusUpdate,
+                mtm, Sl: config.MtmSl, Target: config.MtmTarget,
+                TslFloor: state.TrailingActive ? state.TrailingStop : null,
+                Timestamp: now), ct);
         }
     }
 

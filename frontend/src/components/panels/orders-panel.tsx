@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useNewRows } from "@/hooks/use-new-rows";
 import { RefreshCw, XCircle, AlertCircle, ChevronUp, ChevronDown, Inbox, CheckCircle2 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -11,6 +11,8 @@ import { isBrokerTokenExpired } from "@/lib/token-utils";
 import { useBrokerStore } from "@/stores/broker-store";
 import { BROKERS } from "@/lib/constants";
 import { BrokerBadge } from "@/components/ui/broker-badge";
+import { RiskActivityLog } from "@/components/panels/risk-activity-log";
+import { useRiskLogStore } from "@/stores/risk-log-store";
 import type { Order } from "@/types";
 
 const TERMINAL_STATUSES = new Set(["complete", "rejected", "cancelled"]);
@@ -93,7 +95,7 @@ function fmt(n: number) {
   return new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 }
 
-type Tab = "open" | "executed";
+type Tab = "open" | "executed" | "risk-log";
 
 interface OrdersPanelProps {
   expanded: boolean;
@@ -107,6 +109,9 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
   const [error, setError] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("open");
+  const riskLogEntryCount = useRiskLogStore((s) => s.entries.length);
+  const lastSeenRiskCount = useRef(0);
+  const hasUnreadRisk = tab !== "risk-log" && riskLogEntryCount > lastSeenRiskCount.current;
 
   const load = useCallback(async () => {
     const activeBrokers = BROKERS
@@ -166,6 +171,7 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
   const openOrders = orders.filter((o) => !TERMINAL_STATUSES.has(o.status.toLowerCase()));
   const executedOrders = orders.filter((o) => TERMINAL_STATUSES.has(o.status.toLowerCase()));
   const visibleOrders = tab === "open" ? openOrders : executedOrders;
+  const isRiskLog = tab === "risk-log";
 
   return (
     <div className="flex h-full flex-col">
@@ -204,6 +210,24 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
             <Badge variant="secondary" className="h-4 px-1 text-[10px]">
               {executedOrders.length}
             </Badge>
+          )}
+        </button>
+        <button
+          className={cn(
+            "flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium transition-colors",
+            tab === "risk-log"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+          onClick={(e) => {
+            e.stopPropagation();
+            setTab("risk-log");
+            lastSeenRiskCount.current = riskLogEntryCount;
+          }}
+        >
+          Risk Log
+          {hasUnreadRisk && (
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-yellow-400" />
           )}
         </button>
 
@@ -252,7 +276,9 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
 
       {/* Body */}
       <div className={cn("flex-1 overflow-auto", !expanded && "hidden")}>
-        {visibleOrders.length === 0 && !loading ? (
+        {isRiskLog ? (
+          <RiskActivityLog />
+        ) : visibleOrders.length === 0 && !loading ? (
           <EmptyState
             icon={tab === "open" ? Inbox : CheckCircle2}
             message={tab === "open" ? "No open orders" : "No executed orders"}

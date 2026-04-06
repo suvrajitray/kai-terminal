@@ -34,5 +34,7 @@ public enum RiskNotificationType
     SquareOffFailed,
     AutoShiftTriggered,   // sell position shifted further OTM automatically
     AutoShiftExhausted,   // max auto-shifts reached — position exited
+    AutoShiftFailed,      // auto-shift attempted but failed (order error / contract not found)
     AutoSquareOff,        // auto square-off triggered at configured time
+    StatusUpdate,         // periodic PnL snapshot (rate-limited, max once per 15 min per broker)
 }

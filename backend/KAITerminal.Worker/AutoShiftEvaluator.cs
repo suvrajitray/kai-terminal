@@ -61,6 +61,31 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
         if (!config.AutoShiftEnabled)
             return;
 
+        try
+        {
+            await EvaluateCoreAsync(userId, config, broker, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "AutoShift evaluation FAILED — {UserId} ({Broker})",
+                userId, broker.BrokerType);
+            try
+            {
+                await _notifier.NotifyAsync(new RiskNotification(
+                    UserId:    userId,
+                    Broker:    broker.BrokerType,
+                    Type:      RiskNotificationType.AutoShiftFailed,
+                    Mtm:       _cache.GetMtm($"{userId}::{config.BrokerType}"),
+                    Timestamp: DateTimeOffset.UtcNow), ct);
+            }
+            catch { /* best-effort */ }
+        }
+    }
+
+    private async Task EvaluateCoreAsync(
+        string userId, UserConfig config, IBrokerClient broker, CancellationToken ct)
+    {
         var stateKey = $"{userId}::{config.BrokerType}";
         var state = await _repo.GetOrCreateAsync(stateKey);
         if (state.IsSquaredOff)
@@ -102,6 +127,13 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
                 _logger.LogWarning(
                     "AutoShift — no contract found for token {Token} ({Broker}) — skipping",
                     position.InstrumentToken, broker.BrokerType);
+                await _notifier.NotifyAsync(new RiskNotification(
+                    UserId:          userId,
+                    Broker:          broker.BrokerType,
+                    Type:            RiskNotificationType.AutoShiftFailed,
+                    Mtm:             _cache.GetMtm(stateKey),
+                    InstrumentToken: position.InstrumentToken,
+                    Timestamp:       DateTimeOffset.UtcNow), ct);
                 continue;
             }
 
@@ -159,6 +191,8 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
             "AutoShift EXHAUSTED exit order placed — {Token} exited after {Count}/{MaxCount} shift(s) [{Broker} / {UserId}]",
             exitToken, shiftCount, maxCount, broker.BrokerType, userId);
 
+        _cache.RemovePosition(stateKey, position.InstrumentToken);
+
         // Mark this chain as exited so repeated ticks don't fire another order
         // before the position poll removes the position from cache.
         state.MarkChainExited(chainKey);
@@ -196,7 +230,7 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
             return;
         }
 
-        _logger.LogInformation(
+        _logger.LogWarning(
             "AutoShift SHIFTING — chain={ChainKey} current strike={Strike} moving {Gap} strike(s) OTM [{Broker} / {UserId}]",
             chainKey, contract.Strike, config.AutoShiftStrikeGap, broker.BrokerType, userId);
 
@@ -234,10 +268,31 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
             chainKey, currentCount, currentCount + 1, closeToken, qty, openToken, qty, broker.BrokerType, userId);
 
         // Short: close first (releases margin) then open the new short
-        await broker.PlaceOrderAsync(closeOrder, ct);
+        try
+        {
+            await broker.PlaceOrderAsync(closeOrder, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "AutoShift FAILED — could not place close order for {CloseToken} qty={Qty} chain={ChainKey} [{Broker} / {UserId}]",
+                closeToken, qty, chainKey, broker.BrokerType, userId);
+            await _notifier.NotifyAsync(new RiskNotification(
+                UserId:          userId,
+                Broker:          broker.BrokerType,
+                Type:            RiskNotificationType.AutoShiftFailed,
+                Mtm:             _cache.GetMtm(stateKey),
+                InstrumentToken: position.InstrumentToken,
+                Timestamp:       DateTimeOffset.UtcNow), ct);
+            throw;
+        }
         _logger.LogInformation(
             "AutoShift close order placed — {CloseToken} qty={Qty} [{Broker} / {UserId}]",
             closeToken, qty, broker.BrokerType, userId);
+
+        // Remove the old position from cache immediately so subsequent LTP ticks do not
+        // re-trigger another shift before the next REST poll refreshes the position list.
+        _cache.RemovePosition(stateKey, position.InstrumentToken);
 
         try
         {

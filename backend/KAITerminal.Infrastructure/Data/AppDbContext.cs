@@ -8,8 +8,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<UserTradingSettings> UserTradingSettings => Set<UserTradingSettings>();
     public DbSet<AppUser> Users => Set<AppUser>();
     public DbSet<UserRiskConfig> UserRiskConfigs => Set<UserRiskConfig>();
-    public DbSet<AppSetting>  AppSettings  => Set<AppSetting>();
-    public DbSet<IvSnapshot>  IvSnapshots  => Set<IvSnapshot>();
+    public DbSet<AppSetting>    AppSettings    => Set<AppSetting>();
+    public DbSet<IvSnapshot>    IvSnapshots    => Set<IvSnapshot>();
+    public DbSet<RiskEngineLog> RiskEngineLogs => Set<RiskEngineLog>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<BrokerCredential>()

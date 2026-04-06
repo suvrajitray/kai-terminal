@@ -120,7 +120,23 @@ export type RiskNotificationType =
   | "SquareOffComplete"
   | "SquareOffFailed"
   | "AutoShiftTriggered"
-  | "AutoShiftExhausted";
+  | "AutoShiftExhausted"
+  | "AutoShiftFailed"
+  | "AutoSquareOff"
+  | "StatusUpdate";
+
+export interface RiskLogEntry {
+  id:               number;
+  timestamp:        string;    // ISO string
+  broker:           string;
+  type:             RiskNotificationType;
+  mtm:              number;
+  target?:          number | null;
+  sl?:              number | null;
+  tslFloor?:        number | null;
+  instrumentToken?: string | null;
+  shiftCount?:      number | null;
+}
 
 export interface RiskEvent {
   userId:            string;
