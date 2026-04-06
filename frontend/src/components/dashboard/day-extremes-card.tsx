@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Position } from "@/types";
 
 const STORAGE_KEY = "kai-terminal-mtm-extremes";
@@ -52,10 +53,17 @@ export function DayExtremesCard({ positions }: DayExtremesCardProps) {
       </CardHeader>
       <CardContent className="px-4 pb-4 space-y-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <TrendingUp className="size-3.5 text-green-400" />
-            Peak Profit
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground cursor-default">
+                <TrendingUp className="size-3.5 text-green-400" />
+                Peak Profit
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Highest MTM value reached during the session</p>
+            </TooltipContent>
+          </Tooltip>
           {maxProfit !== null ? (
             <span className={cn("tabular-nums font-semibold text-sm", maxProfit >= 0 ? "text-green-500" : "text-red-500")}>
               {formatVal(maxProfit)}
@@ -65,10 +73,17 @@ export function DayExtremesCard({ positions }: DayExtremesCardProps) {
           )}
         </div>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <TrendingDown className="size-3.5 text-red-400" />
-            Peak Loss
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground cursor-default">
+                <TrendingDown className="size-3.5 text-red-400" />
+                Peak Loss
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Lowest MTM value reached during the session</p>
+            </TooltipContent>
+          </Tooltip>
           {maxLoss !== null ? (
             <span className={cn("tabular-nums font-semibold text-sm", maxLoss >= 0 ? "text-green-500" : "text-red-500")}>
               {formatVal(maxLoss)}

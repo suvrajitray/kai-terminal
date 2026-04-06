@@ -1,6 +1,7 @@
 import { Plus, Minus, ArrowUp, ArrowDown, MoreHorizontal, TrendingDown, TrendingUp, RefreshCw, ShieldAlert, LogOut } from "lucide-react";
 import { QtyInput, type QtyMode } from "./qty-input";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,19 +42,25 @@ interface ActionBtnProps {
 
 function ActionBtn({ onClick, disabled, title, className, children }: ActionBtnProps) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      title={title}
-      className={cn(
-        "flex cursor-pointer items-center justify-center px-2 py-1.5 text-muted-foreground transition-colors",
-        "hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30",
-        className,
-      )}
-    >
-      {children}
-    </button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={onClick}
+          disabled={disabled}
+          className={cn(
+            "flex cursor-pointer items-center justify-center px-2 py-1.5 text-muted-foreground transition-colors",
+            "hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-30",
+            className,
+          )}
+        >
+          {children}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>{title}</p>
+      </TooltipContent>
+    </Tooltip>
   );
 }
 

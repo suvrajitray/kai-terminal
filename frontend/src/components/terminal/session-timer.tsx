@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { Timer } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 function subscribe(cb: () => void) {
   const id = setInterval(cb, 1000);
@@ -32,12 +33,18 @@ export function SessionTimer() {
     : `${m}m ${String(s).padStart(2, "0")}s`;
 
   return (
-    <span
-      className="hidden items-center gap-1 text-xs text-muted-foreground sm:flex"
-      title="Time since market open (09:15 IST)"
-    >
-      <Timer className="size-3 shrink-0" />
-      {label}
-    </span>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          className="hidden cursor-default items-center gap-1 text-xs text-muted-foreground sm:flex"
+        >
+          <Timer className="size-3 shrink-0" />
+          {label}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>Time since market open (09:15 IST)</p>
+      </TooltipContent>
+    </Tooltip>
   );
 }

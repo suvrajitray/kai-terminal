@@ -3,6 +3,7 @@ import { Copy, Check } from "lucide-react";
 import { useBrokerStore } from "@/stores/broker-store";
 import { isBrokerTokenExpired } from "@/lib/token-utils";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface CopyTokenButtonProps {
   brokerId?: string;
@@ -21,13 +22,19 @@ export function CopyTokenButton({ brokerId = "upstox" }: CopyTokenButtonProps) {
   };
 
   return (
-    <Button
-      variant="outline"
-      size="icon"
-      onClick={handleCopy}
-      title="Copy access token"
-    >
-      {copied ? <Check className="size-4 text-green-500" /> : <Copy className="size-4" />}
-    </Button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="outline"
+          size="icon"
+          onClick={handleCopy}
+        >
+          {copied ? <Check className="size-4 text-green-500" /> : <Copy className="size-4" />}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p>Copy access token</p>
+      </TooltipContent>
+    </Tooltip>
   );
 }

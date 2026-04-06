@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { fetchOrders, cancelAllOrders, cancelOrder } from "@/services/trading-api";
 import { OptionTypeBadge } from "@/components/panels/positions-panel/option-type-badge";
 import { isBrokerTokenExpired } from "@/lib/token-utils";
@@ -182,7 +183,7 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
       >
         <button
           className={cn(
-            "flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-medium transition-colors",
+            "flex cursor-pointer items-center gap-1.5 rounded px-2 py-0.5 text-xs font-medium transition-colors",
             tab === "open"
               ? "bg-background text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground",
@@ -198,7 +199,7 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
         </button>
         <button
           className={cn(
-            "flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-medium transition-colors",
+            "flex cursor-pointer items-center gap-1.5 rounded px-2 py-0.5 text-xs font-medium transition-colors",
             tab === "executed"
               ? "bg-background text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground",
@@ -214,7 +215,7 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
         </button>
         <button
           className={cn(
-            "flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium transition-colors",
+            "flex cursor-pointer items-center gap-1 rounded px-2 py-0.5 text-xs font-medium transition-colors",
             tab === "risk-log"
               ? "bg-background text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground",
@@ -252,26 +253,38 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
             </Button>
           )}
           {expanded && (
-            <Button
-              size="icon"
-              variant="ghost"
-              className="size-6"
-              onClick={load}
-              disabled={loading}
-              title="Refresh"
-            >
-              <RefreshCw className={cn("size-3", loading && "animate-spin")} />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-6"
+                  onClick={load}
+                  disabled={loading}
+                >
+                  <RefreshCw className={cn("size-3", loading && "animate-spin")} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Refresh</p>
+              </TooltipContent>
+            </Tooltip>
           )}
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-8"
-            onClick={onToggle}
-            title={expanded ? "Collapse" : "Expand"}
-          >
-            {expanded ? <ChevronDown className="size-5" /> : <ChevronUp className="size-5" />}
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-8"
+                onClick={onToggle}
+              >
+                {expanded ? <ChevronDown className="size-5" /> : <ChevronUp className="size-5" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{expanded ? "Collapse" : "Expand"}</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
