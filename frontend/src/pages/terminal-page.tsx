@@ -27,7 +27,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-const DEFAULT_ORDERS_HEIGHT = 180;
+const DEFAULT_ORDERS_HEIGHT = 300;
 const MIN_HEIGHT = 32;
 
 export function TerminalPage() {

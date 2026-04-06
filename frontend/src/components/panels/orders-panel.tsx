@@ -187,7 +187,7 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
               ? "bg-background text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground",
           )}
-          onClick={(e) => { e.stopPropagation(); setTab("open"); }}
+          onClick={(e) => { if (expanded) e.stopPropagation(); setTab("open"); if (!expanded) onToggle(); }}
         >
           Open
           {openOrders.length > 0 && (
@@ -203,7 +203,7 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
               ? "bg-background text-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground",
           )}
-          onClick={(e) => { e.stopPropagation(); setTab("executed"); }}
+          onClick={(e) => { if (expanded) e.stopPropagation(); setTab("executed"); if (!expanded) onToggle(); }}
         >
           Executed
           {executedOrders.length > 0 && (
@@ -220,9 +220,10 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
               : "text-muted-foreground hover:text-foreground",
           )}
           onClick={(e) => {
-            e.stopPropagation();
+            if (expanded) e.stopPropagation();
             setTab("risk-log");
             lastSeenRiskCount.current = riskLogEntryCount;
+            if (!expanded) onToggle();
           }}
         >
           Risk Log
