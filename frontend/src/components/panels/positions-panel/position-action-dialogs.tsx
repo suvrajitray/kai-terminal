@@ -103,7 +103,7 @@ function SymbolChip({ position }: { position: Position }) {
         <span className="font-semibold text-sm truncate">{position.tradingSymbol}</span>
       )}
       <span className="text-[11px] text-muted-foreground">{position.exchange}</span>
-      <span className={cn("ml-auto font-semibold tabular-nums text-sm", position.quantity < 0 ? "text-red-400" : "text-green-400")}>
+      <span className={cn("ml-auto font-semibold tabular-nums text-sm", position.quantity < 0 ? "text-rose-400" : "text-emerald-400")}>
         {position.quantity > 0 ? "+" : ""}{position.quantity} qty
       </span>
     </div>
@@ -226,7 +226,7 @@ export function ExitPositionDialog({
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <LogOut className="size-4 text-red-400" />
+            <LogOut className="size-4 text-rose-400" />
             Exit Position
           </DialogTitle>
         </DialogHeader>
@@ -332,7 +332,7 @@ export function SellBuyMoreDialog({ open, onOpenChange, position }: MoreDialogPr
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle className={cn("flex items-center gap-2", isSell ? "text-red-400" : "text-green-400")}>
+          <DialogTitle className={cn("flex items-center gap-2", isSell ? "text-rose-400" : "text-emerald-400")}>
             <Icon className="size-4" />
             {label}
           </DialogTitle>

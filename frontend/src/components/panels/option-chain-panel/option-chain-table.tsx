@@ -24,9 +24,9 @@ export function OptionChainTable({ rows, atmStrike, spotPrice, underlying, liveS
         <tr className="h-9 border-b border-border text-muted-foreground">
           <th className="w-[14%] py-1.5 text-center font-medium text-muted-foreground/50" title="Open Interest · OI Change">OI</th>
           <th className="w-[13%] py-1.5 text-center font-medium text-muted-foreground/50">Δ</th>
-          <th className="w-[14%] py-1.5 text-center font-medium text-red-400/80 tracking-wider">CALL</th>
+          <th className="w-[14%] py-1.5 text-center font-medium text-rose-400/80 tracking-wider">CALL</th>
           <th className="w-[18%] py-1.5 text-center font-medium text-muted-foreground">Strike</th>
-          <th className="w-[14%] py-1.5 text-center font-medium text-green-400/80 tracking-wider">PUT</th>
+          <th className="w-[14%] py-1.5 text-center font-medium text-emerald-400/80 tracking-wider">PUT</th>
           <th className="w-[13%] py-1.5 text-center font-medium text-muted-foreground/50">Δ</th>
           <th className="w-[14%] py-1.5 text-center font-medium text-muted-foreground/50" title="Open Interest · OI Change">OI</th>
         </tr>

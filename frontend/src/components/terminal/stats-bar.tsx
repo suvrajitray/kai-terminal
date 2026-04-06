@@ -135,7 +135,7 @@ export function StatsBar({
                       {maxProfit !== null && (
                         <span className="flex items-center gap-1">
                           <span className="text-muted-foreground">↑</span>
-                          <span className={cn("font-mono tabular-nums font-medium", maxProfit >= 0 ? "text-green-500" : "text-red-500")}>
+                          <span className={cn("font-mono tabular-nums font-medium", maxProfit >= 0 ? "text-emerald-500" : "text-rose-500")}>
                             {maxProfit >= 0 ? "+" : "-"}₹{Math.abs(maxProfit).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
                           </span>
                         </span>
@@ -143,7 +143,7 @@ export function StatsBar({
                       {maxLoss !== null && maxLoss !== maxProfit && (
                         <span className="flex items-center gap-1">
                           <span className="text-muted-foreground">↓</span>
-                          <span className={cn("font-mono tabular-nums font-medium", maxLoss >= 0 ? "text-green-500" : "text-red-500")}>
+                          <span className={cn("font-mono tabular-nums font-medium", maxLoss >= 0 ? "text-emerald-500" : "text-rose-500")}>
                             {maxLoss >= 0 ? "+" : "-"}₹{Math.abs(maxLoss).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
                           </span>
                         </span>
@@ -167,11 +167,11 @@ export function StatsBar({
               {ppBrokers.length === 1 ? (
                 <>
                   <span className="text-muted-foreground">TGT</span>
-                  <span className="font-mono font-medium tabular-nums text-green-500">
+                  <span className="font-mono font-medium tabular-nums text-emerald-500">
                     ₹{ppBrokers[0].target.toLocaleString("en-IN")}
                   </span>
                   <span className="text-muted-foreground">SL</span>
-                  <span className="font-mono font-medium tabular-nums text-red-500">
+                  <span className="font-mono font-medium tabular-nums text-rose-500">
                     ₹{ppBrokers[0].currentSl.toLocaleString("en-IN")}
                   </span>
                 </>
@@ -182,11 +182,11 @@ export function StatsBar({
                     <span key={b.broker} className="flex items-center gap-1">
                       <BrokerBadge brokerId={b.broker} />
                       <span className="text-muted-foreground">TGT</span>
-                      <span className="font-mono font-medium tabular-nums text-green-500">
+                      <span className="font-mono font-medium tabular-nums text-emerald-500">
                         ₹{b.target.toLocaleString("en-IN")}
                       </span>
                       <span className="text-muted-foreground">SL</span>
-                      <span className="font-mono font-medium tabular-nums text-red-500">
+                      <span className="font-mono font-medium tabular-nums text-rose-500">
                         ₹{b.currentSl.toLocaleString("en-IN")}
                       </span>
                     </span>

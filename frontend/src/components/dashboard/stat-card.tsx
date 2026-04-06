@@ -24,7 +24,7 @@ const FLASH_BG: Record<"up" | "down", string> = {
 function FlashingValue({ value, colored, prefix }: { value: number; colored: boolean; prefix: string }) {
   const flash = useValueFlash(value);
   const color = colored
-    ? value > 0 ? "text-green-500" : value < 0 ? "text-red-500" : "text-foreground"
+    ? value > 0 ? "text-emerald-500" : value < 0 ? "text-rose-500" : "text-foreground"
     : "text-foreground";
 
   return (
@@ -62,7 +62,7 @@ export function StatCard({ label, value, index, colored = false, prefix = "", fl
               className={cn(
                 "font-mono tabular-nums font-bold text-2xl",
                 colored
-                  ? value > 0 ? "text-green-500" : value < 0 ? "text-red-500" : "text-foreground"
+                  ? value > 0 ? "text-emerald-500" : value < 0 ? "text-rose-500" : "text-foreground"
                   : "text-foreground",
               )}
             >

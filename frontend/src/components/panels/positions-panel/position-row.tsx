@@ -27,7 +27,7 @@ const PRODUCT_LABEL: Record<string, string> = {
 
 
 export function PnlCell({ value, pct, noDecimal }: { value: number; pct?: number; noDecimal?: boolean }) {
-  const color = value > 0 ? "text-green-500" : value < 0 ? "text-red-500" : "text-muted-foreground";
+  const color = value > 0 ? "text-emerald-500" : value < 0 ? "text-rose-500" : "text-muted-foreground";
   const fmt = noDecimal ? INR_INT : INR;
   return (
     <div className="flex flex-col items-end gap-0">
@@ -133,7 +133,7 @@ export function PositionRow({
         <td
           className={cn(
             "px-3 py-1.5 text-right font-mono tabular-nums font-semibold",
-            p.quantity < 0 ? "text-red-500" : "text-green-500",
+            p.quantity < 0 ? "text-rose-500" : "text-emerald-500",
           )}
         >
           {p.quantity > 0 ? "+" : ""}

@@ -213,7 +213,7 @@ export function PayoffChartDialog({ open, onOpenChange, positions }: Props) {
                   {pnlAtSpot !== null && (
                     <span className="flex items-center gap-1">
                       <span className="text-muted-foreground">at spot</span>
-                      <span className={cn("font-mono font-semibold tabular-nums", pnlAtSpot >= 0 ? "text-green-500" : "text-red-500")}>
+                      <span className={cn("font-mono font-semibold tabular-nums", pnlAtSpot >= 0 ? "text-emerald-500" : "text-rose-500")}>
                         {pnlAtSpot >= 0 ? "+" : ""}₹{INR.format(pnlAtSpot)}
                       </span>
                     </span>
@@ -360,10 +360,10 @@ export function PayoffChartDialog({ open, onOpenChange, positions }: Props) {
                       <span className="flex items-center gap-2">
                         <span className="text-muted-foreground">{leg.index}</span>
                         <span className="font-mono font-medium">₹{INR.format(leg.strike)}</span>
-                        <span className={cn("rounded px-1 py-0.5 text-[10px] font-bold", leg.instrumentType === "CE" ? "bg-red-500/15 text-red-400" : "bg-green-500/15 text-green-400")}>
+                        <span className={cn("rounded px-1 py-0.5 text-[10px] font-bold", leg.instrumentType === "CE" ? "bg-rose-500/15 text-rose-400" : "bg-emerald-500/15 text-emerald-400")}>
                           {leg.instrumentType}
                         </span>
-                        <span className={cn("text-[11px] font-medium", leg.quantity < 0 ? "text-red-400" : "text-green-400")}>
+                        <span className={cn("text-[11px] font-medium", leg.quantity < 0 ? "text-rose-400" : "text-emerald-400")}>
                           {leg.quantity < 0 ? "Short" : "Long"} {Math.abs(leg.quantity)}
                         </span>
                       </span>

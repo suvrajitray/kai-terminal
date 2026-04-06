@@ -218,7 +218,7 @@ export function ProfitProtectionPanel({ open, onClose, positions }: ProfitProtec
               <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Current MTM</span>
               <span className={cn(
                 "text-lg font-bold tabular-nums leading-tight",
-                currentMtm >= 0 ? "text-green-500" : "text-red-500",
+                currentMtm >= 0 ? "text-emerald-500" : "text-rose-500",
               )}>
                 ₹{currentMtm.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>

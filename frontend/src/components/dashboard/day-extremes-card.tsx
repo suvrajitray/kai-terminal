@@ -56,7 +56,7 @@ export function DayExtremesCard({ positions }: DayExtremesCardProps) {
           <Tooltip>
             <TooltipTrigger asChild>
               <div className="flex items-center gap-2 text-sm text-muted-foreground cursor-default">
-                <TrendingUp className="size-3.5 text-green-400" />
+                <TrendingUp className="size-3.5 text-emerald-400" />
                 Peak Profit
               </div>
             </TooltipTrigger>
@@ -65,7 +65,7 @@ export function DayExtremesCard({ positions }: DayExtremesCardProps) {
             </TooltipContent>
           </Tooltip>
           {maxProfit !== null ? (
-            <span className={cn("tabular-nums font-semibold text-sm", maxProfit >= 0 ? "text-green-500" : "text-red-500")}>
+            <span className={cn("tabular-nums font-semibold text-sm", maxProfit >= 0 ? "text-emerald-500" : "text-rose-500")}>
               {formatVal(maxProfit)}
             </span>
           ) : (
@@ -76,7 +76,7 @@ export function DayExtremesCard({ positions }: DayExtremesCardProps) {
           <Tooltip>
             <TooltipTrigger asChild>
               <div className="flex items-center gap-2 text-sm text-muted-foreground cursor-default">
-                <TrendingDown className="size-3.5 text-red-400" />
+                <TrendingDown className="size-3.5 text-rose-400" />
                 Peak Loss
               </div>
             </TooltipTrigger>
@@ -85,7 +85,7 @@ export function DayExtremesCard({ positions }: DayExtremesCardProps) {
             </TooltipContent>
           </Tooltip>
           {maxLoss !== null ? (
-            <span className={cn("tabular-nums font-semibold text-sm", maxLoss >= 0 ? "text-green-500" : "text-red-500")}>
+            <span className={cn("tabular-nums font-semibold text-sm", maxLoss >= 0 ? "text-emerald-500" : "text-rose-500")}>
               {formatVal(maxLoss)}
             </span>
           ) : (

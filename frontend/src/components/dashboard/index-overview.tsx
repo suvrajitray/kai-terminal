@@ -48,7 +48,7 @@ function IndexCard({ label, quote, delay }: { label: string; quote: IndexQuote; 
           {hasData ? fmt(quote.ltp) : <span className="text-muted-foreground/30">—</span>}
         </span>
         {hasData && change !== null && changePct !== null ? (
-          <span className={cn("text-[11px] tabular-nums font-medium leading-none", isUp ? "text-green-500" : "text-red-500")}>
+          <span className={cn("text-[11px] tabular-nums font-medium leading-none", isUp ? "text-emerald-500" : "text-rose-500")}>
             {isUp ? "+" : ""}{FMT.format(change)}
             <span className="ml-1 text-[10px] opacity-70">({isUp ? "+" : ""}{changePct.toFixed(2)}%)</span>
           </span>
@@ -64,11 +64,11 @@ function IndexCard({ label, quote, delay }: { label: string; quote: IndexQuote; 
           <span className="text-muted-foreground/55">{fmt(quote.open)}</span>
         </span>
         <span className="flex items-center gap-1 leading-tight">
-          <span className="w-2 font-bold text-green-400/70">H</span>
+          <span className="w-2 font-bold text-emerald-400/70">H</span>
           <span className="text-muted-foreground/55">{fmt(quote.high)}</span>
         </span>
         <span className="flex items-center gap-1 leading-tight">
-          <span className="w-2 font-bold text-red-400/70">L</span>
+          <span className="w-2 font-bold text-rose-400/70">L</span>
           <span className="text-muted-foreground/55">{fmt(quote.low)}</span>
         </span>
       </div>

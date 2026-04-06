@@ -142,9 +142,9 @@ export function PositionActions({
           <DropdownMenuContent align="end" className="w-44">
             <DropdownMenuItem onClick={onSellMore} className="gap-2 cursor-pointer">
               {isSell ? (
-                <TrendingDown className="size-3.5 text-red-400" />
+                <TrendingDown className="size-3.5 text-rose-400" />
               ) : (
-                <TrendingUp className="size-3.5 text-green-400" />
+                <TrendingUp className="size-3.5 text-emerald-400" />
               )}
               <span>{isSell ? "Sell more" : "Buy more"}</span>
             </DropdownMenuItem>

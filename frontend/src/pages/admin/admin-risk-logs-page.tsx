@@ -21,8 +21,8 @@ function StatusNode({ type }: { type: string }) {
   
   return (
     <span className={cn("size-2 rounded-full shrink-0",
-      isSuccess ? 'bg-green-500' :
-      isError ? 'bg-red-500' : 
+      isSuccess ? 'bg-emerald-500' :
+      isError ? 'bg-rose-500' : 
       isWarning ? 'bg-amber-500' : 'bg-blue-500'
     )} title={type} />
   )
@@ -138,8 +138,12 @@ export function AdminRiskLogsPage() {
                       Loading risk logs...
                     </td>
                   </tr>
-                ) : filteredLogs.length > 0 ? filteredLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-muted/20 transition-colors">
+                ) : filteredLogs.length > 0 ? filteredLogs.map((log, i) => (
+                  <tr 
+                    key={log.id} 
+                    className="hover:bg-muted/20 transition-colors animate-row-enter"
+                    style={{ animationDelay: `${i * 30}ms` }}
+                  >
                     <td className="px-4 py-2.5 text-muted-foreground whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <StatusNode type={log.type} />
@@ -153,7 +157,7 @@ export function AdminRiskLogsPage() {
                     <td className="px-4 py-2.5 text-right font-mono text-xs text-muted-foreground whitespace-nowrap">{log.shiftCount ?? "--"}</td>
                     <td className="px-4 py-2.5 text-right font-mono text-xs text-muted-foreground whitespace-nowrap">{fmt(log.tslFloor)}</td>
                     <td className="px-4 py-2.5 text-right font-mono text-xs whitespace-nowrap">
-                      <span className={log.mtm >= 0 ? "text-green-500" : "text-red-500"}>
+                      <span className={log.mtm >= 0 ? "text-emerald-500" : "text-rose-500"}>
                         {log.mtm >= 0 ? "+" : ""}₹{fmt(log.mtm)}
                       </span>
                     </td>

@@ -79,12 +79,12 @@ function rowColor(type: RiskNotificationType): string {
     case "SquareOffFailed":
     case "AutoShiftExhausted":
     case "AutoShiftFailed":
-      return "text-red-400";
+      return "text-rose-400";
     case "TargetHit":
     case "SquareOffComplete":
     case "TslActivated":
     case "TslRaised":
-      return "text-green-400";
+      return "text-emerald-400";
     case "AutoSquareOff":
     case "AutoShiftTriggered":
       return "text-yellow-400";
@@ -101,14 +101,14 @@ function Chip({ active, label, tooltip }: { active: boolean; label: string; tool
           className={cn(
             "inline-flex cursor-default items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium leading-none",
             active
-              ? "bg-green-500/10 text-green-400"
+              ? "bg-emerald-500/10 text-emerald-400"
               : "bg-muted/40 text-muted-foreground",
           )}
         >
           <span
             className={cn(
               "size-1.5 rounded-full",
-              active ? "bg-green-400" : "bg-muted-foreground/40",
+              active ? "bg-emerald-400" : "bg-muted-foreground/40",
             )}
           />
           {label}

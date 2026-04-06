@@ -108,8 +108,12 @@ function UserManagementCard() {
           <p className="text-sm text-muted-foreground">No users match the selected filters.</p>
         ) : (
           <div className="divide-y divide-border/40">
-            {filteredUsers.map((user) => (
-              <div key={user.id} className="flex items-center justify-between py-3">
+            {filteredUsers.map((user, i) => (
+              <div 
+                key={user.id} 
+                className="flex items-center justify-between py-3 animate-row-enter"
+                style={{ animationDelay: `${i * 30}ms` }}
+              >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span 

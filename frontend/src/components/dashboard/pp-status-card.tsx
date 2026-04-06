@@ -20,7 +20,7 @@ function BrokerConfigRows({ broker, label }: { broker: string; label?: string })
       {label && (
         <div className="flex items-center gap-1.5">
           {enabled ? (
-            <ShieldCheck className="size-3.5 text-green-500" />
+            <ShieldCheck className="size-3.5 text-emerald-500" />
           ) : (
             <ShieldOff className="size-3.5 text-muted-foreground/50" />
           )}
@@ -28,7 +28,7 @@ function BrokerConfigRows({ broker, label }: { broker: string; label?: string })
           <span
             className={cn(
               "rounded-full px-1.5 py-0 text-[10px] font-semibold",
-              enabled ? "bg-green-500/15 text-green-500" : "bg-muted/40 text-muted-foreground",
+              enabled ? "bg-emerald-500/15 text-emerald-500" : "bg-muted/40 text-muted-foreground",
             )}
           >
             {enabled ? "Active" : "Off"}
@@ -38,14 +38,14 @@ function BrokerConfigRows({ broker, label }: { broker: string; label?: string })
       {!label && (
         <div className="flex items-center gap-2">
           {enabled ? (
-            <ShieldCheck className="size-4 text-green-500" />
+            <ShieldCheck className="size-4 text-emerald-500" />
           ) : (
             <ShieldOff className="size-4 text-muted-foreground/50" />
           )}
           <span
             className={cn(
               "rounded-full px-2.5 py-0.5 text-xs font-semibold",
-              enabled ? "bg-green-500/15 text-green-500" : "bg-muted/40 text-muted-foreground",
+              enabled ? "bg-emerald-500/15 text-emerald-500" : "bg-muted/40 text-muted-foreground",
             )}
           >
             {enabled ? "Active" : "Disabled"}
@@ -55,11 +55,11 @@ function BrokerConfigRows({ broker, label }: { broker: string; label?: string })
       <div className="space-y-2 rounded-md border border-border/30 bg-muted/20 px-3 py-2.5 text-xs">
         <div className="flex items-center justify-between">
           <span className="text-muted-foreground">Target</span>
-          <span className="tabular-nums font-medium text-green-500">₹{INR.format(mtmTarget)}</span>
+          <span className="tabular-nums font-medium text-emerald-500">₹{INR.format(mtmTarget)}</span>
         </div>
         <div className="flex items-center justify-between">
           <span className="text-muted-foreground">Stop Loss</span>
-          <span className="tabular-nums font-medium text-red-500">₹{INR.format(mtmSl)}</span>
+          <span className="tabular-nums font-medium text-rose-500">₹{INR.format(mtmSl)}</span>
         </div>
         <div className="flex items-center justify-between">
           <span className="text-muted-foreground">Trailing</span>

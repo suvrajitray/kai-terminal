@@ -69,9 +69,9 @@ function StatusBadge({ status }: { status: string }) {
   const s = status.toLowerCase();
   const styles =
     s === "complete"
-      ? "bg-green-500/15 text-green-500"
+      ? "bg-emerald-500/15 text-emerald-500"
       : s === "rejected" || s.includes("cancel")
-        ? "bg-red-500/15 text-red-500"
+        ? "bg-rose-500/15 text-rose-500"
         : s === "open" || s === "pending" || s === "trigger pending"
           ? "bg-amber-500/15 text-amber-500"
           : "bg-muted text-muted-foreground";
@@ -356,7 +356,7 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
                     <td className="px-3 py-1.5">
                       <span className={cn(
                         "inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold",
-                        o.transactionType === "Buy" ? "bg-green-500/15 text-green-500" : "bg-red-500/15 text-red-500"
+                        o.transactionType === "Buy" ? "bg-emerald-500/15 text-emerald-500" : "bg-rose-500/15 text-rose-500"
                       )}>
                         {o.transactionType}
                       </span>
@@ -375,7 +375,7 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-6 px-2 text-xs text-destructive hover:text-destructive"
+                          className="h-6 px-2 text-xs text-destructive hover:text-destructive active:scale-[0.98]"
                           onClick={() => handleCancel(o.orderId)}
                           disabled={cancelling === o.orderId}
                         >

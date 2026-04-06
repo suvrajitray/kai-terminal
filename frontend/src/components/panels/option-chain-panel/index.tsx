@@ -239,7 +239,7 @@ export function OptionChainPanel({ width, onResize, onClose, netDelta }: Props) 
               <FooterStat
                 label="PCR"
                 value={pcr.toFixed(2)}
-                valueClass={pcr >= 1 ? "text-green-400" : "text-red-400"}
+                valueClass={pcr >= 1 ? "text-emerald-400" : "text-rose-400"}
               />
             </>
           )}
@@ -249,7 +249,7 @@ export function OptionChainPanel({ width, onResize, onClose, netDelta }: Props) 
               <FooterStat
                 label="IVR"
                 value={ivRank.toFixed(0)}
-                valueClass={ivRank >= 50 ? "text-green-400" : ivRank >= 30 ? "text-amber-400" : "text-red-400"}
+                valueClass={ivRank >= 50 ? "text-emerald-400" : ivRank >= 30 ? "text-amber-400" : "text-rose-400"}
                 title={`IV Rank ${ivRank.toFixed(0)}/100 — higher than ${ivPercentile?.toFixed(0)}% of past ${ivHistoryDays} days`}
               />
             </>
@@ -297,18 +297,18 @@ export function OptionChainPanel({ width, onResize, onClose, netDelta }: Props) 
               <span className="flex items-center gap-1.5">
                 <span className={cn(
                   "font-mono text-[11px] font-semibold tabular-nums",
-                  Math.abs(netDelta) < 1 ? "text-green-400" : "text-muted-foreground/60"
+                  Math.abs(netDelta) < 1 ? "text-emerald-400" : "text-muted-foreground/60"
                 )}>
                   {netDelta > 0 ? "+" : ""}{netDelta.toFixed(1)}
                 </span>
-                <span className="text-[10px] text-green-400/60">Balanced</span>
+                <span className="text-[10px] text-emerald-400/60">Balanced</span>
               </span>
             ) : (
               <span className="flex items-center gap-2 overflow-hidden">
                 {/* Current delta — problem */}
                 <span className={cn(
                   "font-mono text-[11px] font-semibold tabular-nums shrink-0",
-                  netDelta < 0 ? "text-red-400" : "text-amber-400"
+                  netDelta < 0 ? "text-rose-400" : "text-amber-400"
                 )}>
                   {netDelta > 0 ? "+" : ""}{netDelta.toFixed(1)}
                 </span>
@@ -317,14 +317,14 @@ export function OptionChainPanel({ width, onResize, onClose, netDelta }: Props) 
                 <span className={cn(
                   "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold tracking-wide",
                   hedgeSuggestion.side === "PE"
-                    ? "bg-green-500/15 text-green-400"
-                    : "bg-red-500/15 text-red-400"
+                    ? "bg-emerald-500/15 text-emerald-400"
+                    : "bg-rose-500/15 text-rose-400"
                 )}>
                   Sell {hedgeSuggestion.lots}L
                 </span>
                 <span className="font-mono text-[10px] text-foreground/80 shrink-0">
                   {underlying} {hedgeSuggestion.strike}{" "}
-                  <span className={hedgeSuggestion.side === "PE" ? "text-green-400" : "text-red-400"}>
+                  <span className={hedgeSuggestion.side === "PE" ? "text-emerald-400" : "text-rose-400"}>
                     {hedgeSuggestion.side}
                   </span>
                 </span>
@@ -337,7 +337,7 @@ export function OptionChainPanel({ width, onResize, onClose, netDelta }: Props) 
                 {/* Result delta */}
                 <span className={cn(
                   "font-mono text-[10px] font-medium tabular-nums shrink-0",
-                  Math.abs(hedgeSuggestion.residualDelta) < 5 ? "text-green-400/80" : "text-amber-400/80"
+                  Math.abs(hedgeSuggestion.residualDelta) < 5 ? "text-emerald-400/80" : "text-amber-400/80"
                 )}>
                   Δ {hedgeSuggestion.residualDelta > 0 ? "+" : ""}{hedgeSuggestion.residualDelta.toFixed(1)}
                 </span>
@@ -398,7 +398,7 @@ function MaxPainStat({ maxPain, spotPrice }: MaxPainStatProps) {
       {absDist !== null && absDist > 0 && (
         <span className={cn(
           "font-mono text-[10px]",
-          distance! > 0 ? "text-green-400/70" : "text-red-400/70",
+          distance! > 0 ? "text-emerald-400/70" : "text-rose-400/70",
         )}>
           {arrow}{absDist} pts
         </span>

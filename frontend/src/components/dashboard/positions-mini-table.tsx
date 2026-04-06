@@ -10,7 +10,7 @@ import type { Position } from "@/types";
 const INR = new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 });
 
 function PnlCell({ value }: { value: number }) {
-  const color = value > 0 ? "text-green-500" : value < 0 ? "text-red-500" : "text-muted-foreground";
+  const color = value > 0 ? "text-emerald-500" : value < 0 ? "text-rose-500" : "text-muted-foreground";
   return (
     <span className={cn("font-mono tabular-nums", color)}>
       {value >= 0 ? "+" : "-"}₹{INR.format(Math.abs(value))}
@@ -104,7 +104,7 @@ export function PositionsMiniTable({ positions, loading }: PositionsMiniTablePro
                         <td
                           className={cn(
                             "px-3 py-1.5 text-right font-mono tabular-nums font-semibold",
-                            p.quantity < 0 ? "text-red-500" : "text-green-500",
+                            p.quantity < 0 ? "text-rose-500" : "text-emerald-500",
                           )}
                         >
                           {p.quantity > 0 ? "+" : ""}{p.quantity}
