@@ -9,7 +9,7 @@ namespace KAITerminal.Upstox;
 /// </summary>
 public sealed class UpstoxClient
 {
-    public IBrokerAuthService     Auth      { get; }
+    public IUpstoxAuthService     Auth      { get; }
     public IBrokerPositionService Positions { get; }
     public IBrokerOrderService    Orders    { get; }
     public IBrokerMarginService   Margin    { get; }

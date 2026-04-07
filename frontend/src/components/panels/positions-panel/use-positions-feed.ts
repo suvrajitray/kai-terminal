@@ -5,6 +5,7 @@ import { fetchPositions, fetchZerodhaPositions } from "@/services/trading-api";
 import { isBrokerTokenExpired } from "@/lib/token-utils";
 import { API_BASE_URL } from "@/lib/constants";
 import { useBrokerStore } from "@/stores/broker-store";
+import { useAuthStore } from "@/stores/auth-store";
 import type { Position } from "@/types";
 
 export function usePositionsFeed(onOrderUpdate?: () => void) {
@@ -52,9 +53,10 @@ export function usePositionsFeed(onOrderUpdate?: () => void) {
     if (hasZerodha) { params.set("zerodhaToken", zerodhaToken!); params.set("zerodhaApiKey", zerodhaApiKey!); }
 
     const wsUrl = `${API_BASE_URL}/hubs/positions?${params.toString()}`;
+    const jwt   = useAuthStore.getState().token ?? "";
 
     const conn = new signalR.HubConnectionBuilder()
-      .withUrl(wsUrl)
+      .withUrl(wsUrl, { accessTokenFactory: () => jwt })
       .withAutomaticReconnect()
       .build();
 

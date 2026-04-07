@@ -56,16 +56,19 @@ public sealed class PositionsHub : Hub
 
         var exchangeFilter = ParseExchanges(qs?["exchange"].ToString());
         var connectionId   = Context.ConnectionId;
+        var username       = Context.User?.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
+                          ?? Context.User?.FindFirst("email")?.Value
+                          ?? "unknown";
         var filterDesc     = exchangeFilter is null ? "all exchanges" : string.Join(",", exchangeFilter);
         var brokerDesc     = string.Join("+", brokers.Select(b => b.BrokerType));
 
         _logger.LogInformation(
-            "PositionsHub: client {Id} connected — brokers: {Brokers}, filter: {Filter}",
-            connectionId, brokerDesc, filterDesc);
+            "PositionsHub: client {Id} connected — user: {User}, brokers: {Brokers}, filter: {Filter}",
+            connectionId, username, brokerDesc, filterDesc);
 
         var coordinator = new PositionStreamCoordinator(
             _hubContext, brokers, _sharedMarketData, _zerodhaInstruments,
-            connectionId, exchangeFilter, _logger);
+            connectionId, username, exchangeFilter, _logger);
 
         await coordinator.StartAsync(Context.ConnectionAborted);
         _manager.Add(connectionId, coordinator);

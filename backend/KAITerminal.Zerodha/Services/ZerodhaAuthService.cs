@@ -3,7 +3,7 @@ using KAITerminal.Zerodha.Http;
 
 namespace KAITerminal.Zerodha.Services;
 
-internal sealed class ZerodhaAuthService : IBrokerAuthService
+internal sealed class ZerodhaAuthService : IZerodhaAuthService
 {
     private readonly ZerodhaHttpClient _http;
 
@@ -16,4 +16,12 @@ internal sealed class ZerodhaAuthService : IBrokerAuthService
         string? redirectUri = null,
         CancellationToken ct = default)
         => _http.ExchangeTokenAsync(clientId, clientSecret, authorizationCode, ct);
+
+    public Task<(string AccessToken, string? UserId)> GenerateTokenWithUserIdAsync(
+        string clientId,
+        string clientSecret,
+        string authorizationCode,
+        string? redirectUri = null,
+        CancellationToken ct = default)
+        => _http.ExchangeTokenWithUserIdAsync(clientId, clientSecret, authorizationCode, ct);
 }

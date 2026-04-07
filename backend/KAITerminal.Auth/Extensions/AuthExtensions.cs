@@ -39,8 +39,10 @@ public static class AuthExtensions
                 OnMessageReceived = context =>
                 {
                     var accessToken = context.Request.Query["access_token"];
+                    var path = context.HttpContext.Request.Path;
                     if (!string.IsNullOrEmpty(accessToken) &&
-                        context.HttpContext.Request.Path.StartsWithSegments("/hubs/risk"))
+                        (path.StartsWithSegments("/hubs/risk") ||
+                         path.StartsWithSegments("/hubs/positions")))
                     {
                         context.Token = accessToken;
                     }

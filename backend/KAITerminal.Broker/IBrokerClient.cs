@@ -37,8 +37,8 @@ public interface IBrokerClient
     /// <summary>Fetch all orders placed during the current trading day.</summary>
     Task<IReadOnlyList<BrokerOrder>> GetAllOrdersAsync(CancellationToken ct = default);
 
-    /// <summary>Place an order using broker-agnostic request parameters.</summary>
-    Task PlaceOrderAsync(BrokerOrderRequest request, CancellationToken ct = default);
+    /// <summary>Place an order using broker-agnostic request parameters. Returns the broker-assigned order ID(s).</summary>
+    Task<string> PlaceOrderAsync(BrokerOrderRequest request, CancellationToken ct = default);
 
     /// <summary>Cancel a single order by ID.</summary>
     Task<string> CancelOrderAsync(string orderId, CancellationToken ct = default);

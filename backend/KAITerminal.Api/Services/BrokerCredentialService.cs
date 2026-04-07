@@ -55,6 +55,16 @@ public class BrokerCredentialService(AppDbContext db)
         await db.SaveChangesAsync();
     }
 
+    public async Task UpdateBrokerUserIdAsync(string username, string brokerName, string brokerUserId)
+    {
+        var cred = await db.BrokerCredentials
+            .FirstOrDefaultAsync(x => x.Username == username && x.BrokerName == brokerName);
+        if (cred is null) return;
+        cred.BrokerUserId = brokerUserId;
+        cred.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+    }
+
     public async Task<bool> DeleteAsync(string username, string brokerName)
     {
         var credential = await db.BrokerCredentials

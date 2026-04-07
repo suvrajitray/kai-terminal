@@ -45,7 +45,7 @@ public static class ZerodhaEndpoints
                 });
             }
 
-            var accessToken = await zerodha.Auth.GenerateTokenAsync(
+            var (accessToken, brokerUserId) = await zerodha.Auth.GenerateTokenWithUserIdAsync(
                 request.ApiKey, request.ApiSecret, request.RequestToken, ct: ct);
 
             var userEmail = ctx.User.FindFirst(
@@ -58,10 +58,12 @@ public static class ZerodhaEndpoints
                     ApiKey:      request.ApiKey,
                     ApiSecret:   request.ApiSecret,
                     AccessToken: accessToken));
+                if (!string.IsNullOrEmpty(brokerUserId))
+                    await credentials.UpdateBrokerUserIdAsync(userEmail, BrokerNames.Zerodha, brokerUserId);
             }
 
             lf.CreateLogger("ZerodhaEndpoints").LogInformation(
-                "Zerodha access token exchanged and persisted — {User}", userEmail);
+                "Zerodha access token exchanged and persisted — {User} zerodhaUserId={UserId}", userEmail, brokerUserId);
 
             return Results.Ok(new { accessToken });
         });

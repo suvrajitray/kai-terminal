@@ -58,10 +58,10 @@ public sealed class ZerodhaBrokerClient : IBrokerClient
         return await _zerodha.Orders.GetAllOrdersAsync(ct);
     }
 
-    public async Task PlaceOrderAsync(BrokerOrderRequest request, CancellationToken ct = default)
+    public async Task<string> PlaceOrderAsync(BrokerOrderRequest request, CancellationToken ct = default)
     {
         using var _ = UseToken();
-        await _zerodha.Orders.PlaceOrderAsync(request, ct);
+        return await _zerodha.Orders.PlaceOrderAsync(request, ct);
     }
 
     public async Task<string> CancelOrderAsync(string orderId, CancellationToken ct = default)

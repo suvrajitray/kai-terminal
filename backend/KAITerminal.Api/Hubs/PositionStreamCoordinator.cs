@@ -16,7 +16,7 @@ namespace KAITerminal.Api.Hubs;
 /// Supports any number of brokers symmetrically — Upstox and Zerodha are treated identically.
 /// Zerodha instruments are mapped to Upstox feed tokens via exchange_token (public Kite CSV).
 /// </summary>
-internal sealed class PositionStreamCoordinator : IAsyncDisposable
+public sealed class PositionStreamCoordinator : IAsyncDisposable
 {
     private readonly IHubContext<PositionsHub>    _hub;
     private readonly IReadOnlyList<IBrokerClient> _brokers;
@@ -28,6 +28,10 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
 
     private const int PositionPollIntervalMs = 10_000;
 
+    public string Username { get; }
+    public bool HasBroker(string brokerType) =>
+        _brokers.Any(b => b.BrokerType.Equals(brokerType, StringComparison.OrdinalIgnoreCase));
+
     private readonly CancellationTokenSource _cts = new();
     private Task _pollLoop = Task.CompletedTask;
 
@@ -35,9 +39,6 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
     private HashSet<string> _subscribedUpstoxTokens = [];
     // Zerodha: feed token (e.g. "NSE_FO|885247") → native instrument token (e.g. "15942914")
     private Dictionary<string, string> _zerodhaFeedToNative = new(StringComparer.Ordinal);
-
-    // Order status tracking: (brokerType, orderId) → last known status
-    private Dictionary<(string, string), string> _lastOrderStatuses = new();
 
     private readonly EventHandler<LtpUpdate> _feedHandler;
 
@@ -47,6 +48,7 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
         ISharedMarketDataService     sharedMarketData,
         IZerodhaInstrumentService    zerodhaInstruments,
         string                       connectionId,
+        string                       username,
         HashSet<string>?             exchangeFilter,
         ILogger                      logger)
     {
@@ -55,6 +57,7 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
         _sharedMarketData   = sharedMarketData;
         _zerodhaInstruments = zerodhaInstruments;
         _connectionId       = connectionId;
+        Username            = username;
         _exchangeFilter     = exchangeFilter;
         _logger             = logger;
         _feedHandler        = OnFeedReceived;
@@ -90,7 +93,6 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
                     .SendAsync("ReceivePositions", filtered.Select(p => p.ToResponse()).ToList(), ct);
 
                 await RefreshSubscriptionsAsync(filtered, ct);
-                await PollOrdersAsync(ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { return; }
             catch (Exception ex)
@@ -210,56 +212,46 @@ internal sealed class PositionStreamCoordinator : IAsyncDisposable
             _ => null
         };
 
-    // ── Order polling ─────────────────────────────────────────────────────────
+    // ── Webhook-triggered actions ─────────────────────────────────────────────
 
-    private async Task PollOrdersAsync(CancellationToken ct)
+    /// <summary>
+    /// Called by the broker webhook handler when an order fill is confirmed.
+    /// Fetches fresh positions immediately and pushes them to the client.
+    /// </summary>
+    public async Task TriggerRefreshAsync()
     {
-        foreach (var broker in _brokers)
+        try
         {
-            try
-            {
-                using var _ = broker.UseToken();
-                var orders = await broker.GetAllOrdersAsync(ct);
-
-                foreach (var order in orders)
-                {
-                    var key    = (broker.BrokerType, order.OrderId);
-                    var status = order.Status;
-
-                    if (!_lastOrderStatuses.TryGetValue(key, out var prev) || prev == status)
-                    {
-                        _lastOrderStatuses[key] = status;
-                        continue;
-                    }
-
-                    _lastOrderStatuses[key] = status;
-
-                    if (!status.Equals("complete", StringComparison.OrdinalIgnoreCase) &&
-                        !status.Equals("rejected", StringComparison.OrdinalIgnoreCase))
-                        continue;
-
-                    _logger.LogInformation(
-                        "PositionStreamCoordinator [{Id}]: order {Status} — {Broker} {OrderId} {Symbol} — {Message}",
-                        _connectionId, status.ToUpperInvariant(),
-                        broker.BrokerType, order.OrderId, order.TradingSymbol, order.StatusMessage);
-
-                    await _hub.Clients.Client(_connectionId).SendAsync("ReceiveOrderUpdate", new
-                    {
-                        orderId       = order.OrderId,
-                        status        = order.Status,
-                        statusMessage = order.StatusMessage,
-                        tradingSymbol = order.TradingSymbol,
-                    }, ct);
-                }
-            }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested) { return; }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex,
-                    "PositionStreamCoordinator [{Id}]: error polling orders for {Broker} — will retry",
-                    _connectionId, broker.BrokerType);
-            }
+            var ct = _cts.Token;
+            var allPositions = await FetchAllPositionsAsync(ct);
+            var filtered     = ApplyFilter(allPositions);
+            await _hub.Clients.Client(_connectionId)
+                .SendAsync("ReceivePositions", filtered.Select(p => p.ToResponse()).ToList(), ct);
+            _logger.LogInformation(
+                "PositionStreamCoordinator [{Id}] ({User}): webhook refresh — pushed {Count} position(s)",
+                _connectionId, Username, filtered.Count);
         }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "PositionStreamCoordinator [{Id}] ({User}): error during webhook-triggered refresh",
+                _connectionId, Username);
+        }
+    }
+
+    /// <summary>
+    /// Called by the broker webhook handler to push an order status update to the client.
+    /// </summary>
+    public Task PushOrderUpdateAsync(
+        string orderId, string status, string statusMessage, string tradingSymbol)
+    {
+        _logger.LogInformation(
+            "PositionStreamCoordinator [{Id}] ({User}): order {Status} — {Symbol}",
+            _connectionId, Username, status.ToUpperInvariant(), tradingSymbol);
+        return _hub.Clients.Client(_connectionId).SendAsync("ReceiveOrderUpdate", new
+        {
+            orderId, status, statusMessage, tradingSymbol,
+        }, _cts.Token);
     }
 
     // ── LTP feed handler ──────────────────────────────────────────────────────

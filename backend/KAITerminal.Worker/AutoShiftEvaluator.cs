@@ -303,9 +303,10 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
             chainKey, currentCount, currentCount + 1, closeToken, qty, openToken, qty, broker.BrokerType, userId);
 
         // Short: close first (releases margin) then open the new short
+        string closeOrderId;
         try
         {
-            await broker.PlaceOrderAsync(closeOrder, ct);
+            closeOrderId = await broker.PlaceOrderAsync(closeOrder, ct);
         }
         catch (Exception ex)
         {
@@ -322,8 +323,8 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
             throw;
         }
         _logger.LogInformation(
-            "AutoShift close order placed — {CloseToken} qty={Qty} [{Broker} / {UserId}]",
-            closeToken, qty, broker.BrokerType, userId);
+            "AutoShift close order placed — {CloseToken} qty={Qty} orderId={OrderId} [{Broker} / {UserId}]",
+            closeToken, qty, closeOrderId, broker.BrokerType, userId);
 
         // Mark the old token so subsequent LTP ticks don't re-trigger a second shift before
         // the next poll. The position stays in cache — MTM remains accurate until the poll
@@ -336,17 +337,15 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
             ? openToken.Split('|')[1]
             : openToken;
 
-        // Fire-and-forget: wait 3s for margin to settle then open the new short.
-        // Running this off the evaluation hot path ensures the gate semaphore is released
-        // immediately so SL / target checks keep running during the margin-settle window.
+        // Fire-and-forget: wait for the close order to actually fill, then open the new short.
+        // Running off the eval loop so risk checks (SL/target) continue during the fill wait.
         _ = Task.Run(async () =>
         {
             try
             {
-                _logger.LogInformation(
-                    "AutoShift waiting 3s for margin release before opening new leg [{Broker} / {UserId}]",
-                    broker.BrokerType, userId);
-                await Task.Delay(3_000);   // no ct — let margin settle even if session cancels
+                // Wait for confirmed fill rather than a blind delay — eliminates margin errors
+                // from opening a new short before the close has actually settled.
+                await WaitForFillAsync(broker, closeOrderId, timeoutSeconds: 15, userId, chainKey);
 
                 await broker.PlaceOrderAsync(openOrder, CancellationToken.None);
                 _logger.LogInformation(
@@ -445,5 +444,65 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
             c.ExchangeToken.Equals(exchangeToken, StringComparison.OrdinalIgnoreCase));
 
         return match is not null ? $"{match.Exchange}|{match.TradingSymbol}" : null;
+    }
+
+    // ── Fill polling ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Polls <see cref="IBrokerClient.GetAllOrdersAsync"/> until all order IDs in
+    /// <paramref name="orderIds"/> (comma-separated for Upstox sliced orders) reach
+    /// "complete" status, or until the timeout elapses.
+    /// Throws <see cref="InvalidOperationException"/> if any order is rejected.
+    /// On timeout, logs a warning and returns so the open order can still be attempted.
+    /// </summary>
+    private async Task WaitForFillAsync(
+        IBrokerClient broker, string orderIds, int timeoutSeconds,
+        string userId, string chainKey)
+    {
+        var ids = orderIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                          .ToHashSet(StringComparer.Ordinal);
+
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(timeoutSeconds);
+
+        _logger.LogInformation(
+            "AutoShift waiting for fill — orderIds={OrderIds} timeout={Timeout}s chain={ChainKey} [{UserId}]",
+            orderIds, timeoutSeconds, chainKey, userId);
+
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            try
+            {
+                var orders  = await broker.GetAllOrdersAsync(CancellationToken.None);
+                var matched = orders.Where(o => ids.Contains(o.OrderId)).ToList();
+
+                var rejected = matched.FirstOrDefault(o =>
+                    o.Status.Equals("rejected", StringComparison.OrdinalIgnoreCase));
+                if (rejected is not null)
+                    throw new InvalidOperationException(
+                        $"Close order {rejected.OrderId} was rejected: {rejected.StatusMessage}");
+
+                if (matched.Count > 0 &&
+                    matched.All(o => o.Status.Equals("complete", StringComparison.OrdinalIgnoreCase)))
+                {
+                    _logger.LogInformation(
+                        "AutoShift close order filled — orderIds={OrderIds} chain={ChainKey} [{UserId}]",
+                        orderIds, chainKey, userId);
+                    return;
+                }
+            }
+            catch (InvalidOperationException) { throw; }
+            catch (Exception ex)
+            {
+                // Network blip — keep polling
+                _logger.LogDebug(ex,
+                    "AutoShift WaitForFillAsync: transient error polling orders, retrying [{UserId}]", userId);
+            }
+
+            await Task.Delay(500, CancellationToken.None);
+        }
+
+        _logger.LogWarning(
+            "AutoShift WaitForFillAsync: timed out after {Timeout}s for orderIds={OrderIds} chain={ChainKey} — proceeding with open order anyway [{UserId}]",
+            timeoutSeconds, orderIds, chainKey, userId);
     }
 }

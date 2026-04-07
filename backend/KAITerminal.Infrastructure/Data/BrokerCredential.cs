@@ -8,6 +8,7 @@ public class BrokerCredential
     public string ApiKey { get; set; } = string.Empty;
     public string ApiSecret { get; set; } = string.Empty;
     public string AccessToken { get; set; } = string.Empty;
+    public string? BrokerUserId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }

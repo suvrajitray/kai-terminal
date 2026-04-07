@@ -144,6 +144,7 @@ app.MapRiskConfigEndpoints();
 app.MapRiskLogEndpoints();
 app.MapMasterDataEndpoints();
 app.MapRiskNotificationEndpoints();
+app.MapWebhookEndpoints();
 app.MapAdminEndpoints();
 app.MapHub<PositionsHub>("/hubs/positions");
 app.MapHub<IndexHub>("/hubs/indices");

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { AlertCircle, CheckCircle2, ChevronDown, KeyRound, LogIn, PlugZap, Copy, Check } from "lucide-react";
+import { AlertCircle, CheckCircle2, ChevronDown, KeyRound, LogIn, PlugZap, Copy, Check, Webhook } from "lucide-react";
 import { BROKERS } from "@/lib/constants";
 import { BrokerCard } from "@/components/brokers/broker-card";
 import { useBrokerStore } from "@/stores/broker-store";
@@ -21,7 +21,7 @@ function getBrokerStatus(
   return "active";
 }
 
-function CopyUrl({ url }: { url: string }) {
+function CopyUrl({ url, label = "Copy URL" }: { url: string; label?: string }) {
   const [copied, setCopied] = useState(false);
   const copy = () => {
     navigator.clipboard.writeText(url);
@@ -34,7 +34,7 @@ function CopyUrl({ url }: { url: string }) {
       <button
         onClick={copy}
         className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
-        title="Copy redirect URL"
+        title={label}
       >
         {copied ? <Check className="size-3 text-green-500" /> : <Copy className="size-3" />}
       </button>
@@ -42,11 +42,18 @@ function CopyUrl({ url }: { url: string }) {
   );
 }
 
-function HowToConnect() {
+function HowToConnect({ zerodhaApiKey }: { zerodhaApiKey?: string }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab]   = useState<"upstox" | "zerodha">("upstox");
 
   const redirectUrl = (broker: string) => `${window.location.origin}/redirect/${broker}`;
+  const webhookUrl  = (broker: string) => {
+    if (broker === "zerodha") {
+      const key = zerodhaApiKey || "YOUR_API_KEY";
+      return `${window.location.origin}/api/webhooks/zerodha/order?apiKey=${key}`;
+    }
+    return `${window.location.origin}/api/webhooks/upstox/order`;
+  };
 
   const steps = [
     {
@@ -55,6 +62,7 @@ function HowToConnect() {
       upstox: "Go to Upstox Developer → My Apps → create an app. Set the redirect URL below, then copy the API Key and Secret.",
       zerodha: "Go to Kite Connect → Your Apps → create an app. Set the redirect URL below, then copy the API Key and Secret.",
       showRedirect: true,
+      showWebhook: false,
     },
     {
       icon: PlugZap,
@@ -62,6 +70,7 @@ function HowToConnect() {
       upstox: 'Click "Connect" on the Upstox card and paste your API Key and Secret.',
       zerodha: 'Click "Connect" on the Zerodha card and paste your API Key and Secret.',
       showRedirect: false,
+      showWebhook: false,
     },
     {
       icon: LogIn,
@@ -69,6 +78,15 @@ function HowToConnect() {
       upstox: "Click \"Authenticate\" → log in with your Upstox account → you'll be redirected back automatically.",
       zerodha: "Click \"Authenticate\" → log in with your Zerodha account → you'll be redirected back automatically.",
       showRedirect: false,
+      showWebhook: false,
+    },
+    {
+      icon: Webhook,
+      title: "Configure postback (optional)",
+      upstox: "In your Upstox app settings, set the Postback URL below. KAI Terminal will push order-fill notifications to your browser instantly — no waiting for the next poll.",
+      zerodha: "In your Kite app settings, set the Postback URL below. The URL includes your API key so KAI Terminal can route the notification to the right account.",
+      showRedirect: false,
+      showWebhook: true,
     },
   ];
 
@@ -120,7 +138,8 @@ function HowToConnect() {
                     <div className="flex-1 space-y-0.5 pt-0.5">
                       <p className="text-xs font-semibold text-foreground">{step.title}</p>
                       <p className="text-xs text-muted-foreground">{step[tab]}</p>
-                      {step.showRedirect && <CopyUrl url={redirectUrl(tab)} />}
+                      {step.showRedirect && <CopyUrl url={redirectUrl(tab)} label="Copy redirect URL" />}
+                      {step.showWebhook && <CopyUrl url={webhookUrl(tab)} label="Copy webhook URL" />}
                     </div>
                   </li>
                 ))}
@@ -159,6 +178,8 @@ export function ConnectBrokersPage() {
       });
   }, [saveCredentials]);
 
+  const zerodhaApiKey = getCredentials("zerodha")?.apiKey;
+
   // Only care about brokers that have been set up (have API credentials)
   const connectedBrokers = BROKERS.filter((b) => isConnected(b.id));
 
@@ -183,7 +204,7 @@ export function ConnectBrokersPage() {
         </p>
       </div>
 
-      <HowToConnect />
+      <HowToConnect zerodhaApiKey={zerodhaApiKey} />
 
       {anyNeedsReAuth && (
         <motion.div

@@ -70,7 +70,6 @@ Entry {
 ```
 _subscribedUpstoxTokens: HashSet<string>                       // O(1) feed token filter
 _zerodhaFeedToNative:    Dictionary<feedToken, nativeToken>    // reverse map for ReceiveLtpBatch
-_lastOrderStatuses:      Dictionary<(broker, orderId), status> // detects order status changes
 ```
 
 **Lifetime:** Created in `PositionsHub.OnConnectedAsync`; disposed in `PositionStreamManager` on SignalR disconnect.
@@ -79,6 +78,7 @@ _lastOrderStatuses:      Dictionary<(broker, orderId), status> // detects order 
 - `_zerodhaFeedToNative` is built once on connect from `exchange_token` → `tradingSymbol` lookups via `IZerodhaInstrumentService` (now in `KAITerminal.MarketData.Services` — moved from Zerodha SDK).
 - Feed tokens for Zerodha instruments are `NSE_FO|{exchangeToken}` / `BSE_FO|{exchangeToken}` — subscribed to the shared Upstox market-data WebSocket.
 - On each `LtpUpdate`, the coordinator translates feed tokens back to native Zerodha trading symbols before pushing `ReceiveLtpBatch` so the frontend `instrumentToken` match works without changes.
+- Order status updates are **pushed via broker webhooks** (not polled). `PositionStreamManager.GetAllForUser(username)` and `GetAllForBroker(brokerType)` route webhook payloads to the right coordinator(s); `PushOrderUpdateAsync` sends the toast and `TriggerRefreshAsync` refreshes positions on fill.
 
 ---
 
@@ -205,7 +205,7 @@ Survives Worker restarts — prevents TSL re-activation and duplicate square-off
 |---|---|---|---|---|
 | `MasterDataService` | `IMemoryCache` | `contracts:{broker}:{date}` | `IReadOnlyList<IndexContracts>` | 8:15 AM IST daily |
 | `PositionCache` | `ConcurrentDictionary` | `userId` | positions + LTP map | Process lifetime |
-| `PositionStreamCoordinator` | in-process per-connection | — | token maps, order statuses | On SignalR disconnect |
+| `PositionStreamCoordinator` | in-process per-connection | — | token maps; order updates pushed via broker webhooks | On SignalR disconnect |
 | `PositionStreamManager` | `ConcurrentDictionary` | `connectionId` | `IAsyncDisposable` (coordinator) | On SignalR disconnect |
 | `IndexStreamManager` | `ConcurrentDictionary` | `connectionId` | event handler | On SignalR disconnect |
 | `StreamingRiskWorker` | `ConcurrentDictionary` | `userId` / `userId::broker` | gates + sessions | Dynamic (30 s DB refresh) |

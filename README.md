@@ -230,7 +230,33 @@ Open `http://localhost:3000` and sign in with Google.
 3. After login you receive a `request_token` — exchange it: `POST /api/zerodha/access-token`
 
 > [!NOTE]
-> Zerodha portfolio/order streaming is stubbed — order status toasts (`ReceiveOrderUpdate`) will not appear for Zerodha orders. However, live LTP is sourced from the shared Upstox market-data feed via `exchange_token` mapping, so position P&L updates and risk monitoring (Profit Protection) work fully for Zerodha users.
+> Zerodha portfolio/order streaming is stubbed — live LTP is sourced from the shared Upstox market-data feed via `exchange_token` mapping. Order status toasts are delivered via the Kite postback webhook (see below).
+
+### Broker Webhook Setup (Order Notifications)
+
+Webhooks push instant order-fill notifications to connected browser tabs without waiting for the 10-second position poll.
+
+**Zerodha (Kite Connect)**
+
+In your Kite app settings (developers.kite.trade), set the **Postback URL** to:
+
+```
+https://<your-host>/api/webhooks/zerodha/order?apiKey=<your_kite_api_key>
+```
+
+Each Kite app maps to exactly one KAI user via the `apiKey` query parameter. The API key in the URL must match the one stored in **Settings → Brokers → Zerodha** for that user.
+
+**Upstox**
+
+In your Upstox app settings, set the **Postback URL** to:
+
+```
+https://<your-host>/api/webhooks/upstox/order
+```
+
+Upstox sends a single postback URL for all users on the same app. KAI routes to the correct user via the `user_id` field in the postback payload, matched against the `BrokerUserId` stored in the DB. **Users must re-authenticate once after the DB migration** (`ALTER TABLE "BrokerCredentials" ADD COLUMN "BrokerUserId" VARCHAR;`) to populate this field.
+
+Both endpoints verify the broker's cryptographic signature before processing — unauthenticated requests are rejected with `401`.
 
 ---
 

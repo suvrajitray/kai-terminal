@@ -9,7 +9,7 @@ namespace KAITerminal.Zerodha;
 /// </summary>
 public sealed class ZerodhaClient
 {
-    public IBrokerAuthService     Auth      { get; }
+    public IZerodhaAuthService    Auth      { get; }
     public IBrokerPositionService Positions { get; }
     public IBrokerOrderService    Orders    { get; }
     public IBrokerFundsService    Funds     { get; }

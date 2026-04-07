@@ -73,6 +73,7 @@ Adding a new broker: create `KAITerminal.{Broker}`, implement `IBrokerClient`, r
 - **Token context middleware** — `/api/upstox/*` reads `X-Upstox-Access-Token` → `UpstoxTokenContext.Use(token)`; `/api/zerodha/*` reads both headers → `ZerodhaTokenContext.Use(apiKey, token)`.
 - **Zerodha live LTP** — sourced from shared Upstox market-data feed via `exchange_token` mapping. Zerodha portfolio/order streaming is **stubbed**.
 - **Risk events** — `POST /api/internal/risk-event` (validated by `X-Internal-Key`) forwards `RiskNotification` from Worker to user's SignalR group (`/hubs/risk`). `Api:InternalKey` must match in both Api and Worker secrets.
+- **Order webhooks** — `POST /api/webhooks/zerodha/order?apiKey={key}` and `POST /api/webhooks/upstox/order`. Zerodha: routed by API key (unique per Kite app), verified via SHA256 checksum. Upstox: verified via `X-Api-Verify-Token` HMAC, user resolved by `BrokerUserId` DB lookup (requires users to have re-authenticated after the `BrokerUserId` column migration). Both push instant order-status toasts + position refresh to connected frontend clients via `PositionStreamCoordinator`.
 - `Frontend:Url` controls CORS + OAuth redirect.
 
 ### API Response Layer
@@ -89,6 +90,7 @@ API enums always use `[JsonConverter(typeof(JsonStringEnumConverter))]` — stri
 - OAuth credentials are **never** stored in `UpstoxConfig` — always passed as method params to `GenerateTokenAsync`.
 - API errors → `UpstoxException`; WebSocket errors → `Disconnected` event (never thrown).
 - `UpstoxHttpClient` is `internal` — expose new functionality via a public interface in DI.
+- `UpstoxClient.Auth` is typed as `IUpstoxAuthService` (extends `IBrokerAuthService`). Use `GenerateTokenWithUserIdAsync` when you need both the access token and the Upstox `user_id` in one call.
 
 ### Zerodha SDK (`KAITerminal.Zerodha`)
 
@@ -96,6 +98,7 @@ API enums always use `[JsonConverter(typeof(JsonStringEnumConverter))]` — stri
 - **Position token**: `InstrumentToken = TradingSymbol` (e.g. `NIFTY2641320700PE`) throughout the stack — not a numeric ID.
 - **Product quirk**: NRML positions exit back as `"NRML"` (not `"CNC"`) — `ZerodhaPositionService.MapProductBack` preserves this.
 - Broker streaming is **stubbed** — `KiteTickerStreamer`/`ZerodhaPortfolioStreamer` never fire events. LTP arrives via shared Upstox feed.
+- `ZerodhaClient.Auth` is typed as `IZerodhaAuthService` (extends `IBrokerAuthService`). Use `GenerateTokenWithUserIdAsync` when you need both the access token and the Zerodha `user_id` (client ID, e.g. `AB1234`).
 
 ### MarketData (`KAITerminal.MarketData`)
 
@@ -130,7 +133,7 @@ PostgreSQL via Neon. Tables auto-created on first start; **new tables require ma
 
 | Table                 | Purpose                                                                                                      |
 | --------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `BrokerCredentials`   | Per-user credentials. Unique on `(Username, BrokerName)`.                                                    |
+| `BrokerCredentials`   | Per-user credentials. Unique on `(Username, BrokerName)`. Includes `BrokerUserId VARCHAR` (nullable) — stores the broker-native user ID (Upstox `user_id`, Zerodha client ID like `AB1234`). **Requires manual migration:** `ALTER TABLE "BrokerCredentials" ADD COLUMN "BrokerUserId" VARCHAR;` Users must re-authenticate once to populate it. |
 | `UserTradingSettings` | Per-user trading preferences. Includes `AutoSquareOffEnabled` (bool) + `AutoSquareOffTime` (varchar "HH:mm"). **Requires manual migration — see `TODO.md`.** |
 | `AppUsers`            | `Email`, `Name`, `IsActive`, `IsAdmin`                                                                       |
 | `UserRiskConfigs`     | PP/risk config. Unique on `(Username, BrokerType)`. Includes `WatchedProducts VARCHAR NOT NULL DEFAULT 'All'`. **Requires manual migration:** `ALTER TABLE "UserRiskConfigs" ADD COLUMN "WatchedProducts" VARCHAR NOT NULL DEFAULT 'All';` |
