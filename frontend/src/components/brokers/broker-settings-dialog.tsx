@@ -27,17 +27,27 @@ export function BrokerSettingsDialog({ broker, open, onOpenChange }: BrokerSetti
   const removeCredentials = useBrokerStore((s) => s.removeCredentials);
   const [apiKey, setApiKey] = useState(credentials?.apiKey ?? "");
   const [apiSecret, setApiSecret] = useState(credentials?.apiSecret ?? "");
-  const [copied, setCopied] = useState(false);
+  const [copiedRedirect, setCopiedRedirect] = useState(false);
+  const [copiedWebhook, setCopiedWebhook]   = useState(false);
   const [saving, setSaving] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const redirectUrl = `${window.location.origin}${broker.redirectPath}`;
+  const webhookUrl  = broker.id === "zerodha"
+    ? `${window.location.origin}/api/webhooks/zerodha/order?apiKey=${apiKey || "YOUR_API_KEY"}`
+    : `${window.location.origin}/api/webhooks/${broker.id}/order`;
 
-  const handleCopy = async () => {
+  const handleCopyRedirect = async () => {
     await navigator.clipboard.writeText(redirectUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopiedRedirect(true);
+    setTimeout(() => setCopiedRedirect(false), 2000);
+  };
+
+  const handleCopyWebhook = async () => {
+    await navigator.clipboard.writeText(webhookUrl);
+    setCopiedWebhook(true);
+    setTimeout(() => setCopiedWebhook(false), 2000);
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -111,8 +121,17 @@ export function BrokerSettingsDialog({ broker, open, onOpenChange }: BrokerSetti
             <Label htmlFor="settings-redirect-url">Redirect URL</Label>
             <div className="flex gap-2">
               <Input id="settings-redirect-url" value={redirectUrl} readOnly className="text-muted-foreground" />
-              <Button type="button" variant="outline" size="icon" onClick={handleCopy}>
-                {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+              <Button type="button" variant="outline" size="icon" onClick={handleCopyRedirect}>
+                {copiedRedirect ? <Check className="size-4" /> : <Copy className="size-4" />}
+              </Button>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="settings-webhook-url">Webhook URL</Label>
+            <div className="flex gap-2">
+              <Input id="settings-webhook-url" value={webhookUrl} readOnly className="text-muted-foreground font-mono text-xs" />
+              <Button type="button" variant="outline" size="icon" onClick={handleCopyWebhook}>
+                {copiedWebhook ? <Check className="size-4" /> : <Copy className="size-4" />}
               </Button>
             </div>
           </div>
