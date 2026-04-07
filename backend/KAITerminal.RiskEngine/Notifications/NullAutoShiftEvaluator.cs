@@ -6,6 +6,6 @@ namespace KAITerminal.RiskEngine.Notifications;
 
 internal sealed class NullAutoShiftEvaluator : IAutoShiftEvaluator
 {
-    public Task EvaluateAsync(string userId, UserConfig config, IBrokerClient broker, CancellationToken ct)
+    public Task EvaluateAsync(UserConfig config, IBrokerClient broker, CancellationToken ct)
         => Task.CompletedTask;
 }

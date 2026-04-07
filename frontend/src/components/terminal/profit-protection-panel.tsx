@@ -226,7 +226,11 @@ export function ProfitProtectionPanel({ open, onClose, positions }: ProfitProtec
 
             {/* Right: ON/OFF pill toggle */}
             <button
-              onClick={() => setStr("enabled", !draft.enabled)}
+              onClick={() => setDraft((d) => ({
+                ...d,
+                enabled: !d.enabled,
+                ...(!d.enabled ? {} : { autoShiftEnabled: false }),
+              }))}
               className={cn(
                 "flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all",
                 draft.enabled

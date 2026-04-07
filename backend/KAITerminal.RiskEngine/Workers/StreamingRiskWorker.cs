@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-using System.Diagnostics;
+using System.Threading.Channels;
 using KAITerminal.Broker;
 using KAITerminal.Contracts.Domain;
 using KAITerminal.Contracts.Notifications;
@@ -15,40 +15,33 @@ using Microsoft.Extensions.Options;
 namespace KAITerminal.RiskEngine.Workers;
 
 /// <summary>
-/// Polling + streaming risk worker.
-/// <para>
-/// Per user: creates a broker client via <see cref="IBrokerClientFactory"/> for REST calls,
-/// subscribes to <see cref="ISharedMarketDataService"/> for LTP ticks (shared across all users),
-/// and polls positions via REST every <see cref="RiskEngineConfig.PositionPollIntervalMs"/> ms.
-/// LTP-triggered evaluations are rate-limited via <see cref="RiskEngineConfig.LtpEvalMinIntervalMs"/>.
-/// Portfolio events (fills) are detected via the position poll, not a WebSocket stream.
-/// </para>
+/// One <see cref="Task"/> per user session drives everything: LTP ticks arrive via a
+/// per-user <see cref="Channel{T}"/>, the poll timer fires via <c>CancelAfter</c>, and an
+/// optional refresh signal from auto-shift wakes the loop early.  Because evaluation always
+/// runs on a single task there are no concurrency primitives — no semaphores, no gates, no
+/// concurrent <c>Task.Run</c> for ticks — making the control flow easy to follow and test.
 /// </summary>
-public sealed class StreamingRiskWorker : BackgroundService
+public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTrigger
 {
-    private readonly IUserTokenSource         _tokenSource;
-    private readonly IBrokerClientFactory     _brokerFactory;
-    private readonly IPositionCache           _cache;
-    private readonly IRiskRepository          _repo;
-    private readonly RiskEvaluator            _evaluator;
-    private readonly IAutoShiftEvaluator      _autoShift;
-    private readonly IRiskEventNotifier       _notifier;
-    private readonly ISharedMarketDataService _sharedMarketData;
-    private readonly ITokenMapper             _tokenMapper;
-    private readonly RiskEngineConfig         _cfg;
+    private readonly IUserTokenSource            _tokenSource;
+    private readonly IBrokerClientFactory        _brokerFactory;
+    private readonly IPositionCache              _cache;
+    private readonly IRiskRepository             _repo;
+    private readonly RiskEvaluator               _evaluator;
+    private readonly IAutoShiftEvaluator         _autoShift;
+    private readonly IRiskEventNotifier          _notifier;
+    private readonly ISharedMarketDataService    _sharedMarketData;
+    private readonly ITokenMapper                _tokenMapper;
+    private readonly RiskEngineConfig            _cfg;
     private readonly ILogger<StreamingRiskWorker> _logger;
-    private readonly TimeZoneInfo             _tradingTz;
+    private readonly TimeZoneInfo                _tradingTz;
 
-    private readonly ConcurrentDictionary<string, UserGate>    _gates    = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, SessionEntry>           _sessions = new(StringComparer.Ordinal);
+    // Keyed by "{userId}::{brokerType}"
+    private readonly Dictionary<string, SessionEntry>                _sessions        = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, Channel<LtpUpdate>> _ltpChannels   = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, Channel<bool>>      _refreshChannels = new(StringComparer.Ordinal);
 
     private int _tradingWindowState = -1;
-
-    private sealed class UserGate
-    {
-        public readonly SemaphoreSlim Sem = new(1, 1);
-        public long LastLtpEvalTicks;
-    }
 
     private sealed class SessionEntry
     {
@@ -57,20 +50,19 @@ public sealed class StreamingRiskWorker : BackgroundService
         public required UserConfig              Config { get; init; }
     }
 
-    private static string SessionKey(UserConfig u) => $"{u.UserId}::{u.BrokerType}";
-    private static string CacheKey(UserConfig u)   => $"{u.UserId}::{u.BrokerType}";
+    private static string Key(UserConfig u) => $"{u.UserId}::{u.BrokerType}";
 
     public StreamingRiskWorker(
-        IUserTokenSource         tokenSource,
-        IBrokerClientFactory     brokerFactory,
-        IPositionCache           cache,
-        IRiskRepository          repo,
-        RiskEvaluator            evaluator,
-        IAutoShiftEvaluator      autoShift,
-        IRiskEventNotifier       notifier,
-        ISharedMarketDataService sharedMarketData,
-        ITokenMapper             tokenMapper,
-        IOptions<RiskEngineConfig> cfg,
+        IUserTokenSource            tokenSource,
+        IBrokerClientFactory        brokerFactory,
+        IPositionCache              cache,
+        IRiskRepository             repo,
+        RiskEvaluator               evaluator,
+        IAutoShiftEvaluator         autoShift,
+        IRiskEventNotifier          notifier,
+        ISharedMarketDataService    sharedMarketData,
+        ITokenMapper                tokenMapper,
+        IOptions<RiskEngineConfig>  cfg,
         ILogger<StreamingRiskWorker> logger)
     {
         _tokenSource      = tokenSource;
@@ -87,20 +79,29 @@ public sealed class StreamingRiskWorker : BackgroundService
         _tradingTz        = TimeZoneInfo.FindSystemTimeZoneById(_cfg.TradingTimeZone);
     }
 
+    // ── IPositionRefreshTrigger ──────────────────────────────────────────────
+
+    /// <summary>Wakes the eval loop immediately for this user+broker. Safe to call from any thread.</summary>
+    public void RequestRefresh(string cacheKey)
+    {
+        var ch = _refreshChannels.GetOrAdd(cacheKey, _ =>
+            Channel.CreateBounded<bool>(new BoundedChannelOptions(1)
+                { FullMode = BoundedChannelFullMode.DropOldest }));
+        ch.Writer.TryWrite(true);
+    }
+
+    // ── Supervisor ───────────────────────────────────────────────────────────
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation(
-            "RiskWorker started — trading window {Start}–{End} {Tz}, LTP eval every {IntervalMs}ms, " +
-            "position poll every {PollMs}ms, user refresh every {RefreshMs}ms",
+            "RiskWorker started — trading window {Start}–{End} {Tz}, poll every {PollMs}ms, user refresh every {RefreshMs}ms",
             _cfg.TradingWindowStart.ToString(@"hh\:mm"),
             _cfg.TradingWindowEnd.ToString(@"hh\:mm"),
             _cfg.TradingTimeZone,
-            _cfg.LtpEvalMinIntervalMs,
             _cfg.PositionPollIntervalMs,
             _cfg.UserRefreshIntervalMs);
 
-        // Supervisor loop: re-queries DB every UserRefreshIntervalMs.
-        // Starts sessions for new users, restarts on config change, stops for removed/disabled users.
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -118,23 +119,17 @@ public sealed class StreamingRiskWorker : BackgroundService
             catch (OperationCanceledException) { break; }
         }
 
-        // Shutdown: cancel all running sessions and wait for them to exit
         var allEntries = _sessions.Values.ToList();
-        foreach (var entry in allEntries)
-            entry.Cts.Cancel();
-
+        foreach (var entry in allEntries) entry.Cts.Cancel();
         await Task.WhenAll(allEntries.Select(e => e.Task));
 
         _logger.LogInformation("RiskWorker stopped");
     }
 
-    // ── Supervisor ────────────────────────────────────────────────────────────
-
     private async Task SyncSessionsAsync(IReadOnlyList<UserConfig> freshUsers, CancellationToken stoppingToken)
     {
-        var freshByKey = freshUsers.ToDictionary(SessionKey, StringComparer.Ordinal);
+        var freshByKey = freshUsers.ToDictionary(Key, StringComparer.Ordinal);
 
-        // Stop sessions for users no longer present or whose config changed
         var toStop = _sessions
             .Where(kvp => !freshByKey.TryGetValue(kvp.Key, out var fresh) || HasConfigChanged(kvp.Value.Config, fresh))
             .ToList();
@@ -142,38 +137,36 @@ public sealed class StreamingRiskWorker : BackgroundService
         foreach (var (key, entry) in toStop)
         {
             bool configChanged = freshByKey.ContainsKey(key);
-            var reason = configChanged ? "config changed" : "disabled or token expired";
             _logger.LogInformation(
                 "Stopping session ({Reason}) — {UserId} ({Broker})",
-                reason, entry.Config.UserId, entry.Config.BrokerType);
+                configChanged ? "config changed" : "disabled or token expired",
+                entry.Config.UserId, entry.Config.BrokerType);
             entry.Cts.Cancel();
             _sessions.Remove(key);
+            _ltpChannels.TryRemove(key, out _);
+            _refreshChannels.TryRemove(key, out _);
 
-            // Config change = intentional reconfiguration; wipe TSL floor and squared-off state
-            // so the new session starts clean with the updated parameters.
             if (configChanged)
-                await _repo.ResetAsync($"{entry.Config.UserId}::{entry.Config.BrokerType}");
+                await _repo.ResetAsync(key);
         }
 
-        // Wait for stopped sessions to exit cleanly before restarting them
         if (toStop.Count > 0)
             await Task.WhenAll(toStop.Select(x => x.Value.Task));
 
-        // Start sessions for new users (including restarts after config change)
         foreach (var user in freshUsers)
         {
-            var key = SessionKey(user);
-            if (_sessions.ContainsKey(key)) continue;
+            if (_sessions.ContainsKey(Key(user))) continue;
 
             _logger.LogInformation("Starting session — {UserId} ({Broker})", user.UserId, user.BrokerType);
             var cts  = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
             var task = RunUserWithRestartAsync(user, cts.Token);
-            _sessions[key] = new SessionEntry { Cts = cts, Task = task, Config = user };
+            _sessions[Key(user)] = new SessionEntry { Cts = cts, Task = task, Config = user };
         }
     }
 
     private static bool HasConfigChanged(UserConfig old, UserConfig next) =>
         old.AccessToken           != next.AccessToken           ||
+        old.ApiKey                != next.ApiKey                ||
         old.MtmTarget             != next.MtmTarget             ||
         old.MtmSl                 != next.MtmSl                 ||
         old.TrailingEnabled       != next.TrailingEnabled       ||
@@ -189,113 +182,7 @@ public sealed class StreamingRiskWorker : BackgroundService
         old.AutoSquareOffTime     != next.AutoSquareOffTime     ||
         old.WatchedProducts       != next.WatchedProducts;
 
-    // ── Per-user session ─────────────────────────────────────────────────────
-
-    private async Task RunUserAsync(UserConfig user, CancellationToken ct)
-    {
-        // Reset risk state at the start of each new trading day so stale TSL / squared-off
-        // flags from yesterday do not carry over into today's session.
-        var stateKey = $"{user.UserId}::{user.BrokerType}";
-        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, _tradingTz).DateTime);
-        var existingState = await _repo.GetOrCreateAsync(stateKey);
-        if (existingState.LastSessionDate < today)
-        {
-            _logger.LogInformation(
-                "New trading day — resetting risk state for {UserId} ({Broker})",
-                user.UserId, user.BrokerType);
-            await _repo.UpdateAsync(stateKey, new UserRiskState { LastSessionDate = today });
-        }
-
-        var broker = _brokerFactory.Create(user.BrokerType, user.AccessToken, user.ApiKey);
-
-        // ── Initial position fetch ────────────────────────────────────────
-        var rawPositions = await broker.GetAllPositionsAsync(ct);
-        var positions = user.WatchedProducts == "All"
-            ? rawPositions
-            : rawPositions
-                .Where(p => ProductTypeFilter.Matches(p.Product, user.WatchedProducts))
-                .ToList()
-                .AsReadOnly();
-        if (user.WatchedProducts == "All")
-            _logger.LogInformation(
-                "Positions loaded — {UserId} ({Broker}) | {Count} position(s) [all products]",
-                user.UserId, user.BrokerType, positions.Count);
-        else
-            _logger.LogInformation(
-                "Positions loaded — {UserId} ({Broker}) | {Watched}/{Total} position(s) [{Filter} only — {Excluded} excluded]",
-                user.UserId, user.BrokerType, positions.Count, rawPositions.Count,
-                user.WatchedProducts, rawPositions.Count - positions.Count);
-        _cache.UpdatePositions(CacheKey(user), positions);  // also clears stale LTP
-
-        var tokens = _cache.GetOpenInstrumentTokens(CacheKey(user));
-
-        // ── Subscribe to shared market data ───────────────────────────────
-        if (tokens.Count > 0)
-        {
-            await _tokenMapper.EnsureReadyAsync(user.BrokerType, ct);
-            var feedTokens = _tokenMapper.ToFeedTokens(user.BrokerType, tokens);
-            _logger.LogInformation(
-                "Subscribing {Count} instrument(s) — {UserId} ({Broker})",
-                feedTokens.Count, user.UserId, user.BrokerType);
-            await _sharedMarketData.SubscribeAsync(feedTokens, FeedMode.Ltpc, ct);
-        }
-
-        var openCount   = tokens.Count;
-        var totalCount  = rawPositions.Count(p => p.IsOpen);
-        var watchLabel  = user.WatchedProducts switch
-        {
-            "Intraday" => "Intraday",
-            "Delivery" => "Delivery",
-            _          => "Intraday + Delivery",
-        };
-        if (user.WatchedProducts == "All" || totalCount == openCount)
-            _logger.LogInformation(
-                "Streams live — {UserId} ({Broker})  watching {Count} open instrument(s) [{Watch}]",
-                user.UserId, user.BrokerType, openCount, watchLabel);
-        else
-            _logger.LogWarning(
-                "Streams live — {UserId} ({Broker})  watching {Watched}/{Total} open instrument(s) [{Watch} filter — {Excluded} excluded]",
-                user.UserId, user.BrokerType, openCount, totalCount, watchLabel, totalCount - openCount);
-
-        if (openCount > 0)
-        {
-            await _notifier.NotifyAsync(new RiskNotification(
-                user.UserId, user.BrokerType, RiskNotificationType.SessionStarted,
-                _cache.GetMtm(CacheKey(user)),
-                OpenPositionCount: openCount,
-                Timestamp: DateTimeOffset.UtcNow), ct);
-        }
-
-        // ── LTP event handler ─────────────────────────────────────────────
-        EventHandler<LtpUpdate> ltpHandler = (_, update) =>
-            _ = Task.Run(() => HandleLtpTickAsync(user, broker, update, ct));
-
-        _sharedMarketData.FeedReceived += ltpHandler;
-
-        try
-        {
-            // ── Position poll loop (replaces portfolio stream) ────────────
-            await RunPositionPollLoopAsync(user, broker, ct);
-        }
-        finally
-        {
-            _sharedMarketData.FeedReceived -= ltpHandler;
-
-            // Unsubscribe this user's instruments from shared feed
-            var currentTokens = _cache.GetOpenInstrumentTokens(CacheKey(user));
-            if (currentTokens.Count > 0)
-            {
-                try
-                {
-                    var feedTokens = _tokenMapper.ToFeedTokens(user.BrokerType, currentTokens);
-                    await _sharedMarketData.UnsubscribeAsync(feedTokens);
-                }
-                catch { /* best-effort on shutdown */ }
-            }
-        }
-    }
-
-    // ── Session restart wrapper ──────────────────────────────────────────────
+    // ── Per-user session (with restart) ─────────────────────────────────────
 
     private async Task RunUserWithRestartAsync(UserConfig user, CancellationToken ct)
     {
@@ -310,175 +197,252 @@ public sealed class StreamingRiskWorker : BackgroundService
                 await RunUserAsync(user, ct);
                 return;
             }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
-            {
-                return;
-            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { return; }
             catch
             {
-                _logger.LogWarning(
-                    "Restarting session — {UserId} ({Broker}) in {Delay}s",
+                _logger.LogWarning("Restarting session — {UserId} ({Broker}) in {Delay}s",
                     user.UserId, user.BrokerType, delaySeconds);
-
                 try { await Task.Delay(TimeSpan.FromSeconds(delaySeconds), ct); }
                 catch (OperationCanceledException) { return; }
-
                 delaySeconds = Math.Min(delaySeconds * 2, maxDelaySeconds);
             }
         }
     }
 
-    // ── Position poll loop ────────────────────────────────────────────────────
-
-    private async Task RunPositionPollLoopAsync(UserConfig user, IBrokerClient broker, CancellationToken ct)
+    private async Task RunUserAsync(UserConfig user, CancellationToken ct)
     {
+        // Reset risk state on a new trading day
+        var stateKey = Key(user);
+        var today    = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, _tradingTz).DateTime);
+        var existing = await _repo.GetOrCreateAsync(stateKey);
+        if (existing.LastSessionDate < today)
+        {
+            _logger.LogInformation("New trading day — resetting risk state for {UserId} ({Broker})",
+                user.UserId, user.BrokerType);
+            await _repo.UpdateAsync(stateKey, new UserRiskState { LastSessionDate = today });
+        }
+
+        var broker = _brokerFactory.Create(user.BrokerType, user.AccessToken, user.ApiKey);
+
+        // ── Initial position fetch and feed subscription ──────────────────
+        await PollPositionsAsync(user, broker, isStartup: true, ct);
+
+        // ── LTP channel: event handler just enqueues, eval loop processes ─
+        // A fresh channel per session avoids stale ticks from a previous restart.
+        var ltpChannel = Channel.CreateBounded<LtpUpdate>(
+            new BoundedChannelOptions(200) { FullMode = BoundedChannelFullMode.DropOldest });
+        _ltpChannels[stateKey] = ltpChannel;
+
+        var refreshChannel = _refreshChannels.GetOrAdd(stateKey, _ =>
+            Channel.CreateBounded<bool>(new BoundedChannelOptions(1)
+                { FullMode = BoundedChannelFullMode.DropOldest }));
+
+        // Thread-safe: just write to the channel — no async, no Task.Run needed
+        EventHandler<LtpUpdate> ltpHandler = (_, update) => ltpChannel.Writer.TryWrite(update);
+        _sharedMarketData.FeedReceived += ltpHandler;
+
+        try
+        {
+            await RunEvalLoopAsync(user, broker, ltpChannel.Reader, refreshChannel.Reader, ct);
+        }
+        finally
+        {
+            _sharedMarketData.FeedReceived -= ltpHandler;
+
+            var openTokens = _cache.GetOpenInstrumentTokens(stateKey);
+            if (openTokens.Count > 0)
+            {
+                try
+                {
+                    var feedTokens = _tokenMapper.ToFeedTokens(user.BrokerType, openTokens);
+                    await _sharedMarketData.UnsubscribeAsync(feedTokens);
+                }
+                catch { /* best-effort on shutdown */ }
+            }
+        }
+    }
+
+    // ── Unified eval loop — single Task per user, no concurrency needed ──────
+
+    private async Task RunEvalLoopAsync(
+        UserConfig       user,
+        IBrokerClient    broker,
+        ChannelReader<LtpUpdate> ltpReader,
+        ChannelReader<bool>      refreshReader,
+        CancellationToken ct)
+    {
+        // Initial poll already done in RunUserAsync; schedule the next one after the full interval.
+        var stateKey   = Key(user);
+        var nextPollAt = DateTimeOffset.UtcNow.AddMilliseconds(_cfg.PositionPollIntervalMs);
+        var lastEvalAt = DateTimeOffset.MinValue;
+        var minEvalGap = TimeSpan.FromMilliseconds(_cfg.LtpEvalMinIntervalMs);
+
         while (!ct.IsCancellationRequested)
         {
             try
             {
-                await Task.Delay(_cfg.PositionPollIntervalMs, ct);
-
-                _logger.LogDebug("Polling positions — {UserId} ({Broker})", user.UserId, user.BrokerType);
-
-                var rawPositions = await broker.GetAllPositionsAsync(ct);
-                var positions = user.WatchedProducts == "All"
-                    ? rawPositions
-                    : rawPositions
-                        .Where(p => ProductTypeFilter.Matches(p.Product, user.WatchedProducts))
-                        .ToList()
-                        .AsReadOnly();
-                _logger.LogDebug(
-                    "Position poll — {UserId} ({Broker}) | {Watched}/{Total} [{Filter}]",
-                    user.UserId, user.BrokerType, positions.Count, rawPositions.Count, user.WatchedProducts);
-                _cache.UpdatePositions(CacheKey(user), positions);  // clears stale LTP
-
-                // Re-subscribe if open instruments changed
-                var newTokens = _cache.GetOpenInstrumentTokens(CacheKey(user));
-                if (newTokens.Count > 0)
+                // ── 1. Drain all pending LTP ticks into the cache ────────────────
+                bool anyNewLtp  = false;
+                var  openTokens = _cache.GetOpenInstrumentTokens(stateKey);
+                while (ltpReader.TryRead(out var tick))
                 {
-                    var feedTokens = _tokenMapper.ToFeedTokens(user.BrokerType, newTokens);
-                    await _sharedMarketData.SubscribeAsync(feedTokens, FeedMode.Ltpc, ct);
+                    foreach (var (feedToken, ltp) in tick.Ltps)
+                    {
+                        var native = _tokenMapper.ToNativeToken(user.BrokerType, feedToken);
+                        if (!openTokens.Contains(native)) continue;
+                        _cache.UpdateLtp(stateKey, native, ltp);
+                        anyNewLtp = true;
+                    }
                 }
 
-                await EvaluateAsync(user, broker, ct);
+                // ── 2. Poll positions if timer fired or refresh requested ─────────
+                bool refreshRequested = refreshReader.TryRead(out _);
+                bool pollDue          = DateTimeOffset.UtcNow >= nextPollAt || refreshRequested;
+
+                if (pollDue)
+                {
+                    await PollPositionsAsync(user, broker, isStartup: false, ct);
+                    nextPollAt  = DateTimeOffset.UtcNow.AddMilliseconds(_cfg.PositionPollIntervalMs);
+                    openTokens  = _cache.GetOpenInstrumentTokens(stateKey); // refresh after poll
+                }
+
+                // ── 3. Evaluate risk ──────────────────────────────────────────────
+                //  • Always evaluate after a poll (positions may have changed)
+                //  • For LTP-only wakeups, rate-limit to avoid evaluating on every tick
+                var now         = DateTimeOffset.UtcNow;
+                bool ltpEvalDue = anyNewLtp && (now - lastEvalAt) >= minEvalGap;
+
+                if ((pollDue || ltpEvalDue) && CheckTradingWindow())
+                {
+                    if (openTokens.Count > 0)
+                    {
+                        lastEvalAt = now;
+                        var mtm = _cache.GetMtm(stateKey);
+                        await _evaluator.EvaluateAsync(user.UserId, mtm, user, broker, ct);
+                        await _autoShift.EvaluateAsync(user, broker, ct);
+                    }
+                    else
+                    {
+                        _logger.LogDebug("No open positions — skipping evaluation for {UserId} ({Broker})",
+                            user.UserId, user.BrokerType);
+                    }
+                }
             }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
-            {
-                return;
-            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { break; }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in position poll — {UserId} ({Broker})", user.UserId, user.BrokerType);
+                // Transient error (network blip, broker timeout) — log and continue.
+                // The session keeps running; the next poll will retry.
+                _logger.LogError(ex, "Error in eval loop — {UserId} ({Broker})", user.UserId, user.BrokerType);
             }
+
+            // ── 4. Sleep until the next LTP tick, refresh signal, or poll time ─
+            // Task.WhenAny never throws; CancelAfter acts as the poll timer.
+            var sleepMs = (int)Math.Max(0, (nextPollAt - DateTimeOffset.UtcNow).TotalMilliseconds);
+            using var sleepCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            sleepCts.CancelAfter(sleepMs);
+            await Task.WhenAny(
+                ltpReader.WaitToReadAsync(sleepCts.Token).AsTask(),
+                refreshReader.WaitToReadAsync(sleepCts.Token).AsTask());
         }
     }
 
-    // ── LTP tick handler ─────────────────────────────────────────────────────
+    // ── Position poll ─────────────────────────────────────────────────────────
 
-    private async Task HandleLtpTickAsync(
-        UserConfig user, IBrokerClient broker, LtpUpdate update, CancellationToken ct)
+    private async Task PollPositionsAsync(UserConfig user, IBrokerClient broker, bool isStartup, CancellationToken ct)
     {
-        // Filter to only this user's open instruments.
-        // Feed tokens are in Upstox format (e.g. "NSE_FO|37590"); for Zerodha users
-        // we map them back to native position tokens (e.g. "226623237") before cache lookup.
-        var userTokens = _cache.GetOpenInstrumentTokens(CacheKey(user));
-        bool relevant = false;
-        foreach (var (feedToken, ltp) in update.Ltps)
+        _logger.LogDebug("Polling positions — {UserId} ({Broker})", user.UserId, user.BrokerType);
+
+        var rawPositions = await broker.GetAllPositionsAsync(ct);
+        var positions = user.WatchedProducts == "All"
+            ? rawPositions
+            : rawPositions
+                .Where(p => ProductTypeFilter.Matches(p.Product, user.WatchedProducts))
+                .ToList()
+                .AsReadOnly();
+
+        if (isStartup)
         {
-            var nativeToken = _tokenMapper.ToNativeToken(user.BrokerType, feedToken);
-            if (!userTokens.Contains(nativeToken)) continue;
-            _cache.UpdateLtp(CacheKey(user), nativeToken, ltp);
-            relevant = true;
+            if (user.WatchedProducts == "All")
+                _logger.LogInformation("Positions loaded — {UserId} ({Broker}) | {Count} position(s) [all products]",
+                    user.UserId, user.BrokerType, positions.Count);
+            else
+                _logger.LogInformation(
+                    "Positions loaded — {UserId} ({Broker}) | {Watched}/{Total} position(s) [{Filter} only — {Excluded} excluded]",
+                    user.UserId, user.BrokerType, positions.Count, rawPositions.Count,
+                    user.WatchedProducts, rawPositions.Count - positions.Count);
+        }
+        else
+        {
+            _logger.LogDebug("Position poll — {UserId} ({Broker}) | {Watched}/{Total} [{Filter}]",
+                user.UserId, user.BrokerType, positions.Count, rawPositions.Count, user.WatchedProducts);
         }
 
-        if (!relevant) return;
+        _cache.UpdatePositions(Key(user), positions);
 
-        if (!CanEvaluateFromLtp(CacheKey(user)))
+        // Subscribe any new open instruments to the shared LTP feed
+        var openTokens = _cache.GetOpenInstrumentTokens(Key(user));
+        if (openTokens.Count > 0)
         {
-            _logger.LogDebug("LTP eval rate-limited — {UserId} ({Broker})", user.UserId, user.BrokerType);
-            return;
+            await _tokenMapper.EnsureReadyAsync(user.BrokerType, ct);
+            var feedTokens = _tokenMapper.ToFeedTokens(user.BrokerType, openTokens);
+
+            if (isStartup)
+                _logger.LogInformation("Subscribing {Count} instrument(s) — {UserId} ({Broker})",
+                    feedTokens.Count, user.UserId, user.BrokerType);
+
+            await _sharedMarketData.SubscribeAsync(feedTokens, FeedMode.Ltpc, ct);
         }
 
-        try
+        if (isStartup)
         {
-            await EvaluateAsync(user, broker, ct);
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error in LTP evaluation — {UserId} ({Broker})", user.UserId, user.BrokerType);
+            var watchLabel = user.WatchedProducts switch
+            {
+                "Intraday" => "Intraday",
+                "Delivery" => "Delivery",
+                _          => "Intraday + Delivery",
+            };
+            var totalOpen = rawPositions.Count(p => p.IsOpen);
+            if (user.WatchedProducts == "All" || totalOpen == openTokens.Count)
+                _logger.LogInformation("Streams live — {UserId} ({Broker})  watching {Count} open instrument(s) [{Watch}]",
+                    user.UserId, user.BrokerType, openTokens.Count, watchLabel);
+            else
+                _logger.LogWarning(
+                    "Streams live — {UserId} ({Broker})  watching {Watched}/{Total} open instrument(s) [{Watch} filter — {Excluded} excluded]",
+                    user.UserId, user.BrokerType, openTokens.Count, totalOpen, watchLabel, totalOpen - openTokens.Count);
+
+            if (openTokens.Count > 0)
+                await _notifier.NotifyAsync(new RiskNotification(
+                    user.UserId, user.BrokerType, RiskNotificationType.SessionStarted,
+                    _cache.GetMtm(Key(user)),
+                    OpenPositionCount: openTokens.Count,
+                    Timestamp: DateTimeOffset.UtcNow), ct);
         }
     }
 
-    // ── Risk evaluation helper ───────────────────────────────────────────────
-
-    private async Task EvaluateAsync(UserConfig user, IBrokerClient broker, CancellationToken ct)
-    {
-        if (!CheckTradingWindow())
-        {
-            _logger.LogDebug("Outside trading hours — skipping evaluation for {UserId} ({Broker})", user.UserId, user.BrokerType);
-            return;
-        }
-
-        if (_cache.GetOpenInstrumentTokens(CacheKey(user)).Count == 0)
-        {
-            _logger.LogDebug("No open positions — skipping evaluation for {UserId} ({Broker})", user.UserId, user.BrokerType);
-            return;
-        }
-
-        var gate = _gates.GetOrAdd(CacheKey(user), _ => new UserGate());
-        if (!await gate.Sem.WaitAsync(0, ct))
-        {
-            _logger.LogDebug("Evaluation in progress — skipping for {UserId} ({Broker})", user.UserId, user.BrokerType);
-            return;
-        }
-        try
-        {
-            var mtm = _cache.GetMtm(CacheKey(user));
-            await _evaluator.EvaluateAsync(user.UserId, mtm, user, broker, ct);
-            await _autoShift.EvaluateAsync(user.UserId, user, broker, ct);
-        }
-        finally
-        {
-            gate.Sem.Release();
-        }
-    }
+    // ── Trading window ────────────────────────────────────────────────────────
 
     private bool CheckTradingWindow()
     {
-        var now = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, _tradingTz).TimeOfDay;
+        var now      = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, _tradingTz).TimeOfDay;
         bool inWindow = now >= _cfg.TradingWindowStart && now <= _cfg.TradingWindowEnd;
 
         int newState = inWindow ? 1 : 0;
-        int prev = Interlocked.Exchange(ref _tradingWindowState, newState);
+        int prev     = Interlocked.Exchange(ref _tradingWindowState, newState);
 
         if (prev != newState)
         {
             if (inWindow)
-                _logger.LogInformation(
-                    "Market open — risk engine active ({Start}–{End} {Tz})",
+                _logger.LogInformation("Market open — risk engine active ({Start}–{End} {Tz})",
                     _cfg.TradingWindowStart.ToString(@"hh\:mm"),
                     _cfg.TradingWindowEnd.ToString(@"hh\:mm"),
                     _cfg.TradingTimeZone);
             else
-                _logger.LogInformation(
-                    "Market closed — risk engine paused until {Start} {Tz}",
+                _logger.LogInformation("Market closed — risk engine paused until {Start} {Tz}",
                     _cfg.TradingWindowStart.ToString(@"hh\:mm"),
                     _cfg.TradingTimeZone);
         }
 
         return inWindow;
-    }
-
-    private bool CanEvaluateFromLtp(string userId)
-    {
-        var gate = _gates.GetOrAdd(userId, _ => new UserGate());
-        var now  = Stopwatch.GetTimestamp();
-        var minInterval = (long)(_cfg.LtpEvalMinIntervalMs / 1000.0 * Stopwatch.Frequency);
-        var last = Volatile.Read(ref gate.LastLtpEvalTicks);
-
-        if (now - last < minInterval) return false;
-
-        return Interlocked.CompareExchange(ref gate.LastLtpEvalTicks, now, last) == last;
     }
 }

@@ -11,5 +11,5 @@ namespace KAITerminal.RiskEngine.Abstractions;
 /// </summary>
 public interface IAutoShiftEvaluator
 {
-    Task EvaluateAsync(string userId, UserConfig config, IBrokerClient broker, CancellationToken ct);
+    Task EvaluateAsync(UserConfig config, IBrokerClient broker, CancellationToken ct);
 }

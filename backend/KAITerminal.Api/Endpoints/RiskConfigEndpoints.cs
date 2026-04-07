@@ -46,6 +46,9 @@ public static class RiskConfigEndpoints
             [Microsoft.AspNetCore.Mvc.FromQuery] string broker = "upstox") =>
         {
             var username = user.FindFirstValue(ClaimTypes.Email)!;
+            // Auto-shift requires PP to be active — enforce this invariant on every save.
+            if (!body.Enabled)
+                body.AutoShiftEnabled = false;
             await svc.UpsertAsync(username, broker, body);
             return Results.NoContent();
         })

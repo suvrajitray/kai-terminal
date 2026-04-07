@@ -35,7 +35,12 @@ public static class RiskEngineExtensions
         services.AddSingleton<IUserTokenSource, TTokenSource>();
 
         services.AddSingleton<RiskEvaluator>();
-        services.AddHostedService<StreamingRiskWorker>();
+
+        // Register StreamingRiskWorker as a singleton so the same instance is resolvable
+        // as both IHostedService and IPositionRefreshTrigger (used by AutoShiftEvaluator).
+        services.AddSingleton<StreamingRiskWorker>();
+        services.AddSingleton<IPositionRefreshTrigger>(sp => sp.GetRequiredService<StreamingRiskWorker>());
+        services.AddHostedService(sp => sp.GetRequiredService<StreamingRiskWorker>());
 
         return services;
     }

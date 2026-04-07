@@ -37,6 +37,7 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
     private readonly IRiskRepository             _repo;
     private readonly IRiskEventNotifier          _notifier;
     private readonly IPositionCache              _cache;
+    private readonly IPositionRefreshTrigger     _refreshTrigger;
     private readonly ILogger<AutoShiftEvaluator> _logger;
 
     public AutoShiftEvaluator(
@@ -45,6 +46,7 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
         IRiskRepository             repo,
         IRiskEventNotifier          notifier,
         IPositionCache              cache,
+        IPositionRefreshTrigger     refreshTrigger,
         ILogger<AutoShiftEvaluator> logger)
     {
         _strikeSvc          = strikeSvc;
@@ -52,18 +54,19 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
         _repo               = repo;
         _notifier           = notifier;
         _cache              = cache;
+        _refreshTrigger     = refreshTrigger;
         _logger             = logger;
     }
 
-    public async Task EvaluateAsync(
-        string userId, UserConfig config, IBrokerClient broker, CancellationToken ct)
+    public async Task EvaluateAsync(UserConfig config, IBrokerClient broker, CancellationToken ct)
     {
         if (!config.AutoShiftEnabled)
             return;
 
+        var userId = config.UserId;
         try
         {
-            await EvaluateCoreAsync(userId, config, broker, ct);
+            await EvaluateCoreAsync(config, broker, ct);
         }
         catch (Exception ex)
         {
@@ -83,9 +86,9 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
         }
     }
 
-    private async Task EvaluateCoreAsync(
-        string userId, UserConfig config, IBrokerClient broker, CancellationToken ct)
+    private async Task EvaluateCoreAsync(UserConfig config, IBrokerClient broker, CancellationToken ct)
     {
+        var userId   = config.UserId;
         var stateKey = $"{userId}::{config.BrokerType}";
         var state = await _repo.GetOrCreateAsync(stateKey);
         if (state.IsSquaredOff)
@@ -105,6 +108,17 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
 
         foreach (var position in sellPositions)
         {
+            // Skip positions already shifted/exited this poll cycle — MarkShifted was called
+            // after placing orders, and this guard prevents re-triggering on subsequent LTP
+            // ticks before the next REST poll refreshes the position list.
+            if (_cache.IsShifted(stateKey, position.InstrumentToken))
+            {
+                _logger.LogDebug(
+                    "AutoShift — {Token} already actioned this cycle, skipping [{Broker} / {UserId}]",
+                    position.InstrumentToken, broker.BrokerType, userId);
+                continue;
+            }
+
             // Only evaluate when a validated live feed tick is available.
             // Falling back to the broker's last_price (position.Ltp) risks using stale
             // data (e.g. Zerodha returns very old last_price) and triggering a false shift.
@@ -112,16 +126,16 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
             if (ltp is null)
             {
                 _logger.LogDebug(
-                    "AutoShift — no live LTP yet for {Token}, skipping this tick ({Broker})",
-                    position.InstrumentToken, broker.BrokerType);
+                    "AutoShift — no live LTP yet for {Token}, skipping this tick [{Broker} / {UserId}]",
+                    position.InstrumentToken, broker.BrokerType, userId);
                 continue;
             }
 
             var threshold = position.AveragePrice * (1 + config.AutoShiftThresholdPct / 100m);
 
             _logger.LogDebug(
-                "AutoShift check — {Token} | avg={Avg:F2} threshold={Threshold:F2} ltp={Ltp:F2} ({Broker})",
-                position.InstrumentToken, position.AveragePrice, threshold, ltp.Value, broker.BrokerType);
+                "AutoShift check — {Token} | avg={Avg:F2} threshold={Threshold:F2} ltp={Ltp:F2} [{Broker} / {UserId}]",
+                position.InstrumentToken, position.AveragePrice, threshold, ltp.Value, broker.BrokerType, userId);
 
             if (ltp.Value < threshold)
                 continue;
@@ -136,8 +150,8 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
             if (contract is null)
             {
                 _logger.LogWarning(
-                    "AutoShift — no contract found for token {Token} ({Broker}) — skipping",
-                    position.InstrumentToken, broker.BrokerType);
+                    "AutoShift — no contract found for token {Token} [{Broker} / {UserId}] — skipping",
+                    position.InstrumentToken, broker.BrokerType, userId);
                 await _notifier.NotifyAsync(new RiskNotification(
                     UserId:          userId,
                     Broker:          broker.BrokerType,
@@ -179,7 +193,7 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
             }
             else
             {
-                await ShiftPositionAsync(userId, stateKey, position, contract, effectiveChainKey, broker, state, config, ct);
+                await ShiftPositionAsync(userId, stateKey, position, contract, effectiveChainKey, broker, state, config, allContracts, ct);
             }
         }
     }
@@ -202,15 +216,25 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
             "AutoShift EXHAUSTED exit order placed — {Token} exited after {Count}/{MaxCount} shift(s) [{Broker} / {UserId}]",
             exitToken, shiftCount, maxCount, broker.BrokerType, userId);
 
-        _cache.RemovePosition(stateKey, position.InstrumentToken);
+        // Mark this token so subsequent LTP ticks don't re-trigger before the next poll.
+        // The position stays in cache so MTM remains accurate (realized P&L via broker REST
+        // on the next poll cycle — no MTM hole from premature cache removal).
+        _cache.MarkShifted(stateKey, position.InstrumentToken);
 
-        // Mark this chain as exited so repeated ticks don't fire another order
-        // before the position poll removes the position from cache.
+        // Also mark chain exited to guard against duplicate exhausted-exit orders.
         state.MarkChainExited(chainKey);
         await _repo.UpdateAsync(stateKey, state);
         _logger.LogInformation(
             "AutoShift EXHAUSTED chain={ChainKey} marked exited — duplicate exits suppressed [{Broker} / {UserId}]",
             chainKey, broker.BrokerType, userId);
+
+        // Trigger an immediate position poll (~500 ms delay for fill propagation) so MTM
+        // reflects the closed leg's realized P&L without waiting for the next scheduled poll.
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(500);
+            _refreshTrigger.RequestRefresh(stateKey);
+        });
 
         await _notifier.NotifyAsync(new RiskNotification(
             UserId:          userId,
@@ -225,7 +249,8 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
     private async Task ShiftPositionAsync(
         string userId, string stateKey, Contracts.Domain.BrokerPosition position, ZerodhaOptionContract contract,
         string chainKey, IBrokerClient broker,
-        RiskEngine.Models.UserRiskState state, UserConfig config, CancellationToken ct)
+        RiskEngine.Models.UserRiskState state, UserConfig config,
+        IReadOnlyList<ZerodhaOptionContract> allContracts, CancellationToken ct)
     {
         // CE seller: higher strike = further OTM → positive gap
         // PE seller: lower strike  = further OTM → negative gap
@@ -258,8 +283,7 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
         }
 
         var closeToken = BuildCloseToken(position, broker.BrokerType);
-        var openToken  = BuildOpenToken(newUpstoxKey, broker.BrokerType,
-            await _zerodhaInstruments.GetAllCurrentYearContractsAsync(ct));
+        var openToken  = BuildOpenToken(newUpstoxKey, broker.BrokerType, allContracts);
 
         if (openToken is null)
         {
@@ -301,50 +325,78 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
             "AutoShift close order placed — {CloseToken} qty={Qty} [{Broker} / {UserId}]",
             closeToken, qty, broker.BrokerType, userId);
 
-        // Remove the old position from cache immediately so subsequent LTP ticks do not
-        // re-trigger another shift before the next REST poll refreshes the position list.
-        _cache.RemovePosition(stateKey, position.InstrumentToken);
+        // Mark the old token so subsequent LTP ticks don't re-trigger a second shift before
+        // the next poll. The position stays in cache — MTM remains accurate until the poll
+        // returns the closed leg's realized P&L and the new leg as open.
+        _cache.MarkShifted(stateKey, position.InstrumentToken);
 
-        try
-        {
-            await broker.PlaceOrderAsync(openOrder, ct);
-            _logger.LogInformation(
-                "AutoShift open order placed — {OpenToken} qty={Qty} [{Broker} / {UserId}]",
-                openToken, qty, broker.BrokerType, userId);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex,
-                "AutoShift PARTIAL FAILURE — close={CloseToken} succeeded but open={OpenToken} FAILED for chain={ChainKey} [{Broker} / {UserId}]. Manual intervention required.",
-                closeToken, openToken, chainKey, broker.BrokerType, userId);
-            throw;
-        }
-
-        var newCount = state.IncrementAutoShiftCount(chainKey);
-        // Map new token → original chain key so the counter is inherited on the next tick.
-        // For Zerodha, openToken is "NFO|SYMBOL" but position.InstrumentToken is "SYMBOL" —
-        // strip the exchange prefix so the map key matches what we look up on future ticks.
+        // Compute the map key now (needs openToken + brokerType) before the closure captures it.
         var mapKey = string.Equals(broker.BrokerType, BrokerNames.Zerodha, StringComparison.OrdinalIgnoreCase)
                      && openToken.Contains('|')
             ? openToken.Split('|')[1]
             : openToken;
-        state.MapShiftOrigin(mapKey, chainKey);
-        await _repo.UpdateAsync(stateKey, state);
 
-        _logger.LogInformation(
-            "AutoShift COMPLETE — chain={ChainKey} shift {NewCount}/{MaxCount} done | {OldStrike}→{NewToken} | remaining shifts={Remaining} [{Broker} / {UserId}]",
-            chainKey, newCount, config.AutoShiftMaxCount, contract.Strike, openToken,
-            config.AutoShiftMaxCount - newCount, broker.BrokerType, userId);
+        // Fire-and-forget: wait 3s for margin to settle then open the new short.
+        // Running this off the evaluation hot path ensures the gate semaphore is released
+        // immediately so SL / target checks keep running during the margin-settle window.
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                _logger.LogInformation(
+                    "AutoShift waiting 3s for margin release before opening new leg [{Broker} / {UserId}]",
+                    broker.BrokerType, userId);
+                await Task.Delay(3_000);   // no ct — let margin settle even if session cancels
 
-        await _notifier.NotifyAsync(new RiskNotification(
-            UserId:          userId,
-            Broker:          broker.BrokerType,
-            Type:            RiskNotificationType.AutoShiftTriggered,
-            Mtm:             _cache.GetMtm(stateKey),
-            InstrumentToken: position.InstrumentToken,
-            NewToken:        openToken,
-            ShiftCount:      newCount,
-            Timestamp:       DateTimeOffset.UtcNow), ct);
+                await broker.PlaceOrderAsync(openOrder, CancellationToken.None);
+                _logger.LogInformation(
+                    "AutoShift open order placed — {OpenToken} qty={Qty} [{Broker} / {UserId}]",
+                    openToken, qty, broker.BrokerType, userId);
+
+                // Fetch fresh state — other evaluations may have run while we waited.
+                var freshState = await _repo.GetOrCreateAsync(stateKey);
+                var newCount   = freshState.IncrementAutoShiftCount(chainKey);
+                freshState.MapShiftOrigin(mapKey, chainKey);
+                await _repo.UpdateAsync(stateKey, freshState);
+
+                _logger.LogInformation(
+                    "AutoShift COMPLETE — chain={ChainKey} shift {NewCount}/{MaxCount} done | {OldStrike}→{NewToken} | remaining shifts={Remaining} [{Broker} / {UserId}]",
+                    chainKey, newCount, config.AutoShiftMaxCount, contract.Strike, openToken,
+                    config.AutoShiftMaxCount - newCount, broker.BrokerType, userId);
+
+                // Trigger an immediate position poll so the new leg is subscribed to the
+                // LTP feed and MTM is accurate without waiting for the next scheduled poll.
+                await Task.Delay(500);
+                _refreshTrigger.RequestRefresh(stateKey);
+
+                await _notifier.NotifyAsync(new RiskNotification(
+                    UserId:          userId,
+                    Broker:          broker.BrokerType,
+                    Type:            RiskNotificationType.AutoShiftTriggered,
+                    Mtm:             _cache.GetMtm(stateKey),
+                    InstrumentToken: position.InstrumentToken,
+                    NewToken:        openToken,
+                    ShiftCount:      newCount,
+                    Timestamp:       DateTimeOffset.UtcNow), CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "AutoShift PARTIAL FAILURE — close={CloseToken} succeeded but open={OpenToken} FAILED for chain={ChainKey} [{Broker} / {UserId}]. Manual intervention required.",
+                    closeToken, openToken, chainKey, broker.BrokerType, userId);
+                try
+                {
+                    await _notifier.NotifyAsync(new RiskNotification(
+                        UserId:          userId,
+                        Broker:          broker.BrokerType,
+                        Type:            RiskNotificationType.AutoShiftFailed,
+                        Mtm:             _cache.GetMtm(stateKey),
+                        InstrumentToken: position.InstrumentToken,
+                        Timestamp:       DateTimeOffset.UtcNow), CancellationToken.None);
+                }
+                catch { /* best-effort */ }
+            }
+        });
     }
 
     private static ZerodhaOptionContract? LookupContract(

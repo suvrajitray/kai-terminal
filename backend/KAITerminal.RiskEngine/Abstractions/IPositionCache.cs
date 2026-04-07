@@ -29,8 +29,9 @@ public interface IPositionCache
     decimal? TryGetLiveLtp(string userId, string instrumentToken);
 
     /// <summary>
-    /// Computes total MTM using cached positions and live LTP values.
-    /// Formula per position: <c>pnl + quantity * (liveLtp - ltp)</c>.
+    /// Computes total MTM from the last REST poll, enhanced with live LTP for open positions.
+    /// Open positions with a live LTP tick: <c>quantity × (ltp − avgPrice)</c>.
+    /// Closed positions and open positions awaiting their first tick: broker's <c>p.Pnl</c>.
     /// </summary>
     decimal GetMtm(string userId);
 
@@ -38,8 +39,12 @@ public interface IPositionCache
     IReadOnlyList<string> GetOpenInstrumentTokens(string userId);
 
     /// <summary>
-    /// Removes a position from the cache immediately after a shift/exit order is placed,
-    /// so subsequent LTP ticks do not re-trigger the same action before the next REST poll.
+    /// Marks a token as shifted/exited this poll cycle so subsequent LTP ticks do not
+    /// re-trigger auto-shift before the next REST poll refreshes positions.
+    /// Cleared automatically on the next <see cref="UpdatePositions"/> call.
     /// </summary>
-    void RemovePosition(string userId, string instrumentToken);
+    void MarkShifted(string userId, string instrumentToken);
+
+    /// <summary>Returns true if the token was marked shifted this poll cycle.</summary>
+    bool IsShifted(string userId, string instrumentToken);
 }
