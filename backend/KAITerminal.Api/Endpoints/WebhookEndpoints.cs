@@ -30,7 +30,7 @@ public static class WebhookEndpoints
                 apiKey, payload.OrderId, payload.TradingSymbol, payload.Status);
 
             // Look up the user by their unique Zerodha API key (cache-first)
-            var cred = await credentials.FindByZerodhaApiKeyAsync(apiKey);
+            var cred = await credentials.FindByApiKeyAsync(BrokerNames.Zerodha, apiKey);
 
             if (cred is null)
             {
@@ -93,17 +93,19 @@ public static class WebhookEndpoints
 
         // ── Upstox order postback ─────────────────────────────────────────────
         // Configure your Upstox app's postback URL as:
-        //   https://{host}/api/webhooks/upstox/order
+        //   https://{host}/api/webhooks/upstox/order?apiKey={your_upstox_api_key}
+        // Each user has their own Upstox app — apiKey identifies the user.
         // Upstox sends X-Api-Verify-Token header = SHA256(raw_body + api_secret).
-        // Since Upstox is app-level (one postback URL for all users), we verify against
-        // the shared ApiSecret stored in any Upstox BrokerCredential row.
         app.MapPost("/api/webhooks/upstox/order", async (
+            [FromQuery] string apiKey,
             HttpRequest request,
             BrokerCredentialService credentials,
             PositionStreamManager manager,
             ILogger<UpstoxOrderPostback> logger) =>
         {
-            logger.LogInformation("Upstox webhook received — reading body for signature verification");
+            logger.LogInformation(
+                "Upstox webhook received — apiKey={ApiKey}",
+                apiKey);
 
             // Read raw body for signature verification before deserialization
             request.EnableBuffering();
@@ -114,25 +116,35 @@ public static class WebhookEndpoints
                 bodyBytes.Length,
                 request.Headers.ContainsKey("X-Api-Verify-Token") ? "present" : "absent");
 
-            // Fetch any stored Upstox ApiSecret — cache-first
-            var anyUpstoxCred = await credentials.FindUpstoxSecretAsync();
+            // Look up the user by their Upstox API key (cache-first)
+            var cred = await credentials.FindByApiKeyAsync(BrokerNames.Upstox, apiKey);
 
-            if (anyUpstoxCred is not null)
+            if (cred is null)
             {
-                var signature = request.Headers["X-Api-Verify-Token"].FirstOrDefault() ?? "";
-                if (!VerifyUpstoxSignature(bodyBytes, anyUpstoxCred.ApiSecret, signature))
-                {
-                    logger.LogWarning(
-                        "Upstox webhook: signature verification failed — receivedToken={Token} — returning 401",
-                        string.IsNullOrEmpty(signature) ? "<empty>" : signature[..Math.Min(8, signature.Length)] + "…");
-                    return Results.Unauthorized();
-                }
-                logger.LogInformation("Upstox webhook: signature verified");
+                logger.LogWarning(
+                    "Upstox webhook: no credential found for apiKey={ApiKey} — returning 401",
+                    apiKey);
+                return Results.Unauthorized();
             }
-            else
+
+            logger.LogInformation(
+                "Upstox webhook: resolved apiKey={ApiKey} → user={User}",
+                apiKey, cred.Username);
+
+            // Verify HMAC: SHA256(raw_body + api_secret), hex-encoded
+            var signature = request.Headers["X-Api-Verify-Token"].FirstOrDefault() ?? "";
+            if (!VerifyUpstoxSignature(bodyBytes, cred.ApiSecret, signature))
             {
-                logger.LogWarning("Upstox webhook: no Upstox ApiSecret in DB — skipping signature check (configure credentials first)");
+                logger.LogWarning(
+                    "Upstox webhook: signature verification failed — user={User} receivedToken={Token} — returning 401",
+                    cred.Username,
+                    string.IsNullOrEmpty(signature) ? "<empty>" : signature[..Math.Min(8, signature.Length)] + "…");
+                return Results.Unauthorized();
             }
+
+            logger.LogInformation(
+                "Upstox webhook: signature verified — user={User}",
+                cred.Username);
 
             var payload = await System.Text.Json.JsonSerializer.DeserializeAsync<UpstoxOrderPostback>(
                 new MemoryStream(bodyBytes));
@@ -143,8 +155,8 @@ public static class WebhookEndpoints
             }
 
             logger.LogInformation(
-                "Upstox webhook parsed — upstoxUserId={UpstoxUserId} orderId={OrderId} symbol={Symbol} status={Status}",
-                payload.UserId, payload.OrderId, payload.TradingSymbol, payload.Status);
+                "Upstox webhook parsed — user={User} upstoxUserId={UpstoxUserId} orderId={OrderId} symbol={Symbol} status={Status}",
+                cred.Username, payload.UserId, payload.OrderId, payload.TradingSymbol, payload.Status);
 
             var status = payload.Status?.ToLowerInvariant() ?? "";
             if (status is not "complete" and not "rejected")
@@ -156,44 +168,16 @@ public static class WebhookEndpoints
             }
 
             logger.LogInformation(
-                "Upstox webhook: actionable order update — status={Status} upstoxUserId={UpstoxUserId} orderId={OrderId} symbol={Symbol} message={Message}",
-                status.ToUpperInvariant(), payload.UserId, payload.OrderId, payload.TradingSymbol, payload.StatusMessage);
+                "Upstox webhook: actionable order update — status={Status} user={User} orderId={OrderId} symbol={Symbol} message={Message}",
+                status.ToUpperInvariant(), cred.Username, payload.OrderId, payload.TradingSymbol, payload.StatusMessage);
 
-            List<KAITerminal.Api.Hubs.PositionStreamCoordinator> targets;
-
-            if (!string.IsNullOrEmpty(payload.UserId))
-            {
-                // Resolve the specific user by their stored Upstox user_id — cache-first.
-                var username = await credentials.FindUsernameByUpstoxUserIdAsync(payload.UserId);
-
-                if (username is not null)
-                {
-                    logger.LogInformation(
-                        "Upstox webhook: resolved upstoxUserId={UpstoxUserId} → user={User}",
-                        payload.UserId, username);
-                    targets = manager.GetAllForUser(username).ToList();
-                }
-                else
-                {
-                    logger.LogWarning(
-                        "Upstox webhook: no user found for upstoxUserId={UpstoxUserId} — broadcasting to all Upstox connections (user may need to re-authenticate to populate BrokerUserId)",
-                        payload.UserId);
-                    targets = manager.GetAllForBroker(BrokerNames.Upstox).ToList();
-                }
-            }
-            else
-            {
-                logger.LogWarning(
-                    "Upstox webhook: payload has no user_id — broadcasting to all Upstox connections");
-                targets = manager.GetAllForBroker(BrokerNames.Upstox).ToList();
-            }
-
+            var coordinators = manager.GetAllForUser(cred.Username).ToList();
             logger.LogInformation(
-                "Upstox webhook: pushing to {Count} active connection(s)",
-                targets.Count);
+                "Upstox webhook: pushing to {Count} active connection(s) for user={User}",
+                coordinators.Count, cred.Username);
 
             await PushAndRefreshAsync(
-                targets,
+                coordinators,
                 payload.OrderId       ?? "",
                 payload.Status        ?? "",
                 payload.StatusMessage ?? "",

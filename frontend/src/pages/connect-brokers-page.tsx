@@ -42,17 +42,14 @@ function CopyUrl({ url, label = "Copy URL" }: { url: string; label?: string }) {
   );
 }
 
-function HowToConnect({ zerodhaApiKey }: { zerodhaApiKey?: string }) {
+function HowToConnect({ zerodhaApiKey, upstoxApiKey }: { zerodhaApiKey?: string; upstoxApiKey?: string }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab]   = useState<"upstox" | "zerodha">("upstox");
 
   const redirectUrl = (broker: string) => `${window.location.origin}/redirect/${broker}`;
-  const webhookUrl  = (broker: string) => {
-    if (broker === "zerodha") {
-      const key = zerodhaApiKey || "YOUR_API_KEY";
-      return `${window.location.origin}/api/webhooks/zerodha/order?apiKey=${key}`;
-    }
-    return `${window.location.origin}/api/webhooks/upstox/order`;
+  const webhookUrl = (broker: string) => {
+    const key = broker === "zerodha" ? (zerodhaApiKey || "YOUR_API_KEY") : (upstoxApiKey || "YOUR_API_KEY");
+    return `${window.location.origin}/api/webhooks/${broker}/order?apiKey=${key}`;
   };
 
   const steps = [
@@ -179,6 +176,7 @@ export function ConnectBrokersPage() {
   }, [saveCredentials]);
 
   const zerodhaApiKey = getCredentials("zerodha")?.apiKey;
+  const upstoxApiKey  = getCredentials("upstox")?.apiKey;
 
   // Only care about brokers that have been set up (have API credentials)
   const connectedBrokers = BROKERS.filter((b) => isConnected(b.id));
@@ -204,7 +202,7 @@ export function ConnectBrokersPage() {
         </p>
       </div>
 
-      <HowToConnect zerodhaApiKey={zerodhaApiKey} />
+      <HowToConnect zerodhaApiKey={zerodhaApiKey} upstoxApiKey={upstoxApiKey} />
 
       {anyNeedsReAuth && (
         <motion.div

@@ -31,9 +31,7 @@ export function ConnectBrokerDialog({ broker, open, onOpenChange }: ConnectBroke
   const [error, setError] = useState<string | null>(null);
 
   const redirectUrl = `${window.location.origin}${broker.redirectPath}`;
-  const webhookUrl  = broker.id === "zerodha"
-    ? `${window.location.origin}/api/webhooks/zerodha/order?apiKey=${apiKey || "YOUR_API_KEY"}`
-    : `${window.location.origin}/api/webhooks/${broker.id}/order`;
+  const webhookUrl = `${window.location.origin}/api/webhooks/${broker.id}/order?apiKey=${apiKey || "YOUR_API_KEY"}`;
 
   const handleCopyRedirect = async () => {
     await navigator.clipboard.writeText(redirectUrl);

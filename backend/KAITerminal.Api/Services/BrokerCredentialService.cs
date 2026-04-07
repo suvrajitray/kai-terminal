@@ -1,6 +1,5 @@
 using KAITerminal.Infrastructure.Data;
 using KAITerminal.Api.Models;
-using KAITerminal.Contracts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 
@@ -12,9 +11,7 @@ public class BrokerCredentialService(
     BrokerCredentialCacheInvalidator cacheInvalidator)
 {
     // Cache keys
-    private static string ZerodhaApiKeyKey(string apiKey)  => $"brokercred:zerodha:apikey:{apiKey}";
-    private static string UpstoxSecretKey()                 => "brokercred:upstox:secret";
-    private static string UpstoxUserIdKey(string userId)    => $"brokercred:upstox:userid:{userId}";
+    private static string ApiKeyLookupKey(string brokerName, string apiKey) => $"brokercred:{brokerName}:apikey:{apiKey}";
 
     private MemoryCacheEntryOptions CacheOptions() =>
         new MemoryCacheEntryOptions()
@@ -34,57 +31,21 @@ public class BrokerCredentialService(
     // ── Webhook-optimised cache-first lookups ─────────────────────────────────
 
     /// <summary>
-    /// Returns the Zerodha credential matching <paramref name="apiKey"/>, or null.
+    /// Returns the credential for <paramref name="brokerName"/> matching <paramref name="apiKey"/>, or null.
+    /// Used by both Zerodha and Upstox webhook handlers — same pattern, same cache.
     /// Result is cached — cache is invalidated on any write.
     /// </summary>
-    public async Task<BrokerCredential?> FindByZerodhaApiKeyAsync(string apiKey)
+    public async Task<BrokerCredential?> FindByApiKeyAsync(string brokerName, string apiKey)
     {
-        var key = ZerodhaApiKeyKey(apiKey);
+        var key = ApiKeyLookupKey(brokerName, apiKey);
         if (cache.TryGetValue(key, out BrokerCredential? cached))
             return cached;
 
         var cred = await db.BrokerCredentials
-            .FirstOrDefaultAsync(x => x.BrokerName == BrokerNames.Zerodha && x.ApiKey == apiKey);
+            .FirstOrDefaultAsync(x => x.BrokerName == brokerName && x.ApiKey == apiKey);
 
         cache.Set(key, cred, CacheOptions());
         return cred;
-    }
-
-    /// <summary>
-    /// Returns any Upstox credential that has a non-empty ApiSecret (shared across all users).
-    /// Result is cached — cache is invalidated on any write.
-    /// </summary>
-    public async Task<BrokerCredential?> FindUpstoxSecretAsync()
-    {
-        var key = UpstoxSecretKey();
-        if (cache.TryGetValue(key, out BrokerCredential? cached))
-            return cached;
-
-        var cred = await db.BrokerCredentials
-            .Where(x => x.BrokerName == BrokerNames.Upstox && x.ApiSecret != "")
-            .FirstOrDefaultAsync();
-
-        cache.Set(key, cred, CacheOptions());
-        return cred;
-    }
-
-    /// <summary>
-    /// Returns the KAI username for the given Upstox <paramref name="brokerUserId"/>, or null.
-    /// Result is cached — cache is invalidated on any write.
-    /// </summary>
-    public async Task<string?> FindUsernameByUpstoxUserIdAsync(string brokerUserId)
-    {
-        var key = UpstoxUserIdKey(brokerUserId);
-        if (cache.TryGetValue(key, out string? cached))
-            return cached;
-
-        var username = await db.BrokerCredentials
-            .Where(x => x.BrokerName == BrokerNames.Upstox && x.BrokerUserId == brokerUserId)
-            .Select(x => x.Username)
-            .FirstOrDefaultAsync();
-
-        cache.Set(key, username, CacheOptions());
-        return username;
     }
 
     // ── Write methods (all invalidate cache) ──────────────────────────────────
