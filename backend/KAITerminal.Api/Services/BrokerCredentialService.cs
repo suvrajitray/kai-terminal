@@ -19,7 +19,7 @@ public class BrokerCredentialService(
     private MemoryCacheEntryOptions CacheOptions() =>
         new MemoryCacheEntryOptions()
             .AddExpirationToken(cacheInvalidator.GetChangeToken())
-            .SetAbsoluteExpiration(TimeSpan.FromHours(1)); // safety net; primary eviction is the cancellation token on write
+            .SetAbsoluteExpiration(TimeSpan.FromHours(7)); // safety net covers full trading session; primary eviction is the cancellation token on write
 
     private void InvalidateCache() => cacheInvalidator.Invalidate();
 
