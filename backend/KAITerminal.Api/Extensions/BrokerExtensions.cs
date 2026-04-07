@@ -39,6 +39,7 @@ public static class BrokerExtensions
         services.AddMarketDataConsumer();
 
         services.AddSingleton<OptionStrikeService>();
+        services.AddSingleton<BrokerCredentialCacheInvalidator>();
         services.AddScoped<BrokerCredentialService>();
 
         return services;

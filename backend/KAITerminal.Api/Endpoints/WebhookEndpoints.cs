@@ -3,12 +3,10 @@ using System.Text;
 using System.Text.Json.Serialization;
 using KAITerminal.Api.Services;
 using KAITerminal.Contracts;
-using KAITerminal.Infrastructure.Data;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
-using Microsoft.EntityFrameworkCore;
 
 namespace KAITerminal.Api.Endpoints;
 
@@ -23,7 +21,7 @@ public static class WebhookEndpoints
         app.MapPost("/api/webhooks/zerodha/order", async (
             [FromQuery] string apiKey,
             [FromBody]  ZerodhaOrderPostback payload,
-            AppDbContext db,
+            BrokerCredentialService credentials,
             PositionStreamManager manager,
             ILogger<ZerodhaOrderPostback> logger) =>
         {
@@ -31,11 +29,8 @@ public static class WebhookEndpoints
                 "Zerodha webhook received — apiKey={ApiKey} orderId={OrderId} symbol={Symbol} status={Status}",
                 apiKey, payload.OrderId, payload.TradingSymbol, payload.Status);
 
-            // Look up the user by their unique Zerodha API key
-            var cred = await db.BrokerCredentials
-                .FirstOrDefaultAsync(x =>
-                    x.BrokerName == BrokerNames.Zerodha &&
-                    x.ApiKey     == apiKey);
+            // Look up the user by their unique Zerodha API key (cache-first)
+            var cred = await credentials.FindByZerodhaApiKeyAsync(apiKey);
 
             if (cred is null)
             {
@@ -104,7 +99,7 @@ public static class WebhookEndpoints
         // the shared ApiSecret stored in any Upstox BrokerCredential row.
         app.MapPost("/api/webhooks/upstox/order", async (
             HttpRequest request,
-            AppDbContext db,
+            BrokerCredentialService credentials,
             PositionStreamManager manager,
             ILogger<UpstoxOrderPostback> logger) =>
         {
@@ -119,10 +114,8 @@ public static class WebhookEndpoints
                 bodyBytes.Length,
                 request.Headers.ContainsKey("X-Api-Verify-Token") ? "present" : "absent");
 
-            // Fetch any stored Upstox ApiSecret (all users on the same app share one)
-            var anyUpstoxCred = await db.BrokerCredentials
-                .Where(x => x.BrokerName == BrokerNames.Upstox && x.ApiSecret != "")
-                .FirstOrDefaultAsync();
+            // Fetch any stored Upstox ApiSecret — cache-first
+            var anyUpstoxCred = await credentials.FindUpstoxSecretAsync();
 
             if (anyUpstoxCred is not null)
             {
@@ -170,11 +163,8 @@ public static class WebhookEndpoints
 
             if (!string.IsNullOrEmpty(payload.UserId))
             {
-                // Resolve the specific user by their stored Upstox user_id.
-                var username = await db.BrokerCredentials
-                    .Where(x => x.BrokerName == BrokerNames.Upstox && x.BrokerUserId == payload.UserId)
-                    .Select(x => x.Username)
-                    .FirstOrDefaultAsync();
+                // Resolve the specific user by their stored Upstox user_id — cache-first.
+                var username = await credentials.FindUsernameByUpstoxUserIdAsync(payload.UserId);
 
                 if (username is not null)
                 {
