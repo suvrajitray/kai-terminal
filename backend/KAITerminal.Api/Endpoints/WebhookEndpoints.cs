@@ -27,6 +27,10 @@ public static class WebhookEndpoints
             PositionStreamManager manager,
             ILogger<ZerodhaOrderPostback> logger) =>
         {
+            logger.LogInformation(
+                "Zerodha webhook received — apiKey={ApiKey} orderId={OrderId} symbol={Symbol} status={Status}",
+                apiKey, payload.OrderId, payload.TradingSymbol, payload.Status);
+
             // Look up the user by their unique Zerodha API key
             var cred = await db.BrokerCredentials
                 .FirstOrDefaultAsync(x =>
@@ -35,9 +39,15 @@ public static class WebhookEndpoints
 
             if (cred is null)
             {
-                logger.LogWarning("Zerodha webhook: unknown apiKey={ApiKey}", apiKey);
+                logger.LogWarning(
+                    "Zerodha webhook: no credential found for apiKey={ApiKey} — returning 401",
+                    apiKey);
                 return Results.Unauthorized();
             }
+
+            logger.LogDebug(
+                "Zerodha webhook: resolved apiKey={ApiKey} → user={User}",
+                apiKey, cred.Username);
 
             // Verify Zerodha checksum: SHA256(tradingsymbol + order_id + api_secret)
             var expected = ComputeZerodhaChecksum(
@@ -45,23 +55,43 @@ public static class WebhookEndpoints
             if (!string.Equals(expected, payload.Checksum, StringComparison.OrdinalIgnoreCase))
             {
                 logger.LogWarning(
-                    "Zerodha webhook: checksum mismatch for user={User} order={OrderId}",
-                    cred.Username, payload.OrderId);
+                    "Zerodha webhook: checksum mismatch — user={User} orderId={OrderId} receivedChecksum={Received} expectedChecksum={Expected}",
+                    cred.Username, payload.OrderId, payload.Checksum, expected);
                 return Results.Unauthorized();
             }
 
+            logger.LogDebug(
+                "Zerodha webhook: checksum verified — user={User} orderId={OrderId}",
+                cred.Username, payload.OrderId);
+
             var status = payload.Status?.ToLowerInvariant() ?? "";
             if (status is not "complete" and not "rejected")
-                return Results.Ok(); // ignore intermediate states
+            {
+                logger.LogDebug(
+                    "Zerodha webhook: ignoring intermediate status={Status} for orderId={OrderId}",
+                    payload.Status, payload.OrderId);
+                return Results.Ok();
+            }
 
             logger.LogInformation(
-                "Zerodha webhook: order {Status} — user={User} orderId={OrderId} symbol={Symbol}",
-                status.ToUpperInvariant(), cred.Username, payload.OrderId, payload.TradingSymbol);
+                "Zerodha webhook: actionable order update — status={Status} user={User} orderId={OrderId} symbol={Symbol} message={Message}",
+                status.ToUpperInvariant(), cred.Username, payload.OrderId, payload.TradingSymbol, payload.StatusMessage);
+
+            var coordinators = manager.GetAllForUser(cred.Username).ToList();
+            logger.LogInformation(
+                "Zerodha webhook: pushing to {Count} active connection(s) for user={User}",
+                coordinators.Count, cred.Username);
 
             await PushAndRefreshAsync(
-                manager.GetAllForUser(cred.Username),
+                coordinators,
                 payload.OrderId ?? "", payload.Status ?? "", payload.StatusMessage ?? "", payload.TradingSymbol ?? "",
-                refresh: status == "complete");
+                refresh: status == "complete",
+                logger: logger,
+                broker: "Zerodha");
+
+            logger.LogInformation(
+                "Zerodha webhook: done — orderId={OrderId} refresh={Refresh}",
+                payload.OrderId, status == "complete");
 
             return Results.Ok();
         });
@@ -78,9 +108,16 @@ public static class WebhookEndpoints
             PositionStreamManager manager,
             ILogger<UpstoxOrderPostback> logger) =>
         {
+            logger.LogInformation("Upstox webhook received — reading body for signature verification");
+
             // Read raw body for signature verification before deserialization
             request.EnableBuffering();
             var bodyBytes = await ReadBodyBytesAsync(request);
+
+            logger.LogDebug(
+                "Upstox webhook: body size={Bytes}B X-Api-Verify-Token={HasToken}",
+                bodyBytes.Length,
+                request.Headers.ContainsKey("X-Api-Verify-Token") ? "present" : "absent");
 
             // Fetch any stored Upstox ApiSecret (all users on the same app share one)
             var anyUpstoxCred = await db.BrokerCredentials
@@ -92,28 +129,44 @@ public static class WebhookEndpoints
                 var signature = request.Headers["X-Api-Verify-Token"].FirstOrDefault() ?? "";
                 if (!VerifyUpstoxSignature(bodyBytes, anyUpstoxCred.ApiSecret, signature))
                 {
-                    logger.LogWarning("Upstox webhook: invalid signature — request rejected");
+                    logger.LogWarning(
+                        "Upstox webhook: signature verification failed — receivedToken={Token} — returning 401",
+                        string.IsNullOrEmpty(signature) ? "<empty>" : signature[..Math.Min(8, signature.Length)] + "…");
                     return Results.Unauthorized();
                 }
+                logger.LogDebug("Upstox webhook: signature verified");
             }
             else
             {
-                logger.LogWarning("Upstox webhook: no ApiSecret stored — skipping signature check");
+                logger.LogWarning("Upstox webhook: no Upstox ApiSecret in DB — skipping signature check (configure credentials first)");
             }
 
             var payload = await System.Text.Json.JsonSerializer.DeserializeAsync<UpstoxOrderPostback>(
                 new MemoryStream(bodyBytes));
-            if (payload is null) return Results.BadRequest();
+            if (payload is null)
+            {
+                logger.LogWarning("Upstox webhook: failed to deserialize body — returning 400");
+                return Results.BadRequest();
+            }
+
+            logger.LogInformation(
+                "Upstox webhook parsed — upstoxUserId={UpstoxUserId} orderId={OrderId} symbol={Symbol} status={Status}",
+                payload.UserId, payload.OrderId, payload.TradingSymbol, payload.Status);
 
             var status = payload.Status?.ToLowerInvariant() ?? "";
             if (status is not "complete" and not "rejected")
+            {
+                logger.LogDebug(
+                    "Upstox webhook: ignoring intermediate status={Status} for orderId={OrderId}",
+                    payload.Status, payload.OrderId);
                 return Results.Ok();
+            }
 
             logger.LogInformation(
-                "Upstox webhook: order {Status} — userId={UpstoxUserId} orderId={OrderId} symbol={Symbol}",
-                status.ToUpperInvariant(), payload.UserId, payload.OrderId, payload.TradingSymbol);
+                "Upstox webhook: actionable order update — status={Status} upstoxUserId={UpstoxUserId} orderId={OrderId} symbol={Symbol} message={Message}",
+                status.ToUpperInvariant(), payload.UserId, payload.OrderId, payload.TradingSymbol, payload.StatusMessage);
 
-            IEnumerable<KAITerminal.Api.Hubs.PositionStreamCoordinator> targets;
+            List<KAITerminal.Api.Hubs.PositionStreamCoordinator> targets;
 
             if (!string.IsNullOrEmpty(payload.UserId))
             {
@@ -123,14 +176,31 @@ public static class WebhookEndpoints
                     .Select(x => x.Username)
                     .FirstOrDefaultAsync();
 
-                targets = username is not null
-                    ? manager.GetAllForUser(username)
-                    : manager.GetAllForBroker(BrokerNames.Upstox); // fallback: broadcast
+                if (username is not null)
+                {
+                    logger.LogInformation(
+                        "Upstox webhook: resolved upstoxUserId={UpstoxUserId} → user={User}",
+                        payload.UserId, username);
+                    targets = manager.GetAllForUser(username).ToList();
+                }
+                else
+                {
+                    logger.LogWarning(
+                        "Upstox webhook: no user found for upstoxUserId={UpstoxUserId} — broadcasting to all Upstox connections (user may need to re-authenticate to populate BrokerUserId)",
+                        payload.UserId);
+                    targets = manager.GetAllForBroker(BrokerNames.Upstox).ToList();
+                }
             }
             else
             {
-                targets = manager.GetAllForBroker(BrokerNames.Upstox);
+                logger.LogWarning(
+                    "Upstox webhook: payload has no user_id — broadcasting to all Upstox connections");
+                targets = manager.GetAllForBroker(BrokerNames.Upstox).ToList();
             }
+
+            logger.LogInformation(
+                "Upstox webhook: pushing to {Count} active connection(s)",
+                targets.Count);
 
             await PushAndRefreshAsync(
                 targets,
@@ -138,7 +208,13 @@ public static class WebhookEndpoints
                 payload.Status        ?? "",
                 payload.StatusMessage ?? "",
                 payload.TradingSymbol ?? "",
-                refresh: status == "complete");
+                refresh: status == "complete",
+                logger: logger,
+                broker: "Upstox");
+
+            logger.LogInformation(
+                "Upstox webhook: done — orderId={OrderId} refresh={Refresh}",
+                payload.OrderId, status == "complete");
 
             return Results.Ok();
         });
@@ -156,6 +232,31 @@ public static class WebhookEndpoints
             await coord.PushOrderUpdateAsync(orderId, status, statusMessage, tradingSymbol);
             if (refresh)
                 await coord.TriggerRefreshAsync();
+        });
+        await Task.WhenAll(tasks);
+    }
+
+    private static async Task PushAndRefreshAsync(
+        IEnumerable<KAITerminal.Api.Hubs.PositionStreamCoordinator> coordinators,
+        string orderId, string status, string statusMessage, string tradingSymbol,
+        bool refresh,
+        ILogger logger,
+        string broker)
+    {
+        var list  = coordinators.ToList();
+        var tasks = list.Select(async coord =>
+        {
+            logger.LogDebug(
+                "{Broker} webhook: sending ReceiveOrderUpdate to connection={Connection} — orderId={OrderId} status={Status}",
+                broker, coord.Username, orderId, status);
+            await coord.PushOrderUpdateAsync(orderId, status, statusMessage, tradingSymbol);
+            if (refresh)
+            {
+                logger.LogDebug(
+                    "{Broker} webhook: triggering position refresh for connection={Connection}",
+                    broker, coord.Username);
+                await coord.TriggerRefreshAsync();
+            }
         });
         await Task.WhenAll(tasks);
     }
