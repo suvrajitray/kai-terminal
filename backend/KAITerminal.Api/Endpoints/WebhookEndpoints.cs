@@ -45,7 +45,7 @@ public static class WebhookEndpoints
                 return Results.Unauthorized();
             }
 
-            logger.LogDebug(
+            logger.LogInformation(
                 "Zerodha webhook: resolved apiKey={ApiKey} → user={User}",
                 apiKey, cred.Username);
 
@@ -60,14 +60,14 @@ public static class WebhookEndpoints
                 return Results.Unauthorized();
             }
 
-            logger.LogDebug(
+            logger.LogInformation(
                 "Zerodha webhook: checksum verified — user={User} orderId={OrderId}",
                 cred.Username, payload.OrderId);
 
             var status = payload.Status?.ToLowerInvariant() ?? "";
             if (status is not "complete" and not "rejected")
             {
-                logger.LogDebug(
+                logger.LogInformation(
                     "Zerodha webhook: ignoring intermediate status={Status} for orderId={OrderId}",
                     payload.Status, payload.OrderId);
                 return Results.Ok();
@@ -114,7 +114,7 @@ public static class WebhookEndpoints
             request.EnableBuffering();
             var bodyBytes = await ReadBodyBytesAsync(request);
 
-            logger.LogDebug(
+            logger.LogInformation(
                 "Upstox webhook: body size={Bytes}B X-Api-Verify-Token={HasToken}",
                 bodyBytes.Length,
                 request.Headers.ContainsKey("X-Api-Verify-Token") ? "present" : "absent");
@@ -134,7 +134,7 @@ public static class WebhookEndpoints
                         string.IsNullOrEmpty(signature) ? "<empty>" : signature[..Math.Min(8, signature.Length)] + "…");
                     return Results.Unauthorized();
                 }
-                logger.LogDebug("Upstox webhook: signature verified");
+                logger.LogInformation("Upstox webhook: signature verified");
             }
             else
             {
@@ -156,7 +156,7 @@ public static class WebhookEndpoints
             var status = payload.Status?.ToLowerInvariant() ?? "";
             if (status is not "complete" and not "rejected")
             {
-                logger.LogDebug(
+                logger.LogInformation(
                     "Upstox webhook: ignoring intermediate status={Status} for orderId={OrderId}",
                     payload.Status, payload.OrderId);
                 return Results.Ok();
@@ -246,13 +246,13 @@ public static class WebhookEndpoints
         var list  = coordinators.ToList();
         var tasks = list.Select(async coord =>
         {
-            logger.LogDebug(
+            logger.LogInformation(
                 "{Broker} webhook: sending ReceiveOrderUpdate to connection={Connection} — orderId={OrderId} status={Status}",
                 broker, coord.Username, orderId, status);
             await coord.PushOrderUpdateAsync(orderId, status, statusMessage, tradingSymbol);
             if (refresh)
             {
-                logger.LogDebug(
+                logger.LogInformation(
                     "{Broker} webhook: triggering position refresh for connection={Connection}",
                     broker, coord.Username);
                 await coord.TriggerRefreshAsync();
