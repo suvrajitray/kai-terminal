@@ -129,13 +129,17 @@ public sealed class PositionStreamCoordinator : IAsyncDisposable
             .Select(p => p.InstrumentToken!)
             .ToHashSet(StringComparer.Ordinal);
 
-        var addedUpstox = newUpstoxTokens.Except(_subscribedUpstoxTokens).ToList();
-        if (addedUpstox.Count > 0)
+        // Always re-subscribe all current tokens — not just new ones.
+        // This ensures the Worker recovers subscriptions after a restart without
+        // requiring a frontend reconnect (the Worker's _subscribed set resets on startup).
+        if (newUpstoxTokens.Count > 0)
         {
-            _logger.LogInformation(
-                "PositionStreamCoordinator [{Id}]: subscribing {Count} new Upstox instrument(s) — {Tokens}",
-                _connectionId, addedUpstox.Count, string.Join(", ", addedUpstox));
-            await _sharedMarketData.SubscribeAsync(addedUpstox, FeedMode.Ltpc, ct);
+            var addedUpstox = newUpstoxTokens.Except(_subscribedUpstoxTokens).ToList();
+            if (addedUpstox.Count > 0)
+                _logger.LogInformation(
+                    "PositionStreamCoordinator [{Id}]: {New} new Upstox instrument(s) — resubscribing all {Total}",
+                    _connectionId, addedUpstox.Count, newUpstoxTokens.Count);
+            await _sharedMarketData.SubscribeAsync(newUpstoxTokens.ToList(), FeedMode.Ltpc, ct);
         }
         _subscribedUpstoxTokens = newUpstoxTokens;
 
@@ -149,18 +153,19 @@ public sealed class PositionStreamCoordinator : IAsyncDisposable
         if (openZerodha.Count > 0)
         {
             var newFeedMap = await BuildZerodhaFeedMapAsync(openZerodha, ct);
-            var addedZerodha = newFeedMap.Keys.Except(_zerodhaFeedToNative.Keys).ToList();
-            if (addedZerodha.Count > 0)
+            if (newFeedMap.Count > 0)
             {
-                _logger.LogInformation(
-                    "PositionStreamCoordinator [{Id}]: subscribing {Count} new Zerodha instrument(s) — {Tokens}",
-                    _connectionId, addedZerodha.Count, string.Join(", ", addedZerodha));
-                await _sharedMarketData.SubscribeAsync(addedZerodha, FeedMode.Ltpc, ct);
+                var addedZerodha = newFeedMap.Keys.Except(_zerodhaFeedToNative.Keys).ToList();
+                if (addedZerodha.Count > 0)
+                    _logger.LogInformation(
+                        "PositionStreamCoordinator [{Id}]: {New} new Zerodha instrument(s) — resubscribing all {Total}",
+                        _connectionId, addedZerodha.Count, newFeedMap.Count);
+                await _sharedMarketData.SubscribeAsync(newFeedMap.Keys.ToList(), FeedMode.Ltpc, ct);
             }
             _zerodhaFeedToNative = newFeedMap;
         }
 
-        if (addedUpstox.Count == 0 && openZerodha.Count == 0)
+        if (newUpstoxTokens.Count == 0 && openZerodha.Count == 0)
             _logger.LogInformation(
                 "PositionStreamCoordinator [{Id}]: no open positions — no LTP subscriptions requested",
                 _connectionId);

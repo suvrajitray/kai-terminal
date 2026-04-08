@@ -5,6 +5,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>dotnet-KAITerminal.Worker-7fddacc6-829a-41ab-87be-1bd65ae47b88</UserSecretsId>
+    <!-- Disable AppHost wrapper: native apphost binary hangs on macOS (Sequoia + .NET 10).
+         dotnet run uses dotnet exec <dll> directly, which works correctly. -->
+    <UseAppHost>false</UseAppHost>
   </PropertyGroup>
 
   <ItemGroup>

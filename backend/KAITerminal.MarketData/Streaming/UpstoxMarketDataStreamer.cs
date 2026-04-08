@@ -69,15 +69,10 @@ internal sealed class UpstoxMarketDataStreamer : IMarketDataStreamer
     public async Task DisconnectAsync()
     {
         _cts?.Cancel();
+        _ws?.Abort(); // unblocks any pending ReceiveAsync immediately
 
         try { await _receiveLoop; }
         catch { /* ignore */ }
-
-        if (_ws?.State == WebSocketState.Open)
-        {
-            try { await _ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Disconnect", CancellationToken.None); }
-            catch { /* ignore */ }
-        }
     }
 
     public async Task SubscribeAsync(IReadOnlyCollection<string> instrumentTokens, Contracts.Streaming.FeedMode mode)
@@ -94,21 +89,12 @@ internal sealed class UpstoxMarketDataStreamer : IMarketDataStreamer
         _disposed = true;
 
         _cts?.Cancel();
+        _ws?.Abort(); // unblocks any pending ReceiveAsync immediately — no WS close handshake needed on shutdown
 
         try { await _receiveLoop; }
         catch { /* ignore */ }
 
-        if (_ws is not null)
-        {
-            try
-            {
-                if (_ws.State == WebSocketState.Open)
-                    await _ws.CloseAsync(WebSocketCloseStatus.NormalClosure, "Disposed", CancellationToken.None);
-            }
-            catch { /* ignore */ }
-            _ws.Dispose();
-        }
-
+        _ws?.Dispose();
         _cts?.Dispose();
         _sendLock.Dispose();
     }

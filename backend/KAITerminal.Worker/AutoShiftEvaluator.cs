@@ -37,25 +37,28 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
     private readonly IRiskRepository             _repo;
     private readonly IRiskEventNotifier          _notifier;
     private readonly IPositionCache              _cache;
-    private readonly IPositionRefreshTrigger     _refreshTrigger;
-    private readonly ILogger<AutoShiftEvaluator> _logger;
+    // Func<T> breaks the StreamingRiskWorker → AutoShiftEvaluator → IPositionRefreshTrigger
+    // → StreamingRiskWorker circular DI dependency. The trigger is resolved lazily on first use
+    // (after all singletons are fully constructed), not during DI construction.
+    private readonly Func<IPositionRefreshTrigger> _refreshTriggerFactory;
+    private readonly ILogger<AutoShiftEvaluator>   _logger;
 
     public AutoShiftEvaluator(
-        OptionStrikeService         strikeSvc,
-        IZerodhaInstrumentService   zerodhaInstruments,
-        IRiskRepository             repo,
-        IRiskEventNotifier          notifier,
-        IPositionCache              cache,
-        IPositionRefreshTrigger     refreshTrigger,
-        ILogger<AutoShiftEvaluator> logger)
+        OptionStrikeService               strikeSvc,
+        IZerodhaInstrumentService         zerodhaInstruments,
+        IRiskRepository                   repo,
+        IRiskEventNotifier                notifier,
+        IPositionCache                    cache,
+        Func<IPositionRefreshTrigger>     refreshTriggerFactory,
+        ILogger<AutoShiftEvaluator>       logger)
     {
-        _strikeSvc          = strikeSvc;
-        _zerodhaInstruments = zerodhaInstruments;
-        _repo               = repo;
-        _notifier           = notifier;
-        _cache              = cache;
-        _refreshTrigger     = refreshTrigger;
-        _logger             = logger;
+        _strikeSvc             = strikeSvc;
+        _zerodhaInstruments    = zerodhaInstruments;
+        _repo                  = repo;
+        _notifier              = notifier;
+        _cache                 = cache;
+        _refreshTriggerFactory = refreshTriggerFactory;
+        _logger                = logger;
     }
 
     public async Task EvaluateAsync(UserConfig config, IBrokerClient broker, CancellationToken ct)
@@ -233,7 +236,7 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
         _ = Task.Run(async () =>
         {
             await Task.Delay(500);
-            _refreshTrigger.RequestRefresh(stateKey);
+            _refreshTriggerFactory().RequestRefresh(stateKey);
         });
 
         await _notifier.NotifyAsync(new RiskNotification(
@@ -366,7 +369,7 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
                 // Trigger an immediate position poll so the new leg is subscribed to the
                 // LTP feed and MTM is accurate without waiting for the next scheduled poll.
                 await Task.Delay(500);
-                _refreshTrigger.RequestRefresh(stateKey);
+                _refreshTriggerFactory().RequestRefresh(stateKey);
 
                 await _notifier.NotifyAsync(new RiskNotification(
                     UserId:          userId,
