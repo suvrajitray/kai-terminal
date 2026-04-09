@@ -55,9 +55,9 @@ public static class WebhookEndpoints
                 "Zerodha webhook: resolved apiKey={ApiKey} → user={User}",
                 apiKey, cred.Username);
 
-            // Verify Zerodha checksum: SHA256(tradingsymbol + order_id + api_secret)
+            // Verify Zerodha checksum: SHA256(order_id + order_timestamp + api_secret)
             var expected = ComputeZerodhaChecksum(
-                payload.TradingSymbol, payload.OrderId, cred.ApiSecret);
+                payload.OrderId, payload.OrderTimestamp, cred.ApiSecret);
             if (!string.Equals(expected, payload.Checksum, StringComparison.OrdinalIgnoreCase))
             {
                 logger.LogWarning(
@@ -104,11 +104,11 @@ public static class WebhookEndpoints
 
         // ── Upstox order postback ─────────────────────────────────────────────
         // Configure your Upstox app's postback URL as:
-        //   https://{host}/api/webhooks/upstox/order?apiKey={your_upstox_api_key}
+        //   https://{host}/api/webhooks/upstox/order/{your_upstox_api_key}
         // Each user has their own Upstox app — apiKey identifies the user.
-        // Upstox sends X-Api-Verify-Token header = SHA256(raw_body + api_secret).
-        app.MapPost("/api/webhooks/upstox/order", async (
-            [FromQuery] string apiKey,
+        // Upstox does not send a verification signature — the apiKey in the URL path acts as the shared secret.
+        app.MapPost("/api/webhooks/upstox/order/{apiKey}", async (
+            string apiKey,
             HttpRequest request,
             BrokerCredentialService credentials,
             PositionStreamManager manager,
@@ -118,18 +118,10 @@ public static class WebhookEndpoints
                 "Upstox webhook received — apiKey={ApiKey}",
                 apiKey);
 
-            // Read raw body for signature verification before deserialization
             request.EnableBuffering();
             var bodyBytes = await ReadBodyBytesAsync(request);
 
-            logger.LogInformation(
-                "Upstox webhook: body size={Bytes}B X-Api-Verify-Token={HasToken}",
-                bodyBytes.Length,
-                request.Headers.ContainsKey("X-Api-Verify-Token") ? "present" : "absent");
-
-            // Look up the user by their Upstox API key (cache-first)
             var cred = await credentials.FindByApiKeyAsync(BrokerNames.Upstox, apiKey);
-
             if (cred is null)
             {
                 logger.LogWarning(
@@ -142,26 +134,22 @@ public static class WebhookEndpoints
                 "Upstox webhook: resolved apiKey={ApiKey} → user={User}",
                 apiKey, cred.Username);
 
-            // Verify HMAC: SHA256(raw_body + api_secret), hex-encoded
-            var signature = request.Headers["X-Api-Verify-Token"].FirstOrDefault() ?? "";
-            if (!VerifyUpstoxSignature(bodyBytes, cred.ApiSecret, signature))
-            {
-                logger.LogWarning(
-                    "Upstox webhook: signature verification failed — user={User} receivedToken={Token} — returning 401",
-                    cred.Username,
-                    string.IsNullOrEmpty(signature) ? "<empty>" : signature[..Math.Min(8, signature.Length)] + "…");
-                return Results.Unauthorized();
-            }
-
-            logger.LogInformation(
-                "Upstox webhook: signature verified — user={User}",
-                cred.Username);
-
             var payload = System.Text.Json.JsonSerializer.Deserialize<UpstoxOrderPostback>(bodyBytes.AsSpan());
             if (payload is null)
             {
                 logger.LogWarning("Upstox webhook: failed to deserialize body — returning 400");
                 return Results.BadRequest();
+            }
+
+            // Verify the payload belongs to this user — guards against forged requests from
+            // anyone who happens to know the webhook URL.
+            if (!string.IsNullOrEmpty(cred.BrokerUserId) &&
+                !string.Equals(payload.UserId, cred.BrokerUserId, StringComparison.OrdinalIgnoreCase))
+            {
+                logger.LogWarning(
+                    "Upstox webhook: userId mismatch — payload userId={PayloadUserId} expected={Expected} — returning 401",
+                    payload.UserId, cred.BrokerUserId);
+                return Results.Unauthorized();
             }
 
             logger.LogInformation(
@@ -255,28 +243,12 @@ public static class WebhookEndpoints
         return ms.ToArray();
     }
 
-    // ── Upstox HMAC verification ──────────────────────────────────────────────
-
-    /// <summary>
-    /// Upstox postback signature: SHA256(raw_body_string + api_secret), hex-encoded.
-    /// Ref: Upstox developer docs → Postback → Verification.
-    /// </summary>
-    private static bool VerifyUpstoxSignature(byte[] bodyBytes, string apiSecret, string signature)
-    {
-        if (string.IsNullOrEmpty(signature)) return false;
-        var body     = Encoding.UTF8.GetString(bodyBytes);
-        var raw      = body + apiSecret;
-        var hash     = SHA256.HashData(Encoding.UTF8.GetBytes(raw));
-        var expected = Convert.ToHexStringLower(hash);
-        return string.Equals(expected, signature, StringComparison.OrdinalIgnoreCase);
-    }
-
     // ── Zerodha checksum ──────────────────────────────────────────────────────
 
     private static string ComputeZerodhaChecksum(
-        string? tradingSymbol, string? orderId, string apiSecret)
+        string? orderId, string? orderTimestamp, string apiSecret)
     {
-        var raw   = $"{tradingSymbol}{orderId}{apiSecret}";
+        var raw   = $"{orderId}{orderTimestamp}{apiSecret}";
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(raw));
         return Convert.ToHexStringLower(bytes);
     }
@@ -287,18 +259,19 @@ public static class WebhookEndpoints
 
 public sealed class ZerodhaOrderPostback
 {
-    [JsonPropertyName("user_id")]      public string? UserId        { get; init; }
-    [JsonPropertyName("order_id")]     public string? OrderId       { get; init; }
-    [JsonPropertyName("tradingsymbol")]public string? TradingSymbol { get; init; }
-    [JsonPropertyName("status")]       public string? Status        { get; init; }
-    [JsonPropertyName("status_message")]public string? StatusMessage{ get; init; }
-    [JsonPropertyName("checksum")]     public string? Checksum      { get; init; }
+    [JsonPropertyName("user_id")]         public string? UserId          { get; init; }
+    [JsonPropertyName("order_id")]        public string? OrderId         { get; init; }
+    [JsonPropertyName("order_timestamp")] public string? OrderTimestamp  { get; init; }
+    [JsonPropertyName("tradingsymbol")]   public string? TradingSymbol   { get; init; }
+    [JsonPropertyName("status")]          public string? Status          { get; init; }
+    [JsonPropertyName("status_message")]  public string? StatusMessage   { get; init; }
+    [JsonPropertyName("checksum")]        public string? Checksum        { get; init; }
 }
 
 public sealed class UpstoxOrderPostback
 {
     [JsonPropertyName("order_id")]       public string? OrderId       { get; init; }
-    [JsonPropertyName("user_id")]        public string? UserId        { get; init; }
+    [JsonPropertyName("userId")]         public string? UserId        { get; init; }
     [JsonPropertyName("trading_symbol")] public string? TradingSymbol { get; init; }
     [JsonPropertyName("status")]         public string? Status        { get; init; }
     [JsonPropertyName("status_message")] public string? StatusMessage { get; init; }

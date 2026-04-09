@@ -34,7 +34,9 @@ export function BrokerSettingsDialog({ broker, open, onOpenChange }: BrokerSetti
   const [error, setError] = useState<string | null>(null);
 
   const redirectUrl = `${window.location.origin}${broker.redirectPath}`;
-  const webhookUrl = `${window.location.origin}/api/webhooks/${broker.id}/order?apiKey=${apiKey || "YOUR_API_KEY"}`;
+  const webhookUrl = broker.id === "upstox"
+    ? `${window.location.origin}/api/webhooks/upstox/order/${apiKey || "YOUR_API_KEY"}`
+    : `${window.location.origin}/api/webhooks/${broker.id}/order?apiKey=${apiKey || "YOUR_API_KEY"}`;
 
   const handleCopyRedirect = async () => {
     await navigator.clipboard.writeText(redirectUrl);
