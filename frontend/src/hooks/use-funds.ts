@@ -7,10 +7,12 @@ export interface MultiBrokerFunds {
   zerodha: FundsData | null;
 }
 
-export function useFunds() {
-  const [funds, setFunds]     = useState<FundsData | null>(null);
+const DEFAULT_POLL_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
+export function useFunds(pollIntervalMs = DEFAULT_POLL_INTERVAL_MS) {
+  const [funds, setFunds]       = useState<FundsData | null>(null);
   const [allFunds, setAllFunds] = useState<MultiBrokerFunds>({ upstox: null, zerodha: null });
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading]   = useState(false);
 
   const isUpstoxAuthenticated  = useBrokerStore((s) => s.isAuthenticated("upstox"));
   const isZerodhaAuthenticated = useBrokerStore((s) => s.isAuthenticated("zerodha"));
@@ -25,7 +27,7 @@ export function useFunds() {
         isUpstoxAuthenticated
           ? fetchFunds()
               .then((f) => { results.upstox = f; })
-              .catch(() => { /* broker may not be authenticated */ })
+              .catch(() => {})
           : Promise.resolve(),
 
         isZerodhaAuthenticated
@@ -34,13 +36,12 @@ export function useFunds() {
               if (!creds?.apiKey || !creds?.accessToken) return Promise.resolve();
               return fetchZerodhaFunds(creds.apiKey, creds.accessToken)
                 .then((f) => { results.zerodha = f; })
-                .catch(() => { /* silently ignore */ });
+                .catch(() => {});
             })()
           : Promise.resolve(),
       ]);
 
       setAllFunds(results);
-      // Keep single-broker `funds` for backwards compatibility
       setFunds(results.upstox ?? results.zerodha);
     } finally {
       setLoading(false);
@@ -49,7 +50,9 @@ export function useFunds() {
 
   useEffect(() => {
     refresh();
-  }, [refresh]);
+    const id = setInterval(refresh, pollIntervalMs);
+    return () => clearInterval(id);
+  }, [refresh, pollIntervalMs]);
 
   return { funds, allFunds, loading, refresh };
 }

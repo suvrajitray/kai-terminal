@@ -11,7 +11,7 @@ import type { FundsData } from "@/services/trading-api";
 export function BrokerStatusChips() {
   const credentials       = useBrokerStore((s) => s.credentials);
   const removeCredentials = useBrokerStore((s) => s.removeCredentials);
-  const { allFunds, loading: fundsLoading } = useFunds();
+  const { allFunds, loading: fundsLoading, refresh } = useFunds();
 
   const connectedBrokers = BROKERS.filter((b) => credentials[b.id]);
 
@@ -26,7 +26,7 @@ export function BrokerStatusChips() {
         const pillBar  = getUtilization(funds);
 
         return (
-          <Popover key={broker.id}>
+          <Popover key={broker.id} onOpenChange={(open) => { if (open) refresh(); }}>
             <PopoverTrigger asChild>
               <button
                 className={cn(
