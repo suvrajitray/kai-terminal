@@ -6,7 +6,7 @@ function subscribe(cb: () => void) {
   const id = setInterval(cb, 1000);
   return () => clearInterval(id);
 }
-const getSnapshot = () => Date.now();
+const getSnapshot = () => Math.floor(Date.now() / 1000);
 
 function getSessionElapsed(): { h: number; m: number; s: number } | null {
   const now = new Date();
