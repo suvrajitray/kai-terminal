@@ -87,8 +87,20 @@ internal sealed class ZerodhaPositionService : IBrokerPositionService
         string instrumentToken, string oldProduct, int quantity, CancellationToken ct = default)
     {
         var positions = await GetAllPositionsAsync(ct);
+
+        // oldProduct arrives as "Intraday" or "Delivery" (unified API enum) from the frontend.
+        // Zerodha positions carry "I" (MIS) or "NRML"/"D" (overnight) in unified form.
+        // When both MIS and NRML positions exist for the same symbol we must filter on product
+        // to pick the right row; without this the first match wins and the wrong leg gets converted.
+        var wantIntraday = oldProduct.Equals("Intraday", StringComparison.OrdinalIgnoreCase)
+                        || oldProduct.Equals("I",        StringComparison.OrdinalIgnoreCase)
+                        || oldProduct.Equals("MIS",      StringComparison.OrdinalIgnoreCase);
+
         var pos = positions.FirstOrDefault(p =>
-            p.InstrumentToken.Equals(instrumentToken, StringComparison.OrdinalIgnoreCase));
+            p.InstrumentToken.Equals(instrumentToken, StringComparison.OrdinalIgnoreCase) &&
+            (wantIntraday
+                ? p.Product.Equals("I", StringComparison.OrdinalIgnoreCase)
+                : !p.Product.Equals("I", StringComparison.OrdinalIgnoreCase)));
 
         if (pos is null || pos.Quantity == 0) return;
 
