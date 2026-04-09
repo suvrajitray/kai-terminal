@@ -207,17 +207,15 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
         string userId, string stateKey, Contracts.Domain.BrokerPosition position, IBrokerClient broker,
         RiskEngine.Models.UserRiskState state, string chainKey, int shiftCount, int maxCount, CancellationToken ct)
     {
-        var exitToken = BuildCloseToken(position, broker.BrokerType);
-
         _logger.LogWarning(
             "AutoShift EXHAUSTED — {UserId} ({Broker}) | token={Token} has used all {MaxCount} shift(s) — placing exit order now",
-            userId, broker.BrokerType, exitToken, maxCount);
+            userId, broker.BrokerType, position.InstrumentToken, maxCount);
 
-        await broker.ExitPositionAsync(exitToken, position.Product, ct);
+        await broker.ExitPositionAsync(position.InstrumentToken, position.Product, ct);
 
         _logger.LogInformation(
             "AutoShift EXHAUSTED exit order placed — {Token} exited after {Count}/{MaxCount} shift(s) [{Broker} / {UserId}]",
-            exitToken, shiftCount, maxCount, broker.BrokerType, userId);
+            position.InstrumentToken, shiftCount, maxCount, broker.BrokerType, userId);
 
         // Mark this token so subsequent LTP ticks don't re-trigger before the next poll.
         // The position stays in cache so MTM remains accurate (realized P&L via broker REST
@@ -285,10 +283,9 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
             return;
         }
 
-        var closeToken = BuildCloseToken(position, broker.BrokerType);
-        var openToken  = BuildOpenToken(newUpstoxKey, broker.BrokerType, allContracts);
+        var (openSymbol, openExchange) = BuildOpenOrder(newUpstoxKey, broker.BrokerType, allContracts);
 
-        if (openToken is null)
+        if (openSymbol is null)
         {
             _logger.LogWarning(
                 "AutoShift — could not resolve open token for upstoxKey={UpstoxKey} chain={ChainKey} ({Broker}) — skipping [{UserId}]",
@@ -297,13 +294,13 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
         }
 
         var qty        = Math.Abs(position.Quantity);
-        var closeOrder = new BrokerOrderRequest(closeToken, qty, "BUY",  position.Product, "MARKET");
-        var openOrder  = new BrokerOrderRequest(openToken,  qty, "SELL", position.Product, "MARKET");
+        var closeOrder = new BrokerOrderRequest(position.InstrumentToken, qty, "BUY",  position.Product, "MARKET", Exchange: position.Exchange);
+        var openOrder  = new BrokerOrderRequest(openSymbol,               qty, "SELL", position.Product, "MARKET", Exchange: openExchange);
 
         var currentCount = state.AutoShiftCounts.GetValueOrDefault(chainKey, 0);
         _logger.LogInformation(
-            "AutoShift placing orders — chain={ChainKey} shift {From}→{To} | close={CloseToken} qty={Qty} | open={OpenToken} qty={Qty} [{Broker} / {UserId}]",
-            chainKey, currentCount, currentCount + 1, closeToken, qty, openToken, qty, broker.BrokerType, userId);
+            "AutoShift placing orders — chain={ChainKey} shift {From}→{To} | close={CloseSymbol} qty={Qty} | open={OpenSymbol} qty={Qty} [{Broker} / {UserId}]",
+            chainKey, currentCount, currentCount + 1, position.InstrumentToken, qty, openSymbol, qty, broker.BrokerType, userId);
 
         // Short: close first (releases margin) then open the new short
         string closeOrderId;
@@ -314,8 +311,8 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
         catch (Exception ex)
         {
             _logger.LogError(ex,
-                "AutoShift FAILED — could not place close order for {CloseToken} qty={Qty} chain={ChainKey} [{Broker} / {UserId}]",
-                closeToken, qty, chainKey, broker.BrokerType, userId);
+                "AutoShift FAILED — could not place close order for {CloseSymbol} qty={Qty} chain={ChainKey} [{Broker} / {UserId}]",
+                position.InstrumentToken, qty, chainKey, broker.BrokerType, userId);
             await _notifier.NotifyAsync(new RiskNotification(
                 UserId:          userId,
                 Broker:          broker.BrokerType,
@@ -326,19 +323,13 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
             throw;
         }
         _logger.LogInformation(
-            "AutoShift close order placed — {CloseToken} qty={Qty} orderId={OrderId} [{Broker} / {UserId}]",
-            closeToken, qty, closeOrderId, broker.BrokerType, userId);
+            "AutoShift close order placed — {CloseSymbol} qty={Qty} orderId={OrderId} [{Broker} / {UserId}]",
+            position.InstrumentToken, qty, closeOrderId, broker.BrokerType, userId);
 
         // Mark the old token so subsequent LTP ticks don't re-trigger a second shift before
         // the next poll. The position stays in cache — MTM remains accurate until the poll
         // returns the closed leg's realized P&L and the new leg as open.
         _cache.MarkShifted(stateKey, position.InstrumentToken);
-
-        // Compute the map key now (needs openToken + brokerType) before the closure captures it.
-        var mapKey = string.Equals(broker.BrokerType, BrokerNames.Zerodha, StringComparison.OrdinalIgnoreCase)
-                     && openToken.Contains('|')
-            ? openToken.Split('|')[1]
-            : openToken;
 
         // Fire-and-forget: wait for the close order to actually fill, then open the new short.
         // Running off the eval loop so risk checks (SL/target) continue during the fill wait.
@@ -352,18 +343,18 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
 
                 await broker.PlaceOrderAsync(openOrder, CancellationToken.None);
                 _logger.LogInformation(
-                    "AutoShift open order placed — {OpenToken} qty={Qty} [{Broker} / {UserId}]",
-                    openToken, qty, broker.BrokerType, userId);
+                    "AutoShift open order placed — {OpenSymbol} qty={Qty} [{Broker} / {UserId}]",
+                    openSymbol, qty, broker.BrokerType, userId);
 
                 // Fetch fresh state — other evaluations may have run while we waited.
                 var freshState = await _repo.GetOrCreateAsync(stateKey);
                 var newCount   = freshState.IncrementAutoShiftCount(chainKey);
-                freshState.MapShiftOrigin(mapKey, chainKey);
+                freshState.MapShiftOrigin(openSymbol, chainKey);
                 await _repo.UpdateAsync(stateKey, freshState);
 
                 _logger.LogInformation(
-                    "AutoShift COMPLETE — chain={ChainKey} shift {NewCount}/{MaxCount} done | {OldStrike}→{NewToken} | remaining shifts={Remaining} [{Broker} / {UserId}]",
-                    chainKey, newCount, config.AutoShiftMaxCount, contract.Strike, openToken,
+                    "AutoShift COMPLETE — chain={ChainKey} shift {NewCount}/{MaxCount} done | {OldStrike}→{OpenSymbol} | remaining shifts={Remaining} [{Broker} / {UserId}]",
+                    chainKey, newCount, config.AutoShiftMaxCount, contract.Strike, openSymbol,
                     config.AutoShiftMaxCount - newCount, broker.BrokerType, userId);
 
                 // Trigger an immediate position poll so the new leg is subscribed to the
@@ -377,15 +368,15 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
                     Type:            RiskNotificationType.AutoShiftTriggered,
                     Mtm:             _cache.GetMtm(stateKey),
                     InstrumentToken: position.InstrumentToken,
-                    NewToken:        openToken,
+                    NewToken:        openSymbol,
                     ShiftCount:      newCount,
                     Timestamp:       DateTimeOffset.UtcNow), CancellationToken.None);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex,
-                    "AutoShift PARTIAL FAILURE — close={CloseToken} succeeded but open={OpenToken} FAILED for chain={ChainKey} [{Broker} / {UserId}]. Manual intervention required.",
-                    closeToken, openToken, chainKey, broker.BrokerType, userId);
+                    "AutoShift PARTIAL FAILURE — close={CloseSymbol} succeeded but open={OpenSymbol} FAILED for chain={ChainKey} [{Broker} / {UserId}]. Manual intervention required.",
+                    position.InstrumentToken, openSymbol, chainKey, broker.BrokerType, userId);
                 try
                 {
                     await _notifier.NotifyAsync(new RiskNotification(
@@ -420,33 +411,24 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
             c.ExchangeToken.Equals(exchangeToken, StringComparison.OrdinalIgnoreCase));
     }
 
-    private static string BuildCloseToken(Contracts.Domain.BrokerPosition position, string brokerType)
-    {
-        if (string.Equals(brokerType, BrokerNames.Zerodha, StringComparison.OrdinalIgnoreCase))
-        {
-            // ZerodhaOrderService expects "{exchange}|{tradingSymbol}"
-            return string.IsNullOrEmpty(position.Exchange)
-                ? position.InstrumentToken
-                : $"{position.Exchange}|{position.InstrumentToken}";
-        }
-
-        // Upstox: InstrumentToken is already the full instrument key
-        return position.InstrumentToken;
-    }
-
-    private static string? BuildOpenToken(
+    /// <summary>
+    /// Resolves the open order (symbol + exchange) for a shift.
+    /// Upstox: returns the Upstox instrument key with no exchange (it's encoded in the key).
+    /// Zerodha: looks up the TradingSymbol and Exchange from the Kite contract list.
+    /// </summary>
+    private static (string? symbol, string? exchange) BuildOpenOrder(
         string upstoxKey, string brokerType,
         IReadOnlyList<ZerodhaOptionContract> contracts)
     {
         if (string.Equals(brokerType, BrokerNames.Upstox, StringComparison.OrdinalIgnoreCase))
-            return upstoxKey;
+            return (upstoxKey, null);
 
-        // Zerodha: derive exchange_token from the Upstox key, look up the trading symbol
+        // Zerodha: derive exchange_token from the Upstox key, look up the trading symbol + exchange
         var exchangeToken = upstoxKey.Contains('|') ? upstoxKey.Split('|')[1] : upstoxKey;
         var match = contracts.FirstOrDefault(c =>
             c.ExchangeToken.Equals(exchangeToken, StringComparison.OrdinalIgnoreCase));
 
-        return match is not null ? $"{match.Exchange}|{match.TradingSymbol}" : null;
+        return match is not null ? (match.TradingSymbol, match.Exchange) : (null, null);
     }
 
     // ── Fill polling ──────────────────────────────────────────────────────────

@@ -1,14 +1,20 @@
 using KAITerminal.Broker;
 using KAITerminal.Contracts.Domain;
 using KAITerminal.Zerodha.Http;
+using Microsoft.Extensions.Logging;
 
 namespace KAITerminal.Zerodha.Services;
 
 internal sealed class ZerodhaOrderService : IBrokerOrderService
 {
     private readonly ZerodhaHttpClient _http;
+    private readonly ILogger<ZerodhaOrderService> _logger;
 
-    public ZerodhaOrderService(ZerodhaHttpClient http) => _http = http;
+    public ZerodhaOrderService(ZerodhaHttpClient http, ILogger<ZerodhaOrderService> logger)
+    {
+        _http   = http;
+        _logger = logger;
+    }
 
     public async Task<IReadOnlyList<BrokerOrder>> GetAllOrdersAsync(CancellationToken ct = default)
     {
@@ -37,13 +43,16 @@ internal sealed class ZerodhaOrderService : IBrokerOrderService
 
     public Task<string> PlaceOrderAsync(BrokerOrderRequest request, CancellationToken ct = default)
     {
-        var parts    = request.InstrumentToken.Split('|', 2);
-        var exchange = parts.Length == 2 ? parts[0] : "NFO";
-        var symbol   = parts.Length == 2 ? parts[1] : request.InstrumentToken;
+        var exchange    = request.Exchange ?? InferExchange(request.InstrumentToken);
         var kiteProduct = ZerodhaProductMap.ToKite(request.Product, exchange);
 
+        _logger.LogDebug(
+            "ZerodhaOrderService.PlaceOrderAsync — symbol={Symbol} exchange={Exchange} kiteProduct={KiteProduct} orderType={OrderType} qty={Qty}",
+            request.InstrumentToken, exchange, kiteProduct, request.OrderType, request.Quantity);
+
         return _http.PlaceOrderAsync(
-            symbol, exchange,
+            request.InstrumentToken,
+            exchange,
             request.TransactionType.ToUpperInvariant(),
             kiteProduct,
             request.OrderType.ToUpperInvariant(),
@@ -51,6 +60,16 @@ internal sealed class ZerodhaOrderService : IBrokerOrderService
             request.Price,
             request.TriggerPrice,
             ct);
+    }
+
+    /// <summary>
+    /// Infer Zerodha exchange from trading symbol when not explicitly provided.
+    /// SENSEX and BANKEX are BSE F&amp;O (BFO); everything else is NSE F&amp;O (NFO).
+    /// </summary>
+    private static string InferExchange(string symbol)
+    {
+        var upper = symbol.ToUpperInvariant();
+        return upper.StartsWith("SENSEX") || upper.StartsWith("BANKEX") ? "BFO" : "NFO";
     }
 
     public Task<string> CancelOrderAsync(string orderId, CancellationToken ct = default)

@@ -20,11 +20,22 @@ public static class WebhookEndpoints
         // Zerodha sends: POST with JSON body containing order details + SHA-256 checksum.
         app.MapPost("/api/webhooks/zerodha/order", async (
             [FromQuery] string apiKey,
-            [FromBody]  ZerodhaOrderPostback payload,
+            HttpRequest request,
             BrokerCredentialService credentials,
             PositionStreamManager manager,
             ILogger<ZerodhaOrderPostback> logger) =>
         {
+            // Zerodha sends JSON via Go-http-client without Content-Type: application/json,
+            // so we read the raw body and deserialize manually to avoid 415.
+            request.EnableBuffering();
+            var bodyBytes = await ReadBodyBytesAsync(request);
+            var payload   = System.Text.Json.JsonSerializer.Deserialize<ZerodhaOrderPostback>(bodyBytes.AsSpan());
+            if (payload is null)
+            {
+                logger.LogWarning("Zerodha webhook: failed to deserialize body — returning 400");
+                return Results.BadRequest();
+            }
+
             logger.LogInformation(
                 "Zerodha webhook received — apiKey={ApiKey} orderId={OrderId} symbol={Symbol} status={Status}",
                 apiKey, payload.OrderId, payload.TradingSymbol, payload.Status);
@@ -146,8 +157,7 @@ public static class WebhookEndpoints
                 "Upstox webhook: signature verified — user={User}",
                 cred.Username);
 
-            var payload = await System.Text.Json.JsonSerializer.DeserializeAsync<UpstoxOrderPostback>(
-                new MemoryStream(bodyBytes));
+            var payload = System.Text.Json.JsonSerializer.Deserialize<UpstoxOrderPostback>(bodyBytes.AsSpan());
             if (payload is null)
             {
                 logger.LogWarning("Upstox webhook: failed to deserialize body — returning 400");

@@ -162,14 +162,14 @@ export async function placeMarketOrder(
   exchange?: string,
 ): Promise<void> {
   if (broker === "zerodha") {
-    const token = exchange ? `${exchange}|${instrumentToken}` : instrumentToken;
     await apiClient.post("/api/zerodha/orders/v3", {
-      instrumentToken: token,
+      instrumentToken,
       quantity,
       transactionType,
       product,
       orderType: "Market",
       price: null,
+      exchange: exchange || undefined,
     });
   } else {
     await apiClient.post("/api/upstox/orders/v3", {
@@ -226,14 +226,14 @@ export async function placeOrder(
   exchange?: string,
 ): Promise<void> {
   if (broker === "zerodha") {
-    const token = exchange ? `${exchange}|${instrumentToken}` : instrumentToken;
     await apiClient.post("/api/zerodha/orders/v3", {
-      instrumentToken: token,
+      instrumentToken,
       quantity,
       transactionType,
       product,
       orderType: orderType === "market" ? "Market" : "Limit",
       price: orderType === "limit" ? (limitPrice ?? 0) : null,
+      exchange: exchange || undefined,
     });
   } else {
     await apiClient.post("/api/upstox/orders/v3", {
@@ -258,14 +258,14 @@ export async function placeStoplossOrder(
   exchange?: string,
 ): Promise<void> {
   if (broker === "zerodha") {
-    const token = exchange ? `${exchange}|${instrumentToken}` : instrumentToken;
     await apiClient.post("/api/zerodha/orders/v3", {
-      instrumentToken: token,
+      instrumentToken,
       quantity,
       transactionType,
       product,
       orderType: "SL-M",
       triggerPrice,
+      exchange: exchange || undefined,
     });
   } else {
     await apiClient.post("/api/upstox/orders/v3", {

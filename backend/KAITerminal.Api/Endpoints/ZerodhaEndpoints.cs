@@ -149,16 +149,11 @@ public static class ZerodhaEndpoints
             if (match is null)
                 return Results.Problem($"Zerodha trading symbol not found for exchange token {exchangeToken}.");
 
-            var closeToken = string.IsNullOrEmpty(request.Exchange)
-                ? request.InstrumentToken
-                : $"{request.Exchange}|{request.InstrumentToken}";
-            var openToken  = $"{match.Exchange}|{match.TradingSymbol}";
-
             var closeTxn = request.IsShort ? "Buy"  : "Sell";
             var openTxn  = request.IsShort ? "Sell" : "Buy";
 
-            var closeOrder = new BrokerOrderRequest(closeToken, request.Qty, closeTxn, request.Product, "MARKET");
-            var openOrder  = new BrokerOrderRequest(openToken,  request.Qty, openTxn,  request.Product, "MARKET");
+            var closeOrder = new BrokerOrderRequest(request.InstrumentToken, request.Qty, closeTxn, request.Product, "MARKET", Exchange: request.Exchange);
+            var openOrder  = new BrokerOrderRequest(match.TradingSymbol,     request.Qty, openTxn,  request.Product, "MARKET", Exchange: match.Exchange);
 
             var logger = lf.CreateLogger("ZerodhaEndpoints");
             var email  = user.FindFirstValue(ClaimTypes.Email) ?? "unknown";
@@ -179,8 +174,8 @@ public static class ZerodhaEndpoints
                 catch (Exception ex)
                 {
                     logger.LogError(ex,
-                        "PARTIAL SHIFT — {User} — close {CloseToken} succeeded but open {OpenToken} failed. Manual intervention required.",
-                        email, closeToken, openToken);
+                        "PARTIAL SHIFT — {User} — close {CloseSymbol} succeeded but open {OpenSymbol} failed. Manual intervention required.",
+                        email, request.InstrumentToken, match.TradingSymbol);
                     return Results.Problem(
                         $"Close order placed but open order failed: {ex.Message}. Check your positions — manual intervention may be required.");
                 }
@@ -195,18 +190,18 @@ public static class ZerodhaEndpoints
                 catch (Exception ex)
                 {
                     logger.LogError(ex,
-                        "PARTIAL SHIFT — {User} — open {OpenToken} succeeded but close {CloseToken} failed. Manual intervention required.",
-                        email, openToken, closeToken);
+                        "PARTIAL SHIFT — {User} — open {OpenSymbol} succeeded but close {CloseSymbol} failed. Manual intervention required.",
+                        email, match.TradingSymbol, request.InstrumentToken);
                     return Results.Problem(
                         $"Open order placed but close order failed: {ex.Message}. Check your positions — manual intervention may be required.");
                 }
             }
 
             logger.LogInformation(
-                "Shift {Direction} — {User} — close {CloseToken} qty={Qty} | open {OpenToken} product={Product}",
-                request.Direction, email, closeToken, request.Qty, openToken, request.Product);
+                "Shift {Direction} — {User} — close {CloseSymbol} ({CloseExchange}) qty={Qty} | open {OpenSymbol} ({OpenExchange}) product={Product}",
+                request.Direction, email, request.InstrumentToken, request.Exchange, request.Qty, match.TradingSymbol, match.Exchange, request.Product);
 
-            return Results.Ok(new { targetToken = openToken });
+            return Results.Ok(new { targetToken = $"{match.Exchange}|{match.TradingSymbol}" });
         });
 
         group.MapPost("/positions/{instrumentToken}/exit", async (
@@ -243,7 +238,8 @@ public static class ZerodhaEndpoints
                 request.Product,
                 request.OrderType,
                 request.Price,
-                request.TriggerPrice);
+                request.TriggerPrice,
+                request.Exchange);
             var orderId = await zerodha.Orders.PlaceOrderAsync(brokerRequest, ct);
             lf.CreateLogger("ZerodhaEndpoints").LogInformation(
                 "Order placed — {User} — {Token} qty={Qty} {Side} — order {OrderId}",
@@ -275,15 +271,14 @@ public static class ZerodhaEndpoints
             if (match is null)
                 return Results.Problem($"Zerodha trading symbol not found for exchange token {exchangeToken}.");
 
-            var orderToken = $"{match.Exchange}|{match.TradingSymbol}";
-            var brokerRequest = new BrokerOrderRequest(orderToken, request.Qty, request.TransactionType, request.Product, "MARKET");
+            var brokerRequest = new BrokerOrderRequest(match.TradingSymbol, request.Qty, request.TransactionType, request.Product, "MARKET", Exchange: match.Exchange);
             await zerodha.Orders.PlaceOrderAsync(brokerRequest, ct);
 
             lf.CreateLogger("ZerodhaEndpoints").LogInformation(
-                "By-price order — {User} — {Underlying} {Expiry} {Type} qty={Qty} {Side} target=₹{Premium} → {Token}",
+                "By-price order — {User} — {Underlying} {Expiry} {Type} qty={Qty} {Side} target=₹{Premium} → {Symbol} ({Exchange})",
                 user.FindFirstValue(ClaimTypes.Email) ?? "unknown",
                 request.UnderlyingKey, request.Expiry, request.InstrumentType,
-                request.Qty, request.TransactionType, request.TargetPremium, orderToken);
+                request.Qty, request.TransactionType, request.TargetPremium, match.TradingSymbol, match.Exchange);
 
             return Results.Ok(new { instrumentKey = upstoxKey });
         });
@@ -349,6 +344,7 @@ public static class ZerodhaEndpoints
         string   Product,
         string   OrderType,
         decimal? Price        = null,
-        decimal? TriggerPrice = null);
+        decimal? TriggerPrice = null,
+        string?  Exchange     = null);
 
 }

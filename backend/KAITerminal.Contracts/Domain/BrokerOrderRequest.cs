@@ -15,4 +15,5 @@ public sealed record BrokerOrderRequest(
     string   Product,
     string   OrderType,
     decimal? Price        = null,
-    decimal? TriggerPrice = null);
+    decimal? TriggerPrice = null,
+    string?  Exchange     = null);

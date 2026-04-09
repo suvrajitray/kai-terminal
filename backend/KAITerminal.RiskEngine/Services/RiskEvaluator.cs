@@ -240,14 +240,10 @@ public sealed class RiskEvaluator
 
             foreach (var pos in toExit)
             {
-                var token = string.Equals(brokerType, BrokerNames.Zerodha, StringComparison.OrdinalIgnoreCase)
-                            && !string.IsNullOrEmpty(pos.Exchange)
-                    ? $"{pos.Exchange}|{pos.InstrumentToken}"
-                    : pos.InstrumentToken;
                 _logger.LogInformation(
                     "  Exiting {Direction} {Token} qty={Qty} product={Product} [{Broker} / {UserId}]",
-                    pos.Quantity < 0 ? "SHORT" : "LONG", token, Math.Abs(pos.Quantity), pos.Product, brokerType, userId);
-                await broker.ExitPositionAsync(token, pos.Product, ct);
+                    pos.Quantity < 0 ? "SHORT" : "LONG", pos.InstrumentToken, Math.Abs(pos.Quantity), pos.Product, brokerType, userId);
+                await broker.ExitPositionAsync(pos.InstrumentToken, pos.Product, ct);
             }
 
             state.IsSquaredOff = true;
