@@ -62,7 +62,19 @@ export function usePositionsFeed(onOrderUpdate?: () => void) {
 
     // Backend sends combined positions for all connected brokers
     conn.on("ReceivePositions", (incoming: Position[]) => {
-      setPositions(incoming);
+      setPositions((prev) => {
+        if (prev.length === 0) return incoming;
+        // Preserve live LTP (and derived PnL) for positions we already track —
+        // the REST poll returns stale LTP which would clobber the live feed.
+        const liveMap = new Map(prev.map((p) => [p.instrumentToken, p]));
+        return incoming.map((p) => {
+          const live = liveMap.get(p.instrumentToken);
+          if (!live) return p;
+          const ltp = live.ltp;
+          const pnl = p.pnl + p.quantity * (ltp - p.ltp);
+          return { ...p, ltp, pnl };
+        });
+      });
       setLoading(false);
     });
 

@@ -237,7 +237,6 @@ export function ExitPositionDialog({
           <OrderTypeRow ltp={position.ltp} orderMode={orderMode} onOrderModeChange={handleOrderModeChange} />
 
           <div className="grid grid-cols-2 gap-4">
-            <PriceInput orderMode={orderMode} value={limitPrice} onChange={setLimitPrice} />
             <div className="space-y-1.5">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Quantity
@@ -250,6 +249,7 @@ export function ExitPositionDialog({
                 onToggleMode={toggleQtyMode}
               />
             </div>
+            <PriceInput orderMode={orderMode} value={limitPrice} onChange={setLimitPrice} />
           </div>
 
           <Button
@@ -344,7 +344,6 @@ export function SellBuyMoreDialog({ open, onOpenChange, position }: MoreDialogPr
           <OrderTypeRow ltp={position.ltp} orderMode={orderMode} onOrderModeChange={handleOrderModeChange} />
 
           <div className="grid grid-cols-2 gap-4">
-            <PriceInput orderMode={orderMode} value={limitPrice} onChange={setLimitPrice} />
             <div className="space-y-1.5">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Quantity
@@ -357,6 +356,7 @@ export function SellBuyMoreDialog({ open, onOpenChange, position }: MoreDialogPr
                 onToggleMode={toggleQtyMode}
               />
             </div>
+            <PriceInput orderMode={orderMode} value={limitPrice} onChange={setLimitPrice} />
           </div>
 
           <Button
@@ -414,7 +414,8 @@ export function AddStoplossDialog({ open, onOpenChange, position }: AddStoplossD
     } else {
       ltpSnapped.current = false;
     }
-  }, [open, position.ltp]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const canConfirm = qty > 0 && !!triggerPrice && parseFloat(triggerPrice) > 0;
 

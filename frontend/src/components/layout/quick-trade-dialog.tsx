@@ -282,6 +282,16 @@ function ByPriceContent({
       {/* Target Premium + Quantity + Buy/Sell */}
       <div className="grid gap-3" style={{ gridTemplateColumns: "1fr 1fr auto" }}>
         <div className="space-y-2">
+          <Label className="text-xs text-muted-foreground uppercase tracking-wider">Quantity</Label>
+          <QtyInput
+            value={qtyValue}
+            mode={qtyMode}
+            lotSize={lotSize}
+            onChange={onQtyChange}
+            onToggleMode={onToggleQtyMode}
+          />
+        </div>
+        <div className="space-y-2">
           <Label className="text-xs text-muted-foreground uppercase tracking-wider">Target Premium</Label>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
@@ -295,16 +305,6 @@ function ByPriceContent({
               placeholder="0.00"
             />
           </div>
-        </div>
-        <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground uppercase tracking-wider">Quantity</Label>
-          <QtyInput
-            value={qtyValue}
-            mode={qtyMode}
-            lotSize={lotSize}
-            onChange={onQtyChange}
-            onToggleMode={onToggleQtyMode}
-          />
         </div>
         <div className="space-y-2">
           <Label className="text-xs text-muted-foreground uppercase tracking-wider">Direction</Label>

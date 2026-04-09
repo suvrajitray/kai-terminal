@@ -234,6 +234,7 @@ export function useOptionChain() {
     underlying, setUnderlying,
     expiry, setExpiry,
     expiries,
+    allChain,
     visibleRows,
     hasMoreLow,
     hasMoreHigh,

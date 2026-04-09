@@ -20,6 +20,7 @@ export function OptionChainPanel({ width, onResize, onClose, netDelta }: Props) 
     underlying, setUnderlying,
     expiry, setExpiry,
     expiries,
+    allChain,
     visibleRows,
     hasMoreLow,
     hasMoreHigh,
@@ -348,7 +349,19 @@ export function OptionChainPanel({ width, onResize, onClose, netDelta }: Props) 
       </div>
     </div>
 
-    <OptionChainOrderDialog intent={orderIntent} onClose={() => setOrderIntent(null)} />
+    <OptionChainOrderDialog
+      intent={orderIntent}
+      currentLtp={orderIntent ? (() => {
+        for (const entry of allChain) {
+          if (entry.callOptions?.instrumentKey === orderIntent.instrumentKey)
+            return entry.callOptions.marketData?.ltp;
+          if (entry.putOptions?.instrumentKey === orderIntent.instrumentKey)
+            return entry.putOptions.marketData?.ltp;
+        }
+        return undefined;
+      })() : undefined}
+      onClose={() => setOrderIntent(null)}
+    />
     </>
   );
 }
