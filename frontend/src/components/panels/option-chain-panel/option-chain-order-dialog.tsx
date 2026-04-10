@@ -40,18 +40,20 @@ export function OptionChainOrderDialog({ intent, currentLtp, onClose }: Props) {
     (b) => !isBrokerTokenExpired(b.id, credentials[b.id]?.accessToken),
   );
 
-  const [broker, setBroker]         = useState<string>(() => activeBrokers[0]?.id ?? "upstox");
-  const [qtyValue, setQtyValue]     = useState("1");
-  const [qtyMode, setQtyMode]       = useState<"qty" | "lot">("lot");
-  const [product, setProduct]       = useState<"Intraday" | "Delivery">("Intraday");
-  const [orderType, setOrderType]   = useState<"market" | "limit">("market");
-  const [limitPrice, setLimitPrice] = useState(() => intent?.ltp.toFixed(2) ?? "0");
+  const [broker, setBroker]             = useState<string>(() => activeBrokers[0]?.id ?? "upstox");
+  const [direction, setDirection]       = useState<"Buy" | "Sell">(() => intent?.transactionType ?? "Buy");
+  const [qtyValue, setQtyValue]         = useState("1");
+  const [qtyMode, setQtyMode]           = useState<"qty" | "lot">("lot");
+  const [product, setProduct]           = useState<"Intraday" | "Delivery">("Intraday");
+  const [orderType, setOrderType]       = useState<"market" | "limit">("market");
+  const [limitPrice, setLimitPrice]     = useState(() => intent?.ltp.toFixed(2) ?? "0");
   const [placing, setPlacing]           = useState(false);
   const [availableMargin, setAvailable] = useState<number | null>(null);
 
   // Reset to defaults every time the dialog opens for a new intent
   useEffect(() => {
     if (!intent) return;
+    setDirection(intent.transactionType);
     setOrderType("market");
     setProduct("Intraday");
     setQtyValue("1");
@@ -75,18 +77,21 @@ export function OptionChainOrderDialog({ intent, currentLtp, onClose }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [broker, !!intent]);
 
-  // Derived values — computed even when intent is null so hooks order is stable
-  const lotSize   = intent ? getLotSize(intent.underlying) : 1;
-  const parsed    = parseInt(qtyValue, 10);
-  const qty       = isNaN(parsed) || parsed <= 0 ? lotSize
-                  : qtyMode === "lot" ? parsed * lotSize : parsed;
-  const contract  = intent ? getByInstrumentKey(intent.instrumentKey) : null;
-  const direction = intent?.transactionType ?? "Buy";
+  // Derived values — computed before early return so hook order is stable
+  const isBuy    = direction === "Buy";
+  const lotSize  = intent ? getLotSize(intent.underlying) : 1;
+  const parsed   = parseInt(qtyValue, 10);
+  const qty      = isNaN(parsed) || parsed <= 0 ? lotSize
+                 : qtyMode === "lot" ? parsed * lotSize : parsed;
+  const contract = intent ? getByInstrumentKey(intent.instrumentKey) : null;
+
+  // Accent palette — green for Buy, red for Sell
+  const accent = isBuy
+    ? { border: "border-emerald-500", dot: "bg-emerald-500", btn: "bg-emerald-600 hover:bg-emerald-700", toggle: "bg-emerald-600" }
+    : { border: "border-rose-500",    dot: "bg-rose-500",    btn: "bg-rose-600 hover:bg-rose-700",       toggle: "bg-rose-600"   };
 
   const marginInstruments = useMemo<MarginInstrument[] | null>(() => {
     if (!intent || qty <= 0) return null;
-    // Both brokers expect the Upstox instrument key (NSE_FO|{exchangeToken}).
-    // The Zerodha margin endpoint extracts exchangeToken from the | format and resolves internally.
     return [{ instrumentToken: intent.instrumentKey, quantity: qty, product: product === "Intraday" ? "I" : "D", transactionType: direction.toUpperCase() }];
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [intent?.instrumentKey, qty, product, direction]);
@@ -101,8 +106,7 @@ export function OptionChainOrderDialog({ intent, currentLtp, onClose }: Props) {
 
   if (!intent) return null;
 
-  const ltp   = currentLtp ?? intent.ltp;
-  const isBuy = direction === "Buy";
+  const ltp = currentLtp ?? intent.ltp;
 
   const toggleMode = () => {
     setQtyMode((prev) => {
@@ -136,25 +140,40 @@ export function OptionChainOrderDialog({ intent, currentLtp, onClose }: Props) {
     <Dialog open={!!intent} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-[480px] p-0 gap-0 overflow-hidden" showCloseButton={false}>
 
-        {/* Accessible title (visually hidden — instrument info is in the body) */}
         <DialogTitle className="sr-only">
           {direction} {intent.underlying} {intent.strike} {intent.side}
         </DialogTitle>
 
         {/* Body */}
-        <div className="px-5 pt-6 pb-4 space-y-5">
+        <div className="px-5 pt-5 pb-4 space-y-5">
 
-          {/* Instrument + LTP */}
-          <div className="flex items-center justify-between">
-            <p className="text-base font-semibold text-foreground">
-              {intent.underlying} {intent.strike} {intent.side}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              NFO · LTP <span className="font-mono font-semibold text-foreground tabular-nums">{ltp.toFixed(2)}</span>
-            </p>
+          {/* Header: instrument + LTP + buy/sell toggle */}
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-base font-semibold text-foreground">
+                {intent.underlying} {intent.strike} {intent.side}
+              </p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                NFO · LTP <span className="font-mono font-semibold text-foreground tabular-nums">{ltp.toFixed(2)}</span>
+              </p>
+            </div>
+            {/* Direction toggle — always "on", color indicates Buy/Sell */}
+            <button
+              onClick={() => setDirection((d) => d === "Buy" ? "Sell" : "Buy")}
+              className={cn(
+                "relative mt-0.5 flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200",
+                accent.toggle,
+              )}
+              title={`Switch to ${isBuy ? "Sell" : "Buy"}`}
+            >
+              <span className={cn(
+                "absolute size-5 rounded-full bg-white shadow-sm transition-transform duration-200",
+                isBuy ? "translate-x-5" : "translate-x-0.5",
+              )} />
+            </button>
           </div>
 
-          {/* Broker toggle — only when multiple brokers connected */}
+          {/* Broker toggle */}
           {activeBrokers.length > 1 && (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -186,9 +205,9 @@ export function OptionChainOrderDialog({ intent, currentLtp, onClose }: Props) {
               <button key={p} onClick={() => setProduct(p)} className="flex items-center gap-2 group">
                 <span className={cn(
                   "size-4 rounded-full border-2 flex items-center justify-center transition-colors",
-                  product === p ? "border-primary" : "border-muted-foreground/30 group-hover:border-muted-foreground/50",
+                  product === p ? accent.border : "border-muted-foreground/30 group-hover:border-muted-foreground/50",
                 )}>
-                  {product === p && <span className="size-2 rounded-full bg-primary" />}
+                  {product === p && <span className={cn("size-2 rounded-full", accent.dot)} />}
                 </span>
                 <span className={cn("text-sm font-medium transition-colors", product === p ? "text-foreground" : "text-muted-foreground")}>
                   {p}
@@ -200,7 +219,7 @@ export function OptionChainOrderDialog({ intent, currentLtp, onClose }: Props) {
             ))}
           </div>
 
-          {/* Lots + Price inputs */}
+          {/* Lots + Price */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Lots</p>
@@ -271,14 +290,8 @@ export function OptionChainOrderDialog({ intent, currentLtp, onClose }: Props) {
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <Button variant="outline" className="h-10 px-5" onClick={onClose} disabled={placing}>
-              Cancel
-            </Button>
             <Button
-              className={cn(
-                "h-10 px-8 font-bold text-white uppercase tracking-wide",
-                isBuy ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700",
-              )}
+              className={cn("h-10 w-24 font-bold text-white uppercase tracking-wide", accent.btn)}
               onClick={handlePlace}
               disabled={placing}
             >
@@ -287,6 +300,9 @@ export function OptionChainOrderDialog({ intent, currentLtp, onClose }: Props) {
               ) : (
                 direction.toUpperCase()
               )}
+            </Button>
+            <Button variant="outline" className="h-10 w-24" onClick={onClose} disabled={placing}>
+              Cancel
             </Button>
           </div>
         </div>
