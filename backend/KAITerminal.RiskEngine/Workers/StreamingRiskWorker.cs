@@ -37,7 +37,7 @@ public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTri
     private readonly TimeZoneInfo                _tradingTz;
 
     // Keyed by "{userId}::{brokerType}"
-    private readonly Dictionary<string, SessionEntry>                _sessions        = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, SessionEntry>      _sessions        = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, Channel<LtpUpdate>> _ltpChannels   = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, Channel<bool>>      _refreshChannels = new(StringComparer.Ordinal);
 
@@ -142,7 +142,7 @@ public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTri
                 configChanged ? "config changed" : "disabled or token expired",
                 entry.Config.UserId, entry.Config.BrokerType);
             entry.Cts.Cancel();
-            _sessions.Remove(key);
+            _sessions.TryRemove(key, out _);
             _ltpChannels.TryRemove(key, out _);
             _refreshChannels.TryRemove(key, out _);
 
