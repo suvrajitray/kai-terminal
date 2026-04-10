@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using KAITerminal.Api.Mapping;
 using KAITerminal.Broker;
 using KAITerminal.Contracts;
@@ -35,10 +36,10 @@ public sealed class PositionStreamCoordinator : IAsyncDisposable
     private readonly CancellationTokenSource _cts = new();
     private Task _pollLoop = Task.CompletedTask;
 
-    // Upstox: instrument token IS the feed token — use HashSet for O(1) lookup in feed handler
-    private HashSet<string> _subscribedUpstoxTokens = [];
+    // Upstox: instrument token IS the feed token — ConcurrentDictionary for thread-safe O(1) lookup in feed handler
+    private readonly ConcurrentDictionary<string, bool> _subscribedUpstoxTokens = new(StringComparer.Ordinal);
     // Zerodha: feed token (e.g. "NSE_FO|885247") → native instrument token (e.g. "15942914")
-    private Dictionary<string, string> _zerodhaFeedToNative = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, string> _zerodhaFeedToNative = new(StringComparer.Ordinal);
 
     private readonly EventHandler<LtpUpdate> _feedHandler;
 
@@ -134,14 +135,17 @@ public sealed class PositionStreamCoordinator : IAsyncDisposable
         // requiring a frontend reconnect (the Worker's _subscribed set resets on startup).
         if (newUpstoxTokens.Count > 0)
         {
-            var addedUpstox = newUpstoxTokens.Except(_subscribedUpstoxTokens).ToList();
+            var addedUpstox = newUpstoxTokens.Except(_subscribedUpstoxTokens.Keys).ToList();
             if (addedUpstox.Count > 0)
                 _logger.LogInformation(
                     "PositionStreamCoordinator [{Id}]: {New} new Upstox instrument(s) — resubscribing all {Total}",
                     _connectionId, addedUpstox.Count, newUpstoxTokens.Count);
             await _sharedMarketData.SubscribeAsync(newUpstoxTokens.ToList(), FeedMode.Ltpc, ct);
         }
-        _subscribedUpstoxTokens = newUpstoxTokens;
+        foreach (var key in _subscribedUpstoxTokens.Keys.Except(newUpstoxTokens).ToList())
+            _subscribedUpstoxTokens.TryRemove(key, out _);
+        foreach (var key in newUpstoxTokens)
+            _subscribedUpstoxTokens.TryAdd(key, true);
 
         // Zerodha: map native tokens → feed tokens via exchange_token
         var openZerodha = allPositions
@@ -162,7 +166,10 @@ public sealed class PositionStreamCoordinator : IAsyncDisposable
                         _connectionId, addedZerodha.Count, newFeedMap.Count);
                 await _sharedMarketData.SubscribeAsync(newFeedMap.Keys.ToList(), FeedMode.Ltpc, ct);
             }
-            _zerodhaFeedToNative = newFeedMap;
+            foreach (var key in _zerodhaFeedToNative.Keys.Except(newFeedMap.Keys).ToList())
+                _zerodhaFeedToNative.TryRemove(key, out _);
+            foreach (var (k, v) in newFeedMap)
+                _zerodhaFeedToNative[k] = v;
         }
 
         if (newUpstoxTokens.Count == 0 && openZerodha.Count == 0)
@@ -270,7 +277,7 @@ public sealed class PositionStreamCoordinator : IAsyncDisposable
         var relevant = new List<object>(capacity: update.Ltps.Count);
         foreach (var (feedToken, ltp) in update.Ltps)
         {
-            if (_subscribedUpstoxTokens.Contains(feedToken))
+            if (_subscribedUpstoxTokens.ContainsKey(feedToken))
                 relevant.Add(new { instrumentToken = feedToken, ltp });
             if (_zerodhaFeedToNative.TryGetValue(feedToken, out var native))
                 relevant.Add(new { instrumentToken = native, ltp });
