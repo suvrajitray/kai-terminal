@@ -229,7 +229,7 @@ export function ProfitProtectionPanel({ open, onClose, positions }: ProfitProtec
               onClick={() => setDraft((d) => ({
                 ...d,
                 enabled: !d.enabled,
-                ...(!d.enabled ? {} : { autoShiftEnabled: false }),
+                ...(!d.enabled ? {} : { autoShiftEnabled: false, trailingEnabled: false }),
               }))}
               className={cn(
                 "flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-all",

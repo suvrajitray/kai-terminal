@@ -248,7 +248,8 @@ public sealed class PositionStreamCoordinator : IAsyncDisposable
     /// Called by the broker webhook handler to push an order status update to the client.
     /// </summary>
     public Task PushOrderUpdateAsync(
-        string orderId, string status, string statusMessage, string tradingSymbol)
+        string orderId, string status, string statusMessage, string tradingSymbol,
+        decimal averagePrice, string transactionType, int filledQuantity)
     {
         _logger.LogInformation(
             "PositionStreamCoordinator [{Id}] ({User}): order {Status} — {Symbol}",
@@ -256,6 +257,7 @@ public sealed class PositionStreamCoordinator : IAsyncDisposable
         return _hub.Clients.Client(_connectionId).SendAsync("ReceiveOrderUpdate", new
         {
             orderId, status, statusMessage, tradingSymbol,
+            averagePrice, transactionType, filledQuantity,
         }, _cts.Token);
     }
 

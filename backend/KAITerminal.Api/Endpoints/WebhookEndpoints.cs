@@ -91,6 +91,7 @@ public static class WebhookEndpoints
             await PushAndRefreshAsync(
                 coordinators,
                 payload.OrderId ?? "", payload.Status ?? "", payload.StatusMessage ?? "", payload.TradingSymbol ?? "",
+                payload.AveragePrice, payload.TransactionType ?? "", payload.FilledQuantity,
                 refresh: status == "complete",
                 logger: logger,
                 broker: "Zerodha");
@@ -180,6 +181,7 @@ public static class WebhookEndpoints
                 payload.Status        ?? "",
                 payload.StatusMessage ?? "",
                 payload.TradingSymbol ?? "",
+                payload.AveragePrice, payload.TransactionType ?? "", payload.FilledQuantity,
                 refresh: status == "complete",
                 logger: logger,
                 broker: "Upstox");
@@ -197,11 +199,12 @@ public static class WebhookEndpoints
     private static async Task PushAndRefreshAsync(
         IEnumerable<KAITerminal.Api.Hubs.PositionStreamCoordinator> coordinators,
         string orderId, string status, string statusMessage, string tradingSymbol,
+        decimal averagePrice, string transactionType, int filledQuantity,
         bool refresh)
     {
         var tasks = coordinators.Select(async coord =>
         {
-            await coord.PushOrderUpdateAsync(orderId, status, statusMessage, tradingSymbol);
+            await coord.PushOrderUpdateAsync(orderId, status, statusMessage, tradingSymbol, averagePrice, transactionType, filledQuantity);
             if (refresh)
                 await coord.TriggerRefreshAsync();
         });
@@ -211,6 +214,7 @@ public static class WebhookEndpoints
     private static async Task PushAndRefreshAsync(
         IEnumerable<KAITerminal.Api.Hubs.PositionStreamCoordinator> coordinators,
         string orderId, string status, string statusMessage, string tradingSymbol,
+        decimal averagePrice, string transactionType, int filledQuantity,
         bool refresh,
         ILogger logger,
         string broker)
@@ -221,7 +225,7 @@ public static class WebhookEndpoints
             logger.LogInformation(
                 "{Broker} webhook: sending ReceiveOrderUpdate to connection={Connection} — orderId={OrderId} status={Status}",
                 broker, coord.Username, orderId, status);
-            await coord.PushOrderUpdateAsync(orderId, status, statusMessage, tradingSymbol);
+            await coord.PushOrderUpdateAsync(orderId, status, statusMessage, tradingSymbol, averagePrice, transactionType, filledQuantity);
             if (refresh)
             {
                 logger.LogInformation(
@@ -266,13 +270,19 @@ public sealed class ZerodhaOrderPostback
     [JsonPropertyName("status")]          public string? Status          { get; init; }
     [JsonPropertyName("status_message")]  public string? StatusMessage   { get; init; }
     [JsonPropertyName("checksum")]        public string? Checksum        { get; init; }
+    [JsonPropertyName("average_price")]    public decimal AveragePrice    { get; init; }
+    [JsonPropertyName("transaction_type")] public string? TransactionType { get; init; }
+    [JsonPropertyName("filled_quantity")]  public int     FilledQuantity  { get; init; }
 }
 
 public sealed class UpstoxOrderPostback
 {
-    [JsonPropertyName("order_id")]       public string? OrderId       { get; init; }
-    [JsonPropertyName("userId")]         public string? UserId        { get; init; }
-    [JsonPropertyName("trading_symbol")] public string? TradingSymbol { get; init; }
-    [JsonPropertyName("status")]         public string? Status        { get; init; }
-    [JsonPropertyName("status_message")] public string? StatusMessage { get; init; }
+    [JsonPropertyName("order_id")]        public string? OrderId        { get; init; }
+    [JsonPropertyName("userId")]          public string? UserId         { get; init; }
+    [JsonPropertyName("trading_symbol")]  public string? TradingSymbol  { get; init; }
+    [JsonPropertyName("status")]          public string? Status         { get; init; }
+    [JsonPropertyName("status_message")]  public string? StatusMessage  { get; init; }
+    [JsonPropertyName("average_price")]    public decimal AveragePrice    { get; init; }
+    [JsonPropertyName("transaction_type")] public string? TransactionType { get; init; }
+    [JsonPropertyName("filled_quantity")]  public int     FilledQuantity  { get; init; }
 }
