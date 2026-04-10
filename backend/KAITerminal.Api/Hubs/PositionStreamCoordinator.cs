@@ -142,10 +142,11 @@ public sealed class PositionStreamCoordinator : IAsyncDisposable
                     _connectionId, addedUpstox.Count, newUpstoxTokens.Count);
             await _sharedMarketData.SubscribeAsync(newUpstoxTokens.ToList(), FeedMode.Ltpc, ct);
         }
-        foreach (var key in _subscribedUpstoxTokens.Keys.Except(newUpstoxTokens).ToList())
-            _subscribedUpstoxTokens.TryRemove(key, out _);
+        // Add new entries first — avoids a brief window where a live token is absent from the map
         foreach (var key in newUpstoxTokens)
             _subscribedUpstoxTokens.TryAdd(key, true);
+        foreach (var key in _subscribedUpstoxTokens.Keys.Except(newUpstoxTokens).ToList())
+            _subscribedUpstoxTokens.TryRemove(key, out _);
 
         // Zerodha: map native tokens → feed tokens via exchange_token
         var openZerodha = allPositions
@@ -166,10 +167,16 @@ public sealed class PositionStreamCoordinator : IAsyncDisposable
                         _connectionId, addedZerodha.Count, newFeedMap.Count);
                 await _sharedMarketData.SubscribeAsync(newFeedMap.Keys.ToList(), FeedMode.Ltpc, ct);
             }
-            foreach (var key in _zerodhaFeedToNative.Keys.Except(newFeedMap.Keys).ToList())
-                _zerodhaFeedToNative.TryRemove(key, out _);
+            // Add new entries first — avoids a brief window where a live token is absent
             foreach (var (k, v) in newFeedMap)
                 _zerodhaFeedToNative[k] = v;
+            foreach (var key in _zerodhaFeedToNative.Keys.Except(newFeedMap.Keys).ToList())
+                _zerodhaFeedToNative.TryRemove(key, out _);
+        }
+        else
+        {
+            // No open Zerodha positions — clear stale mappings so OnFeedReceived doesn't route phantom ticks
+            _zerodhaFeedToNative.Clear();
         }
 
         if (newUpstoxTokens.Count == 0 && openZerodha.Count == 0)
