@@ -82,38 +82,61 @@ public sealed class RiskEvaluator
 
         await LogStatusAsync(userId, mtm, state, config, ct);
 
-        // ── 1. Hard stop loss ────────────────────────────────────────────────
-        if (mtm <= config.MtmSl)
-        {
-            _logger.LogWarning(
-                "HARD SL HIT — {UserId} ({Broker})  PnL ₹{Mtm:+#,##0;-#,##0}  ≤  SL ₹{Sl:+#,##0;-#,##0} — exiting all",
-                userId, config.BrokerType, mtm, config.MtmSl);
-            await _notifier.NotifyAsync(new RiskNotification(
-                userId, config.BrokerType, RiskNotificationType.HardSlHit,
-                mtm, Sl: config.MtmSl, Timestamp: DateTimeOffset.UtcNow), ct);
-            await SquareOffAsync(userId, config.BrokerType, stateKey, mtm, state, broker, config, ct);
-            return;
-        }
+        var nowIst = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, _tz).TimeOfDay;
+        var decision = RiskDecisionCalculator.Evaluate(mtm, config, state, nowIst);
 
-        // ── 2. Profit target ─────────────────────────────────────────────────
-        if (mtm >= config.MtmTarget)
+        // Apply trailing state changes (activation or floor raise) regardless of exit
+        if (decision.TrailingUpdate is { } update)
         {
-            _logger.LogInformation(
-                "TARGET HIT — {UserId} ({Broker})  PnL ₹{Mtm:+#,##0;-#,##0}  ≥  Target ₹{Target:+#,##0} — exiting all",
-                userId, config.BrokerType, mtm, config.MtmTarget);
-            await _notifier.NotifyAsync(new RiskNotification(
-                userId, config.BrokerType, RiskNotificationType.TargetHit,
-                mtm, Target: config.MtmTarget, Timestamp: DateTimeOffset.UtcNow), ct);
-            await SquareOffAsync(userId, config.BrokerType, stateKey, mtm, state, broker, config, ct);
-            return;
-        }
+            state.TrailingActive      = true;
+            state.TrailingStop        = update.NewStop;
+            state.TrailingLastTrigger = update.NewLastTrigger;
+            await _repo.UpdateAsync(stateKey, state);
 
-        // ── 3. Auto square-off at configured time ────────────────────────────
-        if (config.AutoSquareOffEnabled)
-        {
-            var nowIst = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, _tz).TimeOfDay;
-            if (nowIst >= config.AutoSquareOffTime)
+            if (update.IsActivation)
             {
+                _logger.LogInformation(
+                    "TSL ACTIVATED — {UserId} ({Broker})  floor locked at ₹{Stop:+#,##0;-#,##0}",
+                    userId, config.BrokerType, state.TrailingStop);
+                await _notifier.NotifyAsync(new RiskNotification(
+                    userId, config.BrokerType, RiskNotificationType.TslActivated,
+                    mtm, TslFloor: state.TrailingStop, Timestamp: DateTimeOffset.UtcNow), ct);
+            }
+            else
+            {
+                _logger.LogInformation(
+                    "TSL RAISED — {UserId} ({Broker})  floor → ₹{Stop:+#,##0;-#,##0}",
+                    userId, config.BrokerType, state.TrailingStop);
+                await _notifier.NotifyAsync(new RiskNotification(
+                    userId, config.BrokerType, RiskNotificationType.TslRaised,
+                    mtm, TslFloor: state.TrailingStop, Timestamp: DateTimeOffset.UtcNow), ct);
+            }
+        }
+
+        // Act on the exit decision
+        switch (decision.Kind)
+        {
+            case RiskDecisionKind.ExitMtmSl:
+                _logger.LogWarning(
+                    "HARD SL HIT — {UserId} ({Broker})  PnL ₹{Mtm:+#,##0;-#,##0}  ≤  SL ₹{Sl:+#,##0;-#,##0} — exiting all",
+                    userId, config.BrokerType, mtm, config.MtmSl);
+                await _notifier.NotifyAsync(new RiskNotification(
+                    userId, config.BrokerType, RiskNotificationType.HardSlHit,
+                    mtm, Sl: config.MtmSl, Timestamp: DateTimeOffset.UtcNow), ct);
+                await SquareOffAsync(userId, config.BrokerType, stateKey, mtm, state, broker, config, ct);
+                break;
+
+            case RiskDecisionKind.ExitTarget:
+                _logger.LogInformation(
+                    "TARGET HIT — {UserId} ({Broker})  PnL ₹{Mtm:+#,##0;-#,##0}  ≥  Target ₹{Target:+#,##0} — exiting all",
+                    userId, config.BrokerType, mtm, config.MtmTarget);
+                await _notifier.NotifyAsync(new RiskNotification(
+                    userId, config.BrokerType, RiskNotificationType.TargetHit,
+                    mtm, Target: config.MtmTarget, Timestamp: DateTimeOffset.UtcNow), ct);
+                await SquareOffAsync(userId, config.BrokerType, stateKey, mtm, state, broker, config, ct);
+                break;
+
+            case RiskDecisionKind.ExitAutoSquareOff:
                 _logger.LogWarning(
                     "AUTO SQUARE-OFF — {UserId} ({Broker})  time {Now} ≥ configured {Cfg} — exiting all",
                     userId, config.BrokerType,
@@ -122,48 +145,9 @@ public sealed class RiskEvaluator
                     userId, config.BrokerType, RiskNotificationType.AutoSquareOff,
                     mtm, Timestamp: DateTimeOffset.UtcNow), ct);
                 await SquareOffAsync(userId, config.BrokerType, stateKey, mtm, state, broker, config, ct);
-                return;
-            }
-        }
+                break;
 
-        // ── 4. Trailing stop loss ────────────────────────────────────────────
-        if (!config.TrailingEnabled) return;
-
-        if (!state.TrailingActive)
-        {
-            if (mtm >= config.TrailingActivateAt)
-            {
-                state.TrailingActive      = true;
-                state.TrailingStop        = config.LockProfitAt;
-                state.TrailingLastTrigger = mtm;
-                await _repo.UpdateAsync(stateKey, state);
-                _logger.LogInformation(
-                    "TSL ACTIVATED — {UserId} ({Broker})  floor locked at ₹{Stop:+#,##0;-#,##0}",
-                    userId, config.BrokerType, state.TrailingStop);
-                await _notifier.NotifyAsync(new RiskNotification(
-                    userId, config.BrokerType, RiskNotificationType.TslActivated,
-                    mtm, TslFloor: state.TrailingStop, Timestamp: DateTimeOffset.UtcNow), ct);
-            }
-        }
-        else
-        {
-            decimal gain = mtm - state.TrailingLastTrigger;
-            if (gain >= config.WhenProfitIncreasesBy)
-            {
-                long steps = (long)(gain / config.WhenProfitIncreasesBy);
-                state.TrailingStop        += steps * config.IncreaseTrailingBy;
-                state.TrailingLastTrigger += steps * config.WhenProfitIncreasesBy;
-                await _repo.UpdateAsync(stateKey, state);
-                _logger.LogInformation(
-                    "TSL RAISED — {UserId} ({Broker})  floor → ₹{Stop:+#,##0;-#,##0}",
-                    userId, config.BrokerType, state.TrailingStop);
-                await _notifier.NotifyAsync(new RiskNotification(
-                    userId, config.BrokerType, RiskNotificationType.TslRaised,
-                    mtm, TslFloor: state.TrailingStop, Timestamp: DateTimeOffset.UtcNow), ct);
-            }
-
-            if (mtm <= state.TrailingStop)
-            {
+            case RiskDecisionKind.ExitTrailingSl:
                 _logger.LogWarning(
                     "TSL HIT — {UserId} ({Broker})  PnL ₹{Mtm:+#,##0;-#,##0}  ≤  floor ₹{Stop:+#,##0;-#,##0} — exiting all",
                     userId, config.BrokerType, mtm, state.TrailingStop);
@@ -171,7 +155,7 @@ public sealed class RiskEvaluator
                     userId, config.BrokerType, RiskNotificationType.TslHit,
                     mtm, TslFloor: state.TrailingStop, Timestamp: DateTimeOffset.UtcNow), ct);
                 await SquareOffAsync(userId, config.BrokerType, stateKey, mtm, state, broker, config, ct);
-            }
+                break;
         }
     }
 
