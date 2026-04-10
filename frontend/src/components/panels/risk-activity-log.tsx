@@ -32,7 +32,9 @@ function formatTime(iso: string): string {
 
 function watchLabel(broker: string): string {
   const wp = useProfitProtectionStore.getState().getConfig(broker)?.watchedProducts ?? "All";
-  return wp === "Intraday" ? "Intraday" : wp === "Delivery" ? "Delivery" : "Intraday + Delivery";
+  if (wp === "Intraday") return " [Intraday]";
+  if (wp === "Delivery") return " [Delivery]";
+  return "";
 }
 
 function buildMessage(entry: RiskLogEntry): string {
@@ -40,35 +42,35 @@ function buildMessage(entry: RiskLogEntry): string {
   const fmt = formatRupee;
   switch (entry.type) {
     case "SessionStarted":
-      return `Risk engine active — PnL ${fmt(entry.mtm)} | SL ${fmt(entry.sl ?? 0)} | Target ${fmt(entry.target ?? 0)} [${watch}]`;
+      return `Risk engine active — PnL ${fmt(entry.mtm)} | SL ${fmt(entry.sl ?? 0)} | Target ${fmt(entry.target ?? 0)}${watch}`;
     case "HardSlHit":
-      return `Hard SL hit — PnL ${fmt(entry.mtm)}${entry.sl != null ? ` ≤ SL ${fmt(entry.sl)}` : ""} [${watch}]`;
+      return `Hard SL hit — PnL ${fmt(entry.mtm)}${entry.sl != null ? ` ≤ SL ${fmt(entry.sl)}` : ""}${watch}`;
     case "TargetHit":
-      return `Target hit — PnL ${fmt(entry.mtm)}${entry.target != null ? ` ≥ ${fmt(entry.target)}` : ""} [${watch}]`;
+      return `Target hit — PnL ${fmt(entry.mtm)}${entry.target != null ? ` ≥ ${fmt(entry.target)}` : ""}${watch}`;
     case "TslActivated":
-      return `TSL activated — floor locked at ${entry.tslFloor != null ? fmt(entry.tslFloor) : "—"} [${watch}]`;
+      return `TSL activated — floor locked at ${entry.tslFloor != null ? fmt(entry.tslFloor) : "—"}${watch}`;
     case "TslRaised":
-      return `TSL raised — new floor ${entry.tslFloor != null ? fmt(entry.tslFloor) : "—"} [${watch}]`;
+      return `TSL raised — new floor ${entry.tslFloor != null ? fmt(entry.tslFloor) : "—"}${watch}`;
     case "TslHit":
-      return `TSL hit — PnL ${fmt(entry.mtm)}${entry.tslFloor != null ? ` ≤ floor ${fmt(entry.tslFloor)}` : ""} [${watch}]`;
+      return `TSL hit — PnL ${fmt(entry.mtm)}${entry.tslFloor != null ? ` ≤ floor ${fmt(entry.tslFloor)}` : ""}${watch}`;
     case "SquareOffComplete":
-      return `Square-off complete — ${watch} positions exited (PnL ${fmt(entry.mtm)}) [${watch}]`;
+      return `Square-off complete — ${watch} positions exited (PnL ${fmt(entry.mtm)})${watch}`;
     case "SquareOffFailed":
-      return `Square-off FAILED — manual verification required [${watch}]`;
+      return `Square-off FAILED — manual verification required${watch}`;
     case "AutoShiftTriggered":
-      return `Auto-shifted ${entry.instrumentToken ?? "position"} — shift #${entry.shiftCount ?? ""} [${watch}]`;
+      return `Auto-shifted ${entry.instrumentToken ?? "position"} — shift #${entry.shiftCount ?? ""}${watch}`;
     case "AutoShiftExhausted":
-      return `Max auto-shifts reached for ${entry.instrumentToken ?? "position"} — position exited [${watch}]`;
+      return `Max auto-shifts reached for ${entry.instrumentToken ?? "position"} — position exited${watch}`;
     case "AutoShiftFailed":
-      return `Auto-shift FAILED for ${entry.instrumentToken ?? "position"} — manual check required [${watch}]`;
+      return `Auto-shift FAILED for ${entry.instrumentToken ?? "position"} — manual check required${watch}`;
     case "AutoSquareOff":
-      return `Auto square-off — time limit reached (PnL ${fmt(entry.mtm)}) [${watch}]`;
+      return `Auto square-off — time limit reached (PnL ${fmt(entry.mtm)})${watch}`;
     case "StatusUpdate":
       if (entry.tslFloor != null)
-        return `PnL ${fmt(entry.mtm)} | TSL floor ${fmt(entry.tslFloor)} | Target ${fmt(entry.target ?? 0)} [${watch}]`;
-      return `PnL ${fmt(entry.mtm)} | SL ${fmt(entry.sl ?? 0)} | Target ${fmt(entry.target ?? 0)} [${watch}]`;
+        return `PnL ${fmt(entry.mtm)} | TSL floor ${fmt(entry.tslFloor)} | Target ${fmt(entry.target ?? 0)}${watch}`;
+      return `PnL ${fmt(entry.mtm)} | SL ${fmt(entry.sl ?? 0)} | Target ${fmt(entry.target ?? 0)}${watch}`;
     default:
-      return `Risk engine event [${watch}]`;
+      return `Risk engine event${watch}`;
   }
 }
 

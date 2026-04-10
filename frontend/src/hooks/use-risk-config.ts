@@ -64,12 +64,16 @@ export function useRiskConfig(brokerType: string = "upstox") {
   }
 
   function setEnabled(enabled: boolean) {
-    // Optimistic update — flip immediately so the toggle feels instant
-    useProfitProtectionStore.getState().setEnabled(brokerType, enabled);
+    const store = useProfitProtectionStore.getState();
+    // When disabling PP, also disable trailing and auto-shift
+    const patch = enabled
+      ? { enabled }
+      : { enabled, trailingEnabled: false, autoShiftEnabled: false };
+    store.setConfig(brokerType, patch);
     // Persist in background; revert on failure
-    const updated = { ...useProfitProtectionStore.getState().getConfig(brokerType), enabled };
+    const updated = { ...store.getConfig(brokerType), ...patch };
     apiClient.put(`/api/risk-config?broker=${brokerType}`, toDto(updated)).catch(() => {
-      useProfitProtectionStore.getState().setEnabled(brokerType, !enabled);
+      store.setEnabled(brokerType, !enabled);
     });
   }
 

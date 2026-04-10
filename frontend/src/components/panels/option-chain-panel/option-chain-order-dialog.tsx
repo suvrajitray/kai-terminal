@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -11,12 +11,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { placeOrder } from "@/services/trading-api";
+import { placeOrder, type MarginInstrument } from "@/services/trading-api";
 import { useBrokerStore } from "@/stores/broker-store";
 import { useOptionContractsStore } from "@/stores/option-contracts-store";
 import { getLotSize } from "@/lib/lot-sizes";
 import { BROKERS } from "@/lib/constants";
 import { isBrokerTokenExpired } from "@/lib/token-utils";
+import { useDirectMarginEstimate } from "@/components/layout/use-margin-estimate";
 
 export interface OrderIntent {
   instrumentKey: string;
@@ -49,17 +50,28 @@ export function OptionChainOrderDialog({ intent, currentLtp, onClose }: Props) {
   const [limitPrice, setLimitPrice] = useState(() => intent?.ltp.toFixed(2) ?? "0");
   const [placing, setPlacing]       = useState(false);
 
+  // Derived values — computed even when intent is null so hooks order is stable
+  const lotSize   = intent ? getLotSize(intent.underlying) : 1;
+  const parsed    = parseInt(qtyValue, 10);
+  const qty       = isNaN(parsed) || parsed <= 0 ? lotSize
+                  : qtyMode === "lot" ? parsed * lotSize : parsed;
+  const contract  = intent ? getByInstrumentKey(intent.instrumentKey) : null;
+  const direction = intent?.transactionType ?? "Buy";
+
+  const marginInstruments = useMemo<MarginInstrument[] | null>(() => {
+    if (!intent || qty <= 0) return null;
+    // Both brokers expect the Upstox instrument key (NSE_FO|{exchangeToken}).
+    // The Zerodha margin endpoint extracts exchangeToken from the | format and resolves internally.
+    return [{ instrumentToken: intent.instrumentKey, quantity: qty, product: product === "Intraday" ? "I" : "D", transactionType: direction.toUpperCase() }];
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [intent?.instrumentKey, qty, product, direction]);
+
+  const { margin, loading: marginLoading } = useDirectMarginEstimate(marginInstruments, broker as "upstox" | "zerodha");
+
   if (!intent) return null;
 
-  const ltp     = currentLtp ?? intent.ltp;
-  const direction = intent.transactionType;
-  const isBuy     = direction === "Buy";
-  const lotSize = getLotSize(intent.underlying);
-  const parsed  = parseInt(qtyValue, 10);
-  const qty     = isNaN(parsed) || parsed <= 0 ? lotSize
-                : qtyMode === "lot" ? parsed * lotSize : parsed;
-
-  const contract = getByInstrumentKey(intent.instrumentKey);
+  const ltp   = currentLtp ?? intent.ltp;
+  const isBuy = direction === "Buy";
 
   const toggleMode = () => {
     setQtyMode((prev) => {
@@ -184,21 +196,37 @@ export function OptionChainOrderDialog({ intent, currentLtp, onClose }: Props) {
             </div>
           </div>
 
-          {/* Price input — disabled + striped when market */}
-          <div className="space-y-1.5">
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Price</p>
-            <Input
-              type="number"
-              step="0.05"
-              min="0"
-              value={orderType === "market" ? "0" : limitPrice}
-              onChange={(e) => setLimitPrice(e.target.value)}
-              disabled={orderType === "market"}
-              className={cn(
-                "h-9 font-mono text-sm",
-                orderType === "market" && "cursor-not-allowed bg-[repeating-linear-gradient(-45deg,transparent,transparent_4px,hsl(var(--muted)/0.3)_4px,hsl(var(--muted)/0.3)_8px)]",
-              )}
-            />
+          {/* Price + Margin row */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Price</p>
+              <Input
+                type="number"
+                step="0.05"
+                min="0"
+                value={orderType === "market" ? "0" : limitPrice}
+                onChange={(e) => setLimitPrice(e.target.value)}
+                disabled={orderType === "market"}
+                className={cn(
+                  "h-9 font-mono text-sm",
+                  orderType === "market" && "cursor-not-allowed bg-[repeating-linear-gradient(-45deg,transparent,transparent_4px,hsl(var(--muted)/0.3)_4px,hsl(var(--muted)/0.3)_8px)]",
+                )}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Req. Margin</p>
+              <div className="flex h-9 items-center rounded-md border border-border/40 bg-muted/20 px-3">
+                {marginLoading ? (
+                  <span className="text-xs text-muted-foreground animate-pulse">—</span>
+                ) : margin != null ? (
+                  <span className="font-mono text-sm tabular-nums text-foreground">
+                    ₹{margin.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">—</span>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Place button */}

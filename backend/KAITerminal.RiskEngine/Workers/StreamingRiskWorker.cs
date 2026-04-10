@@ -415,8 +415,10 @@ public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTri
                 await _notifier.NotifyAsync(new RiskNotification(
                     user.UserId, user.BrokerType, RiskNotificationType.SessionStarted,
                     _cache.GetMtm(Key(user)),
+                    Target:            user.MtmTarget,
+                    Sl:                user.MtmSl,
                     OpenPositionCount: openTokens.Count,
-                    Timestamp: DateTimeOffset.UtcNow), ct);
+                    Timestamp:         DateTimeOffset.UtcNow), ct);
         }
     }
 
