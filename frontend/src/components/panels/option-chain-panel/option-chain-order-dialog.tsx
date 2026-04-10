@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { placeOrder, type MarginInstrument } from "@/services/trading-api";
+import { placeOrder, fetchFunds, fetchZerodhaFunds, type MarginInstrument } from "@/services/trading-api";
 import { useBrokerStore } from "@/stores/broker-store";
 import { useOptionContractsStore } from "@/stores/option-contracts-store";
 import { getLotSize } from "@/lib/lot-sizes";
@@ -48,7 +48,24 @@ export function OptionChainOrderDialog({ intent, currentLtp, onClose }: Props) {
   const [product, setProduct]       = useState<"Intraday" | "Delivery">("Intraday");
   const [orderType, setOrderType]   = useState<"market" | "limit">("market");
   const [limitPrice, setLimitPrice] = useState(() => intent?.ltp.toFixed(2) ?? "0");
-  const [placing, setPlacing]       = useState(false);
+  const [placing, setPlacing]           = useState(false);
+  const [availableMargin, setAvailable] = useState<number | null>(null);
+
+  useEffect(() => {
+    setAvailable(null);
+    if (!intent) return;
+    const creds = useBrokerStore.getState().getCredentials(broker);
+    if (broker === "zerodha" && creds?.apiKey && creds?.accessToken) {
+      fetchZerodhaFunds(creds.apiKey, creds.accessToken)
+        .then((f) => setAvailable(f.availableMargin))
+        .catch(() => {});
+    } else if (broker === "upstox") {
+      fetchFunds()
+        .then((f) => setAvailable(f.availableMargin))
+        .catch(() => {});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [broker, !!intent]);
 
   // Derived values — computed even when intent is null so hooks order is stable
   const lotSize   = intent ? getLotSize(intent.underlying) : 1;
@@ -67,6 +84,12 @@ export function OptionChainOrderDialog({ intent, currentLtp, onClose }: Props) {
   }, [intent?.instrumentKey, qty, product, direction]);
 
   const { margin, loading: marginLoading } = useDirectMarginEstimate(marginInstruments, broker as "upstox" | "zerodha");
+
+  const marginColor =
+    margin == null || availableMargin == null ? "text-foreground"
+    : margin > availableMargin               ? "text-rose-400"
+    : availableMargin < margin * 1.15        ? "text-amber-400"
+    :                                          "text-foreground";
 
   if (!intent) return null;
 
@@ -214,16 +237,16 @@ export function OptionChainOrderDialog({ intent, currentLtp, onClose }: Props) {
               />
             </div>
             <div className="space-y-1.5">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Req. Margin</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Margin</p>
               <div className="flex h-9 items-center rounded-md border border-border/40 bg-muted/20 px-3">
                 {marginLoading ? (
-                  <span className="text-xs text-muted-foreground animate-pulse">—</span>
+                  <span className="text-xs font-mono text-muted-foreground animate-pulse">—</span>
                 ) : margin != null ? (
-                  <span className="font-mono text-sm tabular-nums text-foreground">
+                  <span className={cn("text-xs font-mono tabular-nums font-semibold", marginColor)}>
                     ₹{margin.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
                   </span>
                 ) : (
-                  <span className="text-xs text-muted-foreground">—</span>
+                  <span className="text-xs font-mono text-muted-foreground">—</span>
                 )}
               </div>
             </div>
