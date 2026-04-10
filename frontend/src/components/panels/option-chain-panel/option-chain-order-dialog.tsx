@@ -85,10 +85,10 @@ export function OptionChainOrderDialog({ intent, currentLtp, onClose }: Props) {
                  : qtyMode === "lot" ? parsed * lotSize : parsed;
   const contract = intent ? getByInstrumentKey(intent.instrumentKey) : null;
 
-  // Accent palette — green for Buy, red for Sell
+  // Accent palette — matches quick trade dialog (green-600 / red-600)
   const accent = isBuy
-    ? { border: "border-emerald-500", dot: "bg-emerald-500", btn: "bg-emerald-600 hover:bg-emerald-700", toggle: "bg-emerald-600" }
-    : { border: "border-rose-500",    dot: "bg-rose-500",    btn: "bg-rose-600 hover:bg-rose-700",       toggle: "bg-rose-600"   };
+    ? { border: "border-green-500", dot: "bg-green-500", btn: "bg-green-600 hover:bg-green-700", toggle: "bg-green-600" }
+    : { border: "border-red-500",   dot: "bg-red-500",   btn: "bg-red-600 hover:bg-red-700",     toggle: "bg-red-600"   };
 
   const marginInstruments = useMemo<MarginInstrument[] | null>(() => {
     if (!intent || qty <= 0) return null;
@@ -186,7 +186,7 @@ export function OptionChainOrderDialog({ intent, currentLtp, onClose }: Props) {
                     key={b.id}
                     onClick={() => setBroker(b.id)}
                     className={cn(
-                      "rounded px-3 py-1 text-xs font-semibold transition-all",
+                      "cursor-pointer rounded px-3 py-1 text-xs font-semibold transition-all",
                       broker === b.id
                         ? "bg-primary text-primary-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground",
