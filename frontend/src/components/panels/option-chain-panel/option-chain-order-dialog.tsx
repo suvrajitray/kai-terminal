@@ -175,12 +175,12 @@ export function OptionChainOrderDialog({ intent, currentLtp, onClose }: Props) {
 
           {/* Broker toggle */}
           {activeBrokers.length > 1 && (
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/20 px-3 py-2">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <ArrowRightLeft className="size-3.5" />
                 <span>Route via</span>
               </div>
-              <div className="flex items-center gap-1 rounded-md border border-border/40 bg-muted/10 p-0.5">
+              <div className="flex items-center gap-1 rounded-md border border-border/40 bg-background p-0.5">
                 {activeBrokers.map((b) => (
                   <button
                     key={b.id}

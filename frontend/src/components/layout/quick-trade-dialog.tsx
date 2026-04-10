@@ -4,7 +4,6 @@ import { Zap, TrendingUp, TrendingDown, ArrowUpDown, Layers, ArrowRightLeft } fr
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { QtyInput, type QtyMode } from "@/components/ui/qty-input";
 import { ByChainTab } from "./by-chain-tab";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -50,7 +49,7 @@ export function QuickTradeDialog({ onTabChange }: Props) {
   const [underlying, setUnderlying] = useState("NIFTY");
   const [expiry, setExpiry]         = useState("");
   const [qtyValue, setQtyValue]     = useState("");
-  const [qtyMode, setQtyMode]       = useState<QtyMode>("qty");
+  const [qtyMode, setQtyMode]       = useState<QtyMode>("lot");
   const [product, setProduct]       = useState<"I" | "D">("I");
   const [activeTab, setActiveTab]   = useState("price");
 
@@ -99,7 +98,7 @@ export function QuickTradeDialog({ onTabChange }: Props) {
                 key={b}
                 onClick={() => setBroker(b)}
                 className={cn(
-                  "rounded px-3 py-1 text-xs font-semibold transition-all capitalize",
+                  "cursor-pointer rounded px-3 py-1 text-xs font-semibold transition-all capitalize",
                   broker === b
                     ? "bg-primary text-primary-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground",
@@ -114,7 +113,7 @@ export function QuickTradeDialog({ onTabChange }: Props) {
 
       {/* Underlying */}
       <div className="space-y-2">
-        <Label className="text-xs text-muted-foreground uppercase tracking-wider">Underlying</Label>
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Underlying</p>
         <div className="flex flex-wrap gap-1.5">
           {UNDERLYINGS.map((u) => (
             <button
@@ -136,7 +135,7 @@ export function QuickTradeDialog({ onTabChange }: Props) {
       {/* Expiry + Product */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground uppercase tracking-wider">Expiry</Label>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Expiry</p>
           <Select value={expiry} onValueChange={setExpiry} disabled={expiries.length === 0}>
             <SelectTrigger className="h-9 text-sm">
               <SelectValue placeholder={expiries.length === 0 ? "No contracts" : "Select expiry"}>
@@ -152,20 +151,20 @@ export function QuickTradeDialog({ onTabChange }: Props) {
         </div>
 
         <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground uppercase tracking-wider">Product</Label>
-          <div className="flex gap-1.5">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Product</p>
+          <div className="flex h-9 items-center gap-4">
             {(["I", "D"] as const).map((p) => (
-              <button
-                key={p}
-                onClick={() => setProduct(p)}
-                className={cn(
-                  "flex-1 rounded py-1.5 text-xs font-semibold transition-colors border",
-                  product === p
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "bg-muted/30 text-muted-foreground border-border/40 hover:bg-muted/60 hover:text-foreground",
-                )}
-              >
-                {p === "I" ? "Intraday" : "Delivery"}
+              <button key={p} onClick={() => setProduct(p)} className="flex items-center gap-2 group">
+                <span className={cn(
+                  "size-4 rounded-full border-2 flex items-center justify-center transition-colors",
+                  product === p ? "border-primary" : "border-muted-foreground/30 group-hover:border-muted-foreground/50",
+                )}>
+                  {product === p && <span className="size-2 rounded-full bg-primary" />}
+                </span>
+                <span className={cn("text-sm font-medium transition-colors", product === p ? "text-foreground" : "text-muted-foreground")}>
+                  {p === "I" ? "Intraday" : "Delivery"}
+                </span>
+                <span className="text-[11px] text-muted-foreground/50">{p === "I" ? "MIS" : "NRML"}</span>
               </button>
             ))}
           </div>
@@ -251,7 +250,10 @@ function ByPriceContent({
   const [direction, setDir] = useState<Direction>("Sell");
   const [acting, setActing] = useState<ActionType | null>(null);
 
-  const isBuy = direction === "Buy";
+  const isBuy  = direction === "Buy";
+  const accent = isBuy
+    ? { toggle: "bg-green-600" }
+    : { toggle: "bg-red-600"   };
 
   async function execute(action: ActionType) {
     const targetPremium = parseFloat(price);
@@ -279,10 +281,10 @@ function ByPriceContent({
     <div className="space-y-5">
       {sharedControls}
 
-      {/* Target Premium + Quantity + Buy/Sell */}
+      {/* Quantity + Target Premium + Direction toggle */}
       <div className="grid gap-3" style={{ gridTemplateColumns: "1fr 1fr auto" }}>
-        <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground uppercase tracking-wider">Quantity</Label>
+        <div className="space-y-1.5">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Quantity</p>
           <QtyInput
             value={qtyValue}
             mode={qtyMode}
@@ -291,8 +293,8 @@ function ByPriceContent({
             onToggleMode={onToggleQtyMode}
           />
         </div>
-        <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground uppercase tracking-wider">Target Premium</Label>
+        <div className="space-y-1.5">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Target Premium</p>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
             <Input
@@ -306,25 +308,22 @@ function ByPriceContent({
             />
           </div>
         </div>
-        <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground uppercase tracking-wider">Direction</Label>
-          <div className="flex h-9 w-24 items-center gap-1 rounded-lg border border-border/40 bg-muted/20 p-1">
-            {(["Buy", "Sell"] as Direction[]).map((d) => (
-              <button
-                key={d}
-                onClick={() => setDir(d)}
-                className={cn(
-                  "flex-1 h-full rounded-md text-xs font-semibold transition-all",
-                  direction === d
-                    ? d === "Buy"
-                      ? "bg-green-600 text-white shadow-sm"
-                      : "bg-red-600 text-white shadow-sm"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {d}
-              </button>
-            ))}
+        <div className="space-y-1.5">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Direction</p>
+          <div className="flex h-9 items-center">
+            <button
+              onClick={() => setDir((d) => d === "Buy" ? "Sell" : "Buy")}
+              className={cn(
+                "relative flex h-6 w-11 cursor-pointer items-center rounded-full transition-colors duration-200",
+                accent.toggle,
+              )}
+              title={`Switch to ${isBuy ? "Sell" : "Buy"}`}
+            >
+              <span className={cn(
+                "absolute size-5 rounded-full bg-white shadow-sm transition-transform duration-200",
+                isBuy ? "translate-x-5" : "translate-x-0.5",
+              )} />
+            </button>
           </div>
         </div>
       </div>
