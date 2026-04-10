@@ -3,14 +3,12 @@ import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { QtyInput } from "@/components/ui/qty-input";
-import { ArrowRightLeft, Zap } from "lucide-react";
+import { ArrowRightLeft, Pencil, X as XIcon, Zap } from "lucide-react";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { placeOrder, fetchFunds, fetchZerodhaFunds, type MarginInstrument } from "@/services/trading-api";
 import { useBrokerStore } from "@/stores/broker-store";
 import { useOptionContractsStore } from "@/stores/option-contracts-store";
@@ -50,6 +48,16 @@ export function OptionChainOrderDialog({ intent, currentLtp, onClose }: Props) {
   const [limitPrice, setLimitPrice] = useState(() => intent?.ltp.toFixed(2) ?? "0");
   const [placing, setPlacing]           = useState(false);
   const [availableMargin, setAvailable] = useState<number | null>(null);
+
+  // Reset to defaults every time the dialog opens for a new intent
+  useEffect(() => {
+    if (!intent) return;
+    setOrderType("market");
+    setProduct("Intraday");
+    setQtyValue("1");
+    setQtyMode("lot");
+    setLimitPrice(intent.ltp.toFixed(2));
+  }, [intent?.instrumentKey]);
 
   useEffect(() => {
     setAvailable(null);
@@ -126,28 +134,40 @@ export function OptionChainOrderDialog({ intent, currentLtp, onClose }: Props) {
 
   return (
     <Dialog open={!!intent} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-sm">
-        <DialogHeader>
-          <DialogTitle className={cn("text-lg font-bold", isBuy ? "text-green-400" : "text-red-400")}>
-            {direction} {intent.underlying} {intent.strike} {intent.side}
-          </DialogTitle>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-[480px] p-0 gap-0 overflow-hidden" showCloseButton={false}>
 
-        <div className="space-y-4 pt-1">
-          {/* Broker toggle — top, only when multiple brokers connected */}
+        {/* Accessible title (visually hidden — instrument info is in the body) */}
+        <DialogTitle className="sr-only">
+          {direction} {intent.underlying} {intent.strike} {intent.side}
+        </DialogTitle>
+
+        {/* Body */}
+        <div className="px-5 pt-6 pb-4 space-y-5">
+
+          {/* Instrument + LTP */}
+          <div className="flex items-center justify-between">
+            <p className="text-base font-semibold text-foreground">
+              {intent.underlying} {intent.strike} {intent.side}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              NFO · LTP <span className="font-mono font-semibold text-foreground tabular-nums">{ltp.toFixed(2)}</span>
+            </p>
+          </div>
+
+          {/* Broker toggle — only when multiple brokers connected */}
           {activeBrokers.length > 1 && (
-            <div className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/20 px-3 py-2">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <ArrowRightLeft className="size-3.5" />
                 <span>Route via</span>
               </div>
-              <div className="flex items-center gap-1 rounded-md border border-border/40 bg-background p-0.5">
+              <div className="flex items-center gap-1 rounded-md border border-border/40 bg-muted/10 p-0.5">
                 {activeBrokers.map((b) => (
                   <button
                     key={b.id}
                     onClick={() => setBroker(b.id)}
                     className={cn(
-                      "rounded px-3 py-1 text-xs font-semibold transition-all capitalize",
+                      "rounded px-3 py-1 text-xs font-semibold transition-all",
                       broker === b.id
                         ? "bg-primary text-primary-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground",
@@ -160,36 +180,30 @@ export function OptionChainOrderDialog({ intent, currentLtp, onClose }: Props) {
             </div>
           )}
 
-          {/* LTP + Order type row */}
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-xs text-muted-foreground">
-              LTP <span className="font-mono font-semibold text-foreground tabular-nums">{ltp.toFixed(2)}</span>
-            </span>
-            <div className="flex h-7 items-center gap-0.5 rounded-md border border-border/40 bg-muted/20 p-0.5">
-              {(["market", "limit"] as const).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => {
-                    if (t === "limit" && orderType === "market") setLimitPrice(ltp.toFixed(2));
-                    setOrderType(t);
-                  }}
-                  className={cn(
-                    "rounded px-2.5 py-0.5 text-xs font-semibold capitalize transition-all",
-                    orderType === t
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
+          {/* Product type */}
+          <div className="flex items-center gap-6">
+            {(["Intraday", "Delivery"] as const).map((p) => (
+              <button key={p} onClick={() => setProduct(p)} className="flex items-center gap-2 group">
+                <span className={cn(
+                  "size-4 rounded-full border-2 flex items-center justify-center transition-colors",
+                  product === p ? "border-primary" : "border-muted-foreground/30 group-hover:border-muted-foreground/50",
+                )}>
+                  {product === p && <span className="size-2 rounded-full bg-primary" />}
+                </span>
+                <span className={cn("text-sm font-medium transition-colors", product === p ? "text-foreground" : "text-muted-foreground")}>
+                  {p}
+                </span>
+                <span className="text-[11px] text-muted-foreground/50">
+                  {p === "Intraday" ? "MIS" : "NRML"}
+                </span>
+              </button>
+            ))}
           </div>
 
-          {/* Quantity + Product row */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Quantity</p>
+          {/* Lots + Price inputs */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">Lots</p>
               <QtyInput
                 value={qtyValue}
                 mode={qtyMode}
@@ -198,76 +212,85 @@ export function OptionChainOrderDialog({ intent, currentLtp, onClose }: Props) {
                 onToggleMode={toggleMode}
               />
             </div>
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Product</p>
-              <div className="flex h-9 items-center gap-1 rounded-lg border border-border/40 bg-muted/20 p-1">
-                {(["Intraday", "Delivery"] as const).map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => setProduct(p)}
-                    className={cn(
-                      "flex-1 h-full rounded-md text-xs font-semibold transition-all",
-                      product === p
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {p === "Intraday" ? "Intraday" : "Delivery"}
-                  </button>
-                ))}
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                {orderType === "market" ? "Market price" : "Price"}
+              </p>
+              <div className="flex h-9 overflow-hidden rounded border border-border bg-background">
+                <div className={cn(
+                  "flex flex-1 items-center px-3",
+                  orderType === "market" && "bg-[repeating-linear-gradient(-45deg,rgb(255_255_255_/_0.06)_0px,rgb(255_255_255_/_0.06)_1px,transparent_1px,transparent_8px)]",
+                )}>
+                  <input
+                    type="number"
+                    step="0.05"
+                    min="0"
+                    value={orderType === "market" ? "0" : limitPrice}
+                    onChange={(e) => setLimitPrice(e.target.value)}
+                    disabled={orderType === "market"}
+                    className="w-full bg-transparent text-sm font-mono tabular-nums outline-none disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  />
+                </div>
+                <button
+                  onClick={() => {
+                    if (orderType === "market") { setLimitPrice(ltp.toFixed(2)); setOrderType("limit"); }
+                    else setOrderType("market");
+                  }}
+                  className="flex w-9 shrink-0 items-center justify-center border-l border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  {orderType === "market" ? <Pencil className="size-3.5" /> : <XIcon className="size-3.5" />}
+                </button>
               </div>
             </div>
           </div>
-
-          {/* Price + Margin row */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Price</p>
-              <Input
-                type="number"
-                step="0.05"
-                min="0"
-                value={orderType === "market" ? "0" : limitPrice}
-                onChange={(e) => setLimitPrice(e.target.value)}
-                disabled={orderType === "market"}
-                className={cn(
-                  "h-9 font-mono text-sm",
-                  orderType === "market" && "cursor-not-allowed bg-[repeating-linear-gradient(-45deg,transparent,transparent_4px,hsl(var(--muted)/0.3)_4px,hsl(var(--muted)/0.3)_8px)]",
-                )}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Margin</p>
-              <div className="flex h-9 items-center rounded-md border border-border/40 bg-muted/20 px-3">
-                {marginLoading ? (
-                  <span className="text-xs font-mono text-muted-foreground animate-pulse">—</span>
-                ) : margin != null ? (
-                  <span className={cn("text-xs font-mono tabular-nums font-semibold", marginColor)}>
-                    ₹{margin.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                  </span>
-                ) : (
-                  <span className="text-xs font-mono text-muted-foreground">—</span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Place button */}
-          <Button
-            className={cn(
-              "h-11 w-full text-base font-bold text-white",
-              isBuy ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700",
-            )}
-            onClick={handlePlace}
-            disabled={placing}
-          >
-            {placing ? (
-              <><Zap className="mr-2 size-4 animate-pulse" />Placing…</>
-            ) : (
-              `${direction} ${qty} qty`
-            )}
-          </Button>
         </div>
+
+        {/* Footer */}
+        <div className="h-px bg-border/40" />
+        <div className="flex items-center gap-4 px-5 py-3">
+          <div className="flex-1 min-w-0 space-y-1">
+            <p className="text-[11px] text-muted-foreground">
+              Required{" "}
+              {marginLoading ? (
+                <span className="font-mono animate-pulse">—</span>
+              ) : margin != null ? (
+                <span className={cn("font-mono font-semibold tabular-nums", marginColor)}>
+                  ₹{margin.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                </span>
+              ) : (
+                <span className="font-mono text-muted-foreground/40">—</span>
+              )}
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              Available{" "}
+              <span className="font-mono font-semibold tabular-nums text-foreground">
+                {availableMargin != null
+                  ? `₹${availableMargin.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`
+                  : "—"}
+              </span>
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button variant="outline" className="h-10 px-5" onClick={onClose} disabled={placing}>
+              Cancel
+            </Button>
+            <Button
+              className={cn(
+                "h-10 px-8 font-bold text-white uppercase tracking-wide",
+                isBuy ? "bg-emerald-600 hover:bg-emerald-700" : "bg-rose-600 hover:bg-rose-700",
+              )}
+              onClick={handlePlace}
+              disabled={placing}
+            >
+              {placing ? (
+                <><Zap className="mr-1.5 size-4 animate-pulse" />Placing…</>
+              ) : (
+                direction.toUpperCase()
+              )}
+            </Button>
+          </div>
+        </div>
+
       </DialogContent>
     </Dialog>
   );
