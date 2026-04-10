@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using KAITerminal.Infrastructure.Data;
+using KAITerminal.Api.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -26,9 +27,9 @@ public static class RiskLogEndpoints
                 return Results.Unauthorized();
 
             // Parse requested date (YYYY-MM-DD) or default to today in IST
-            var tz      = TimeZoneInfo.FindSystemTimeZoneById("Asia/Calcutta");
-            var todayIst = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, tz).Date;
-            var targetDate = DateOnly.TryParse(date, out var d) ? d : DateOnly.FromDateTime(todayIst);
+            var tz      = IstClock.Tz;
+            var todayIst = IstClock.Today;
+            var targetDate = DateOnly.TryParse(date, out var d) ? d : todayIst;
 
             var startUtc = new DateTimeOffset(targetDate.ToDateTime(TimeOnly.MinValue), tz.GetUtcOffset(targetDate.ToDateTime(TimeOnly.MinValue))).ToUniversalTime();
             var endUtc   = startUtc.AddDays(1);

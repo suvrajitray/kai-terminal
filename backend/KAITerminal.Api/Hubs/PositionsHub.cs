@@ -1,3 +1,4 @@
+using KAITerminal.Api.Extensions;
 using KAITerminal.Api.Services;
 using KAITerminal.Broker;
 using KAITerminal.Contracts;
@@ -56,9 +57,7 @@ public sealed class PositionsHub : Hub
 
         var exchangeFilter = ParseExchanges(qs?["exchange"].ToString());
         var connectionId   = Context.ConnectionId;
-        var username       = Context.User?.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
-                          ?? Context.User?.FindFirst("email")?.Value
-                          ?? "unknown";
+        var username       = Context.User?.GetEmail() ?? "unknown";
         var filterDesc     = exchangeFilter is null ? "all exchanges" : string.Join(",", exchangeFilter);
         var brokerDesc     = string.Join("+", brokers.Select(b => b.BrokerType));
 

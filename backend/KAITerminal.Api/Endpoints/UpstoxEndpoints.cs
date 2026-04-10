@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using KAITerminal.Api.Extensions;
 using KAITerminal.Api.Mapping;
 using KAITerminal.Api.Models;
 using KAITerminal.Api.Services;
@@ -31,7 +32,7 @@ public static class UpstoxEndpoints
         {
             var (accessToken, brokerUserId) = await upstox.Auth.GenerateTokenWithUserIdAsync(
                 request.ApiKey, request.ApiSecret, request.Code, request.RedirectUri);
-            var username = user.FindFirstValue(ClaimTypes.Email) ?? "";
+            var username = user.GetEmail() ?? "";
             if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(brokerUserId))
                 await credentials.UpdateBrokerUserIdAsync(username, BrokerNames.Upstox, brokerUserId);
             lf.CreateLogger("UpstoxEndpoints").LogInformation(
@@ -56,7 +57,7 @@ public static class UpstoxEndpoints
             [FromQuery] string? exchange = null) =>
         {
             var logger = lf.CreateLogger("UpstoxEndpoints");
-            var email = user.FindFirstValue(ClaimTypes.Email) ?? "unknown";
+            var email = user.GetEmail() ?? "unknown";
             var filterDesc = string.IsNullOrWhiteSpace(exchange) ? "all exchanges" : exchange;
             logger.LogInformation("Exit all positions — {User} — filter: {Filter}", email, filterDesc);
 
@@ -82,7 +83,7 @@ public static class UpstoxEndpoints
             var id = await upstox.Positions.ExitPositionAsync(instrumentToken, product);
             lf.CreateLogger("UpstoxEndpoints").LogInformation(
                 "Exit position — {User} — {Token} ({Product}) — order {OrderId}",
-                user.FindFirstValue(ClaimTypes.Email) ?? "unknown", instrumentToken, product, id);
+                user.GetEmail() ?? "unknown", instrumentToken, product, id);
             return Results.Ok(new { OrderId = id });
         });
 
@@ -96,7 +97,7 @@ public static class UpstoxEndpoints
             await upstox.Positions.ConvertPositionAsync(instrumentToken, request.OldProduct, request.Quantity);
             lf.CreateLogger("UpstoxEndpoints").LogInformation(
                 "Convert position — {User} — {Token} qty={Qty} from {OldProduct}",
-                user.FindFirstValue(ClaimTypes.Email) ?? "unknown",
+                user.GetEmail() ?? "unknown",
                 instrumentToken, request.Quantity, request.OldProduct);
             return Results.Ok();
         });
@@ -142,7 +143,7 @@ public static class UpstoxEndpoints
             };
 
             var logger = lf.CreateLogger("UpstoxEndpoints");
-            var email  = user.FindFirstValue(ClaimTypes.Email) ?? "unknown";
+            var email  = user.GetEmail() ?? "unknown";
 
             // Short: close first (buying back releases margin), then open new short.
             // Long:  open first (maintains hedge), then close old long — avoids margin spike on shorts.
@@ -200,7 +201,7 @@ public static class UpstoxEndpoints
             var result = await upstox.Hft.PlaceOrderV3Async(request);
             lf.CreateLogger("UpstoxEndpoints").LogInformation(
                 "Order placed — {User} — qty={Qty} {Symbol} {Side} @ {Price} — ids=[{OrderIds}] latency={Latency}ms",
-                user.FindFirstValue(ClaimTypes.Email) ?? "unknown",
+                user.GetEmail() ?? "unknown",
                 request.Quantity, request.InstrumentToken, request.TransactionType, request.Price,
                 string.Join(",", result.OrderIds), result.Latency);
             return Results.Ok(result);
@@ -214,7 +215,7 @@ public static class UpstoxEndpoints
             var ids = await upstox.Orders.CancelAllPendingOrdersAsync();
             lf.CreateLogger("UpstoxEndpoints").LogInformation(
                 "Cancel all pending orders — {User} — {Count} order(s) cancelled",
-                user.FindFirstValue(ClaimTypes.Email) ?? "unknown", ids.Count);
+                user.GetEmail() ?? "unknown", ids.Count);
             return Results.Ok(new { OrderIds = ids });
         });
 
@@ -227,7 +228,7 @@ public static class UpstoxEndpoints
             var (id, latency) = await upstox.Hft.CancelOrderV3Async(orderId);
             lf.CreateLogger("UpstoxEndpoints").LogInformation(
                 "Order cancelled — {User} — {OrderId} — latency {Latency}ms",
-                user.FindFirstValue(ClaimTypes.Email) ?? "unknown", id, latency);
+                user.GetEmail() ?? "unknown", id, latency);
             return Results.Ok(new { OrderId = id, Latency = latency });
         });
 
@@ -260,7 +261,7 @@ public static class UpstoxEndpoints
 
             lf.CreateLogger("UpstoxEndpoints").LogInformation(
                 "By-price order — {User} — {Underlying} {Expiry} {Type} qty={Qty} {Side} target=₹{Premium} → {Key}",
-                user.FindFirstValue(ClaimTypes.Email) ?? "unknown",
+                user.GetEmail() ?? "unknown",
                 request.UnderlyingKey, request.Expiry, request.InstrumentType,
                 request.Qty, request.TransactionType, request.TargetPremium, key);
 

@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using KAITerminal.Api.Extensions;
 using KAITerminal.Api.Models;
 using KAITerminal.Api.Services;
 
@@ -12,7 +13,7 @@ public static class BrokerCredentialsEndpoints
 
         group.MapGet("/", async (ClaimsPrincipal user, BrokerCredentialService svc) =>
         {
-            var username = GetEmail(user);
+            var username = user.GetEmail();
             if (username is null) return Results.Unauthorized();
 
             var credentials = await svc.GetAsync(username);
@@ -25,7 +26,7 @@ public static class BrokerCredentialsEndpoints
             BrokerCredentialService svc,
             ILoggerFactory lf) =>
         {
-            var username = GetEmail(user);
+            var username = user.GetEmail();
             if (username is null) return Results.Unauthorized();
 
             await svc.UpsertAsync(username, request);
@@ -41,7 +42,7 @@ public static class BrokerCredentialsEndpoints
             BrokerCredentialService svc,
             ILoggerFactory lf) =>
         {
-            var username = GetEmail(user);
+            var username = user.GetEmail();
             if (username is null) return Results.Unauthorized();
 
             await svc.UpdateAccessTokenAsync(username, brokerName, request.AccessToken);
@@ -56,7 +57,7 @@ public static class BrokerCredentialsEndpoints
             BrokerCredentialService svc,
             ILoggerFactory lf) =>
         {
-            var username = GetEmail(user);
+            var username = user.GetEmail();
             if (username is null) return Results.Unauthorized();
 
             var deleted = await svc.DeleteAsync(username, brokerName);
@@ -67,6 +68,4 @@ public static class BrokerCredentialsEndpoints
         });
     }
 
-    private static string? GetEmail(ClaimsPrincipal user) =>
-        user.FindFirstValue(ClaimTypes.Email) ?? user.FindFirst("email")?.Value;
 }

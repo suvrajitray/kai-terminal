@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using KAITerminal.Infrastructure.Services;
 using KAITerminal.Infrastructure.Data;
+using KAITerminal.Api.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -44,8 +45,8 @@ public static class AdminEndpoints
         {
             if (!IsAdmin(user)) return Results.Forbid();
 
-            var tz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Calcutta");
-            var todayIst = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, tz).Date;
+            var tz = IstClock.Tz;
+            var todayIst = IstClock.Today.ToDateTime(TimeOnly.MinValue);
             var startUtc = new DateTimeOffset(todayIst, tz.GetUtcOffset(todayIst)).ToUniversalTime();
 
             var onlineUsernames = await db.BrokerCredentials
@@ -88,9 +89,9 @@ public static class AdminEndpoints
         {
             if (!IsAdmin(user)) return Results.Forbid();
 
-            var tz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Calcutta");
-            var todayIst = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, tz).Date;
-            var targetDate = DateOnly.TryParse(date, out var d) ? d : DateOnly.FromDateTime(todayIst);
+            var tz = IstClock.Tz;
+            var todayIst = IstClock.Today;
+            var targetDate = DateOnly.TryParse(date, out var d) ? d : todayIst;
 
             var requestDays = days ?? 1;
             var startDate = targetDate.AddDays(-(requestDays - 1));
@@ -128,8 +129,8 @@ public static class AdminEndpoints
         {
             if (!IsAdmin(user)) return Results.Forbid();
 
-            var tz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Calcutta");
-            var todayIst = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, tz).Date;
+            var tz = IstClock.Tz;
+            var todayIst = IstClock.Today.ToDateTime(TimeOnly.MinValue);
             var startUtc = new DateTimeOffset(todayIst, tz.GetUtcOffset(todayIst)).ToUniversalTime();
 
             var totalUsers = await db.Users.CountAsync(ct);

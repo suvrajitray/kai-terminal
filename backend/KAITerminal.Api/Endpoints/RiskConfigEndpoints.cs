@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using KAITerminal.Api.Extensions;
 using KAITerminal.Infrastructure.Data;
 using KAITerminal.Infrastructure.Services;
 using Microsoft.AspNetCore.Builder;
@@ -33,7 +34,7 @@ public static class RiskConfigEndpoints
             IRiskConfigService svc,
             [Microsoft.AspNetCore.Mvc.FromQuery] string broker = "upstox") =>
         {
-            var username = user.FindFirstValue(ClaimTypes.Email)!;
+            var username = user.GetEmail()!;
             var config   = await svc.GetAsync(username, broker) ?? Defaults;
             return Results.Ok(config);
         })
@@ -45,7 +46,7 @@ public static class RiskConfigEndpoints
             UserRiskConfig body,
             [Microsoft.AspNetCore.Mvc.FromQuery] string broker = "upstox") =>
         {
-            var username = user.FindFirstValue(ClaimTypes.Email)!;
+            var username = user.GetEmail()!;
             // Auto-shift requires PP to be active — enforce this invariant on every save.
             if (!body.Enabled)
                 body.AutoShiftEnabled = false;

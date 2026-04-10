@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using KAITerminal.Api.Extensions;
 using KAITerminal.Api.Mapping;
 using KAITerminal.Api.Models;
 using KAITerminal.Api.Services;
@@ -48,8 +49,7 @@ public static class ZerodhaEndpoints
             var (accessToken, brokerUserId) = await zerodha.Auth.GenerateTokenWithUserIdAsync(
                 request.ApiKey, request.ApiSecret, request.RequestToken, ct: ct);
 
-            var userEmail = ctx.User.FindFirst(
-                System.Security.Claims.ClaimTypes.Email)?.Value ?? "";
+            var userEmail = ctx.User?.GetEmail() ?? "";
 
             if (!string.IsNullOrEmpty(userEmail))
             {
@@ -102,7 +102,7 @@ public static class ZerodhaEndpoints
                           .AsReadOnly();
             await zerodha.Positions.ExitAllPositionsAsync(exchanges, ct);
             lf.CreateLogger("ZerodhaEndpoints").LogInformation(
-                "Exit all positions — {User}", user.FindFirstValue(ClaimTypes.Email) ?? "unknown");
+                "Exit all positions — {User}", user.GetEmail() ?? "unknown");
             return Results.Ok();
         });
 
@@ -117,7 +117,7 @@ public static class ZerodhaEndpoints
             await zerodha.Positions.ConvertPositionAsync(instrumentToken, request.OldProduct, request.Quantity, ct);
             lf.CreateLogger("ZerodhaEndpoints").LogInformation(
                 "Convert position — {User} — {Token} qty={Qty} from {OldProduct}",
-                user.FindFirstValue(ClaimTypes.Email) ?? "unknown",
+                user.GetEmail() ?? "unknown",
                 instrumentToken, request.Quantity, request.OldProduct);
             return Results.Ok();
         });
@@ -156,7 +156,7 @@ public static class ZerodhaEndpoints
             var openOrder  = new BrokerOrderRequest(match.TradingSymbol,     request.Qty, openTxn,  request.Product, "MARKET", Exchange: match.Exchange);
 
             var logger = lf.CreateLogger("ZerodhaEndpoints");
-            var email  = user.FindFirstValue(ClaimTypes.Email) ?? "unknown";
+            var email  = user.GetEmail() ?? "unknown";
 
             // Short: close first (buying back releases margin), then open new short.
             // Long:  open first (maintains hedge), then close old long — avoids margin spike on shorts.
@@ -215,7 +215,7 @@ public static class ZerodhaEndpoints
             await zerodha.Positions.ExitPositionAsync(instrumentToken, product, ct);
             lf.CreateLogger("ZerodhaEndpoints").LogInformation(
                 "Exit position — {User} — {Token}",
-                user.FindFirstValue(ClaimTypes.Email) ?? "unknown", instrumentToken);
+                user.GetEmail() ?? "unknown", instrumentToken);
             return Results.Ok();
         });
 
@@ -243,7 +243,7 @@ public static class ZerodhaEndpoints
             var orderId = await zerodha.Orders.PlaceOrderAsync(brokerRequest, ct);
             lf.CreateLogger("ZerodhaEndpoints").LogInformation(
                 "Order placed — {User} — {Token} qty={Qty} {Side} — order {OrderId}",
-                user.FindFirstValue(ClaimTypes.Email) ?? "unknown",
+                user.GetEmail() ?? "unknown",
                 request.InstrumentToken, request.Quantity, request.TransactionType, orderId);
             return Results.Ok(new { orderId });
         });
@@ -276,7 +276,7 @@ public static class ZerodhaEndpoints
 
             lf.CreateLogger("ZerodhaEndpoints").LogInformation(
                 "By-price order — {User} — {Underlying} {Expiry} {Type} qty={Qty} {Side} target=₹{Premium} → {Symbol} ({Exchange})",
-                user.FindFirstValue(ClaimTypes.Email) ?? "unknown",
+                user.GetEmail() ?? "unknown",
                 request.UnderlyingKey, request.Expiry, request.InstrumentType,
                 request.Qty, request.TransactionType, request.TargetPremium, match.TradingSymbol, match.Exchange);
 
