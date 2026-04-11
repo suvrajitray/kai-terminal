@@ -82,7 +82,18 @@ All `/api/{broker}/positions` and `/api/{broker}/orders` use unified camelCase D
 
 API enums always use `[JsonConverter(typeof(JsonStringEnumConverter))]` — strings, never numbers.
 
-`Mapping/PositionMapper.cs` — never import `KAITerminal.Upstox.Models.Enums`; use only API contract enums.
+`Mapping/PositionMapper.cs` — never import `KAITerminal.Upstox.Models.Enums`; use only `KAITerminal.Api.Dto.Enums` types.
+
+**API folder layout (key areas):**
+- `Dto/Enums/` + `Dto/Responses/` — wire types for HTTP boundary (`KAITerminal.Api.Dto.*`). Distinct from the `KAITerminal.Contracts` project (domain types).
+- `Hubs/` — SignalR hubs + all hub-adjacent classes: `PositionStreamCoordinator`, `UpstoxFeedSubscriptionManager`, `ZerodhaFeedSubscriptionManager`, stream managers.
+- `Services/` — scoped/singleton services: `PositionShiftService`, `ByPriceOrderService`, `WebhookOrderProcessor`, `ZerodhaWebhookValidator`, `UpstoxWebhookValidator`, `AdminService`.
+- `Extensions/` — `HttpContextEmailExtensions` (`GetUserEmail()`), `IstClock` (`Now`, `Today`, `ToIst()`, `DateToUtc()`).
+
+**`PositionStreamCoordinator`** is split into three collaborating classes in `Hubs/`:
+- `UpstoxFeedSubscriptionManager` — owns Upstox token set, subscribe/unsubscribe from `MarketDataService`.
+- `ZerodhaFeedSubscriptionManager` — owns zerodha feed-to-native map, `BuildZerodhaFeedMapAsync`.
+- `PositionStreamCoordinator` (orchestrator) — poll loop, routes ticks to client, triggers refresh.
 
 ### Upstox SDK (`KAITerminal.Upstox`)
 
@@ -106,14 +117,27 @@ Zero deps on Upstox/Zerodha SDKs. `UpstoxMarketDataHttpClient` takes an explicit
 
 **DI pattern for singletons needing `IAppSettingService`** (scoped/EF): inject `IServiceScopeFactory`, create a scope per call to resolve `IAppSettingService`. Used in `MarketQuoteService`, `ChartDataService`, option providers, and `MarketDataService`.
 
+**`UpstoxMarketDataStreamer` is split into three classes in `Streaming/`:**
+- `WebSocketFrameReader` — pure. Reads and reassembles binary WebSocket frames into complete messages.
+- `ProtobufFeedDecoder` — pure static. Decodes raw protobuf bytes into `FeedUpdate` domain objects.
+- `UpstoxMarketDataStreamer` (connection manager) — connection lifecycle, reconnect loop, subscription management.
+- `UpstoxFeedMode` — internal 4-value enum (`Ltpc / Full / OptionGreeks / FullD30`) for the Upstox WebSocket protocol. Distinct from `KAITerminal.Contracts.Streaming.FeedMode` (the public 2-value API enum).
+
+`MarketDataFeedV3.cs` (protobuf-generated, 5000+ lines) — **never edit manually**.
+
 ### Risk Engine (`KAITerminal.RiskEngine`)
 
-**`RiskEvaluator` checks (in order):**
+**Risk evaluation is split across three classes:**
+- `RiskDecisionCalculator` — pure static. Takes `(PortfolioSnapshot, UserRiskConfig, UserRiskState, DateTimeOffset now)`, returns a `RiskDecision` record (enum: `None / ExitMtmSl / ExitTarget / ExitAutoSquareOff / ExitTrailingSl / UpdateTrailingFloor`). No I/O.
+- `TrailingStopCalculator` — pure static. Computes the new trailing floor given current MTM + config + existing floor.
+- `RiskEvaluator` (thin executor) — calls `RiskDecisionCalculator`, then applies the decision: notify, square off, persist state.
 
-1. MTM SL (`MtmSl`) → exit all
-2. MTM target (`MtmTarget`) → exit all
-3. Auto square-off: `AutoSquareOffEnabled` + `AutoSquareOffTime` (IST, 24h) from `UserTradingSettings` → exit all when current IST time ≥ configured time
-4. Trailing SL: activates at `TrailingActivateAt`; floor locked at `LockProfitAt`; raised by `IncreaseTrailingBy` every `WhenProfitIncreasesBy`; fires when MTM ≤ floor
+**`RiskDecisionCalculator` checks (in order):**
+
+1. MTM SL (`MtmSl`) → `ExitMtmSl`
+2. MTM target (`MtmTarget`) → `ExitTarget`
+3. Auto square-off: `AutoSquareOffEnabled` + `AutoSquareOffTime` (IST, 24h) from `UserTradingSettings` → `ExitAutoSquareOff` when current IST time ≥ configured time
+4. Trailing SL: activates at `TrailingActivateAt`; floor locked at `LockProfitAt`; raised by `IncreaseTrailingBy` every `WhenProfitIncreasesBy`; fires when MTM ≤ floor → `ExitTrailingSl` or `UpdateTrailingFloor`
 
 **`WatchedProducts` filter** — per-broker setting `"All" | "Intraday" | "Delivery"` (default `"All"`). The Worker filters positions by this value **before** `UpdatePositions`, so MTM, SL, trailing stop, and auto-shift only see the watched product type. Terminal display is **unaffected** — `PositionStreamCoordinator` subscribes all instruments regardless. `ProductTypeFilter` (in `KAITerminal.Contracts/Domain/`) normalises broker-specific raw values: Upstox `"I"`/`"D"` and Zerodha `"MIS"`/`"NRML"`; CO/MTF/CNC positions are excluded when any filter is active.
 
@@ -121,7 +145,27 @@ Zero deps on Upstox/Zerodha SDKs. `UpstoxMarketDataHttpClient` takes an explicit
 
 **Auto-shift chain key** format: `"{underlying}_{expiry}_{optionType}_{strike}"` (e.g. `NIFTY_2026-04-17_PE_22000`). Each original position leg has its own independent shift counter. `ShiftOriginMap` maps shifted-into instrument token → original chain key so the counter is inherited across strikes; for Zerodha the `"NFO|"` exchange prefix is stripped before storing so the map key matches `position.InstrumentToken`. `ExitedChainKeys` in `UserRiskState` guards against duplicate exhausted-exit orders being placed on repeated LTP ticks before the 10-second position poll refreshes the cache.
 
+**`StreamingRiskWorker` is split across three classes in `Workers/`:**
+- `UserSessionRegistry` — owns `ConcurrentDictionary<string, SessionEntry>` and `SyncSessionsAsync`. Starts/stops per-user sessions.
+- `LtpTickDrainer` — pure static. Drains a `Channel<LtpUpdate>` and returns the latest-per-token map.
+- `StreamingRiskWorker` (orchestrator) — uses `UserSessionRegistry`, calls `LtpTickDrainer`, delegates to evaluators.
+
 `InMemoryRiskRepository` state **resets on host restart**. `IRiskEventNotifier` — `NullRiskEventNotifier` is default; hosts override before calling `AddRiskEngine`.
+
+### Worker (`KAITerminal.Worker`)
+
+**Auto-shift is split across four classes in `AutoShift/`:**
+- `AutoShiftDecisionEngine` — pure. Takes positions + state + config, returns an `AutoShiftDecision` record (`Kind`: `Shift / ExitExhausted / SkipContractNotFound / SkipUnknownUnderlying`). No broker calls.
+- `FillPoller` — polls for fill confirmation with timeout/retry. Extracted from the former `WaitForFillAsync`.
+- `AutoShiftOrderExecutor` — executes orders: close leg → wait for fill (via `FillPoller`) → open new leg. Owns all broker calls.
+- `AutoShiftEvaluator` (thin orchestrator) — reads state, calls `DecisionEngine`, hands off to `OrderExecutor`.
+
+**Worker folder layout:**
+- `AutoShift/` — all auto-shift classes above.
+- `TokenSources/` — `DbUserTokenSource`, `ConfigTokenSource`.
+- `Jobs/` — `IvSnapshotJob`.
+- `Mapping/` — `CrossBrokerTokenMapper`.
+- `WorkerIndexKeys.cs` — shared `UnderlyingFeedKeys` dictionary (underlying name → Upstox feed key). Single source of truth used by `AutoShiftDecisionEngine` and `StreamingRiskWorker`.
 
 ### Worker Token Mapping
 
@@ -171,7 +215,7 @@ Use `dotnet user-secrets` for all real tokens. `Api:InternalKey` must match in b
 - **Payoff chart** (`payoff-chart-dialog.tsx`) — P&L at expiry, grouped by expiry date. Each expiry gets its own colored curve (cyan, amber, violet, emerald). Uses the live spot price from `useIndicesFeed`. Spot dot and summary rows per expiry group. Separate `legs/indexName` memo (no feed dependency) vs. spot read inline.
 - **Bulk exit by type** — when no rows are selected, "Exit CEs" (red) and "Exit PEs" (green) buttons appear in the positions toolbar.
 - **Margin utilization gauge** — `MarginEntry` in stats bar shows a color gauge only when both `availableMargin` and `usedMargin` are non-null. Green ≤ 50%, amber ≤ 80%, red > 80%.
-- **Auto square-off settings** — `UserTradingSettingsDialog` has a Switch + time Input. Backend stores in `UserTradingSettings`; `DbUserTokenSource` joins and populates `UserConfig`; evaluated in `RiskEvaluator` as check #3.
+- **Auto square-off settings** — `UserTradingSettingsDialog` has a Switch + time Input. Backend stores in `UserTradingSettings`; `TokenSources/DbUserTokenSource` joins and populates `UserConfig`; evaluated in `RiskDecisionCalculator` as check #3.
 - **WatchedProducts toggle** — PP panel (first tab, top of form) shows a 3-button toggle: "All positions" / "MIS only" / "NRML only". Bound to `draft.watchedProducts`, saved with the rest of the config on submit. Backend scopes the risk engine to that product type; terminal display is unaffected.
 
 ---
