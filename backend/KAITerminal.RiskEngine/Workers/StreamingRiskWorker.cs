@@ -37,18 +37,11 @@ public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTri
     private readonly TimeZoneInfo                _tradingTz;
 
     // Keyed by "{userId}::{brokerType}"
-    private readonly ConcurrentDictionary<string, SessionEntry>      _sessions        = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<string, Channel<LtpUpdate>> _ltpChannels   = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, Channel<LtpUpdate>> _ltpChannels    = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, Channel<bool>>      _refreshChannels = new(StringComparer.Ordinal);
 
+    private readonly UserSessionRegistry _sessionRegistry;
     private int _tradingWindowState = -1;
-
-    private sealed class SessionEntry
-    {
-        public required CancellationTokenSource Cts    { get; init; }
-        public required Task                    Task   { get; init; }
-        public required UserConfig              Config { get; init; }
-    }
 
     private static string Key(UserConfig u) => $"{u.UserId}::{u.BrokerType}";
 
@@ -77,6 +70,16 @@ public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTri
         _cfg              = cfg.Value;
         _logger           = logger;
         _tradingTz        = TimeZoneInfo.FindSystemTimeZoneById(_cfg.TradingTimeZone);
+
+        _sessionRegistry = new UserSessionRegistry(
+            _repo,
+            _logger,
+            onSessionRemoved: key =>
+            {
+                _ltpChannels.TryRemove(key, out _);
+                _refreshChannels.TryRemove(key, out _);
+            },
+            sessionFactory: RunUserWithRestartAsync);
     }
 
     // ── IPositionRefreshTrigger ──────────────────────────────────────────────
@@ -107,7 +110,7 @@ public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTri
             try
             {
                 var users = await _tokenSource.GetUsersAsync(stoppingToken);
-                await SyncSessionsAsync(users, stoppingToken);
+                await _sessionRegistry.SyncSessionsAsync(users, stoppingToken);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception ex)
@@ -119,68 +122,12 @@ public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTri
             catch (OperationCanceledException) { break; }
         }
 
-        var allEntries = _sessions.Values.ToList();
+        var allEntries = _sessionRegistry.AllSessions.ToList();
         foreach (var entry in allEntries) entry.Cts.Cancel();
         await Task.WhenAll(allEntries.Select(e => e.Task));
 
         _logger.LogInformation("RiskWorker stopped");
     }
-
-    private async Task SyncSessionsAsync(IReadOnlyList<UserConfig> freshUsers, CancellationToken stoppingToken)
-    {
-        var freshByKey = freshUsers.ToDictionary(Key, StringComparer.Ordinal);
-
-        var toStop = _sessions
-            .Where(kvp => !freshByKey.TryGetValue(kvp.Key, out var fresh) || HasConfigChanged(kvp.Value.Config, fresh))
-            .ToList();
-
-        foreach (var (key, entry) in toStop)
-        {
-            bool configChanged = freshByKey.ContainsKey(key);
-            _logger.LogInformation(
-                "Stopping session ({Reason}) — {UserId} ({Broker})",
-                configChanged ? "config changed" : "disabled or token expired",
-                entry.Config.UserId, entry.Config.BrokerType);
-            entry.Cts.Cancel();
-            _sessions.TryRemove(key, out _);
-            _ltpChannels.TryRemove(key, out _);
-            _refreshChannels.TryRemove(key, out _);
-
-            if (configChanged)
-                await _repo.ResetAsync(key);
-        }
-
-        if (toStop.Count > 0)
-            await Task.WhenAll(toStop.Select(x => x.Value.Task));
-
-        foreach (var user in freshUsers)
-        {
-            if (_sessions.ContainsKey(Key(user))) continue;
-
-            _logger.LogInformation("Starting session — {UserId} ({Broker})", user.UserId, user.BrokerType);
-            var cts  = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
-            var task = RunUserWithRestartAsync(user, cts.Token);
-            _sessions[Key(user)] = new SessionEntry { Cts = cts, Task = task, Config = user };
-        }
-    }
-
-    private static bool HasConfigChanged(UserConfig old, UserConfig next) =>
-        old.AccessToken           != next.AccessToken           ||
-        old.ApiKey                != next.ApiKey                ||
-        old.MtmTarget             != next.MtmTarget             ||
-        old.MtmSl                 != next.MtmSl                 ||
-        old.TrailingEnabled       != next.TrailingEnabled       ||
-        old.TrailingActivateAt    != next.TrailingActivateAt    ||
-        old.LockProfitAt          != next.LockProfitAt          ||
-        old.WhenProfitIncreasesBy != next.WhenProfitIncreasesBy ||
-        old.IncreaseTrailingBy    != next.IncreaseTrailingBy    ||
-        old.AutoShiftEnabled      != next.AutoShiftEnabled      ||
-        old.AutoShiftThresholdPct != next.AutoShiftThresholdPct ||
-        old.AutoShiftMaxCount     != next.AutoShiftMaxCount     ||
-        old.AutoShiftStrikeGap    != next.AutoShiftStrikeGap    ||
-        old.AutoSquareOffEnabled  != next.AutoSquareOffEnabled  ||
-        old.AutoSquareOffTime     != next.AutoSquareOffTime     ||
-        old.WatchedProducts       != next.WatchedProducts;
 
     // ── Per-user session (with restart) ─────────────────────────────────────
 
@@ -265,11 +212,11 @@ public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTri
     // ── Unified eval loop — single Task per user, no concurrency needed ──────
 
     private async Task RunEvalLoopAsync(
-        UserConfig       user,
-        IBrokerClient    broker,
+        UserConfig               user,
+        IBrokerClient            broker,
         ChannelReader<LtpUpdate> ltpReader,
         ChannelReader<bool>      refreshReader,
-        CancellationToken ct)
+        CancellationToken        ct)
     {
         // Initial poll already done in RunUserAsync; schedule the next one after the full interval.
         var stateKey   = Key(user);
@@ -282,17 +229,15 @@ public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTri
             try
             {
                 // ── 1. Drain all pending LTP ticks into the cache ────────────────
-                bool anyNewLtp  = false;
-                var  openTokens = _cache.GetOpenInstrumentTokens(stateKey);
-                while (ltpReader.TryRead(out var tick))
+                var openTokens = _cache.GetOpenInstrumentTokens(stateKey);
+                var latestLtp  = LtpTickDrainer.DrainLatest(ltpReader);
+                bool anyNewLtp = false;
+                foreach (var (feedToken, ltp) in latestLtp)
                 {
-                    foreach (var (feedToken, ltp) in tick.Ltps)
-                    {
-                        var native = _tokenMapper.ToNativeToken(user.BrokerType, feedToken);
-                        if (!openTokens.Contains(native)) continue;
-                        _cache.UpdateLtp(stateKey, native, ltp);
-                        anyNewLtp = true;
-                    }
+                    var native = _tokenMapper.ToNativeToken(user.BrokerType, feedToken);
+                    if (!openTokens.Contains(native)) continue;
+                    _cache.UpdateLtp(stateKey, native, ltp);
+                    anyNewLtp = true;
                 }
 
                 // ── 2. Poll positions if timer fired or refresh requested ─────────
@@ -302,8 +247,8 @@ public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTri
                 if (pollDue)
                 {
                     await PollPositionsAsync(user, broker, isStartup: false, ct);
-                    nextPollAt  = DateTimeOffset.UtcNow.AddMilliseconds(_cfg.PositionPollIntervalMs);
-                    openTokens  = _cache.GetOpenInstrumentTokens(stateKey); // refresh after poll
+                    nextPollAt = DateTimeOffset.UtcNow.AddMilliseconds(_cfg.PositionPollIntervalMs);
+                    openTokens = _cache.GetOpenInstrumentTokens(stateKey); // refresh after poll
                 }
 
                 // ── 3. Evaluate risk ──────────────────────────────────────────────
