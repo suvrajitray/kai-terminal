@@ -1,3 +1,4 @@
+using KAITerminal.Api.Extensions;
 using KAITerminal.Api.Services;
 using KAITerminal.Broker;
 using KAITerminal.Contracts;
@@ -50,15 +51,11 @@ public sealed class PositionsHub : Hub
             return;
         }
 
-        var brokers = new List<IBrokerClient>();
-        if (hasUpstox)  brokers.Add(_brokerFactory.Create(BrokerNames.Upstox,  upstoxToken!));
-        if (hasZerodha) brokers.Add(_brokerFactory.Create(BrokerNames.Zerodha, zerodhaToken!, zerodhaApiKey!));
+        var brokers = BuildBrokerClients(hasUpstox, upstoxToken, hasZerodha, zerodhaToken, zerodhaApiKey);
 
         var exchangeFilter = ParseExchanges(qs?["exchange"].ToString());
         var connectionId   = Context.ConnectionId;
-        var username       = Context.User?.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value
-                          ?? Context.User?.FindFirst("email")?.Value
-                          ?? "unknown";
+        var username       = Context.User?.GetEmail() ?? "unknown";
         var filterDesc     = exchangeFilter is null ? "all exchanges" : string.Join(",", exchangeFilter);
         var brokerDesc     = string.Join("+", brokers.Select(b => b.BrokerType));
 
@@ -90,6 +87,16 @@ public sealed class PositionsHub : Hub
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────
+
+    private List<IBrokerClient> BuildBrokerClients(
+        bool hasUpstox, string? upstoxToken,
+        bool hasZerodha, string? zerodhaToken, string? zerodhaApiKey)
+    {
+        var brokers = new List<IBrokerClient>();
+        if (hasUpstox)  brokers.Add(_brokerFactory.Create(BrokerNames.Upstox,  upstoxToken!));
+        if (hasZerodha) brokers.Add(_brokerFactory.Create(BrokerNames.Zerodha, zerodhaToken!, zerodhaApiKey!));
+        return brokers;
+    }
 
     private static HashSet<string>? ParseExchanges(string? raw)
     {

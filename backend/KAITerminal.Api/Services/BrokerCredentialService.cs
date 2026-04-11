@@ -59,27 +59,30 @@ public class BrokerCredentialService(
 
         if (existing is not null)
         {
-            existing.ApiKey = request.ApiKey;
-            existing.ApiSecret = request.ApiSecret;
-            existing.AccessToken = accessToken;
-            existing.UpdatedAt = DateTime.UtcNow;
+            ApplyProperties(existing, request.ApiKey, request.ApiSecret, accessToken);
         }
         else
         {
-            db.BrokerCredentials.Add(new BrokerCredential
+            var entity = new BrokerCredential
             {
-                Username = username,
+                Username   = username,
                 BrokerName = request.BrokerName,
-                ApiKey = request.ApiKey,
-                ApiSecret = request.ApiSecret,
-                AccessToken = accessToken,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow,
-            });
+                CreatedAt  = DateTime.UtcNow,
+            };
+            ApplyProperties(entity, request.ApiKey, request.ApiSecret, accessToken);
+            db.BrokerCredentials.Add(entity);
         }
 
         await db.SaveChangesAsync();
         InvalidateCache();
+    }
+
+    private static void ApplyProperties(BrokerCredential entity, string apiKey, string apiSecret, string accessToken)
+    {
+        entity.ApiKey      = apiKey;
+        entity.ApiSecret   = apiSecret;
+        entity.AccessToken = accessToken;
+        entity.UpdatedAt   = DateTime.UtcNow;
     }
 
     public async Task UpdateAccessTokenAsync(string username, string brokerName, string accessToken)

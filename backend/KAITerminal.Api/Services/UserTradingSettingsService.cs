@@ -41,33 +41,29 @@ public class UserTradingSettingsService(AppDbContext db)
 
         if (existing is not null)
         {
-            existing.NiftyShiftOffset = request.NiftyShiftOffset;
-            existing.SensexShiftOffset = request.SensexShiftOffset;
-            existing.BankniftyShiftOffset = request.BankniftyShiftOffset;
-            existing.FinniftyShiftOffset = request.FinniftyShiftOffset;
-            existing.BankexShiftOffset = request.BankexShiftOffset;
-            existing.IndexChangeMode = request.IndexChangeMode;
-            existing.AutoSquareOffEnabled = request.AutoSquareOffEnabled;
-            existing.AutoSquareOffTime = request.AutoSquareOffTime;
+            ApplyProperties(existing, request);
             existing.UpdatedAt = DateTime.UtcNow;
         }
         else
         {
-            db.UserTradingSettings.Add(new UserTradingSettings
-            {
-                Username = username,
-                NiftyShiftOffset = request.NiftyShiftOffset,
-                SensexShiftOffset = request.SensexShiftOffset,
-                BankniftyShiftOffset = request.BankniftyShiftOffset,
-                FinniftyShiftOffset = request.FinniftyShiftOffset,
-                BankexShiftOffset = request.BankexShiftOffset,
-                IndexChangeMode = request.IndexChangeMode,
-                AutoSquareOffEnabled = request.AutoSquareOffEnabled,
-                AutoSquareOffTime = request.AutoSquareOffTime,
-                UpdatedAt = DateTime.UtcNow,
-            });
+            var entity = new UserTradingSettings { Username = username };
+            ApplyProperties(entity, request);
+            entity.UpdatedAt = DateTime.UtcNow;
+            db.UserTradingSettings.Add(entity);
         }
 
         await db.SaveChangesAsync();
+    }
+
+    private static void ApplyProperties(UserTradingSettings entity, SaveUserTradingSettingsRequest req)
+    {
+        entity.NiftyShiftOffset     = req.NiftyShiftOffset;
+        entity.SensexShiftOffset    = req.SensexShiftOffset;
+        entity.BankniftyShiftOffset = req.BankniftyShiftOffset;
+        entity.FinniftyShiftOffset  = req.FinniftyShiftOffset;
+        entity.BankexShiftOffset    = req.BankexShiftOffset;
+        entity.IndexChangeMode      = req.IndexChangeMode;
+        entity.AutoSquareOffEnabled = req.AutoSquareOffEnabled;
+        entity.AutoSquareOffTime    = req.AutoSquareOffTime;
     }
 }

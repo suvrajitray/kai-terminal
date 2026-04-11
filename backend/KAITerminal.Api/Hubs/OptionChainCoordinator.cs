@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using KAITerminal.Contracts.Streaming;
 using KAITerminal.MarketData.Services;
 using Microsoft.AspNetCore.SignalR;
@@ -16,7 +17,7 @@ internal sealed class OptionChainCoordinator : IAsyncDisposable
     private readonly string                          _connectionId;
     private readonly ILogger                         _logger;
 
-    private readonly HashSet<string>            _subscribedTokens = [];
+    private readonly ConcurrentDictionary<string, bool>  _subscribedTokens = new(StringComparer.Ordinal);
     private readonly EventHandler<LtpUpdate>    _feedHandler;
 
     public OptionChainCoordinator(
@@ -36,7 +37,8 @@ internal sealed class OptionChainCoordinator : IAsyncDisposable
 
     public async Task SubscribeAsync(IReadOnlyList<string> feedTokens, CancellationToken ct = default)
     {
-        _subscribedTokens.UnionWith(feedTokens);
+        foreach (var token in feedTokens)
+            _subscribedTokens.TryAdd(token, true);
         await _sharedMarketData.SubscribeAsync(feedTokens, FeedMode.Ltpc, ct);
         _logger.LogDebug(
             "OptionChainCoordinator [{Id}]: subscribed {Count} token(s) — total tracked: {Total}",
@@ -54,7 +56,7 @@ internal sealed class OptionChainCoordinator : IAsyncDisposable
         var relevant = new List<object>(capacity: update.Ltps.Count);
         foreach (var (feedToken, ltp) in update.Ltps)
         {
-            if (_subscribedTokens.Contains(feedToken))
+            if (_subscribedTokens.ContainsKey(feedToken))
                 relevant.Add(new { instrumentToken = feedToken, ltp });
         }
 

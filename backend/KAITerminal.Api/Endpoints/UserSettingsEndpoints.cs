@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using KAITerminal.Api.Extensions;
 using KAITerminal.Api.Models;
 using KAITerminal.Api.Services;
 
@@ -12,7 +13,7 @@ public static class UserSettingsEndpoints
 
         group.MapGet("/", async (ClaimsPrincipal user, UserTradingSettingsService svc) =>
         {
-            var username = GetEmail(user);
+            var username = user.GetEmail();
             if (username is null) return Results.Unauthorized();
 
             return Results.Ok(await svc.GetAsync(username));
@@ -23,7 +24,7 @@ public static class UserSettingsEndpoints
             ClaimsPrincipal user,
             UserTradingSettingsService svc) =>
         {
-            var username = GetEmail(user);
+            var username = user.GetEmail();
             if (username is null) return Results.Unauthorized();
 
             await svc.SaveAsync(username, request);
@@ -31,6 +32,4 @@ public static class UserSettingsEndpoints
         });
     }
 
-    private static string? GetEmail(ClaimsPrincipal user) =>
-        user.FindFirstValue(ClaimTypes.Email) ?? user.FindFirst("email")?.Value;
 }

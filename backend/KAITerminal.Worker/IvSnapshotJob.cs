@@ -21,16 +21,8 @@ internal sealed class IvSnapshotJob : BackgroundService
 {
     private static readonly TimeZoneInfo Ist = TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
 
-    // Maps user-facing name → Upstox underlying key for GetChainAsync
-    private static readonly IReadOnlyDictionary<string, string> UnderlyingKeys =
-        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["NIFTY"]     = "NSE_INDEX|Nifty 50",
-            ["BANKNIFTY"] = "NSE_INDEX|Nifty Bank",
-            ["FINNIFTY"]  = "NSE_INDEX|Nifty Fin Service",
-            ["SENSEX"]    = "BSE_INDEX|SENSEX",
-            ["BANKEX"]    = "BSE_INDEX|BANKEX",
-        };
+    // Underlying name → Upstox index key for GetChainAsync
+    private static IReadOnlyDictionary<string, string> UnderlyingKeys => WorkerIndexKeys.UnderlyingFeedKeys;
 
     private static readonly TimeSpan SnapshotTime  = new(15, 30, 0);
     private static readonly TimeSpan CheckInterval = TimeSpan.FromMinutes(30);

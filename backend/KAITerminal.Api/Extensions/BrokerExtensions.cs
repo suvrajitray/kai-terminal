@@ -42,6 +42,10 @@ public static class BrokerExtensions
         services.AddSingleton<BrokerCredentialCacheInvalidator>();
         services.AddScoped<BrokerCredentialService>();
 
+        services.AddSingleton<PositionShiftService>();
+        services.AddSingleton<ByPriceOrderService>();
+        services.AddSingleton<WebhookOrderProcessor>();
+
         return services;
     }
 }
