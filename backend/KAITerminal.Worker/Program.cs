@@ -82,6 +82,7 @@ try
     builder.Services.AddSingleton<OptionStrikeService>();
     builder.Services.AddSingleton<Func<IPositionRefreshTrigger>>(
         sp => () => sp.GetRequiredService<IPositionRefreshTrigger>());
+    builder.Services.AddSingleton<AutoShiftOrderExecutor>();
     builder.Services.AddSingleton<IAutoShiftEvaluator, AutoShiftEvaluator>();
 
     builder.Services.AddRiskEngine<DbUserTokenSource>(builder.Configuration);

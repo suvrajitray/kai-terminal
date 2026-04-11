@@ -26,22 +26,27 @@ public sealed class RiskConfigService(AppDbContext db) : IRiskConfigService
         }
         else
         {
-            existing.Enabled              = config.Enabled;
-            existing.MtmTarget            = config.MtmTarget;
-            existing.MtmSl                = config.MtmSl;
-            existing.TrailingEnabled      = config.TrailingEnabled;
-            existing.TrailingActivateAt   = config.TrailingActivateAt;
-            existing.LockProfitAt         = config.LockProfitAt;
-            existing.IncreaseBy           = config.IncreaseBy;
-            existing.TrailBy              = config.TrailBy;
-            existing.AutoShiftEnabled     = config.AutoShiftEnabled;
-            existing.AutoShiftThresholdPct = config.AutoShiftThresholdPct;
-            existing.AutoShiftMaxCount    = config.AutoShiftMaxCount;
-            existing.AutoShiftStrikeGap   = config.AutoShiftStrikeGap;
-            existing.WatchedProducts      = config.WatchedProducts;
-            existing.UpdatedAt            = DateTime.UtcNow;
+            ApplyProperties(existing, config);
+            existing.UpdatedAt = DateTime.UtcNow;
         }
 
         await db.SaveChangesAsync();
+    }
+
+    private static void ApplyProperties(UserRiskConfig target, UserRiskConfig source)
+    {
+        target.Enabled               = source.Enabled;
+        target.MtmTarget             = source.MtmTarget;
+        target.MtmSl                 = source.MtmSl;
+        target.TrailingEnabled       = source.TrailingEnabled;
+        target.TrailingActivateAt    = source.TrailingActivateAt;
+        target.LockProfitAt          = source.LockProfitAt;
+        target.IncreaseBy            = source.IncreaseBy;
+        target.TrailBy               = source.TrailBy;
+        target.AutoShiftEnabled      = source.AutoShiftEnabled;
+        target.AutoShiftThresholdPct = source.AutoShiftThresholdPct;
+        target.AutoShiftMaxCount     = source.AutoShiftMaxCount;
+        target.AutoShiftStrikeGap    = source.AutoShiftStrikeGap;
+        target.WatchedProducts       = source.WatchedProducts;
     }
 }

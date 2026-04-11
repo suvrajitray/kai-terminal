@@ -112,6 +112,10 @@ public sealed class ZerodhaInstrumentService : IZerodhaInstrumentService
         return ParseCsv(csv, exchange);
     }
 
+    private readonly record struct ColumnMap(
+        int Token, int ExchangeToken, int Symbol, int Name, int LastPrice,
+        int Expiry, int Strike, int Tick, int Lot, int Type, int Segment);
+
     private IReadOnlyList<ZerodhaOptionContract> ParseCsv(string csv, string exchange)
     {
         var lines = csv.Split('\n', StringSplitOptions.RemoveEmptyEntries);
@@ -125,19 +129,20 @@ public sealed class ZerodhaInstrumentService : IZerodhaInstrumentService
         var headers    = headerLine.Split(',').Select(h => h.Trim()).ToArray();
         int Idx(string col) => Array.IndexOf(headers, col);
 
-        int tokenIdx         = Idx("instrument_token");
-        int exchangeTokenIdx = Idx("exchange_token");
-        int symbolIdx        = Idx("tradingsymbol");
-        int nameIdx          = Idx("name");
-        int lastPriceIdx     = Idx("last_price");
-        int expiryIdx        = Idx("expiry");
-        int strikeIdx        = Idx("strike");
-        int tickIdx          = Idx("tick_size");
-        int lotIdx           = Idx("lot_size");
-        int typeIdx          = Idx("instrument_type");
-        int segmentIdx       = Idx("segment");
+        var map = new ColumnMap(
+            Token:         Idx("instrument_token"),
+            ExchangeToken: Idx("exchange_token"),
+            Symbol:        Idx("tradingsymbol"),
+            Name:          Idx("name"),
+            LastPrice:     Idx("last_price"),
+            Expiry:        Idx("expiry"),
+            Strike:        Idx("strike"),
+            Tick:          Idx("tick_size"),
+            Lot:           Idx("lot_size"),
+            Type:          Idx("instrument_type"),
+            Segment:       Idx("segment"));
 
-        if (tokenIdx < 0 || typeIdx < 0 || expiryIdx < 0)
+        if (map.Token < 0 || map.Type < 0 || map.Expiry < 0)
         {
             _logger.LogWarning("ParseCsv({Exchange}): required column missing. Headers: [{Headers}]",
                 exchange, string.Join(", ", headers));
@@ -145,50 +150,55 @@ public sealed class ZerodhaInstrumentService : IZerodhaInstrumentService
         }
 
         var contracts = new List<ZerodhaOptionContract>();
-
         foreach (var line in lines.Skip(1))
         {
-            var cols = line.TrimEnd('\r').Split(',');
-            if (cols.Length <= typeIdx) continue;
-
-            var instrType = Unquote(cols[typeIdx]);
-            if (instrType is not ("CE" or "PE")) continue;
-
-            var segment = segmentIdx >= 0 && cols.Length > segmentIdx ? Unquote(cols[segmentIdx]) : "";
-            if (!AllowedSegments.Contains(segment)) continue;
-
-            var name = nameIdx >= 0 ? Unquote(cols[nameIdx]) : "";
-            if (!AllowedUnderlyings.Contains(name)) continue;
-
-            var instrumentToken = Unquote(cols[tokenIdx]);
-            var exchangeToken   = exchangeTokenIdx >= 0 && cols.Length > exchangeTokenIdx
-                ? Unquote(cols[exchangeTokenIdx]) : "";
-            var expiry = Unquote(cols[expiryIdx]);
-
-            _ = decimal.TryParse(cols.Length > strikeIdx    ? Unquote(cols[strikeIdx])    : "", out var strike);
-            _ = decimal.TryParse(cols.Length > tickIdx      ? Unquote(cols[tickIdx])      : "", out var tick);
-            _ = decimal.TryParse(cols.Length > lotIdx       ? Unquote(cols[lotIdx])       : "", out var lot);
-            _ = decimal.TryParse(cols.Length > lastPriceIdx ? Unquote(cols[lastPriceIdx]) : "", out var lastPrice);
-
-            contracts.Add(new ZerodhaOptionContract(
-                InstrumentToken: instrumentToken,
-                ExchangeToken:   exchangeToken,
-                TradingSymbol:   symbolIdx >= 0 ? Unquote(cols[symbolIdx]) : "",
-                Name:            name,
-                LastPrice:       lastPrice,
-                Expiry:          expiry,
-                Strike:          strike,
-                TickSize:        tick,
-                LotSize:         lot,
-                InstrumentType:  instrType,
-                Segment:         segment,
-                Exchange:        exchange,
-                Weekly:          IsWeeklyExpiry(expiry)
-            ));
+            var contract = ParseRow(line.TrimEnd('\r').Split(','), map, exchange);
+            if (contract is not null)
+                contracts.Add(contract);
         }
 
         _logger.LogInformation("ParseCsv({Exchange}): parsed {Count} CE/PE contracts", exchange, contracts.Count);
         return contracts;
+    }
+
+    private static ZerodhaOptionContract? ParseRow(string[] cols, in ColumnMap map, string exchange)
+    {
+        if (cols.Length <= map.Type) return null;
+
+        var instrType = Unquote(cols[map.Type]);
+        if (instrType is not ("CE" or "PE")) return null;
+
+        var segment = map.Segment >= 0 && cols.Length > map.Segment ? Unquote(cols[map.Segment]) : "";
+        if (!AllowedSegments.Contains(segment)) return null;
+
+        var name = map.Name >= 0 ? Unquote(cols[map.Name]) : "";
+        if (!AllowedUnderlyings.Contains(name)) return null;
+
+        var instrumentToken = Unquote(cols[map.Token]);
+        var exchangeToken   = map.ExchangeToken >= 0 && cols.Length > map.ExchangeToken
+            ? Unquote(cols[map.ExchangeToken]) : "";
+        var expiry = Unquote(cols[map.Expiry]);
+
+        _ = decimal.TryParse(cols.Length > map.Strike    ? Unquote(cols[map.Strike])    : "", out var strike);
+        _ = decimal.TryParse(cols.Length > map.Tick      ? Unquote(cols[map.Tick])      : "", out var tick);
+        _ = decimal.TryParse(cols.Length > map.Lot       ? Unquote(cols[map.Lot])       : "", out var lot);
+        _ = decimal.TryParse(cols.Length > map.LastPrice ? Unquote(cols[map.LastPrice]) : "", out var lastPrice);
+
+        return new ZerodhaOptionContract(
+            InstrumentToken: instrumentToken,
+            ExchangeToken:   exchangeToken,
+            TradingSymbol:   map.Symbol >= 0 ? Unquote(cols[map.Symbol]) : "",
+            Name:            name,
+            LastPrice:       lastPrice,
+            Expiry:          expiry,
+            Strike:          strike,
+            TickSize:        tick,
+            LotSize:         lot,
+            InstrumentType:  instrType,
+            Segment:         segment,
+            Exchange:        exchange,
+            Weekly:          IsWeeklyExpiry(expiry)
+        );
     }
 
     private static string Unquote(string s)

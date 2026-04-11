@@ -51,9 +51,7 @@ public sealed class PositionsHub : Hub
             return;
         }
 
-        var brokers = new List<IBrokerClient>();
-        if (hasUpstox)  brokers.Add(_brokerFactory.Create(BrokerNames.Upstox,  upstoxToken!));
-        if (hasZerodha) brokers.Add(_brokerFactory.Create(BrokerNames.Zerodha, zerodhaToken!, zerodhaApiKey!));
+        var brokers = BuildBrokerClients(hasUpstox, upstoxToken, hasZerodha, zerodhaToken, zerodhaApiKey);
 
         var exchangeFilter = ParseExchanges(qs?["exchange"].ToString());
         var connectionId   = Context.ConnectionId;
@@ -89,6 +87,16 @@ public sealed class PositionsHub : Hub
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────
+
+    private List<IBrokerClient> BuildBrokerClients(
+        bool hasUpstox, string? upstoxToken,
+        bool hasZerodha, string? zerodhaToken, string? zerodhaApiKey)
+    {
+        var brokers = new List<IBrokerClient>();
+        if (hasUpstox)  brokers.Add(_brokerFactory.Create(BrokerNames.Upstox,  upstoxToken!));
+        if (hasZerodha) brokers.Add(_brokerFactory.Create(BrokerNames.Zerodha, zerodhaToken!, zerodhaApiKey!));
+        return brokers;
+    }
 
     private static HashSet<string>? ParseExchanges(string? raw)
     {

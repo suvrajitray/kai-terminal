@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
 using KAITerminal.Api.Mapping;
 using KAITerminal.Broker;
 using KAITerminal.Contracts;
+using KAITerminal.Contracts.Domain;
 using KAITerminal.Contracts.Streaming;
 using KAITerminal.MarketData.Services;
 using Microsoft.AspNetCore.SignalR;
@@ -22,10 +22,12 @@ public sealed class PositionStreamCoordinator : IAsyncDisposable
     private readonly IHubContext<PositionsHub>    _hub;
     private readonly IReadOnlyList<IBrokerClient> _brokers;
     private readonly ISharedMarketDataService     _sharedMarketData;
-    private readonly IZerodhaInstrumentService    _zerodhaInstruments;
     private readonly string                       _connectionId;
     private readonly HashSet<string>?             _exchangeFilter;
     private readonly ILogger                      _logger;
+
+    private readonly UpstoxFeedSubscriptionManager  _upstox;
+    private readonly ZerodhaFeedSubscriptionManager _zerodha;
 
     private const int PositionPollIntervalMs = 10_000;
 
@@ -35,11 +37,6 @@ public sealed class PositionStreamCoordinator : IAsyncDisposable
 
     private readonly CancellationTokenSource _cts = new();
     private Task _pollLoop = Task.CompletedTask;
-
-    // Upstox: instrument token IS the feed token — ConcurrentDictionary for thread-safe O(1) lookup in feed handler
-    private readonly ConcurrentDictionary<string, bool> _subscribedUpstoxTokens = new(StringComparer.Ordinal);
-    // Zerodha: feed token (e.g. "NSE_FO|885247") → native instrument token (e.g. "15942914")
-    private readonly ConcurrentDictionary<string, string> _zerodhaFeedToNative = new(StringComparer.Ordinal);
 
     private readonly EventHandler<LtpUpdate> _feedHandler;
 
@@ -53,15 +50,17 @@ public sealed class PositionStreamCoordinator : IAsyncDisposable
         HashSet<string>?             exchangeFilter,
         ILogger                      logger)
     {
-        _hub                = hub;
-        _brokers            = brokers;
-        _sharedMarketData   = sharedMarketData;
-        _zerodhaInstruments = zerodhaInstruments;
-        _connectionId       = connectionId;
-        Username            = username;
-        _exchangeFilter     = exchangeFilter;
-        _logger             = logger;
-        _feedHandler        = OnFeedReceived;
+        _hub              = hub;
+        _brokers          = brokers;
+        _sharedMarketData = sharedMarketData;
+        _connectionId     = connectionId;
+        Username          = username;
+        _exchangeFilter   = exchangeFilter;
+        _logger           = logger;
+        _feedHandler      = OnFeedReceived;
+
+        _upstox  = new UpstoxFeedSubscriptionManager(sharedMarketData, connectionId, logger);
+        _zerodha = new ZerodhaFeedSubscriptionManager(sharedMarketData, zerodhaInstruments, connectionId, logger);
     }
 
     internal async Task StartAsync(CancellationToken ct = default)
@@ -105,8 +104,7 @@ public sealed class PositionStreamCoordinator : IAsyncDisposable
 
     // ── Position fetch ────────────────────────────────────────────────────────
 
-    private async Task<IReadOnlyList<KAITerminal.Contracts.Domain.BrokerPosition>> FetchAllPositionsAsync(
-        CancellationToken ct)
+    private async Task<IReadOnlyList<BrokerPosition>> FetchAllPositionsAsync(CancellationToken ct)
     {
         var tasks = _brokers.Select(async broker =>
         {
@@ -120,116 +118,16 @@ public sealed class PositionStreamCoordinator : IAsyncDisposable
     // ── Feed subscription management ──────────────────────────────────────────
 
     private async Task RefreshSubscriptionsAsync(
-        IReadOnlyList<KAITerminal.Contracts.Domain.BrokerPosition> allPositions, CancellationToken ct)
+        IReadOnlyList<BrokerPosition> allPositions, CancellationToken ct)
     {
-        // Upstox: instrument token IS the feed token
-        var newUpstoxTokens = allPositions
-            .Where(p => string.Equals(p.Broker ?? "", BrokerNames.Upstox, StringComparison.OrdinalIgnoreCase)
-                     && p.IsOpen
-                     && !string.IsNullOrEmpty(p.InstrumentToken))
-            .Select(p => p.InstrumentToken!)
-            .ToHashSet(StringComparer.Ordinal);
+        var upstoxCount  = await _upstox.RefreshAsync(allPositions, ct);
+        var zerodhaCount = await _zerodha.RefreshAsync(allPositions, ct);
 
-        // Always re-subscribe all current tokens — not just new ones.
-        // This ensures the Worker recovers subscriptions after a restart without
-        // requiring a frontend reconnect (the Worker's _subscribed set resets on startup).
-        if (newUpstoxTokens.Count > 0)
-        {
-            var addedUpstox = newUpstoxTokens.Except(_subscribedUpstoxTokens.Keys).ToList();
-            if (addedUpstox.Count > 0)
-                _logger.LogInformation(
-                    "PositionStreamCoordinator [{Id}]: {New} new Upstox instrument(s) — resubscribing all {Total}",
-                    _connectionId, addedUpstox.Count, newUpstoxTokens.Count);
-            await _sharedMarketData.SubscribeAsync(newUpstoxTokens.ToList(), FeedMode.Ltpc, ct);
-        }
-        // Add new entries first — avoids a brief window where a live token is absent from the map
-        foreach (var key in newUpstoxTokens)
-            _subscribedUpstoxTokens.TryAdd(key, true);
-        foreach (var key in _subscribedUpstoxTokens.Keys.Except(newUpstoxTokens).ToList())
-            _subscribedUpstoxTokens.TryRemove(key, out _);
-
-        // Zerodha: map native tokens → feed tokens via exchange_token
-        var openZerodha = allPositions
-            .Where(p => string.Equals(p.Broker ?? "", BrokerNames.Zerodha, StringComparison.OrdinalIgnoreCase)
-                     && p.IsOpen
-                     && !string.IsNullOrEmpty(p.InstrumentToken))
-            .ToList();
-
-        if (openZerodha.Count > 0)
-        {
-            var newFeedMap = await BuildZerodhaFeedMapAsync(openZerodha, ct);
-            if (newFeedMap.Count > 0)
-            {
-                var addedZerodha = newFeedMap.Keys.Except(_zerodhaFeedToNative.Keys).ToList();
-                if (addedZerodha.Count > 0)
-                    _logger.LogInformation(
-                        "PositionStreamCoordinator [{Id}]: {New} new Zerodha instrument(s) — resubscribing all {Total}",
-                        _connectionId, addedZerodha.Count, newFeedMap.Count);
-                await _sharedMarketData.SubscribeAsync(newFeedMap.Keys.ToList(), FeedMode.Ltpc, ct);
-            }
-            // Add new entries first — avoids a brief window where a live token is absent
-            foreach (var (k, v) in newFeedMap)
-                _zerodhaFeedToNative[k] = v;
-            foreach (var key in _zerodhaFeedToNative.Keys.Except(newFeedMap.Keys).ToList())
-                _zerodhaFeedToNative.TryRemove(key, out _);
-        }
-        else
-        {
-            // No open Zerodha positions — clear stale mappings so OnFeedReceived doesn't route phantom ticks
-            _zerodhaFeedToNative.Clear();
-        }
-
-        if (newUpstoxTokens.Count == 0 && openZerodha.Count == 0)
+        if (upstoxCount == 0 && zerodhaCount == 0)
             _logger.LogInformation(
                 "PositionStreamCoordinator [{Id}]: no open positions — no LTP subscriptions requested",
                 _connectionId);
     }
-
-    private async Task<Dictionary<string, string>> BuildZerodhaFeedMapAsync(
-        IReadOnlyList<KAITerminal.Contracts.Domain.BrokerPosition> zerodhaPositions, CancellationToken ct)
-    {
-        var map = new Dictionary<string, string>(StringComparer.Ordinal);
-        try
-        {
-            var instruments = await _zerodhaInstruments.GetAllCurrentYearContractsAsync(ct);
-            var tokenLookup = instruments.ToDictionary(c => c.TradingSymbol, c => c.ExchangeToken);
-
-            foreach (var pos in zerodhaPositions)
-            {
-                if (!tokenLookup.TryGetValue(pos.InstrumentToken, out var exchangeToken))
-                {
-                    _logger.LogWarning(
-                        "PositionStreamCoordinator [{Id}]: no CSV match for Zerodha token '{Token}' (exchange={Exchange}) — live LTP will not update for this position",
-                        _connectionId, pos.InstrumentToken, pos.Exchange);
-                    continue;
-                }
-                var prefix = ExchangeToFeedPrefix(pos.Exchange);
-                if (prefix is null)
-                {
-                    _logger.LogWarning(
-                        "PositionStreamCoordinator [{Id}]: unsupported exchange '{Exchange}' for token '{Token}' — skipping",
-                        _connectionId, pos.Exchange, pos.InstrumentToken);
-                    continue;
-                }
-                map[$"{prefix}|{exchangeToken}"] = pos.InstrumentToken;
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex,
-                "PositionStreamCoordinator [{Id}]: failed to build Zerodha feed map — Zerodha LTP will not be live",
-                _connectionId);
-        }
-        return map;
-    }
-
-    private static string? ExchangeToFeedPrefix(string exchange) =>
-        exchange.ToUpperInvariant() switch
-        {
-            "NFO" => "NSE_FO",
-            "BFO" => "BSE_FO",
-            _ => null
-        };
 
     // ── Webhook-triggered actions ─────────────────────────────────────────────
 
@@ -279,30 +177,25 @@ public sealed class PositionStreamCoordinator : IAsyncDisposable
 
     private void OnFeedReceived(object? sender, LtpUpdate update)
     {
-        // Upstox: feed token == instrument token → push as-is
-        // Zerodha: feed token (NSE_FO|885247) → push with native numeric token so frontend matches
         var relevant = new List<object>(capacity: update.Ltps.Count);
         foreach (var (feedToken, ltp) in update.Ltps)
         {
-            if (_subscribedUpstoxTokens.ContainsKey(feedToken))
+            if (_upstox.ContainsToken(feedToken))
                 relevant.Add(new { instrumentToken = feedToken, ltp });
-            if (_zerodhaFeedToNative.TryGetValue(feedToken, out var native))
+            if (_zerodha.TryGetNativeToken(feedToken, out var native))
                 relevant.Add(new { instrumentToken = native, ltp });
         }
-
         if (relevant.Count == 0) return;
 
         _logger.LogDebug(
             "PositionStreamCoordinator [{Id}]: pushing ReceiveLtpBatch — {Count} instrument(s)",
             _connectionId, relevant.Count);
-
         _ = _hub.Clients.Client(_connectionId).SendAsync("ReceiveLtpBatch", relevant);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private IReadOnlyList<KAITerminal.Contracts.Domain.BrokerPosition> ApplyFilter(
-        IReadOnlyList<KAITerminal.Contracts.Domain.BrokerPosition> positions)
+    private IReadOnlyList<BrokerPosition> ApplyFilter(IReadOnlyList<BrokerPosition> positions)
     {
         if (_exchangeFilter is null) return positions;
         return positions

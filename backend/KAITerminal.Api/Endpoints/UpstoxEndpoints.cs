@@ -5,11 +5,8 @@ using KAITerminal.Api.Models;
 using KAITerminal.Api.Services;
 using KAITerminal.Contracts;
 using KAITerminal.Contracts.Domain;
-using KAITerminal.Contracts.Options;
-using KAITerminal.MarketData.Services;
 using KAITerminal.Upstox;
 using KAITerminal.Upstox.Exceptions;
-using KAITerminal.Upstox.Models.Enums;
 using KAITerminal.Upstox.Models.Requests;
 using Microsoft.AspNetCore.Mvc;
 
@@ -104,88 +101,14 @@ public static class UpstoxEndpoints
 
         group.MapPost("/positions/shift", async (
             [FromBody] ShiftPositionRequest request,
-            OptionStrikeService strikeSvc,
+            PositionShiftService shiftSvc,
             UpstoxClient upstox,
             ClaimsPrincipal user,
             ILoggerFactory lf,
             CancellationToken ct) =>
-        {
-            bool isCe = OptionInstrumentType.IsCe(request.InstrumentType);
-            var strikeGap = isCe
-                ? (request.Direction == "down" ? request.StrikeGap : -request.StrikeGap)
-                : (request.Direction == "up"   ? request.StrikeGap : -request.StrikeGap);
-            var targetKey = await strikeSvc.FindByStrikeGapAsync(
-                request.UnderlyingKey, request.Expiry, request.InstrumentType,
-                request.CurrentStrike, strikeGap, ct);
-
-            if (targetKey is null)
-                return Results.Problem("No matching strike found in option chain.");
-
-            var closeTxn = request.IsShort ? TransactionType.Buy  : TransactionType.Sell;
-            var openTxn  = request.IsShort ? TransactionType.Sell : TransactionType.Buy;
-            var product = UpstoxProductMap.ToEnum(request.Product);
-
-            var closeOrder = new PlaceOrderRequest
-            {
-                InstrumentToken = request.InstrumentToken,
-                Quantity        = request.Qty,
-                TransactionType = closeTxn,
-                Product         = product,
-                Slice           = true,
-            };
-            var openOrder = new PlaceOrderRequest
-            {
-                InstrumentToken = targetKey,
-                Quantity        = request.Qty,
-                TransactionType = openTxn,
-                Product         = product,
-                Slice           = true,
-            };
-
-            var logger = lf.CreateLogger("UpstoxEndpoints");
-            var email  = user.GetEmail() ?? "unknown";
-
-            // Short: close first (buying back releases margin), then open new short.
-            // Long:  open first (maintains hedge), then close old long — avoids margin spike on shorts.
-            if (request.IsShort)
-            {
-                await upstox.Hft.PlaceOrderV3Async(closeOrder);
-                try
-                {
-                    await upstox.Hft.PlaceOrderV3Async(openOrder);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex,
-                        "PARTIAL SHIFT — {User} — close {CloseToken} succeeded but open {OpenToken} failed. Manual intervention required.",
-                        email, request.InstrumentToken, targetKey);
-                    return Results.Problem(
-                        $"Close order placed but open order failed: {ex.Message}. Check your positions — manual intervention may be required.");
-                }
-            }
-            else
-            {
-                await upstox.Hft.PlaceOrderV3Async(openOrder);
-                try
-                {
-                    await upstox.Hft.PlaceOrderV3Async(closeOrder);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex,
-                        "PARTIAL SHIFT — {User} — open {OpenToken} succeeded but close {CloseToken} failed. Manual intervention required.",
-                        email, targetKey, request.InstrumentToken);
-                    return Results.Problem(
-                        $"Open order placed but close order failed: {ex.Message}. Check your positions — manual intervention may be required.");
-                }
-            }
-
-            logger.LogInformation(
-                "Shift {Direction} — {User} — close {CloseToken} qty={Qty} | open {OpenToken} product={Product}",
-                request.Direction, email, request.InstrumentToken, request.Qty, targetKey, request.Product);
-
-            return Results.Ok(new { targetToken = targetKey });
-        });
+            await shiftSvc.ShiftUpstoxAsync(
+                request, upstox, user.GetEmail() ?? "unknown",
+                lf.CreateLogger("UpstoxEndpoints"), ct));
 
         // ── Orders ────────────────────────────────────────────────────────────
 
@@ -234,39 +157,14 @@ public static class UpstoxEndpoints
 
         group.MapPost("/orders/by-price", async (
             [FromBody] ByPriceOrderRequest request,
-            OptionStrikeService strikeSvc,
+            ByPriceOrderService byPriceSvc,
             UpstoxClient upstox,
             ClaimsPrincipal user,
             ILoggerFactory lf,
             CancellationToken ct) =>
-        {
-            var key = await strikeSvc.FindByPriceAsync(
-                request.UnderlyingKey, request.Expiry, request.InstrumentType,
-                request.TargetPremium, ct);
-
-            if (key is null)
-                return Results.Problem("No matching strike found in option chain.");
-
-            var txn = request.TransactionType == "Buy" ? TransactionType.Buy : TransactionType.Sell;
-            var product = UpstoxProductMap.ToEnum(request.Product);
-
-            await upstox.Hft.PlaceOrderV3Async(new PlaceOrderRequest
-            {
-                InstrumentToken = key,
-                Quantity        = request.Qty,
-                TransactionType = txn,
-                Product         = product,
-                Slice           = true,
-            });
-
-            lf.CreateLogger("UpstoxEndpoints").LogInformation(
-                "By-price order — {User} — {Underlying} {Expiry} {Type} qty={Qty} {Side} target=₹{Premium} → {Key}",
-                user.GetEmail() ?? "unknown",
-                request.UnderlyingKey, request.Expiry, request.InstrumentType,
-                request.Qty, request.TransactionType, request.TargetPremium, key);
-
-            return Results.Ok(new { instrumentKey = key });
-        });
+            await byPriceSvc.PlaceUpstoxAsync(
+                request, upstox, user.GetEmail() ?? "unknown",
+                lf.CreateLogger("UpstoxEndpoints"), ct));
 
         // ── Funds ─────────────────────────────────────────────────────────────
 

@@ -5,7 +5,6 @@ using KAITerminal.Api.Models;
 using KAITerminal.Api.Services;
 using KAITerminal.Contracts;
 using KAITerminal.Contracts.Domain;
-using KAITerminal.Contracts.Options;
 using KAITerminal.MarketData.Services;
 using KAITerminal.Zerodha;
 using KAITerminal.Zerodha.Services;
@@ -124,85 +123,15 @@ public static class ZerodhaEndpoints
 
         group.MapPost("/positions/shift", async (
             [FromBody] ShiftPositionRequest request,
-            OptionStrikeService strikeSvc,
+            PositionShiftService shiftSvc,
             ZerodhaClient zerodha,
             IZerodhaInstrumentService zerodhaInstruments,
             ClaimsPrincipal user,
             ILoggerFactory lf,
             CancellationToken ct) =>
-        {
-            bool isCe = OptionInstrumentType.IsCe(request.InstrumentType);
-            var strikeGap = isCe
-                ? (request.Direction == "down" ? request.StrikeGap : -request.StrikeGap)
-                : (request.Direction == "up"   ? request.StrikeGap : -request.StrikeGap);
-            var upstoxKey = await strikeSvc.FindByStrikeGapAsync(
-                request.UnderlyingKey, request.Expiry, request.InstrumentType,
-                request.CurrentStrike, strikeGap, ct);
-
-            if (upstoxKey is null)
-                return Results.Problem("No matching strike found in option chain.");
-
-            var exchangeToken = upstoxKey.Contains('|') ? upstoxKey.Split('|')[1] : upstoxKey;
-            var contracts     = await zerodhaInstruments.GetAllCurrentYearContractsAsync(ct);
-            var match         = contracts.FirstOrDefault(c => c.ExchangeToken == exchangeToken);
-
-            if (match is null)
-                return Results.Problem($"Zerodha trading symbol not found for exchange token {exchangeToken}.");
-
-            var closeTxn = request.IsShort ? "Buy"  : "Sell";
-            var openTxn  = request.IsShort ? "Sell" : "Buy";
-
-            var closeOrder = new BrokerOrderRequest(request.InstrumentToken, request.Qty, closeTxn, request.Product, "MARKET", Exchange: request.Exchange);
-            var openOrder  = new BrokerOrderRequest(match.TradingSymbol,     request.Qty, openTxn,  request.Product, "MARKET", Exchange: match.Exchange);
-
-            var logger = lf.CreateLogger("ZerodhaEndpoints");
-            var email  = user.GetEmail() ?? "unknown";
-
-            // Short: close first (buying back releases margin), then open new short.
-            // Long:  open first (maintains hedge), then close old long — avoids margin spike on shorts.
-            // Delay between orders gives Zerodha time to process the execution and reflect the
-            // released margin before the next order is placed — without this the open order hits
-            // a margin check before the close order is settled.
-            if (request.IsShort)
-            {
-                await zerodha.Orders.PlaceOrderAsync(closeOrder, ct);
-                await Task.Delay(1000, ct);
-                try
-                {
-                    await zerodha.Orders.PlaceOrderAsync(openOrder, ct);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex,
-                        "PARTIAL SHIFT — {User} — close {CloseSymbol} succeeded but open {OpenSymbol} failed. Manual intervention required.",
-                        email, request.InstrumentToken, match.TradingSymbol);
-                    return Results.Problem(
-                        $"Close order placed but open order failed: {ex.Message}. Check your positions — manual intervention may be required.");
-                }
-            }
-            else
-            {
-                await zerodha.Orders.PlaceOrderAsync(openOrder, ct);
-                try
-                {
-                    await zerodha.Orders.PlaceOrderAsync(closeOrder, ct);
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex,
-                        "PARTIAL SHIFT — {User} — open {OpenSymbol} succeeded but close {CloseSymbol} failed. Manual intervention required.",
-                        email, match.TradingSymbol, request.InstrumentToken);
-                    return Results.Problem(
-                        $"Open order placed but close order failed: {ex.Message}. Check your positions — manual intervention may be required.");
-                }
-            }
-
-            logger.LogInformation(
-                "Shift {Direction} — {User} — close {CloseSymbol} ({CloseExchange}) qty={Qty} | open {OpenSymbol} ({OpenExchange}) product={Product}",
-                request.Direction, email, request.InstrumentToken, request.Exchange, request.Qty, match.TradingSymbol, match.Exchange, request.Product);
-
-            return Results.Ok(new { targetToken = $"{match.Exchange}|{match.TradingSymbol}" });
-        });
+            await shiftSvc.ShiftZerodhaAsync(
+                request, zerodha, zerodhaInstruments,
+                user.GetEmail() ?? "unknown", lf.CreateLogger("ZerodhaEndpoints"), ct));
 
         group.MapPost("/positions/{instrumentToken}/exit", async (
             string instrumentToken,
@@ -250,38 +179,15 @@ public static class ZerodhaEndpoints
 
         group.MapPost("/orders/by-price", async (
             [FromBody] ByPriceOrderRequest request,
-            OptionStrikeService strikeSvc,
+            ByPriceOrderService byPriceSvc,
             ZerodhaClient zerodha,
             IZerodhaInstrumentService zerodhaInstruments,
             ClaimsPrincipal user,
             ILoggerFactory lf,
             CancellationToken ct) =>
-        {
-            var upstoxKey = await strikeSvc.FindByPriceAsync(
-                request.UnderlyingKey, request.Expiry, request.InstrumentType,
-                request.TargetPremium, ct);
-
-            if (upstoxKey is null)
-                return Results.Problem("No matching strike found in option chain.");
-
-            var exchangeToken = upstoxKey.Contains('|') ? upstoxKey.Split('|')[1] : upstoxKey;
-            var contracts     = await zerodhaInstruments.GetAllCurrentYearContractsAsync(ct);
-            var match         = contracts.FirstOrDefault(c => c.ExchangeToken == exchangeToken);
-
-            if (match is null)
-                return Results.Problem($"Zerodha trading symbol not found for exchange token {exchangeToken}.");
-
-            var brokerRequest = new BrokerOrderRequest(match.TradingSymbol, request.Qty, request.TransactionType, request.Product, "MARKET", Exchange: match.Exchange);
-            await zerodha.Orders.PlaceOrderAsync(brokerRequest, ct);
-
-            lf.CreateLogger("ZerodhaEndpoints").LogInformation(
-                "By-price order — {User} — {Underlying} {Expiry} {Type} qty={Qty} {Side} target=₹{Premium} → {Symbol} ({Exchange})",
-                user.GetEmail() ?? "unknown",
-                request.UnderlyingKey, request.Expiry, request.InstrumentType,
-                request.Qty, request.TransactionType, request.TargetPremium, match.TradingSymbol, match.Exchange);
-
-            return Results.Ok(new { instrumentKey = upstoxKey });
-        });
+            await byPriceSvc.PlaceZerodhaAsync(
+                request, zerodha, zerodhaInstruments,
+                user.GetEmail() ?? "unknown", lf.CreateLogger("ZerodhaEndpoints"), ct));
 
         // ── Margin ────────────────────────────────────────────────────────────
 

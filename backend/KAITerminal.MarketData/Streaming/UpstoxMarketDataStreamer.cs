@@ -4,7 +4,6 @@ using System.Text.Json;
 using KAITerminal.Contracts.Streaming;
 using KAITerminal.MarketData.Configuration;
 using KAITerminal.MarketData.Http;
-using KAITerminal.MarketData.Protos;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MarketFeedMode = KAITerminal.MarketData.Streaming.FeedMode;
@@ -109,7 +108,7 @@ internal sealed class UpstoxMarketDataStreamer : IMarketDataStreamer
 
         try
         {
-            await ReadFramesAsync(ct);
+            await WebSocketFrameReader.ReadAsync(_ws!, HandleBinaryFrame, ct);
             if (ct.IsCancellationRequested) return;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { return; }
@@ -121,28 +120,6 @@ internal sealed class UpstoxMarketDataStreamer : IMarketDataStreamer
             await RunAutoReconnectAsync(ct);
         else if (!ct.IsCancellationRequested)
             AutoReconnectStopped?.Invoke(this, EventArgs.Empty);
-    }
-
-    private async Task ReadFramesAsync(CancellationToken ct)
-    {
-        var buffer = new byte[65536];
-        using var ms = new MemoryStream(65536);
-
-        while (_ws!.State == WebSocketState.Open && !ct.IsCancellationRequested)
-        {
-            ms.SetLength(0);
-            WebSocketReceiveResult result;
-
-            do
-            {
-                result = await _ws.ReceiveAsync(buffer, ct);
-                if (result.MessageType == WebSocketMessageType.Close) return;
-                ms.Write(buffer, 0, result.Count);
-            } while (!result.EndOfMessage);
-
-            if (result.MessageType == WebSocketMessageType.Binary)
-                ProcessBinaryMessage(ms.GetBuffer(), (int)ms.Length);
-        }
     }
 
     private async Task RunAutoReconnectAsync(CancellationToken ct)
@@ -198,39 +175,19 @@ internal sealed class UpstoxMarketDataStreamer : IMarketDataStreamer
     // Protobuf decoding → LtpUpdate
     // ──────────────────────────────────────────────────
 
-    private void ProcessBinaryMessage(byte[] buffer, int count)
+    private void HandleBinaryFrame(byte[] buffer, int count)
     {
         try
         {
-            var proto = FeedResponse.Parser.ParseFrom(buffer, 0, count);
-
-            if (proto.Feeds.Count == 0) return;
-
-            var ltps = new Dictionary<string, decimal>(proto.Feeds.Count);
-            foreach (var kv in proto.Feeds)
-            {
-                var ltp = ExtractLtp(kv.Value);
-                if (ltp.HasValue)
-                    ltps[kv.Key] = ltp.Value;
-            }
-
-            if (ltps.Count > 0)
-                FeedReceived?.Invoke(this, new LtpUpdate(ltps));
+            var update = ProtobufFeedDecoder.Decode(buffer, count);
+            if (update is not null)
+                FeedReceived?.Invoke(this, update);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to parse market data frame ({Length} bytes)", count);
         }
     }
-
-    private static decimal? ExtractLtp(Feed feed) => feed.FeedUnionCase switch
-    {
-        Feed.FeedUnionOneofCase.Ltpc                                             => (decimal?)feed.Ltpc.Ltp,
-        Feed.FeedUnionOneofCase.FullFeed when feed.FullFeed.MarketFF is not null => (decimal?)feed.FullFeed.MarketFF.Ltpc.Ltp,
-        Feed.FeedUnionOneofCase.FullFeed                                         => (decimal?)feed.FullFeed.IndexFF?.Ltpc.Ltp,
-        Feed.FeedUnionOneofCase.FirstLevelWithGreeks                             => (decimal?)feed.FirstLevelWithGreeks.Ltpc.Ltp,
-        _                                                                        => null
-    };
 
     // ──────────────────────────────────────────────────
     // Outgoing message helpers

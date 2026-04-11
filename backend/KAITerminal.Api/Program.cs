@@ -59,6 +59,7 @@ builder.Services.AddSingleton<PositionStreamManager>();
 builder.Services.AddSingleton<IndexStreamManager>();
 builder.Services.AddSingleton<OptionChainStreamManager>();
 builder.Services.AddScoped<UserTradingSettingsService>();
+builder.Services.AddScoped<AdminService>();
 builder.Services.AddSingleton<MasterDataService>();
 
 var app = builder.Build();

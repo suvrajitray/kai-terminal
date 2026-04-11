@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json.Serialization;
 using KAITerminal.Api.Services;
 using KAITerminal.Contracts;
@@ -22,7 +20,7 @@ public static class WebhookEndpoints
             [FromQuery] string apiKey,
             HttpRequest request,
             BrokerCredentialService credentials,
-            PositionStreamManager manager,
+            WebhookOrderProcessor processor,
             ILogger<ZerodhaOrderPostback> logger) =>
         {
             // Zerodha sends JSON via Go-http-client without Content-Type: application/json,
@@ -56,13 +54,11 @@ public static class WebhookEndpoints
                 apiKey, cred.Username);
 
             // Verify Zerodha checksum: SHA256(order_id + order_timestamp + api_secret)
-            var expected = ComputeZerodhaChecksum(
-                payload.OrderId, payload.OrderTimestamp, cred.ApiSecret);
-            if (!string.Equals(expected, payload.Checksum, StringComparison.OrdinalIgnoreCase))
+            if (!ZerodhaWebhookValidator.IsValid(payload.OrderId, payload.OrderTimestamp, cred.ApiSecret, payload.Checksum))
             {
                 logger.LogWarning(
-                    "Zerodha webhook: checksum mismatch — user={User} orderId={OrderId} receivedChecksum={Received} expectedChecksum={Expected}",
-                    cred.Username, payload.OrderId, payload.Checksum, expected);
+                    "Zerodha webhook: checksum mismatch — user={User} orderId={OrderId} receivedChecksum={Received}",
+                    cred.Username, payload.OrderId, payload.Checksum);
                 return Results.Unauthorized();
             }
 
@@ -70,8 +66,7 @@ public static class WebhookEndpoints
                 "Zerodha webhook: checksum verified — user={User} orderId={OrderId}",
                 cred.Username, payload.OrderId);
 
-            var status = payload.Status?.ToLowerInvariant() ?? "";
-            if (status is not "complete" and not "rejected")
+            if (!processor.IsActionableStatus(payload.Status))
             {
                 logger.LogInformation(
                     "Zerodha webhook: ignoring intermediate status={Status} for orderId={OrderId}",
@@ -79,22 +74,16 @@ public static class WebhookEndpoints
                 return Results.Ok();
             }
 
+            var status = payload.Status!.ToLowerInvariant();
             logger.LogInformation(
                 "Zerodha webhook: actionable order update — status={Status} user={User} orderId={OrderId} symbol={Symbol} message={Message}",
                 status.ToUpperInvariant(), cred.Username, payload.OrderId, payload.TradingSymbol, payload.StatusMessage);
 
-            var coordinators = manager.GetAllForUser(cred.Username).ToList();
-            logger.LogInformation(
-                "Zerodha webhook: pushing to {Count} active connection(s) for user={User}",
-                coordinators.Count, cred.Username);
-
-            await PushAndRefreshAsync(
-                coordinators,
+            await processor.ProcessAsync(
+                cred.Username, "Zerodha",
                 payload.OrderId ?? "", payload.Status ?? "", payload.StatusMessage ?? "", payload.TradingSymbol ?? "",
                 payload.AveragePrice, payload.TransactionType ?? "", payload.FilledQuantity,
-                refresh: status == "complete",
-                logger: logger,
-                broker: "Zerodha");
+                refresh: status == "complete", logger);
 
             logger.LogInformation(
                 "Zerodha webhook: done — orderId={OrderId} refresh={Refresh}",
@@ -112,7 +101,7 @@ public static class WebhookEndpoints
             string apiKey,
             HttpRequest request,
             BrokerCredentialService credentials,
-            PositionStreamManager manager,
+            WebhookOrderProcessor processor,
             ILogger<UpstoxOrderPostback> logger) =>
         {
             logger.LogInformation(
@@ -158,7 +147,7 @@ public static class WebhookEndpoints
                 cred.Username, payload.UserId, payload.OrderId, payload.TradingSymbol, payload.Status);
 
             var status = payload.Status?.ToLowerInvariant() ?? "";
-            if (status is not "complete" and not "rejected")
+            if (!processor.IsActionableStatus(payload.Status))
             {
                 logger.LogInformation(
                     "Upstox webhook: ignoring intermediate status={Status} for orderId={OrderId}",
@@ -170,21 +159,14 @@ public static class WebhookEndpoints
                 "Upstox webhook: actionable order update — status={Status} user={User} orderId={OrderId} symbol={Symbol} message={Message}",
                 status.ToUpperInvariant(), cred.Username, payload.OrderId, payload.TradingSymbol, payload.StatusMessage);
 
-            var coordinators = manager.GetAllForUser(cred.Username).ToList();
-            logger.LogInformation(
-                "Upstox webhook: pushing to {Count} active connection(s) for user={User}",
-                coordinators.Count, cred.Username);
-
-            await PushAndRefreshAsync(
-                coordinators,
+            await processor.ProcessAsync(
+                cred.Username, "Upstox",
                 payload.OrderId       ?? "",
                 payload.Status        ?? "",
                 payload.StatusMessage ?? "",
                 payload.TradingSymbol ?? "",
                 payload.AveragePrice, payload.TransactionType ?? "", payload.FilledQuantity,
-                refresh: status == "complete",
-                logger: logger,
-                broker: "Upstox");
+                refresh: status == "complete", logger);
 
             logger.LogInformation(
                 "Upstox webhook: done — orderId={OrderId} refresh={Refresh}",
@@ -192,49 +174,6 @@ public static class WebhookEndpoints
 
             return Results.Ok();
         });
-    }
-
-    // ── Shared helper ─────────────────────────────────────────────────────────
-
-    private static async Task PushAndRefreshAsync(
-        IEnumerable<KAITerminal.Api.Hubs.PositionStreamCoordinator> coordinators,
-        string orderId, string status, string statusMessage, string tradingSymbol,
-        decimal averagePrice, string transactionType, int filledQuantity,
-        bool refresh)
-    {
-        var tasks = coordinators.Select(async coord =>
-        {
-            await coord.PushOrderUpdateAsync(orderId, status, statusMessage, tradingSymbol, averagePrice, transactionType, filledQuantity);
-            if (refresh)
-                await coord.TriggerRefreshAsync();
-        });
-        await Task.WhenAll(tasks);
-    }
-
-    private static async Task PushAndRefreshAsync(
-        IEnumerable<KAITerminal.Api.Hubs.PositionStreamCoordinator> coordinators,
-        string orderId, string status, string statusMessage, string tradingSymbol,
-        decimal averagePrice, string transactionType, int filledQuantity,
-        bool refresh,
-        ILogger logger,
-        string broker)
-    {
-        var list  = coordinators.ToList();
-        var tasks = list.Select(async coord =>
-        {
-            logger.LogInformation(
-                "{Broker} webhook: sending ReceiveOrderUpdate to connection={Connection} — orderId={OrderId} status={Status}",
-                broker, coord.Username, orderId, status);
-            await coord.PushOrderUpdateAsync(orderId, status, statusMessage, tradingSymbol, averagePrice, transactionType, filledQuantity);
-            if (refresh)
-            {
-                logger.LogInformation(
-                    "{Broker} webhook: triggering position refresh for connection={Connection}",
-                    broker, coord.Username);
-                await coord.TriggerRefreshAsync();
-            }
-        });
-        await Task.WhenAll(tasks);
     }
 
     // ── Body reading ──────────────────────────────────────────────────────────
@@ -245,16 +184,6 @@ public static class WebhookEndpoints
         await request.Body.CopyToAsync(ms);
         request.Body.Position = 0; // rewind for potential further reads
         return ms.ToArray();
-    }
-
-    // ── Zerodha checksum ──────────────────────────────────────────────────────
-
-    private static string ComputeZerodhaChecksum(
-        string? orderId, string? orderTimestamp, string apiSecret)
-    {
-        var raw   = $"{orderId}{orderTimestamp}{apiSecret}";
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(raw));
-        return Convert.ToHexStringLower(bytes);
     }
 
 }

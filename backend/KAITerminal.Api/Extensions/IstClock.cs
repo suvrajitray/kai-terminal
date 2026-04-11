@@ -16,4 +16,11 @@ public static class IstClock
 
     public static DateTimeOffset ToIst(DateTimeOffset utc) =>
         TimeZoneInfo.ConvertTime(utc, Tz);
+
+    /// <summary>Converts an IST calendar date to a UTC <see cref="DateTimeOffset"/> at midnight.</summary>
+    public static DateTimeOffset DateToUtc(DateOnly date)
+    {
+        var midnight = date.ToDateTime(TimeOnly.MinValue);
+        return new DateTimeOffset(midnight, Tz.GetUtcOffset(midnight));
+    }
 }
