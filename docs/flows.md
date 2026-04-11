@@ -67,15 +67,14 @@ Entry {
 
 **Project:** `KAITerminal.Api`
 
-```
-_subscribedUpstoxTokens: HashSet<string>                       // O(1) feed token filter
-_zerodhaFeedToNative:    Dictionary<feedToken, nativeToken>    // reverse map for ReceiveLtpBatch
-```
+Subscription state is managed by two collaborating classes in `Hubs/`:
+- `UpstoxFeedSubscriptionManager` — owns `ConcurrentDictionary<string, bool>` of subscribed Upstox feed tokens.
+- `ZerodhaFeedSubscriptionManager` — owns `ConcurrentDictionary<feedToken, nativeToken>` reverse map for `ReceiveLtpBatch`.
 
 **Lifetime:** Created in `PositionsHub.OnConnectedAsync`; disposed in `PositionStreamManager` on SignalR disconnect.
 
 **Notes:**
-- `_zerodhaFeedToNative` is built once on connect from `exchange_token` → `tradingSymbol` lookups via `IZerodhaInstrumentService` (now in `KAITerminal.MarketData.Services` — moved from Zerodha SDK).
+- Zerodha feed-to-native map is built on connect from `exchange_token` → `tradingSymbol` lookups via `IZerodhaInstrumentService` (in `KAITerminal.MarketData.Services`).
 - Feed tokens for Zerodha instruments are `NSE_FO|{exchangeToken}` / `BSE_FO|{exchangeToken}` — subscribed to the shared Upstox market-data WebSocket.
 - On each `LtpUpdate`, the coordinator translates feed tokens back to native Zerodha trading symbols before pushing `ReceiveLtpBatch` so the frontend `instrumentToken` match works without changes.
 - Order status updates are **pushed via broker webhooks** (not polled). `PositionStreamManager.GetAllForUser(username)` and `GetAllForBroker(brokerType)` route webhook payloads to the right coordinator(s); `PushOrderUpdateAsync` sends the toast and `TriggerRefreshAsync` refreshes positions on fill.
@@ -104,19 +103,21 @@ _zerodhaFeedToNative:    Dictionary<feedToken, nativeToken>    // reverse map fo
 **Project:** `KAITerminal.RiskEngine`
 
 ```
-_gates:    ConcurrentDictionary<userId, UserGate>
+_gates:    ConcurrentDictionary<userId, UserGate>              // in StreamingRiskWorker
            UserGate {
              SemaphoreSlim Semaphore      // serialises concurrent LTP evaluations per user
              long LastLtpEvalTicks        // rate-limit — skips eval if < LtpEvalMinIntervalMs (15s)
            }
 
-_sessions: Dictionary<"{userId}::{brokerType}", SessionEntry>
+_sessions: ConcurrentDictionary<"{userId}::{brokerType}", SessionEntry>  // in UserSessionRegistry
            SessionEntry {
              CancellationTokenSource Cts
              Task                    Task
              UserConfig              Config
            }
 ```
+
+Session management is owned by `UserSessionRegistry` (extracted from `StreamingRiskWorker`). `LtpTickDrainer` (pure static) drains the `Channel<LtpUpdate>` and returns the latest-per-token map on each eval tick.
 
 **Lifetime:** Supervisor loop re-queries the DB every `UserRefreshIntervalMs` (default 60 s). Sessions are started/stopped/restarted dynamically as users are enabled or disabled in `UserRiskConfigs`.
 
@@ -169,7 +170,7 @@ Survives Worker restarts — prevents TSL re-activation and duplicate square-off
 | `ltp:feed` | Worker → Api | `JSON Dictionary<token, decimal>` — every Upstox WebSocket tick |
 | `ltp:sub-req` | Api → Worker | `JSON List<string>` — tokens the Api wants subscribed on the Worker's WebSocket |
 
-**In-memory (Worker only):** `HashSet<string> _subscribed` — currently active feed tokens (avoids redundant subscribe calls).
+**In-memory (Worker only):** `ConcurrentDictionary<string, bool> _subscribed` — currently active feed tokens (avoids redundant subscribe calls).
 
 **No key-value storage** — pub/sub only; no Redis keys are written. Messages are fire-and-forget.
 
