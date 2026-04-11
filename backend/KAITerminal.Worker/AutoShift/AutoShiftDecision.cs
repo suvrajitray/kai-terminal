@@ -3,13 +3,13 @@ using KAITerminal.MarketData.Models;
 
 namespace KAITerminal.Worker;
 
-internal enum ShiftDecisionKind { Shift, ExitExhausted, SkipContractNotFound, SkipUnknownUnderlying }
+internal enum AutoShiftDecisionKind { Shift, ExitExhausted, SkipContractNotFound, SkipUnknownUnderlying }
 
 /// <summary>
 /// The outcome of evaluating a single sell position for auto-shift.
 /// </summary>
-internal sealed record PositionShiftDecision(
-    ShiftDecisionKind Kind,
+internal sealed record AutoShiftDecision(
+    AutoShiftDecisionKind Kind,
     BrokerPosition Position,
     decimal Ltp,
     ZerodhaOptionContract? Contract,  // null for Skip kinds

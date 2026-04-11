@@ -51,22 +51,22 @@ internal static class AutoShiftDecisionEngine
     /// <summary>
     /// For each threshold crossing, determine the action: Shift, ExitExhausted, or a skip kind.
     /// </summary>
-    public static IReadOnlyList<PositionShiftDecision> Evaluate(
+    public static IReadOnlyList<AutoShiftDecision> Evaluate(
         IReadOnlyList<(BrokerPosition Position, decimal Ltp)> crossings,
         UserRiskState state,
         UserConfig config,
         IReadOnlyList<ZerodhaOptionContract> contracts,
         string brokerType)
     {
-        var result = new List<PositionShiftDecision>();
+        var result = new List<AutoShiftDecision>();
 
         foreach (var (position, ltp) in crossings)
         {
             var contract = LookupContract(position, brokerType, contracts);
             if (contract is null)
             {
-                result.Add(new PositionShiftDecision(
-                    ShiftDecisionKind.SkipContractNotFound,
+                result.Add(new AutoShiftDecision(
+                    AutoShiftDecisionKind.SkipContractNotFound,
                     position, ltp, null, null, 0, null, 0));
                 continue;
             }
@@ -85,8 +85,8 @@ internal static class AutoShiftDecisionEngine
                 if (state.ExitedChainKeys.Contains(chainKey))
                     continue;
 
-                result.Add(new PositionShiftDecision(
-                    ShiftDecisionKind.ExitExhausted,
+                result.Add(new AutoShiftDecision(
+                    AutoShiftDecisionKind.ExitExhausted,
                     position, ltp, contract, chainKey, shiftCount, null, 0,
                     IsShiftedLeg: false,
                     MaxShiftCount: config.AutoShiftMaxCount));
@@ -95,8 +95,8 @@ internal static class AutoShiftDecisionEngine
             {
                 if (!UnderlyingKeys.TryGetValue(contract.Name, out var underlyingKey))
                 {
-                    result.Add(new PositionShiftDecision(
-                        ShiftDecisionKind.SkipUnknownUnderlying,
+                    result.Add(new AutoShiftDecision(
+                        AutoShiftDecisionKind.SkipUnknownUnderlying,
                         position, ltp, contract, chainKey, shiftCount, null, 0));
                     continue;
                 }
@@ -105,8 +105,8 @@ internal static class AutoShiftDecisionEngine
                     ? config.AutoShiftStrikeGap
                     : -config.AutoShiftStrikeGap;
 
-                result.Add(new PositionShiftDecision(
-                    ShiftDecisionKind.Shift,
+                result.Add(new AutoShiftDecision(
+                    AutoShiftDecisionKind.Shift,
                     position, ltp, contract, chainKey, shiftCount, underlyingKey, strikeGap,
                     IsShiftedLeg: isShiftedPosition,
                     MaxShiftCount: config.AutoShiftMaxCount));

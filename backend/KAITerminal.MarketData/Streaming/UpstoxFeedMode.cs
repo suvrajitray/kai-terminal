@@ -4,7 +4,7 @@ namespace KAITerminal.MarketData.Streaming;
 /// Upstox-specific feed modes for the market data WebSocket.
 /// More granular than <see cref="KAITerminal.Contracts.Streaming.FeedMode"/>.
 /// </summary>
-internal enum FeedMode
+internal enum UpstoxFeedMode
 {
     Ltpc,
     Full,

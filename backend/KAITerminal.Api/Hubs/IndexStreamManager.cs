@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using KAITerminal.Contracts.Streaming;
 
-namespace KAITerminal.Api.Services;
+namespace KAITerminal.Api.Hubs;
 
 public sealed class IndexStreamManager
 {

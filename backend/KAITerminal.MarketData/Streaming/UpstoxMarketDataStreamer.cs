@@ -6,7 +6,7 @@ using KAITerminal.MarketData.Configuration;
 using KAITerminal.MarketData.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using MarketFeedMode = KAITerminal.MarketData.Streaming.FeedMode;
+using MarketFeedMode = KAITerminal.MarketData.Streaming.UpstoxFeedMode;
 
 namespace KAITerminal.MarketData.Streaming;
 

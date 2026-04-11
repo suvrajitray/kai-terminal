@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace KAITerminal.Api.Contracts.Enums;
+namespace KAITerminal.Api.Dto.Enums;
 
 /// <summary>Direction of a trade — buy or sell.</summary>
 [JsonConverter(typeof(JsonStringEnumConverter))]

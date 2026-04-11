@@ -1,6 +1,6 @@
-using KAITerminal.Api.Contracts.Enums;
+using KAITerminal.Api.Dto.Enums;
 
-namespace KAITerminal.Api.Contracts.Responses;
+namespace KAITerminal.Api.Dto.Responses;
 
 public sealed record PositionResponse
 {

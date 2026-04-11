@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
-using KAITerminal.Api.Hubs;
 
-namespace KAITerminal.Api.Services;
+namespace KAITerminal.Api.Hubs;
 
 /// <summary>
 /// Tracks per-connection <see cref="OptionChainCoordinator"/> instances for <see cref="OptionChainHub"/>.

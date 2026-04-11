@@ -1,5 +1,5 @@
-using KAITerminal.Api.Contracts.Enums;
-using KAITerminal.Api.Contracts.Responses;
+using KAITerminal.Api.Dto.Enums;
+using KAITerminal.Api.Dto.Responses;
 using KAITerminal.Contracts;
 
 namespace KAITerminal.Api.Mapping;

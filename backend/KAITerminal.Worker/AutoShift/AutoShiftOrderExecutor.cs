@@ -41,7 +41,7 @@ internal sealed class AutoShiftOrderExecutor
     }
 
     public async Task ShiftAsync(
-        PositionShiftDecision decision, UserConfig config, IBrokerClient broker,
+        AutoShiftDecision decision, UserConfig config, IBrokerClient broker,
         string userId, string stateKey, IReadOnlyList<ZerodhaOptionContract> allContracts,
         CancellationToken ct)
     {
@@ -180,7 +180,7 @@ internal sealed class AutoShiftOrderExecutor
     }
 
     public async Task ExitExhaustedAsync(
-        PositionShiftDecision decision, IBrokerClient broker,
+        AutoShiftDecision decision, IBrokerClient broker,
         UserRiskState state, string userId, string stateKey, CancellationToken ct)
     {
         var position  = decision.Position;

@@ -1,3 +1,5 @@
+using KAITerminal.Api.Hubs;
+
 namespace KAITerminal.Api.Services;
 
 /// <summary>

@@ -102,7 +102,7 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
         {
             switch (decision.Kind)
             {
-                case ShiftDecisionKind.SkipContractNotFound:
+                case AutoShiftDecisionKind.SkipContractNotFound:
                     _logger.LogWarning(
                         "AutoShift — no contract found for token {Token} [{Broker} / {UserId}] — skipping",
                         decision.Position.InstrumentToken, broker.BrokerType, userId);
@@ -115,17 +115,17 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
                         Timestamp:       DateTimeOffset.UtcNow), ct);
                     break;
 
-                case ShiftDecisionKind.SkipUnknownUnderlying:
+                case AutoShiftDecisionKind.SkipUnknownUnderlying:
                     _logger.LogWarning(
                         "AutoShift — unknown underlying '{Name}' for chain {ChainKey} — skipping [{Broker} / {UserId}]",
                         decision.Contract!.Name, decision.ChainKey, broker.BrokerType, userId);
                     break;
 
-                case ShiftDecisionKind.ExitExhausted:
+                case AutoShiftDecisionKind.ExitExhausted:
                     await _executor.ExitExhaustedAsync(decision, broker, state, userId, stateKey, ct);
                     break;
 
-                case ShiftDecisionKind.Shift:
+                case AutoShiftDecisionKind.Shift:
                     await _executor.ShiftAsync(decision, config, broker, userId, stateKey, allContracts, ct);
                     break;
             }
