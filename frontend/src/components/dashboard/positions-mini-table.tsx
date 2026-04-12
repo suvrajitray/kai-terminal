@@ -91,7 +91,7 @@ export function PositionsMiniTable({ positions, loading }: PositionsMiniTablePro
                                 <OptionTypeBadge type={contract.instrumentType} />
                               </div>
                               <div className="text-[10px] text-muted-foreground">
-                                {p.exchange} · {formatExpiryLabel(contract.expiry)}
+                                {p.exchange} / {formatExpiryLabel(contract.expiry)}
                               </div>
                             </>
                           ) : (

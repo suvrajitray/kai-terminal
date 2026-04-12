@@ -66,7 +66,7 @@ interface PositionRowProps {
 function buildOrderIntent(
   position: Position,
   transactionType: "Buy" | "Sell",
-  getByInstrumentKey: (token: string, symbol?: string) => { contract: { strikePrice: number; instrumentType: "CE" | "PE" }; index: string } | undefined,
+  getByInstrumentKey: (token: string, symbol?: string) => { contract: { strikePrice: number; instrumentType: "CE" | "PE"; expiry: string }; index: string } | undefined,
 ): OrderIntent {
   const lookup   = getByInstrumentKey(position.instrumentToken, position.tradingSymbol);
   const contract = lookup?.contract;
@@ -80,6 +80,7 @@ function buildOrderIntent(
     ltp:             position.ltp,
     strike:          contract?.strikePrice ?? Number(parsed?.strike ?? 0),
     underlying:      index ?? parsed?.index ?? position.tradingSymbol,
+    expiry:          contract?.expiry,
   };
 }
 
@@ -152,7 +153,7 @@ export function PositionRow({
               </div>
               <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
                 <BrokerBadge brokerId={p.broker ?? "upstox"} size={12} />
-                {p.exchange} {formatExpiryLabel(contract.expiry)}
+                {p.exchange} / {formatExpiryLabel(contract.expiry)}
               </div>
             </>
           ) : (

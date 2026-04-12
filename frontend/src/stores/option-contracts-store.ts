@@ -4,10 +4,10 @@ import type { ContractEntry, IndexContracts } from "@/types";
 
 const MONTH_ABBR = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
 
-/** Formats ISO date "2026-03-17" → "17MAR26" for display */
+/** Formats ISO date "2026-03-17" → "17 MAR 26" for display */
 export function formatExpiryLabel(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
-  return `${String(d).padStart(2, "0")}${MONTH_ABBR[m - 1]}${String(y).slice(-2)}`;
+  return `${String(d).padStart(2, "0")} ${MONTH_ABBR[m - 1]} ${String(y).slice(-2)}`;
 }
 
 export interface ContractLookup {

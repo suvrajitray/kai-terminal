@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { placeOrder, fetchFunds, fetchZerodhaFunds, type MarginInstrument } from "@/services/trading-api";
 import { useBrokerStore } from "@/stores/broker-store";
-import { useOptionContractsStore } from "@/stores/option-contracts-store";
+import { useOptionContractsStore, formatExpiryLabel } from "@/stores/option-contracts-store";
 import { getLotSize } from "@/lib/lot-sizes";
 import { BROKERS } from "@/lib/constants";
 import { isBrokerTokenExpired } from "@/lib/token-utils";
@@ -24,6 +24,8 @@ export interface OrderIntent {
   ltp: number;
   strike: number;
   underlying: string;
+  /** ISO expiry date "YYYY-MM-DD". Carried by position-originated intents to avoid a re-lookup. */
+  expiry?: string;
 }
 
 interface Props {
@@ -179,7 +181,7 @@ export function OrderDialog({
                 {intent.underlying} {intent.strike} {intent.side}
               </p>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                NFO · LTP <span className="font-mono font-semibold text-foreground tabular-nums">{ltp.toFixed(2)}</span>
+                NFO{(intent.expiry ?? contract?.contract.expiry) ? ` / ${formatExpiryLabel((intent.expiry ?? contract!.contract.expiry)!)}` : ""} / LTP <span className="font-mono font-semibold text-foreground tabular-nums">{ltp.toFixed(2)}</span>
               </p>
             </div>
             {/* Direction toggle — hidden for position-row actions */}
