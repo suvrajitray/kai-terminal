@@ -1,0 +1,177 @@
+//@version=5
+indicator("NIFTY Strangle Helper", overlay=true, max_boxes_count=10, max_lines_count=20, max_labels_count=50)
+
+// ── Inputs ───────────────────────────────────────────────────────────────────
+or_mins    = input.int(15,    "Opening range (minutes)",  group="Opening Range", minval=1, maxval=60)
+atr_mult   = input.float(1.5, "Danger ATR multiplier",   group="Opening Range", minval=0.1, step=0.1)
+warn_pct   = input.float(80,  "Warning zone %",          group="Opening Range", minval=50, maxval=99, step=5)
+adx_thresh = input.int(20,    "ADX threshold (<)",       group="Trend Filter",  minval=5,  maxval=50)
+adx_len    = input.int(14,    "ADX length",              group="Trend Filter",  minval=5)
+last_entry_h = input.int(13, "No new entry after hour",   group="Intraday",      minval=9,  maxval=15)
+last_entry_m = input.int(30, "No new entry after minute", group="Intraday",      minval=0,  maxval=59)
+sq_off_h     = input.int(15, "Square-off reminder hour",  group="Intraday",      minval=9,  maxval=15)
+sq_off_m     = input.int(15, "Square-off reminder minute",group="Intraday",      minval=0,  maxval=59)
+show_ref   = input.bool(true,  "Prev Day H/L + Pivot",  group="Reference")
+c_or       = input.color(color.new(color.blue,   85), "OR box",          group="Colours")
+c_danger   = input.color(color.new(color.red,     0), "Danger lines",    group="Colours")
+c_warn     = input.color(color.new(color.orange,  0), "Warning lines",   group="Colours")
+c_entry    = input.color(color.new(color.teal,    0), "Entry signal",    group="Colours")
+c_exit     = input.color(color.new(color.red,    20), "Exit signal",     group="Colours")
+c_ref      = input.color(color.new(color.gray,   30), "Reference lines", group="Colours")
+
+// ── Session & time ────────────────────────────────────────────────────────────
+t_open     = 9 * 60 + 15
+t_close    = 15 * 60 + 30
+bar_min    = hour * 60 + minute
+in_session    = bar_min >= t_open and bar_min < t_close
+or_end        = t_open + or_mins
+in_or         = bar_min >= t_open and bar_min < or_end
+new_day       = dayofmonth != dayofmonth[1]
+t_last_entry  = last_entry_h * 60 + last_entry_m
+t_sq_off      = sq_off_h     * 60 + sq_off_m
+before_cutoff = bar_min < t_last_entry
+at_sq_off     = bar_min == t_sq_off
+
+// ── Opening Range ─────────────────────────────────────────────────────────────
+var float or_high = na
+var float or_low  = na
+var bool  or_done = false
+
+if new_day
+    or_high := na
+    or_low  := na
+    or_done := false
+
+if in_or
+    or_high := na(or_high) ? high : math.max(or_high, high)
+    or_low  := na(or_low)  ? low  : math.min(or_low,  low)
+
+or_just_done = not in_or and not or_done and not na(or_high) and in_session
+if or_just_done
+    or_done := true
+
+// ── ATR-based levels (frozen at OR completion) ────────────────────────────────
+var float danger_high = na
+var float danger_low  = na
+var float warn_high   = na
+var float warn_low    = na
+
+atr = ta.atr(14)
+
+if new_day
+    danger_high := na
+    danger_low  := na
+    warn_high   := na
+    warn_low    := na
+
+if or_just_done
+    danger_high := or_high + atr * atr_mult
+    danger_low  := or_low  - atr * atr_mult
+    warn_high   := or_high + atr * atr_mult * (warn_pct / 100)
+    warn_low    := or_low  - atr * atr_mult * (warn_pct / 100)
+
+// ── ADX trend filter ──────────────────────────────────────────────────────────
+[dmi_plus, dmi_minus, adx_val] = ta.dmi(adx_len, adx_len)
+non_trending = adx_val < adx_thresh
+
+// ── Previous day H/L + Pivot ──────────────────────────────────────────────────
+var float day_high  = na
+var float day_low   = na
+var float day_close = na
+var float pdh = na
+var float pdl = na
+var float pdp = na
+
+if new_day
+    if not na(day_high)
+        pdh := day_high
+        pdl := day_low
+        pdp := (pdh + pdl + day_close) / 3
+    day_high  := high
+    day_low   := low
+    day_close := close
+else
+    day_high  := na(day_high) ? high : math.max(day_high, high)
+    day_low   := na(day_low)  ? low  : math.min(day_low,  low)
+    day_close := close
+
+// ── Signal state (reset each day) ────────────────────────────────────────────
+var bool entry_fired   = false
+var bool warned_up     = false
+var bool warned_down   = false
+var bool breached_up   = false
+var bool breached_down = false
+var bool sq_off_fired  = false
+
+if new_day
+    entry_fired   := false
+    warned_up     := false
+    warned_down   := false
+    breached_up   := false
+    breached_down := false
+    sq_off_fired  := false
+
+price_in_zone = not na(danger_high) and close < danger_high and close > danger_low
+
+// Entry: OR done, non-trending, price within danger lines, before cutoff time, fires once per day
+entry_signal = or_done and non_trending and in_session and before_cutoff and price_in_zone and not entry_fired
+if entry_signal
+    entry_fired := true
+
+// Square-off reminder: fires at configured time if a position was entered today
+sq_off_signal = at_sq_off and entry_fired and not sq_off_fired
+if sq_off_signal
+    sq_off_fired := true
+
+// Warning: price first reaches the warning level (once per side per day)
+warn_up   = or_done and not warned_up   and not na(warn_high) and close >= warn_high and in_session
+warn_down = or_done and not warned_down and not na(warn_low)  and close <= warn_low  and in_session
+if warn_up
+    warned_up := true
+if warn_down
+    warned_down := true
+
+// Breach: close crosses outside danger line (once per side per day)
+breach_up   = or_done and not breached_up   and not na(danger_high) and close > danger_high and in_session
+breach_down = or_done and not breached_down and not na(danger_low)  and close < danger_low  and in_session
+if breach_up
+    breached_up := true
+if breach_down
+    breached_down := true
+
+// ── OR Box ────────────────────────────────────────────────────────────────────
+var box  b_or         = na
+var bool or_box_today = false
+
+if new_day
+    or_box_today := false
+
+if in_or
+    if not or_box_today
+        b_or := box.new(bar_index, high, bar_index, low, bgcolor=c_or, border_color=color.new(color.blue, 50), text=" OR", text_size=size.tiny, text_color=color.new(color.blue, 0), text_halign=text.align_left, text_valign=text.align_top)
+        or_box_today := true
+    else
+        box.set_right(b_or, bar_index)
+        box.set_top(b_or, or_high)
+        box.set_bottom(b_or, or_low)
+
+// ── Background state highlight ────────────────────────────────────────────────
+is_breached = or_done and (breached_up or breached_down)
+is_warned   = or_done and not is_breached and (warned_up or warned_down)
+bgcolor(is_breached ? color.new(color.red, 92) : is_warned ? color.new(color.orange, 95) : na, title="State background")
+
+// ── Plots ─────────────────────────────────────────────────────────────────────
+plot(or_done ? danger_high : na, "Danger High", color=c_danger, linewidth=2)
+plot(or_done ? danger_low  : na, "Danger Low",  color=c_danger, linewidth=2)
+plot(or_done ? warn_high   : na, "Warn High",   color=c_warn,   linewidth=1)
+plot(or_done ? warn_low    : na, "Warn Low",    color=c_warn,   linewidth=1)
+plot(show_ref ? pdh : na, "Prev Day High", color=c_ref, linewidth=1, style=plot.style_linebr)
+plot(show_ref ? pdl : na, "Prev Day Low",  color=c_ref, linewidth=1, style=plot.style_linebr)
+plot(show_ref ? pdp : na, "Pivot (CPP)",   color=c_ref, linewidth=1, style=plot.style_linebr)
+
+plotshape(entry_signal, "Strangle Entry",   shape.labelup,     location.belowbar, c_entry, text="Entry", textcolor=color.white, size=size.normal)
+plotshape(warn_up,      "CE Wing Alert",    shape.triangleup,   location.abovebar, c_warn,  size=size.small)
+plotshape(warn_down,    "PE Wing Alert",    shape.triangledown, location.belowbar, c_warn,  size=size.small)
+plotshape(breach_up,    "CE Breach → Exit",  shape.labeldown, location.abovebar, c_exit, text="EXIT", textcolor=color.white, size=size.small)
+plotshape(breach_down,  "PE Breach → Exit",  shape.labelup,   location.belowbar, c_exit, text="EXIT", textcolor=color.white, size=size.small)
+plotshape(sq_off_signal,"Square-off Reminder", shape.labeldown, location.abovebar, color.new(color.purple, 0), text="SQ", textcolor=color.white, size=size.small)
