@@ -8,11 +8,14 @@ import { OptionTypeBadge } from "./option-type-badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { BrokerBadge } from "@/components/ui/broker-badge";
 import {
-  ExitPositionDialog,
-  SellBuyMoreDialog,
   ConvertPositionDialog,
   AddStoplossDialog,
+  parseTradingSymbol,
 } from "./position-action-dialogs";
+import {
+  OrderDialog,
+  type OrderIntent,
+} from "@/components/panels/order-dialog";
 import type { Position } from "@/types";
 
 const INR    = new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -24,7 +27,6 @@ const PRODUCT_LABEL: Record<string, string> = {
   Mtf:        "MTF",
   CoverOrder: "Cover Order",
 };
-
 
 export function PnlCell({ value, pct, noDecimal }: { value: number; pct?: number; noDecimal?: boolean }) {
   const color = value > 0 ? "text-emerald-500" : value < 0 ? "text-rose-500" : "text-muted-foreground";
@@ -57,9 +59,28 @@ interface PositionRowProps {
   onToggleMode: () => void;
   onAdd: () => void;
   onReduce: () => void;
-  onExit: () => void;
   onShiftUp: () => void;
   onShiftDown: () => void;
+}
+
+function buildOrderIntent(
+  position: Position,
+  transactionType: "Buy" | "Sell",
+  getByInstrumentKey: (token: string, symbol?: string) => { contract: { strikePrice: number; instrumentType: "CE" | "PE" }; index: string } | undefined,
+): OrderIntent {
+  const lookup   = getByInstrumentKey(position.instrumentToken, position.tradingSymbol);
+  const contract = lookup?.contract;
+  const index    = lookup?.index;
+  const parsed   = contract ? null : parseTradingSymbol(position.tradingSymbol);
+
+  return {
+    instrumentKey:   position.instrumentToken,
+    side:            contract?.instrumentType ?? parsed?.type ?? "CE",
+    transactionType,
+    ltp:             position.ltp,
+    strike:          contract?.strikePrice ?? Number(parsed?.strike ?? 0),
+    underlying:      index ?? parsed?.index ?? position.tradingSymbol,
+  };
 }
 
 export function PositionRow({
@@ -74,7 +95,6 @@ export function PositionRow({
   onToggleMode,
   onAdd,
   onReduce,
-  onExit,
   onShiftUp,
   onShiftDown,
 }: PositionRowProps) {
@@ -83,7 +103,6 @@ export function PositionRow({
   const costBasis = Math.abs(p.quantity) * p.averagePrice;
   const toPct = (val: number) => costBasis > 0 ? (val / costBasis) * 100 : undefined;
 
-
   const lot = getLotSize(p.tradingSymbol);
   const num = parseInt(qtyValue, 10);
   const actualQty = isNaN(num) || num <= 0 ? 0 : qtyMode === "lot" ? num * lot : num;
@@ -91,6 +110,25 @@ export function PositionRow({
   const lookup = getByInstrumentKey(p.instrumentToken, p.tradingSymbol);
   const contract = lookup?.contract;
   const index = lookup?.index;
+
+  // OrderIntent for buy-more / sell-more / exit, constructed on demand
+  const isSell = p.quantity < 0;
+  const moreIntent   = dialog === "more"
+    ? buildOrderIntent(p, isSell ? "Sell" : "Buy", getByInstrumentKey)
+    : null;
+  const exitIntent   = dialog === "exit"
+    ? buildOrderIntent(p, isSell ? "Buy" : "Sell", getByInstrumentKey)
+    : null;
+  const activeIntent = moreIntent ?? exitIntent;
+
+  // lockedProduct: only lock when it's a standard product type
+  const lockedProduct: "Intraday" | "Delivery" | undefined =
+    p.product === "Intraday" || p.product === "Delivery" ? p.product : undefined;
+
+  // defaultQtyOverride: exit prefills full position qty; buy/sell more defaults to 1 lot
+  const defaultQtyOverride = dialog === "exit"
+    ? { value: Math.abs(p.quantity), mode: "qty" as const }
+    : undefined;
 
   return (
     <>
@@ -155,7 +193,7 @@ export function PositionRow({
             positionQty={Math.abs(p.quantity)}
             acting={acting}
             hasOpenQty={p.quantity !== 0}
-            isSell={p.quantity < 0}
+            isSell={isSell}
             onQtyChange={onQtyChange}
             onToggleMode={onToggleMode}
             onAdd={onAdd}
@@ -170,18 +208,18 @@ export function PositionRow({
         </td>
       </tr>
 
-      {/* Action dialogs — portal to document.body, safe inside <tr> */}
-      <ExitPositionDialog
-        open={dialog === "exit"}
-        onOpenChange={(open) => !open && setDialog(null)}
-        position={p}
-        onConfirm={onExit}
+      {/* Unified order dialog for buy-more / sell-more / exit */}
+      <OrderDialog
+        intent={activeIntent}
+        currentLtp={p.ltp}
+        onClose={() => setDialog(null)}
+        lockedBroker={p.broker ?? "upstox"}
+        lockedProduct={lockedProduct}
+        hideDirectionToggle
+        defaultQtyOverride={defaultQtyOverride}
       />
-      <SellBuyMoreDialog
-        open={dialog === "more"}
-        onOpenChange={(open) => !open && setDialog(null)}
-        position={p}
-      />
+
+      {/* Other action dialogs — portal to document.body, safe inside <tr> */}
       <ConvertPositionDialog
         open={dialog === "convert"}
         onOpenChange={(open) => !open && setDialog(null)}

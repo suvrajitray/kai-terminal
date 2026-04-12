@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "@/lib/toast";
-import { LogOut, TrendingUp, TrendingDown, RefreshCw, ArrowRight, Zap, ShieldAlert } from "lucide-react";
+import { RefreshCw, ArrowRight, Zap, ShieldAlert } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -14,13 +14,10 @@ import { OptionTypeBadge } from "./option-type-badge";
 import { useOptionContractsStore } from "@/stores/option-contracts-store";
 import { getLotSize } from "@/lib/lot-sizes";
 import { cn } from "@/lib/utils";
-import { convertPosition, placeOrder, placeStoplossOrder } from "@/services/trading-api";
+import { convertPosition, placeStoplossOrder } from "@/services/trading-api";
 import type { Position } from "@/types";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-type OrderMode = "market" | "limit";
-
 
 function isIntraday(product: string) {
   return product === "Intraday";
@@ -64,9 +61,9 @@ function useQtyState(initialQty: number, open: boolean, lotSize: number) {
 
 // ── Symbol formatting fallback ────────────────────────────────────────────────
 
-const INDEX_PREFIXES = ["BANKNIFTY", "FINNIFTY", "SENSEX", "BANKEX", "NIFTY"];
+export const INDEX_PREFIXES = ["BANKNIFTY", "FINNIFTY", "SENSEX", "BANKEX", "NIFTY"];
 
-function parseTradingSymbol(symbol: string) {
+export function parseTradingSymbol(symbol: string) {
   const upper = symbol.toUpperCase();
   const type  = upper.endsWith("CE") ? "CE" : upper.endsWith("PE") ? "PE" : null;
   if (!type) return null;
@@ -107,272 +104,6 @@ function SymbolChip({ position }: { position: Position }) {
         {position.quantity > 0 ? "+" : ""}{position.quantity} qty
       </span>
     </div>
-  );
-}
-
-// ── Shared order controls (mode toggle + price input) ────────────────────────
-
-function OrderTypeRow({
-  ltp,
-  orderMode,
-  onOrderModeChange,
-}: {
-  ltp: number;
-  orderMode: OrderMode;
-  onOrderModeChange: (m: OrderMode) => void;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <span className="text-xs text-muted-foreground">
-        LTP <span className="font-mono font-semibold text-foreground">{ltp.toFixed(2)}</span>
-      </span>
-      <div className="flex h-7 items-center gap-0.5 rounded-md border border-border/40 bg-muted/20 p-0.5">
-        {(["market", "limit"] as OrderMode[]).map((m) => (
-          <button
-            key={m}
-            onClick={() => onOrderModeChange(m)}
-            className={cn(
-              "rounded px-2.5 py-0.5 text-xs font-semibold capitalize transition-all",
-              orderMode === m
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {m}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function PriceInput({
-  orderMode,
-  value,
-  onChange,
-}: {
-  orderMode: OrderMode;
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Price
-      </p>
-      <Input
-        type="number"
-        step="0.05"
-        min="0"
-        value={orderMode === "market" ? "0" : value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={orderMode === "market"}
-        className={cn(
-          "h-9 font-mono text-sm",
-          orderMode === "market" &&
-            "cursor-not-allowed bg-[repeating-linear-gradient(-45deg,transparent,transparent_4px,hsl(var(--muted)/0.3)_4px,hsl(var(--muted)/0.3)_8px)]",
-        )}
-      />
-    </div>
-  );
-}
-
-// ── Exit Position Dialog ──────────────────────────────────────────────────────
-
-interface ExitDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  position: Position;
-  onConfirm: () => void;
-}
-
-export function ExitPositionDialog({
-  open,
-  onOpenChange,
-  position,
-  onConfirm,
-}: ExitDialogProps) {
-  const lotSize = getLotSize(position.tradingSymbol);
-  const { qtyValue, setQtyValue, qtyMode, toggleQtyMode, qty } = useQtyState(
-    Math.abs(position.quantity),
-    open,
-    lotSize,
-  );
-  const [orderMode, setOrderMode] = useState<OrderMode>("market");
-  const [limitPrice, setLimitPrice] = useState("");
-
-  useEffect(() => {
-    if (open) {
-      setOrderMode("market");
-      setLimitPrice("");
-    }
-  }, [open]);
-
-  function handleOrderModeChange(m: OrderMode) {
-    if (m === "limit" && orderMode === "market") setLimitPrice(position.ltp.toFixed(2));
-    setOrderMode(m);
-  }
-
-  const canConfirm =
-    qty > 0 && (orderMode === "market" || (!!limitPrice && parseFloat(limitPrice) > 0));
-
-  function handleConfirm() {
-    onConfirm();
-    onOpenChange(false);
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <LogOut className="size-4 text-rose-400" />
-            Exit Position
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4 pt-1">
-          <SymbolChip position={position} />
-
-          <OrderTypeRow ltp={position.ltp} orderMode={orderMode} onOrderModeChange={handleOrderModeChange} />
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Quantity
-              </p>
-              <QtyInput
-                value={qtyValue}
-                mode={qtyMode}
-                lotSize={lotSize}
-                onChange={setQtyValue}
-                onToggleMode={toggleQtyMode}
-              />
-            </div>
-            <PriceInput orderMode={orderMode} value={limitPrice} onChange={setLimitPrice} />
-          </div>
-
-          <Button
-            disabled={!canConfirm}
-            onClick={handleConfirm}
-            className="h-11 w-full text-base font-bold text-white bg-red-600 hover:bg-red-700"
-          >
-            Exit {qty} qty
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ── Sell More / Buy More Dialog ───────────────────────────────────────────────
-
-interface MoreDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  position: Position;
-}
-
-export function SellBuyMoreDialog({ open, onOpenChange, position }: MoreDialogProps) {
-  const isSell  = position.quantity < 0;
-  const lotSize = getLotSize(position.tradingSymbol);
-  const { qtyValue, setQtyValue, qtyMode, toggleQtyMode, qty } = useQtyState(
-    Math.abs(position.quantity),
-    open,
-    lotSize,
-  );
-  const [orderMode, setOrderMode] = useState<OrderMode>("market");
-  const [limitPrice, setLimitPrice] = useState("");
-  const [placing, setPlacing] = useState(false);
-
-  useEffect(() => {
-    if (open) {
-      setOrderMode("market");
-      setLimitPrice("");
-      setPlacing(false);
-    }
-  }, [open]);
-
-  function handleOrderModeChange(m: OrderMode) {
-    if (m === "limit" && orderMode === "market") setLimitPrice(position.ltp.toFixed(2));
-    setOrderMode(m);
-  }
-
-  const label = isSell ? "Sell More" : "Buy More";
-  const Icon  = isSell ? TrendingDown : TrendingUp;
-  const color = isSell ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700";
-
-  const canConfirm =
-    qty > 0 && (orderMode === "market" || (!!limitPrice && parseFloat(limitPrice) > 0));
-
-  async function handleConfirm() {
-    setPlacing(true);
-    try {
-      const txn = isSell ? "Sell" : "Buy";
-      await placeOrder(
-        position.instrumentToken,
-        qty,
-        txn,
-        position.product,
-        orderMode,
-        orderMode === "limit" ? parseFloat(limitPrice) : undefined,
-        position.broker ?? "upstox",
-        position.exchange,
-      );
-      toast.success(`${label} order placed`);
-      onOpenChange(false);
-    } catch (e) {
-      toast.error((e as Error).message);
-    } finally {
-      setPlacing(false);
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-sm">
-        <DialogHeader>
-          <DialogTitle className={cn("flex items-center gap-2", isSell ? "text-rose-400" : "text-emerald-400")}>
-            <Icon className="size-4" />
-            {label}
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4 pt-1">
-          <SymbolChip position={position} />
-
-          <OrderTypeRow ltp={position.ltp} orderMode={orderMode} onOrderModeChange={handleOrderModeChange} />
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Quantity
-              </p>
-              <QtyInput
-                value={qtyValue}
-                mode={qtyMode}
-                lotSize={lotSize}
-                onChange={setQtyValue}
-                onToggleMode={toggleQtyMode}
-              />
-            </div>
-            <PriceInput orderMode={orderMode} value={limitPrice} onChange={setLimitPrice} />
-          </div>
-
-          <Button
-            disabled={!canConfirm || placing}
-            onClick={handleConfirm}
-            className={cn("h-11 w-full text-base font-bold text-white", color)}
-          >
-            {placing ? (
-              <><Zap className="mr-2 size-4 animate-pulse" />Placing…</>
-            ) : (
-              `${label} ${qty} qty`
-            )}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }
 

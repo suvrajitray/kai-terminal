@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { UNDERLYING_KEYS } from "@/lib/shift-config";
 import { useOptionChain } from "./use-option-chain";
 import { OptionChainTable } from "./option-chain-table";
-import { OptionChainOrderDialog, type OrderIntent } from "./option-chain-order-dialog";
+import { OrderDialog, type OrderIntent } from "@/components/panels/order-dialog";
 import { useOptionContractsStore } from "@/stores/option-contracts-store";
 
 interface Props {
@@ -349,7 +349,7 @@ export function OptionChainPanel({ width, onResize, onClose, netDelta }: Props) 
       </div>
     </div>
 
-    <OptionChainOrderDialog
+    <OrderDialog
       intent={orderIntent}
       currentLtp={orderIntent ? (() => {
         for (const entry of allChain) {

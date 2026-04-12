@@ -75,8 +75,6 @@ export function PositionsPanel({ positions, loading, load, netDelta, thetaPerDay
     }
   };
 
-  const handleExit = (token: string, product: string, broker: string) =>
-    withActing(token + ":exit", () => exitPosition(token, product, broker));
 
   const handleAdd = (token: string, tradingSymbol: string, product: string, broker: string, exchange: string) => {
     const lot = getLotSize(tradingSymbol);
@@ -423,7 +421,6 @@ export function PositionsPanel({ positions, loading, load, netDelta, thetaPerDay
       onToggleMode={toggleMode}
       onAdd={() => handleAdd(p.instrumentToken, p.tradingSymbol, p.product, p.broker ?? "upstox", p.exchange)}
       onReduce={() => handleReduce(p.instrumentToken, p.tradingSymbol, p.product, p.broker ?? "upstox", p.exchange)}
-      onExit={() => handleExit(p.instrumentToken, p.product, p.broker ?? "upstox")}
       onShiftUp={() => handleShift(p.instrumentToken, p.tradingSymbol, p.product, "up", p.broker ?? "upstox", p.exchange ?? "")}
       onShiftDown={() => handleShift(p.instrumentToken, p.tradingSymbol, p.product, "down", p.broker ?? "upstox", p.exchange ?? "")}
     />

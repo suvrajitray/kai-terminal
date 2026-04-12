@@ -1,7 +1,7 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import type { OptionChainEntry } from "@/types";
-import type { OrderIntent } from "./option-chain-order-dialog";
+import type { OrderIntent } from "@/components/panels/order-dialog";
 
 interface Props {
   entry: OptionChainEntry;

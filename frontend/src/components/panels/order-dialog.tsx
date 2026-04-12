@@ -30,9 +30,25 @@ interface Props {
   intent: OrderIntent | null;
   currentLtp?: number;
   onClose: () => void;
+  /** When set, hides the broker routing toggle and locks to this broker. */
+  lockedBroker?: string;
+  /** When set, hides the product radio buttons and locks to this product. */
+  lockedProduct?: "Intraday" | "Delivery";
+  /** When true, hides the Buy/Sell direction toggle. */
+  hideDirectionToggle?: boolean;
+  /** Overrides the initial qty value and mode. Defaults to 1 lot when not set. */
+  defaultQtyOverride?: { value: number; mode: "qty" | "lot" };
 }
 
-export function OptionChainOrderDialog({ intent, currentLtp, onClose }: Props) {
+export function OrderDialog({
+  intent,
+  currentLtp,
+  onClose,
+  lockedBroker,
+  lockedProduct,
+  hideDirectionToggle,
+  defaultQtyOverride,
+}: Props) {
   const credentials        = useBrokerStore((s) => s.credentials);
   const getByInstrumentKey = useOptionContractsStore((s) => s.getByInstrumentKey);
 
@@ -40,11 +56,11 @@ export function OptionChainOrderDialog({ intent, currentLtp, onClose }: Props) {
     (b) => !isBrokerTokenExpired(b.id, credentials[b.id]?.accessToken),
   );
 
-  const [broker, setBroker]             = useState<string>(() => activeBrokers[0]?.id ?? "upstox");
+  const [broker, setBroker]             = useState<string>(() => lockedBroker ?? activeBrokers[0]?.id ?? "upstox");
   const [direction, setDirection]       = useState<"Buy" | "Sell">(() => intent?.transactionType ?? "Buy");
-  const [qtyValue, setQtyValue]         = useState("1");
-  const [qtyMode, setQtyMode]           = useState<"qty" | "lot">("lot");
-  const [product, setProduct]           = useState<"Intraday" | "Delivery">("Intraday");
+  const [qtyValue, setQtyValue]         = useState(() => defaultQtyOverride ? String(defaultQtyOverride.value) : "1");
+  const [qtyMode, setQtyMode]           = useState<"qty" | "lot">(() => defaultQtyOverride?.mode ?? "lot");
+  const [product, setProduct]           = useState<"Intraday" | "Delivery">(lockedProduct ?? "Intraday");
   const [orderType, setOrderType]       = useState<"market" | "limit">("market");
   const [limitPrice, setLimitPrice]     = useState(() => intent?.ltp.toFixed(2) ?? "0");
   const [placing, setPlacing]           = useState(false);
@@ -55,10 +71,17 @@ export function OptionChainOrderDialog({ intent, currentLtp, onClose }: Props) {
     if (!intent) return;
     setDirection(intent.transactionType);
     setOrderType("market");
-    setProduct("Intraday");
-    setQtyValue("1");
-    setQtyMode("lot");
+    setProduct(lockedProduct ?? "Intraday");
+    setBroker(lockedBroker ?? activeBrokers[0]?.id ?? "upstox");
+    if (defaultQtyOverride) {
+      setQtyValue(String(defaultQtyOverride.value));
+      setQtyMode(defaultQtyOverride.mode);
+    } else {
+      setQtyValue("1");
+      setQtyMode("lot");
+    }
     setLimitPrice(intent.ltp.toFixed(2));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [intent?.instrumentKey]);
 
   useEffect(() => {
@@ -136,6 +159,8 @@ export function OptionChainOrderDialog({ intent, currentLtp, onClose }: Props) {
     }
   }
 
+  const brokerLabel = broker === "upstox" ? "Upstox" : "Zerodha";
+
   return (
     <Dialog open={!!intent} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-[480px] p-0 gap-0 overflow-hidden" showCloseButton={false}>
@@ -147,7 +172,7 @@ export function OptionChainOrderDialog({ intent, currentLtp, onClose }: Props) {
         {/* Body */}
         <div className="px-5 pt-5 pb-4 space-y-5">
 
-          {/* Header: instrument + LTP + buy/sell toggle */}
+          {/* Header: instrument + LTP + optional buy/sell toggle */}
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-base font-semibold text-foreground">
@@ -157,67 +182,81 @@ export function OptionChainOrderDialog({ intent, currentLtp, onClose }: Props) {
                 NFO · LTP <span className="font-mono font-semibold text-foreground tabular-nums">{ltp.toFixed(2)}</span>
               </p>
             </div>
-            {/* Direction toggle — always "on", color indicates Buy/Sell */}
-            <button
-              onClick={() => setDirection((d) => d === "Buy" ? "Sell" : "Buy")}
-              className={cn(
-                "relative mt-0.5 flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200",
-                accent.toggle,
-              )}
-              title={`Switch to ${isBuy ? "Sell" : "Buy"}`}
-            >
-              <span className={cn(
-                "absolute size-5 rounded-full bg-white shadow-sm transition-transform duration-200",
-                isBuy ? "translate-x-5" : "translate-x-0.5",
-              )} />
-            </button>
+            {/* Direction toggle — hidden for position-row actions */}
+            {!hideDirectionToggle && (
+              <button
+                onClick={() => setDirection((d) => d === "Buy" ? "Sell" : "Buy")}
+                className={cn(
+                  "relative mt-0.5 flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200",
+                  accent.toggle,
+                )}
+                title={`Switch to ${isBuy ? "Sell" : "Buy"}`}
+              >
+                <span className={cn(
+                  "absolute size-5 rounded-full bg-white shadow-sm transition-transform duration-200",
+                  isBuy ? "translate-x-5" : "translate-x-0.5",
+                )} />
+              </button>
+            )}
           </div>
 
-          {/* Broker toggle */}
-          {activeBrokers.length > 1 && (
-            <div className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/20 px-3 py-2">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <ArrowRightLeft className="size-3.5" />
-                <span>Route via</span>
-              </div>
-              <div className="flex items-center gap-1 rounded-md border border-border/40 bg-background p-0.5">
-                {activeBrokers.map((b) => (
-                  <button
-                    key={b.id}
-                    onClick={() => setBroker(b.id)}
-                    className={cn(
-                      "cursor-pointer rounded px-3 py-1 text-xs font-semibold transition-all",
-                      broker === b.id
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {b.id === "upstox" ? "Upstox" : "Zerodha"}
+          {/* Broker toggle OR locked broker+product pill */}
+          {lockedBroker ? (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>Product</span>
+              <span className="rounded border border-border/40 bg-muted/30 px-2 py-0.5 text-xs font-semibold text-muted-foreground">
+                {product} ({product === "Intraday" ? "MIS" : "NRML"})
+              </span>
+              <span className="text-muted-foreground/50">via {brokerLabel}</span>
+            </div>
+          ) : (
+            <>
+              {activeBrokers.length > 1 && (
+                <div className="flex items-center justify-between rounded-lg border border-border/40 bg-muted/20 px-3 py-2">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <ArrowRightLeft className="size-3.5" />
+                    <span>Route via</span>
+                  </div>
+                  <div className="flex items-center gap-1 rounded-md border border-border/40 bg-background p-0.5">
+                    {activeBrokers.map((b) => (
+                      <button
+                        key={b.id}
+                        onClick={() => setBroker(b.id)}
+                        className={cn(
+                          "cursor-pointer rounded px-3 py-1 text-xs font-semibold transition-all",
+                          broker === b.id
+                            ? "bg-primary text-primary-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                      >
+                        {b.id === "upstox" ? "Upstox" : "Zerodha"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Product type */}
+              <div className="flex items-center gap-6">
+                {(["Intraday", "Delivery"] as const).map((p) => (
+                  <button key={p} onClick={() => setProduct(p)} className="flex items-center gap-2 group">
+                    <span className={cn(
+                      "size-4 rounded-full border-2 flex items-center justify-center transition-colors",
+                      product === p ? accent.border : "border-muted-foreground/30 group-hover:border-muted-foreground/50",
+                    )}>
+                      {product === p && <span className={cn("size-2 rounded-full", accent.dot)} />}
+                    </span>
+                    <span className={cn("text-sm font-medium transition-colors", product === p ? "text-foreground" : "text-muted-foreground")}>
+                      {p}
+                    </span>
+                    <span className="text-[11px] text-muted-foreground/50">
+                      {p === "Intraday" ? "MIS" : "NRML"}
+                    </span>
                   </button>
                 ))}
               </div>
-            </div>
+            </>
           )}
-
-          {/* Product type */}
-          <div className="flex items-center gap-6">
-            {(["Intraday", "Delivery"] as const).map((p) => (
-              <button key={p} onClick={() => setProduct(p)} className="flex items-center gap-2 group">
-                <span className={cn(
-                  "size-4 rounded-full border-2 flex items-center justify-center transition-colors",
-                  product === p ? accent.border : "border-muted-foreground/30 group-hover:border-muted-foreground/50",
-                )}>
-                  {product === p && <span className={cn("size-2 rounded-full", accent.dot)} />}
-                </span>
-                <span className={cn("text-sm font-medium transition-colors", product === p ? "text-foreground" : "text-muted-foreground")}>
-                  {p}
-                </span>
-                <span className="text-[11px] text-muted-foreground/50">
-                  {p === "Intraday" ? "MIS" : "NRML"}
-                </span>
-              </button>
-            ))}
-          </div>
 
           {/* Lots + Price */}
           <div className="grid grid-cols-2 gap-3">

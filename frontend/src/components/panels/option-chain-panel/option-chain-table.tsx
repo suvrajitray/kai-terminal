@@ -1,6 +1,6 @@
 import type { OptionChainEntry } from "@/types";
 import { OptionChainRow } from "./option-chain-row";
-import type { OrderIntent } from "./option-chain-order-dialog";
+import type { OrderIntent } from "@/components/panels/order-dialog";
 
 interface Props {
   rows: OptionChainEntry[];
