@@ -1,6 +1,9 @@
 # Git worktrees
 .worktrees/
 
+# Brainstorming session files
+.superpowers/
+
 # General
 .DS_Store
 __MACOSX/
