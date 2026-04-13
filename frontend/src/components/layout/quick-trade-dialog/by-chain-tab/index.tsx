@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "@/lib/toast";
 import { RefreshCw, Zap, TrendingUp, TrendingDown, ArrowUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -117,7 +117,7 @@ export const ByChainTab = React.memo(function ByChainTab({
 
   useEffect(() => { setSelectedDiff(null); }, [mode, chain]);
 
-  async function loadChain() {
+  const loadChain = useCallback(async () => {
     if (!expiry || !underlyingKey) return;
     setLoading(true);
     try {
@@ -128,12 +128,11 @@ export const ByChainTab = React.memo(function ByChainTab({
     } finally {
       setLoading(false);
     }
-  }
+  }, [expiry, underlyingKey]);
 
   useEffect(() => {
     if (isActive && expiry) loadChain();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [underlying, expiry, isActive]);
+  }, [underlying, expiry, isActive, loadChain]);
 
   useEffect(() => {
     if (!loading && atmRowRef.current && scrollRef.current) {
