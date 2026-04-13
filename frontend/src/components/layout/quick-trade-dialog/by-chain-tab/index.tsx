@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { toast } from "@/lib/toast";
 import { RefreshCw, Zap, TrendingUp, TrendingDown, ArrowUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -6,11 +6,10 @@ import { Button } from "@/components/ui/button";
 import { UNDERLYING_KEYS } from "@/lib/shift-config";
 import { fetchOptionChain, placeMarketOrder, type MarginInstrument } from "@/services/trading-api";
 import { useOptionContractsStore } from "@/stores/option-contracts-store";
-import { useDirectMarginEstimate } from "./use-margin-estimate";
-import { QtyInput, type QtyMode } from "@/components/ui/qty-input";
+import { useDirectMarginEstimate } from "../../use-margin-estimate";
+import { type QtyMode } from "@/components/ui/qty-input";
 import type { OptionChainEntry } from "@/types";
-
-const INR = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
+import { ChainControls } from "./chain-controls";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -48,8 +47,6 @@ function buildRows(
   const atmIdx    = sorted.findIndex((e) => e.strikePrice === atmStrike);
 
   if (mode === "straddle") {
-    // Each chain entry → one row. CE and PE at the SAME strike.
-    // DIFF = strike − ATM  (negative = below ATM, 0 = ATM, positive = above ATM)
     const rows = sorted.map((entry) => ({
       diff:      entry.strikePrice - atmStrike,
       ceStrike:  entry.strikePrice,
@@ -61,14 +58,12 @@ function buildRows(
     }));
     return { rows, atmStrike };
   } else {
-    // Strangle: pair CE at ATM+N with PE at ATM−N (symmetric OTM pairs).
-    // DIFF starts at the first strike step (always positive).
     const maxPairs = Math.min(atmIdx, sorted.length - atmIdx - 1);
     const rows: StraddleRow[] = [];
 
     for (let i = 1; i <= maxPairs; i++) {
-      const ceEntry = sorted[atmIdx + i]; // OTM CE (above ATM)
-      const peEntry = sorted[atmIdx - i]; // OTM PE (below ATM)
+      const ceEntry = sorted[atmIdx + i];
+      const peEntry = sorted[atmIdx - i];
       rows.push({
         diff:     ceEntry.strikePrice - atmStrike,
         ceStrike: ceEntry.strikePrice,
@@ -99,7 +94,10 @@ interface Props {
   onToggleMode: () => void;
 }
 
-export function ByChainTab({ broker, underlying, expiry, product, quantity, isActive, qtyValue, qtyMode, lotSize, onQtyChange, onToggleMode }: Props) {
+export const ByChainTab = React.memo(function ByChainTab({
+  broker, underlying, expiry, product, quantity, isActive,
+  qtyValue, qtyMode, lotSize, onQtyChange, onToggleMode,
+}: Props) {
   const [chain, setChain]               = useState<OptionChainEntry[]>([]);
   const [loading, setLoading]           = useState(false);
   const [mode, setMode]                 = useState<StrategyMode>("strangle");
@@ -117,7 +115,6 @@ export function ByChainTab({ broker, underlying, expiry, product, quantity, isAc
 
   const { rows, atmStrike } = buildRows(chain, spotPrice, mode);
 
-  // Reset selection when mode or chain changes
   useEffect(() => { setSelectedDiff(null); }, [mode, chain]);
 
   async function loadChain() {
@@ -138,7 +135,6 @@ export function ByChainTab({ broker, underlying, expiry, product, quantity, isAc
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [underlying, expiry, isActive]);
 
-  // Scroll ATM / first row into view after chain loads
   useEffect(() => {
     if (!loading && atmRowRef.current && scrollRef.current) {
       const container = scrollRef.current;
@@ -152,7 +148,6 @@ export function ByChainTab({ broker, underlying, expiry, product, quantity, isAc
 
   const isBuy = direction === "Buy";
 
-  // Build margin instruments for the selected row (both legs)
   const marginInstruments: MarginInstrument[] | null = selected && selected.ceKey && selected.peKey
     ? [
         { instrumentToken: selected.ceKey, quantity, product: product === "D" ? "D" : "I", transactionType: isBuy ? "BUY" : "SELL" },
@@ -208,7 +203,6 @@ export function ByChainTab({ broker, underlying, expiry, product, quantity, isAc
 
   const fmt = (n?: number) => (n != null ? n.toFixed(2) : "—");
 
-  // For straddle, ATM is DIFF=0. For strangle, scroll to first row (smallest strangle).
   const scrollTargetDiff = mode === "straddle" ? 0 : rows[0]?.diff ?? 0;
 
   return (
@@ -422,45 +416,17 @@ export function ByChainTab({ broker, underlying, expiry, product, quantity, isAc
       )}
 
       {/* Buy/Sell + Qty + Margin row */}
-      <div className="grid gap-3" style={{ gridTemplateColumns: "1fr auto auto" }}>
-        {/* Buy / Sell rectangular pill */}
-        <QtyInput
-          value={qtyValue}
-          mode={qtyMode}
-          lotSize={lotSize}
-          onChange={onQtyChange}
-          onToggleMode={onToggleMode}
-        />
-
-        <div className="flex h-9 w-24 items-center gap-1 rounded-lg border border-border/40 bg-muted/20 p-1">
-          {(["Buy", "Sell"] as Direction[]).map((d) => (
-            <button
-              key={d}
-              onClick={() => setDirection(d)}
-              className={cn(
-                "flex-1 h-full rounded-md text-xs font-semibold transition-all",
-                direction === d
-                  ? d === "Buy"
-                    ? "bg-green-600 text-white shadow-sm"
-                    : "bg-red-600 text-white shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {d}
-            </button>
-          ))}
-        </div>
-        <div className="flex h-9 w-38 items-center justify-between rounded-lg border border-border/30 bg-muted/10 px-3 text-xs">
-          <span className="text-muted-foreground">Margin</span>
-          {marginLoading ? (
-            <span className="animate-pulse text-muted-foreground/60 tabular-nums">…</span>
-          ) : margin != null ? (
-            <span className="font-semibold tabular-nums">₹{INR.format(margin)}</span>
-          ) : (
-            <span className="text-muted-foreground/40">—</span>
-          )}
-        </div>
-      </div>
+      <ChainControls
+        qtyValue={qtyValue}
+        qtyMode={qtyMode}
+        lotSize={lotSize}
+        direction={direction}
+        margin={margin}
+        marginLoading={marginLoading}
+        onQtyChange={onQtyChange}
+        onToggleMode={onToggleMode}
+        onDirectionChange={setDirection}
+      />
 
       {/* Action buttons */}
       <div className="grid grid-cols-3 gap-2">
@@ -501,4 +467,4 @@ export function ByChainTab({ broker, underlying, expiry, product, quantity, isAc
       </div>
     </div>
   );
-}
+});
