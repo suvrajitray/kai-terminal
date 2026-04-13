@@ -1,4 +1,4 @@
-import React, { useState, type ReactNode } from "react";
+import React, { useState } from "react";
 import { toast } from "@/lib/toast";
 import { Zap, TrendingUp, TrendingDown, ArrowUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -7,28 +7,35 @@ import { Input } from "@/components/ui/input";
 import { QtyInput, type QtyMode } from "@/components/ui/qty-input";
 import { UNDERLYING_KEYS } from "@/lib/shift-config";
 import { placeOrderByPrice } from "@/services/trading-api";
+import { SharedControls } from "./shared-controls";
 
 type Direction = "Buy" | "Sell";
 type ActionType = "CE" | "PE" | "BOTH";
 
 export interface ByPriceContentProps {
   broker: "upstox" | "zerodha";
+  bothConnected: boolean;
   underlying: string;
   expiry: string;
+  expiries: string[];
   product: "I" | "D";
   quantity: number;
   qtyValue: string;
   qtyMode: QtyMode;
   lotSize: number;
+  onBrokerChange: (b: "upstox" | "zerodha") => void;
+  onUnderlyingChange: (u: string) => void;
+  onExpiryChange: (e: string) => void;
+  onProductChange: (p: "I" | "D") => void;
   onQtyChange: (v: string) => void;
   onToggleQtyMode: () => void;
-  sharedControls: ReactNode;
 }
 
 export const ByPriceContent = React.memo(function ByPriceContent({
-  broker, underlying, expiry, product, quantity,
-  qtyValue, qtyMode, lotSize, onQtyChange, onToggleQtyMode,
-  sharedControls,
+  broker, bothConnected, underlying, expiry, expiries, product, quantity,
+  qtyValue, qtyMode, lotSize,
+  onBrokerChange, onUnderlyingChange, onExpiryChange, onProductChange,
+  onQtyChange, onToggleQtyMode,
 }: ByPriceContentProps) {
   const [price, setPrice]   = useState("");
   const [direction, setDir] = useState<Direction>("Sell");
@@ -63,7 +70,18 @@ export const ByPriceContent = React.memo(function ByPriceContent({
 
   return (
     <div className="space-y-5">
-      {sharedControls}
+      <SharedControls
+        broker={broker}
+        bothConnected={bothConnected}
+        underlying={underlying}
+        expiry={expiry}
+        expiries={expiries}
+        product={product}
+        onBrokerChange={onBrokerChange}
+        onUnderlyingChange={onUnderlyingChange}
+        onExpiryChange={onExpiryChange}
+        onProductChange={onProductChange}
+      />
 
       {/* Quantity + Target Premium + Direction toggle */}
       <div className="grid gap-3" style={{ gridTemplateColumns: "1fr 1fr auto" }}>

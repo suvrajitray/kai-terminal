@@ -57,21 +57,6 @@ export function QuickTradeDialog({ onTabChange }: Props) {
     onTabChange?.(tab);
   }, [onTabChange]);
 
-  const sharedControls = (
-    <SharedControls
-      broker={broker}
-      bothConnected={bothConnected}
-      underlying={underlying}
-      expiry={expiry}
-      expiries={expiries}
-      product={product}
-      onBrokerChange={setBroker}
-      onUnderlyingChange={setUnderlying}
-      onExpiryChange={setExpiry}
-      onProductChange={setProduct}
-    />
-  );
-
   return (
     <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
       <TabsList className="w-full mb-5">
@@ -89,22 +74,38 @@ export function QuickTradeDialog({ onTabChange }: Props) {
       <TabsContent value="price" className="mt-0">
         <ByPriceContent
           broker={broker}
+          bothConnected={bothConnected}
           underlying={underlying}
           expiry={expiry}
+          expiries={expiries}
           product={product}
           quantity={quantity}
           qtyValue={qtyValue}
           qtyMode={qtyMode}
           lotSize={lotSize}
+          onBrokerChange={setBroker}
+          onUnderlyingChange={setUnderlying}
+          onExpiryChange={setExpiry}
+          onProductChange={setProduct}
           onQtyChange={setQtyValue}
           onToggleQtyMode={toggleQtyMode}
-          sharedControls={sharedControls}
         />
       </TabsContent>
 
       {/* ── By Chain ─────────────────────────────────────────────────── */}
       <TabsContent value="chain" className="mt-0 space-y-4">
-        {sharedControls}
+        <SharedControls
+          broker={broker}
+          bothConnected={bothConnected}
+          underlying={underlying}
+          expiry={expiry}
+          expiries={expiries}
+          product={product}
+          onBrokerChange={setBroker}
+          onUnderlyingChange={setUnderlying}
+          onExpiryChange={setExpiry}
+          onProductChange={setProduct}
+        />
 
         <ByChainTab
           broker={broker}
