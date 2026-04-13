@@ -26,4 +26,11 @@
     <ProjectReference Include="../KAITerminal.Zerodha/KAITerminal.Zerodha.csproj" />
   </ItemGroup>
 
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>KAITerminal.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
 </Project>
