@@ -94,6 +94,8 @@ export function useRiskFeed(): void {
       switch (event.type) {
         case "HardSlHit":
         case "TslHit":
+          toast.warning(message, { duration: 10000 });
+          break;
         case "SquareOffFailed":
           toast.error(message, { duration: 10000 });
           break;

@@ -74,9 +74,11 @@ public sealed class PositionCache : IPositionCache
         foreach (var p in e.Positions)
         {
             // Closed positions always use the broker's realized P&L — never LTP.
-            // Open positions use live LTP when available; fall back to broker's computed P&L.
+            // Open positions: realised (locked-in intraday P&L from partial closes) + live
+            // unrealised (quantity × (ltp − avgPrice)).  Fall back to broker's computed P&L
+            // when no LTP is cached yet (e.g. newly-added position after a manual shift).
             if (p.IsOpen && e.Ltp.TryGetValue(p.InstrumentToken, out var ltp))
-                total += p.Quantity * (ltp - p.AveragePrice);
+                total += p.Realised + p.Quantity * (ltp - p.AveragePrice);
             else
                 total += p.Pnl;
         }

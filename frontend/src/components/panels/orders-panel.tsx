@@ -110,6 +110,7 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
   const [error, setError] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("open");
+  const [brokerFilter, setBrokerFilter] = useState<string | null>(null);
   const riskLogEntryCount = useRiskLogStore((s) => s.entries.length);
   const lastSeenRiskCount = useRef(0);
   const hasUnreadRisk = tab !== "risk-log" && riskLogEntryCount > lastSeenRiskCount.current;
@@ -169,9 +170,11 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
   const orderKey = useCallback((o: Order) => o.orderId, []);
   const newOrderKeys = useNewRows(orders, orderKey);
 
+  const brokersInOrders = [...new Set(orders.map((o) => o.broker).filter(Boolean))] as string[];
   const openOrders = orders.filter((o) => !TERMINAL_STATUSES.has(o.status.toLowerCase()));
   const executedOrders = orders.filter((o) => TERMINAL_STATUSES.has(o.status.toLowerCase()));
-  const visibleOrders = tab === "open" ? openOrders : executedOrders;
+  const baseOrders = tab === "open" ? openOrders : executedOrders;
+  const visibleOrders = brokerFilter ? baseOrders.filter((o) => o.broker === brokerFilter) : baseOrders;
   const isRiskLog = tab === "risk-log";
 
   return (
@@ -287,6 +290,38 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
           </Tooltip>
         </div>
       </div>
+
+      {/* Broker filter bar — only when expanded, not on risk-log tab, and multiple brokers present */}
+      {expanded && !isRiskLog && brokersInOrders.length > 1 && (
+        <div className="flex h-8 shrink-0 items-center gap-1 border-b border-border/40 bg-muted/20 px-3">
+          <button
+            onClick={() => setBrokerFilter(null)}
+            className={cn(
+              "cursor-pointer rounded px-2 py-0.5 text-[11px] font-medium transition-colors",
+              brokerFilter === null
+                ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            All
+          </button>
+          {brokersInOrders.map((bId) => (
+            <button
+              key={bId}
+              onClick={() => setBrokerFilter(brokerFilter === bId ? null : bId)}
+              className={cn(
+                "flex cursor-pointer items-center gap-1.5 rounded px-2 py-0.5 text-[11px] font-medium transition-colors",
+                brokerFilter === bId
+                  ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <BrokerBadge brokerId={bId} size={12} />
+              <span className="capitalize">{bId}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Body */}
       <div className={cn("flex-1 overflow-auto", !expanded && "hidden")}>
