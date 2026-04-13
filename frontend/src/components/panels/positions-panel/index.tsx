@@ -12,9 +12,7 @@ import type { Position } from "@/types";
 
 interface PositionsPanelProps {
   positions: Position[];
-  setPositions: React.Dispatch<React.SetStateAction<Position[]>>;
   loading: boolean;
-  isLive: boolean;
   load: () => void;
   netDelta?: number;
   thetaPerDay?: number;
@@ -68,7 +66,7 @@ export function PositionsPanel({
     });
   }, [positions]);
 
-  const withActing = async (key: string, fn: () => Promise<void>) => {
+  const withActing = useCallback(async (key: string, fn: () => Promise<void>) => {
     setActing(key);
     try {
       await fn();
@@ -78,7 +76,7 @@ export function PositionsPanel({
     } finally {
       setActing(null);
     }
-  };
+  }, [load]);
 
   const handleAdd = useCallback((token: string, tradingSymbol: string, product: string, broker: string, exchange: string) => {
     const lot = getLotSize(tradingSymbol);
@@ -87,8 +85,7 @@ export function PositionsPanel({
     const position = positions.find((p) => p.instrumentToken === token && p.product === product)!;
     const txn = position.quantity >= 0 ? "Buy" : "Sell";
     return withActing(token + ":add", () => placeMarketOrder(token, qty, txn, product, broker, exchange));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [positions, qtys, qtyMode]);
+  }, [positions, qtys, qtyMode, withActing]);
 
   const handleShift = useCallback((
     token: string,
@@ -128,8 +125,7 @@ export function PositionsPanel({
         })
       );
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [positions, qtys, qtyMode, getByInstrumentKey]);
+  }, [positions, qtys, qtyMode, getByInstrumentKey, withActing]);
 
   const handleReduce = useCallback((token: string, tradingSymbol: string, product: string, broker: string, exchange: string) => {
     const lot = getLotSize(tradingSymbol);
@@ -138,8 +134,7 @@ export function PositionsPanel({
     const position = positions.find((p) => p.instrumentToken === token && p.product === product)!;
     const txn = position.quantity >= 0 ? "Sell" : "Buy";
     return withActing(token + ":reduce", () => placeMarketOrder(token, qty, txn, product, broker, exchange));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [positions, qtys, qtyMode]);
+  }, [positions, qtys, qtyMode, withActing]);
 
   const posKey = useCallback((p: Position) => p.instrumentToken + p.product, []);
   const newPositionKeys = useNewRows(positions, posKey);

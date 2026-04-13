@@ -46,7 +46,7 @@ export function TerminalPage() {
 function TerminalPageInner() {
   const credentials = useBrokerStore((s) => s.credentials);
   const loadOrdersRef = useRef<(() => void) | null>(null);
-  const { positions, setPositions, loading, isLive, load } = usePositionsFeed(
+  const { positions, loading, isLive, load } = usePositionsFeed(
     () => loadOrdersRef.current?.()
   );
   const [acting, setActing] = useState<string | null>(null);
@@ -177,9 +177,7 @@ function TerminalPageInner() {
         <div className={cn("flex-1 overflow-hidden", !isDragging && "transition-[padding-bottom] duration-200 ease-in-out")} style={{ paddingBottom: ordersHeight }}>
           <PositionsPanel
             positions={positions}
-            setPositions={setPositions}
             loading={loading}
-            isLive={isLive}
             load={load}
             productFilter={productFilter}
             onProductFilterChange={setProductFilter}
