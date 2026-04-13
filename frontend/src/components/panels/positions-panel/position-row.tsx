@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import { cn } from "@/lib/utils";
 import { getLotSize } from "@/lib/lot-sizes";
 import { useOptionContractsStore, formatExpiryLabel } from "@/stores/option-contracts-store";
@@ -84,7 +84,7 @@ function buildOrderIntent(
   };
 }
 
-export function PositionRow({
+export const PositionRow = memo(function PositionRow({
   position: p,
   qtyValue,
   qtyMode,
@@ -233,4 +233,4 @@ export function PositionRow({
       />
     </>
   );
-}
+});
