@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useReducer, useRef } from "react";
 import { toast } from "@/lib/toast";
 import { RefreshCw, Zap, TrendingUp, TrendingDown, ArrowUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -78,6 +78,51 @@ function buildRows(
   }
 }
 
+// ── Reducer ──────────────────────────────────────────────────────────────────
+
+interface ChainState {
+  chain: OptionChainEntry[];
+  loading: boolean;
+  mode: StrategyMode;
+  selectedDiff: number | null;
+  direction: Direction;
+  acting: ActionType | null;
+}
+
+type ChainAction =
+  | { type: "LOAD_START" }
+  | { type: "LOAD_SUCCESS"; chain: OptionChainEntry[] }
+  | { type: "LOAD_ERROR" }
+  | { type: "SET_MODE"; mode: StrategyMode }
+  | { type: "SET_SELECTED_DIFF"; diff: number | null }
+  | { type: "SET_DIRECTION"; direction: Direction }
+  | { type: "EXECUTE_START"; acting: ActionType }
+  | { type: "EXECUTE_DONE" };
+
+function chainReducer(state: ChainState, action: ChainAction): ChainState {
+  switch (action.type) {
+    case "LOAD_START":
+      return { ...state, loading: true };
+    case "LOAD_SUCCESS":
+      // Clear selectedDiff on new chain data — no separate useEffect needed
+      return { ...state, loading: false, chain: action.chain, selectedDiff: null };
+    case "LOAD_ERROR":
+      return { ...state, loading: false };
+    case "SET_MODE":
+      // Clear selectedDiff when switching mode — no separate useEffect needed
+      return { ...state, mode: action.mode, selectedDiff: null };
+    case "SET_SELECTED_DIFF":
+      return { ...state, selectedDiff: action.diff };
+    case "SET_DIRECTION":
+      return { ...state, direction: action.direction };
+    case "EXECUTE_START":
+      return { ...state, acting: action.acting };
+    case "EXECUTE_DONE":
+      return { ...state, acting: null };
+    default: return state;
+  }
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 interface Props {
@@ -98,12 +143,15 @@ export const ByChainTab = React.memo(function ByChainTab({
   broker, underlying, expiry, product, quantity, isActive,
   qtyValue, qtyMode, lotSize, onQtyChange, onToggleMode,
 }: Props) {
-  const [chain, setChain]               = useState<OptionChainEntry[]>([]);
-  const [loading, setLoading]           = useState(false);
-  const [mode, setMode]                 = useState<StrategyMode>("strangle");
-  const [selectedDiff, setSelectedDiff] = useState<number | null>(null);
-  const [direction, setDirection]       = useState<Direction>("Sell");
-  const [acting, setActing]             = useState<ActionType | null>(null);
+  const [chainState, dispatch] = useReducer(chainReducer, {
+    chain:        [],
+    loading:      false,
+    mode:         "strangle",
+    selectedDiff: null,
+    direction:    "Sell",
+    acting:       null,
+  });
+  const { chain, loading, mode, selectedDiff, direction, acting } = chainState;
 
   const atmRowRef  = useRef<HTMLTableRowElement | null>(null);
   const scrollRef  = useRef<HTMLDivElement | null>(null);
@@ -115,18 +163,15 @@ export const ByChainTab = React.memo(function ByChainTab({
 
   const { rows, atmStrike } = buildRows(chain, spotPrice, mode);
 
-  useEffect(() => { setSelectedDiff(null); }, [mode, chain]);
-
   const loadChain = useCallback(async () => {
     if (!expiry || !underlyingKey) return;
-    setLoading(true);
+    dispatch({ type: "LOAD_START" });
     try {
       const data = await fetchOptionChain(underlyingKey, expiry);
-      setChain(data);
+      dispatch({ type: "LOAD_SUCCESS", chain: data });
     } catch (e) {
       toast.error((e as Error).message ?? "Failed to load option chain");
-    } finally {
-      setLoading(false);
+      dispatch({ type: "LOAD_ERROR" });
     }
   }, [expiry, underlyingKey]);
 
@@ -189,14 +234,14 @@ export const ByChainTab = React.memo(function ByChainTab({
     if (action === "CE" || action === "BOTH") orders.push(placeMarketOrder(ceToken!, quantity, direction, product, broker, zerodhaExchange));
     if (action === "PE" || action === "BOTH") orders.push(placeMarketOrder(peToken!, quantity, direction, product, broker, zerodhaExchange));
 
-    setActing(action);
+    dispatch({ type: "EXECUTE_START", acting: action });
     try {
       await Promise.all(orders);
       toast.success("Order placed");
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
-      setActing(null);
+      dispatch({ type: "EXECUTE_DONE" });
     }
   }
 
@@ -212,7 +257,7 @@ export const ByChainTab = React.memo(function ByChainTab({
           {(["strangle", "straddle"] as StrategyMode[]).map((m) => (
             <button
               key={m}
-              onClick={() => setMode(m)}
+              onClick={() => dispatch({ type: "SET_MODE", mode: m })}
               className={cn(
                 "rounded-md px-4 py-1.5 text-xs font-semibold transition-all capitalize",
                 mode === m
@@ -302,7 +347,7 @@ export const ByChainTab = React.memo(function ByChainTab({
                     <tr
                       key={`${row.ceStrike}-${row.peStrike}`}
                       ref={row.diff === scrollTargetDiff ? (el) => { atmRowRef.current = el; } : undefined}
-                      onClick={() => setSelectedDiff(isSelected ? null : row.diff)}
+                      onClick={() => dispatch({ type: "SET_SELECTED_DIFF", diff: isSelected ? null : row.diff })}
                       className={cn(
                         "cursor-pointer border-b border-border/10 last:border-0 transition-colors",
                         isSelected
@@ -424,7 +469,7 @@ export const ByChainTab = React.memo(function ByChainTab({
         marginLoading={marginLoading}
         onQtyChange={onQtyChange}
         onToggleMode={onToggleMode}
-        onDirectionChange={setDirection}
+        onDirectionChange={(d) => dispatch({ type: "SET_DIRECTION", direction: d })}
       />
 
       {/* Action buttons */}
