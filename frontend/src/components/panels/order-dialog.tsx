@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useReducer, useState } from "react";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,41 @@ interface Props {
   defaultQtyOverride?: { value: number; mode: "qty" | "lot" };
 }
 
+interface FormState {
+  broker: string;
+  direction: "Buy" | "Sell";
+  qtyValue: string;
+  qtyMode: "qty" | "lot";
+  product: "Intraday" | "Delivery";
+  orderType: "market" | "limit";
+  limitPrice: string;
+}
+
+type FormAction =
+  | { type: "RESET"; payload: FormState }
+  | { type: "SET_BROKER"; broker: string }
+  | { type: "SET_DIRECTION"; direction: "Buy" | "Sell" }
+  | { type: "SET_QTY_VALUE"; value: string }
+  | { type: "SET_QTY_MODE"; mode: "qty" | "lot"; newValue: string }
+  | { type: "SET_PRODUCT"; product: "Intraday" | "Delivery" }
+  | { type: "SET_ORDER_TYPE"; orderType: "market" | "limit"; limitPrice?: string }
+  | { type: "SET_LIMIT_PRICE"; price: string };
+
+function formReducer(state: FormState, action: FormAction): FormState {
+  switch (action.type) {
+    case "RESET":         return action.payload;
+    case "SET_BROKER":    return { ...state, broker: action.broker };
+    case "SET_DIRECTION": return { ...state, direction: action.direction };
+    case "SET_QTY_VALUE": return { ...state, qtyValue: action.value };
+    case "SET_QTY_MODE":  return { ...state, qtyMode: action.mode, qtyValue: action.newValue };
+    case "SET_PRODUCT":   return { ...state, product: action.product };
+    case "SET_ORDER_TYPE":
+      return { ...state, orderType: action.orderType, ...(action.limitPrice !== undefined ? { limitPrice: action.limitPrice } : {}) };
+    case "SET_LIMIT_PRICE": return { ...state, limitPrice: action.price };
+    default: return state;
+  }
+}
+
 export function OrderDialog({
   intent,
   currentLtp,
@@ -58,31 +93,34 @@ export function OrderDialog({
     (b) => !isBrokerTokenExpired(b.id, credentials[b.id]?.accessToken),
   );
 
-  const [broker, setBroker]             = useState<string>(() => lockedBroker ?? activeBrokers[0]?.id ?? "upstox");
-  const [direction, setDirection]       = useState<"Buy" | "Sell">(() => intent?.transactionType ?? "Buy");
-  const [qtyValue, setQtyValue]         = useState(() => defaultQtyOverride ? String(defaultQtyOverride.value) : "1");
-  const [qtyMode, setQtyMode]           = useState<"qty" | "lot">(() => defaultQtyOverride?.mode ?? "lot");
-  const [product, setProduct]           = useState<"Intraday" | "Delivery">(lockedProduct ?? "Intraday");
-  const [orderType, setOrderType]       = useState<"market" | "limit">("market");
-  const [limitPrice, setLimitPrice]     = useState(() => intent?.ltp.toFixed(2) ?? "0");
+  const [form, dispatch] = useReducer(formReducer, {
+    broker:     lockedBroker ?? activeBrokers[0]?.id ?? "upstox",
+    direction:  intent?.transactionType ?? "Buy",
+    qtyValue:   defaultQtyOverride ? String(defaultQtyOverride.value) : "1",
+    qtyMode:    defaultQtyOverride?.mode ?? "lot",
+    product:    lockedProduct ?? "Intraday",
+    orderType:  "market" as const,
+    limitPrice: intent?.ltp.toFixed(2) ?? "0",
+  });
+  const { broker, direction, qtyValue, qtyMode, product, orderType, limitPrice } = form;
   const [placing, setPlacing]           = useState(false);
   const [availableMargin, setAvailable] = useState<number | null>(null);
 
   // Reset to defaults every time the dialog opens for a new intent
   useEffect(() => {
     if (!intent) return;
-    setDirection(intent.transactionType);
-    setOrderType("market");
-    setProduct(lockedProduct ?? "Intraday");
-    setBroker(lockedBroker ?? activeBrokers[0]?.id ?? "upstox");
-    if (defaultQtyOverride) {
-      setQtyValue(String(defaultQtyOverride.value));
-      setQtyMode(defaultQtyOverride.mode);
-    } else {
-      setQtyValue("1");
-      setQtyMode("lot");
-    }
-    setLimitPrice(intent.ltp.toFixed(2));
+    dispatch({
+      type: "RESET",
+      payload: {
+        direction:  intent.transactionType,
+        orderType:  "market",
+        product:    lockedProduct ?? "Intraday",
+        broker:     lockedBroker ?? activeBrokers[0]?.id ?? "upstox",
+        qtyValue:   defaultQtyOverride ? String(defaultQtyOverride.value) : "1",
+        qtyMode:    defaultQtyOverride?.mode ?? "lot",
+        limitPrice: intent.ltp.toFixed(2),
+      },
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [intent?.instrumentKey]);
 
@@ -134,13 +172,13 @@ export function OrderDialog({
   const ltp = currentLtp ?? intent.ltp;
 
   const toggleMode = () => {
-    setQtyMode((prev) => {
-      const next = prev === "lot" ? "qty" : "lot";
-      const cur  = parseInt(qtyValue, 10);
-      if (!isNaN(cur) && cur > 0)
-        setQtyValue(next === "qty" ? String(cur * lotSize) : String(Math.max(1, Math.round(cur / lotSize))));
-      return next;
-    });
+    const cur  = parseInt(qtyValue, 10);
+    const next = qtyMode === "lot" ? "qty" : "lot";
+    const newValue =
+      !isNaN(cur) && cur > 0
+        ? next === "qty" ? String(cur * lotSize) : String(Math.max(1, Math.round(cur / lotSize)))
+        : qtyValue;
+    dispatch({ type: "SET_QTY_MODE", mode: next, newValue });
   };
 
   async function handlePlace() {
@@ -187,7 +225,7 @@ export function OrderDialog({
             {/* Direction toggle — hidden for position-row actions */}
             {!hideDirectionToggle && (
               <button
-                onClick={() => setDirection((d) => d === "Buy" ? "Sell" : "Buy")}
+                onClick={() => dispatch({ type: "SET_DIRECTION", direction: direction === "Buy" ? "Sell" : "Buy" })}
                 className={cn(
                   "relative mt-0.5 flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors duration-200",
                   accent.toggle,
@@ -223,7 +261,7 @@ export function OrderDialog({
                     {activeBrokers.map((b) => (
                       <button
                         key={b.id}
-                        onClick={() => setBroker(b.id)}
+                        onClick={() => dispatch({ type: "SET_BROKER", broker: b.id })}
                         className={cn(
                           "cursor-pointer rounded px-3 py-1 text-xs font-semibold transition-all",
                           broker === b.id
@@ -241,7 +279,7 @@ export function OrderDialog({
               {/* Product type */}
               <div className="flex items-center gap-6">
                 {(["Intraday", "Delivery"] as const).map((p) => (
-                  <button key={p} onClick={() => setProduct(p)} className="flex items-center gap-2 group">
+                  <button key={p} onClick={() => dispatch({ type: "SET_PRODUCT", product: p })} className="flex items-center gap-2 group">
                     <span className={cn(
                       "size-4 rounded-full border-2 flex items-center justify-center transition-colors",
                       product === p ? accent.border : "border-muted-foreground/30 group-hover:border-muted-foreground/50",
@@ -268,7 +306,7 @@ export function OrderDialog({
                 value={qtyValue}
                 mode={qtyMode}
                 lotSize={lotSize}
-                onChange={setQtyValue}
+                onChange={(v) => dispatch({ type: "SET_QTY_VALUE", value: v })}
                 onToggleMode={toggleMode}
               />
             </div>
@@ -286,15 +324,18 @@ export function OrderDialog({
                     step="0.05"
                     min="0"
                     value={orderType === "market" ? "0" : limitPrice}
-                    onChange={(e) => setLimitPrice(e.target.value)}
+                    onChange={(e) => dispatch({ type: "SET_LIMIT_PRICE", price: e.target.value })}
                     disabled={orderType === "market"}
                     className="w-full bg-transparent text-sm font-mono tabular-nums outline-none disabled:cursor-not-allowed [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                   />
                 </div>
                 <button
                   onClick={() => {
-                    if (orderType === "market") { setLimitPrice(ltp.toFixed(2)); setOrderType("limit"); }
-                    else setOrderType("market");
+                    if (orderType === "market") {
+                      dispatch({ type: "SET_ORDER_TYPE", orderType: "limit", limitPrice: ltp.toFixed(2) });
+                    } else {
+                      dispatch({ type: "SET_ORDER_TYPE", orderType: "market" });
+                    }
                   }}
                   className="flex w-9 shrink-0 items-center justify-center border-l border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >

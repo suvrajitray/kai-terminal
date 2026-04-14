@@ -1,4 +1,4 @@
-import React from "react";
+import React, { memo } from "react";
 import { cn } from "@/lib/utils";
 import type { OptionChainEntry } from "@/types";
 import type { OrderIntent } from "@/components/panels/order-dialog";
@@ -40,7 +40,7 @@ function formatOiChange(change: number): string {
 }
 
 
-export function OptionChainRow({ entry, isAtm, isLive, spotPrice, underlying, maxOi, onOrder }: Props) {
+export const OptionChainRow = memo(function OptionChainRow({ entry, isAtm, isLive, spotPrice, underlying, maxOi, onOrder }: Props) {
   const callLtp      = entry.callOptions?.marketData?.ltp;
   const putLtp       = entry.putOptions?.marketData?.ltp;
   const callDelta    = entry.callOptions?.optionGreeks?.delta;
@@ -213,4 +213,4 @@ export function OptionChainRow({ entry, isAtm, isLive, spotPrice, underlying, ma
       </td>
     </tr>
   );
-}
+});

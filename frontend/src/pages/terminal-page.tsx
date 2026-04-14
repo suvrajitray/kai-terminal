@@ -1,10 +1,12 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, lazy, Suspense, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { PositionsPanel } from "@/components/panels/positions-panel";
 import { OrdersPanel } from "@/components/panels/orders-panel";
 import { StatsBar } from "@/components/terminal/stats-bar";
-import { ProfitProtectionPanel } from "@/components/terminal/profit-protection-panel";
+const ProfitProtectionPanel = lazy(() =>
+  import("@/components/terminal/profit-protection-panel").then((m) => ({ default: m.ProfitProtectionPanel }))
+);
 import { BrokerAuthRequired } from "@/components/terminal/broker-auth-required";
 import { usePositionsFeed } from "@/components/panels/positions-panel/use-positions-feed";
 import { useProfitProtection } from "./use-profit-protection";
@@ -46,7 +48,7 @@ export function TerminalPage() {
 function TerminalPageInner() {
   const credentials = useBrokerStore((s) => s.credentials);
   const loadOrdersRef = useRef<(() => void) | null>(null);
-  const { positions, setPositions, loading, isLive, load } = usePositionsFeed(
+  const { positions, loading, isLive, load } = usePositionsFeed(
     () => loadOrdersRef.current?.()
   );
   const [acting, setActing] = useState<string | null>(null);
@@ -110,6 +112,16 @@ function TerminalPageInner() {
 
   const openCount = positions.filter((p) => p.quantity !== 0).length;
 
+  const ppBrokers = useMemo(() => [
+    upstoxPp.enabled ? { broker: "upstox",  target: upstoxPp.mtmTarget, currentSl: upstoxSl,  trailing: upstoxPp.trailingEnabled } : null,
+    zerodhaP.enabled ? { broker: "zerodha", target: zerodhaP.mtmTarget, currentSl: zerodhasl, trailing: zerodhaP.trailingEnabled } : null,
+    dhanPp.enabled   ? { broker: "dhan",    target: dhanPp.mtmTarget,   currentSl: dhanSl,    trailing: dhanPp.trailingEnabled }   : null,
+  ].filter((x): x is NonNullable<typeof x> => x !== null), [
+    upstoxPp.enabled, upstoxPp.mtmTarget, upstoxPp.trailingEnabled, upstoxSl,
+    zerodhaP.enabled, zerodhaP.mtmTarget, zerodhaP.trailingEnabled, zerodhasl,
+    dhanPp.enabled,   dhanPp.mtmTarget,   dhanPp.trailingEnabled,   dhanSl,
+  ]);
+
   // Keyboard shortcuts: R = refresh, E = exit all (with confirm)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -166,20 +178,14 @@ function TerminalPageInner() {
           onToggleChain={() => setChainOpen((v) => !v)}
           chainOpen={chainOpen}
           productFilter={productFilter}
-          ppBrokers={[
-            upstoxPp.enabled ? { broker: "upstox",  target: upstoxPp.mtmTarget, currentSl: upstoxSl,  trailing: upstoxPp.trailingEnabled } : null,
-            zerodhaP.enabled ? { broker: "zerodha", target: zerodhaP.mtmTarget, currentSl: zerodhasl, trailing: zerodhaP.trailingEnabled } : null,
-            dhanPp.enabled   ? { broker: "dhan",    target: dhanPp.mtmTarget,   currentSl: dhanSl,    trailing: dhanPp.trailingEnabled }   : null,
-          ].filter((x): x is NonNullable<typeof x> => x !== null)}
+          ppBrokers={ppBrokers}
         />
 
         {/* Positions — flex-1, scrollable */}
         <div className={cn("flex-1 overflow-hidden", !isDragging && "transition-[padding-bottom] duration-200 ease-in-out")} style={{ paddingBottom: ordersHeight }}>
           <PositionsPanel
             positions={positions}
-            setPositions={setPositions}
             loading={loading}
-            isLive={isLive}
             load={load}
             productFilter={productFilter}
             onProductFilterChange={setProductFilter}
@@ -214,11 +220,13 @@ function TerminalPageInner() {
       {chainOpen && <OptionChainPanel width={chainWidth} onResize={setChainWidth} onClose={() => setChainOpen(false)} netDelta={netDelta} />}
 
       {/* Profit Protection config dialog */}
-      <ProfitProtectionPanel
-        open={ppOpen}
-        onClose={() => setPpOpen(false)}
-        positions={positions}
-      />
+      <Suspense fallback={<div className="flex items-center justify-center p-8 text-muted-foreground text-sm">Loading…</div>}>
+        <ProfitProtectionPanel
+          open={ppOpen}
+          onClose={() => setPpOpen(false)}
+          positions={positions}
+        />
+      </Suspense>
 
       {/* Exit All confirmation (triggered by E key or button) */}
       <AlertDialog open={exitAllConfirmOpen} onOpenChange={setExitAllConfirmOpen}>

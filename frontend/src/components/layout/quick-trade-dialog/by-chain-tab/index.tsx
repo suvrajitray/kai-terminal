@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useReducer, useRef } from "react";
 import { toast } from "@/lib/toast";
 import { RefreshCw, Zap, TrendingUp, TrendingDown, ArrowUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -6,11 +6,10 @@ import { Button } from "@/components/ui/button";
 import { UNDERLYING_KEYS } from "@/lib/shift-config";
 import { fetchOptionChain, placeMarketOrder, type MarginInstrument } from "@/services/trading-api";
 import { useOptionContractsStore } from "@/stores/option-contracts-store";
-import { useDirectMarginEstimate } from "./use-margin-estimate";
-import { QtyInput, type QtyMode } from "@/components/ui/qty-input";
+import { useDirectMarginEstimate } from "../../use-margin-estimate";
+import { type QtyMode } from "@/components/ui/qty-input";
 import type { OptionChainEntry } from "@/types";
-
-const INR = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
+import { ChainControls } from "./chain-controls";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -48,8 +47,6 @@ function buildRows(
   const atmIdx    = sorted.findIndex((e) => e.strikePrice === atmStrike);
 
   if (mode === "straddle") {
-    // Each chain entry → one row. CE and PE at the SAME strike.
-    // DIFF = strike − ATM  (negative = below ATM, 0 = ATM, positive = above ATM)
     const rows = sorted.map((entry) => ({
       diff:      entry.strikePrice - atmStrike,
       ceStrike:  entry.strikePrice,
@@ -61,14 +58,12 @@ function buildRows(
     }));
     return { rows, atmStrike };
   } else {
-    // Strangle: pair CE at ATM+N with PE at ATM−N (symmetric OTM pairs).
-    // DIFF starts at the first strike step (always positive).
     const maxPairs = Math.min(atmIdx, sorted.length - atmIdx - 1);
     const rows: StraddleRow[] = [];
 
     for (let i = 1; i <= maxPairs; i++) {
-      const ceEntry = sorted[atmIdx + i]; // OTM CE (above ATM)
-      const peEntry = sorted[atmIdx - i]; // OTM PE (below ATM)
+      const ceEntry = sorted[atmIdx + i];
+      const peEntry = sorted[atmIdx - i];
       rows.push({
         diff:     ceEntry.strikePrice - atmStrike,
         ceStrike: ceEntry.strikePrice,
@@ -80,6 +75,51 @@ function buildRows(
       });
     }
     return { rows, atmStrike };
+  }
+}
+
+// ── Reducer ──────────────────────────────────────────────────────────────────
+
+interface ChainState {
+  chain: OptionChainEntry[];
+  loading: boolean;
+  mode: StrategyMode;
+  selectedDiff: number | null;
+  direction: Direction;
+  acting: ActionType | null;
+}
+
+type ChainAction =
+  | { type: "LOAD_START" }
+  | { type: "LOAD_SUCCESS"; chain: OptionChainEntry[] }
+  | { type: "LOAD_ERROR" }
+  | { type: "SET_MODE"; mode: StrategyMode }
+  | { type: "SET_SELECTED_DIFF"; diff: number | null }
+  | { type: "SET_DIRECTION"; direction: Direction }
+  | { type: "EXECUTE_START"; acting: ActionType }
+  | { type: "EXECUTE_DONE" };
+
+function chainReducer(state: ChainState, action: ChainAction): ChainState {
+  switch (action.type) {
+    case "LOAD_START":
+      return { ...state, loading: true };
+    case "LOAD_SUCCESS":
+      // Clear selectedDiff on new chain data — no separate useEffect needed
+      return { ...state, loading: false, chain: action.chain, selectedDiff: null };
+    case "LOAD_ERROR":
+      return { ...state, loading: false };
+    case "SET_MODE":
+      // Clear selectedDiff when switching mode — no separate useEffect needed
+      return { ...state, mode: action.mode, selectedDiff: null };
+    case "SET_SELECTED_DIFF":
+      return { ...state, selectedDiff: action.diff };
+    case "SET_DIRECTION":
+      return { ...state, direction: action.direction };
+    case "EXECUTE_START":
+      return { ...state, acting: action.acting };
+    case "EXECUTE_DONE":
+      return { ...state, acting: null };
+    default: return state;
   }
 }
 
@@ -99,13 +139,19 @@ interface Props {
   onToggleMode: () => void;
 }
 
-export function ByChainTab({ broker, underlying, expiry, product, quantity, isActive, qtyValue, qtyMode, lotSize, onQtyChange, onToggleMode }: Props) {
-  const [chain, setChain]               = useState<OptionChainEntry[]>([]);
-  const [loading, setLoading]           = useState(false);
-  const [mode, setMode]                 = useState<StrategyMode>("strangle");
-  const [selectedDiff, setSelectedDiff] = useState<number | null>(null);
-  const [direction, setDirection]       = useState<Direction>("Sell");
-  const [acting, setActing]             = useState<ActionType | null>(null);
+export const ByChainTab = React.memo(function ByChainTab({
+  broker, underlying, expiry, product, quantity, isActive,
+  qtyValue, qtyMode, lotSize, onQtyChange, onToggleMode,
+}: Props) {
+  const [chainState, dispatch] = useReducer(chainReducer, {
+    chain:        [],
+    loading:      false,
+    mode:         "strangle",
+    selectedDiff: null,
+    direction:    "Sell",
+    acting:       null,
+  });
+  const { chain, loading, mode, selectedDiff, direction, acting } = chainState;
 
   const atmRowRef  = useRef<HTMLTableRowElement | null>(null);
   const scrollRef  = useRef<HTMLDivElement | null>(null);
@@ -117,28 +163,22 @@ export function ByChainTab({ broker, underlying, expiry, product, quantity, isAc
 
   const { rows, atmStrike } = buildRows(chain, spotPrice, mode);
 
-  // Reset selection when mode or chain changes
-  useEffect(() => { setSelectedDiff(null); }, [mode, chain]);
-
-  async function loadChain() {
+  const loadChain = useCallback(async () => {
     if (!expiry || !underlyingKey) return;
-    setLoading(true);
+    dispatch({ type: "LOAD_START" });
     try {
       const data = await fetchOptionChain(underlyingKey, expiry);
-      setChain(data);
+      dispatch({ type: "LOAD_SUCCESS", chain: data });
     } catch (e) {
       toast.error((e as Error).message ?? "Failed to load option chain");
-    } finally {
-      setLoading(false);
+      dispatch({ type: "LOAD_ERROR" });
     }
-  }
+  }, [expiry, underlyingKey]);
 
   useEffect(() => {
     if (isActive && expiry) loadChain();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [underlying, expiry, isActive]);
+  }, [underlying, expiry, isActive, loadChain]);
 
-  // Scroll ATM / first row into view after chain loads
   useEffect(() => {
     if (!loading && atmRowRef.current && scrollRef.current) {
       const container = scrollRef.current;
@@ -152,7 +192,6 @@ export function ByChainTab({ broker, underlying, expiry, product, quantity, isAc
 
   const isBuy = direction === "Buy";
 
-  // Build margin instruments for the selected row (both legs)
   const marginInstruments: MarginInstrument[] | null = selected && selected.ceKey && selected.peKey
     ? [
         { instrumentToken: selected.ceKey, quantity, product: product === "D" ? "D" : "I", transactionType: isBuy ? "BUY" : "SELL" },
@@ -195,20 +234,19 @@ export function ByChainTab({ broker, underlying, expiry, product, quantity, isAc
     if (action === "CE" || action === "BOTH") orders.push(placeMarketOrder(ceToken!, quantity, direction, product, broker, zerodhaExchange));
     if (action === "PE" || action === "BOTH") orders.push(placeMarketOrder(peToken!, quantity, direction, product, broker, zerodhaExchange));
 
-    setActing(action);
+    dispatch({ type: "EXECUTE_START", acting: action });
     try {
       await Promise.all(orders);
       toast.success("Order placed");
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
-      setActing(null);
+      dispatch({ type: "EXECUTE_DONE" });
     }
   }
 
   const fmt = (n?: number) => (n != null ? n.toFixed(2) : "—");
 
-  // For straddle, ATM is DIFF=0. For strangle, scroll to first row (smallest strangle).
   const scrollTargetDiff = mode === "straddle" ? 0 : rows[0]?.diff ?? 0;
 
   return (
@@ -219,7 +257,7 @@ export function ByChainTab({ broker, underlying, expiry, product, quantity, isAc
           {(["strangle", "straddle"] as StrategyMode[]).map((m) => (
             <button
               key={m}
-              onClick={() => setMode(m)}
+              onClick={() => dispatch({ type: "SET_MODE", mode: m })}
               className={cn(
                 "rounded-md px-4 py-1.5 text-xs font-semibold transition-all capitalize",
                 mode === m
@@ -309,7 +347,7 @@ export function ByChainTab({ broker, underlying, expiry, product, quantity, isAc
                     <tr
                       key={`${row.ceStrike}-${row.peStrike}`}
                       ref={row.diff === scrollTargetDiff ? (el) => { atmRowRef.current = el; } : undefined}
-                      onClick={() => setSelectedDiff(isSelected ? null : row.diff)}
+                      onClick={() => dispatch({ type: "SET_SELECTED_DIFF", diff: isSelected ? null : row.diff })}
                       className={cn(
                         "cursor-pointer border-b border-border/10 last:border-0 transition-colors",
                         isSelected
@@ -422,45 +460,17 @@ export function ByChainTab({ broker, underlying, expiry, product, quantity, isAc
       )}
 
       {/* Buy/Sell + Qty + Margin row */}
-      <div className="grid gap-3" style={{ gridTemplateColumns: "1fr auto auto" }}>
-        {/* Buy / Sell rectangular pill */}
-        <QtyInput
-          value={qtyValue}
-          mode={qtyMode}
-          lotSize={lotSize}
-          onChange={onQtyChange}
-          onToggleMode={onToggleMode}
-        />
-
-        <div className="flex h-9 w-24 items-center gap-1 rounded-lg border border-border/40 bg-muted/20 p-1">
-          {(["Buy", "Sell"] as Direction[]).map((d) => (
-            <button
-              key={d}
-              onClick={() => setDirection(d)}
-              className={cn(
-                "flex-1 h-full rounded-md text-xs font-semibold transition-all",
-                direction === d
-                  ? d === "Buy"
-                    ? "bg-green-600 text-white shadow-sm"
-                    : "bg-red-600 text-white shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {d}
-            </button>
-          ))}
-        </div>
-        <div className="flex h-9 w-38 items-center justify-between rounded-lg border border-border/30 bg-muted/10 px-3 text-xs">
-          <span className="text-muted-foreground">Margin</span>
-          {marginLoading ? (
-            <span className="animate-pulse text-muted-foreground/60 tabular-nums">…</span>
-          ) : margin != null ? (
-            <span className="font-semibold tabular-nums">₹{INR.format(margin)}</span>
-          ) : (
-            <span className="text-muted-foreground/40">—</span>
-          )}
-        </div>
-      </div>
+      <ChainControls
+        qtyValue={qtyValue}
+        qtyMode={qtyMode}
+        lotSize={lotSize}
+        direction={direction}
+        margin={margin}
+        marginLoading={marginLoading}
+        onQtyChange={onQtyChange}
+        onToggleMode={onToggleMode}
+        onDirectionChange={(d) => dispatch({ type: "SET_DIRECTION", direction: d })}
+      />
 
       {/* Action buttons */}
       <div className="grid grid-cols-3 gap-2">
@@ -501,4 +511,4 @@ export function ByChainTab({ broker, underlying, expiry, product, quantity, isAc
       </div>
     </div>
   );
-}
+});
