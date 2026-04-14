@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { RefreshCw, LogOut, Wifi, WifiOff, ShieldCheck, PanelRight, BarChart2, Filter } from "lucide-react";
-import { PayoffChartDialog } from "./payoff-chart-dialog";
-import { SessionTimer } from "./session-timer";
-import { MtmDisplay } from "./mtm-display";
-import { PositionCountBadges } from "./position-count-badges";
-import { KeyboardShortcutsHelp } from "./keyboard-shortcuts-help";
+import { PayoffChartDialog } from "../payoff-chart-dialog";
+import { SessionTimer } from "../session-timer";
+import { MtmDisplay } from "../mtm-display";
+import { PositionCountBadges } from "../position-count-badges";
+import { KeyboardShortcutsHelp } from "../keyboard-shortcuts-help";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,8 @@ import { BROKERS } from "@/lib/constants";
 import { useShallow } from "zustand/react/shallow";
 import { BrokerBadge } from "@/components/ui/broker-badge";
 import type { Position } from "@/types";
+import { useSessionExtremes } from "./use-session-extremes";
+import { PnlBadge } from "./pnl-badge";
 
 
 export interface PpBrokerEntry {
@@ -65,28 +67,7 @@ export function StatsBar({
   const totalPnl = displayPositions.reduce((s, p) => s + p.pnl, 0);
   // Always track session extremes from total MTM — independent of any active filter
   const allPnl = positions.reduce((s, p) => s + p.pnl, 0);
-  const STORAGE_KEY = "kai-terminal-mtm-extremes";
-
-  const readStored = (): { maxProfit: number | null; maxLoss: number | null } => {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null") ?? { maxProfit: null, maxLoss: null }; }
-    catch { return { maxProfit: null, maxLoss: null }; }
-  };
-
-  const [maxProfit, setMaxProfit] = useState<number | null>(() => readStored().maxProfit);
-  const [maxLoss, setMaxLoss] = useState<number | null>(() => readStored().maxLoss);
-
-  useEffect(() => {
-    if (positions.length === 0) return;
-    setMaxProfit((prevMax) => {
-      const nextMax = prevMax === null || allPnl > prevMax ? allPnl : prevMax;
-      setMaxLoss((prevMin) => {
-        const nextMin = prevMin === null || allPnl < prevMin ? allPnl : prevMin;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ maxProfit: nextMax, maxLoss: nextMin }));
-        return nextMin;
-      });
-      return nextMax;
-    });
-  }, [allPnl, positions.length]);
+  const { maxProfit, maxLoss } = useSessionExtremes(allPnl, positions.length > 0);
 
   return (
     <div className="flex flex-col lg:flex-row shrink-0 border-b border-border bg-muted/40 px-3">
@@ -135,17 +116,13 @@ export function StatsBar({
                       {maxProfit !== null && (
                         <span className="flex items-center gap-1">
                           <span className="text-muted-foreground">↑</span>
-                          <span className={cn("font-mono tabular-nums font-medium", maxProfit >= 0 ? "text-emerald-500" : "text-rose-500")}>
-                            {maxProfit >= 0 ? "+" : "-"}₹{Math.abs(maxProfit).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                          </span>
+                          <PnlBadge value={maxProfit} />
                         </span>
                       )}
                       {maxLoss !== null && maxLoss !== maxProfit && (
                         <span className="flex items-center gap-1">
                           <span className="text-muted-foreground">↓</span>
-                          <span className={cn("font-mono tabular-nums font-medium", maxLoss >= 0 ? "text-emerald-500" : "text-rose-500")}>
-                            {maxLoss >= 0 ? "+" : "-"}₹{Math.abs(maxLoss).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-                          </span>
+                          <PnlBadge value={maxLoss} />
                         </span>
                       )}
                     </span>
@@ -317,4 +294,3 @@ export function StatsBar({
     </div>
   );
 }
-
