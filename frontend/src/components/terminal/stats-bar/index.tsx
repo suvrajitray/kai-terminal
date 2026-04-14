@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { RefreshCw, LogOut, Wifi, WifiOff, ShieldCheck, PanelRight, BarChart2, Filter } from "lucide-react";
-import { PayoffChartDialog } from "../payoff-chart-dialog";
+const PayoffChartDialog = lazy(() =>
+  import("../payoff-chart-dialog").then((m) => ({ default: m.PayoffChartDialog }))
+);
 import { SessionTimer } from "../session-timer";
 import { MtmDisplay } from "../mtm-display";
 import { PositionCountBadges } from "../position-count-badges";
@@ -286,11 +288,13 @@ export function StatsBar({
         </Tooltip>
       </div>
 
-      <PayoffChartDialog
-        open={payoffOpen}
-        onOpenChange={setPayoffOpen}
-        positions={positions}
-      />
+      <Suspense fallback={null}>
+        <PayoffChartDialog
+          open={payoffOpen}
+          onOpenChange={setPayoffOpen}
+          positions={positions}
+        />
+      </Suspense>
     </div>
   );
 }
