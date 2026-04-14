@@ -68,7 +68,7 @@ interface UseSignalrPositionsOptions {
   onPositions: (positions: Position[]) => void;
   onLtpBatch: (updates: Array<{ instrumentToken: string; ltp: number }>) => void;
   onOrderUpdate?: () => void;
-  onFallbackLoad: () => void;
+  onFallbackLoad: () => Promise<void> | void;
   setLoading: (loading: boolean) => void;
 }
 
@@ -190,7 +190,7 @@ export function useSignalrPositions({
       .then(() => setIsLive(true))
       .catch(() => {
         setIsLive(false);
-        onFallbackLoadRef.current();
+        onFallbackLoadRef.current()?.catch(() => {});
       });
 
     return () => {
