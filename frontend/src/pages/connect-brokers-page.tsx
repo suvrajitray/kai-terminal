@@ -173,7 +173,7 @@ export function ConnectBrokersPage() {
       .catch(() => {
         // silently ignore — store may already have persisted data
       });
-  }, [saveCredentials]);
+  }, [getCredentials, saveCredentials]);
 
   const zerodhaApiKey = getCredentials("zerodha")?.apiKey;
   const upstoxApiKey  = getCredentials("upstox")?.apiKey;

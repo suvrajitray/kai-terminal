@@ -37,32 +37,22 @@ export function BrokerRedirectPage() {
   const addStep = (message: string) =>
     setSteps((prev) => [...prev, { message, done: true }]);
 
+  const isZerodha = brokerId === "zerodha";
+  const code = searchParams.get("code");
+  const requestToken = searchParams.get("request_token");
+  const authParam = isZerodha ? requestToken : code;
+  const creds = brokerId ? getCredentials(brokerId) : undefined;
+  const validationError = !authParam || !brokerId
+    ? (isZerodha
+        ? "request_token not found in redirect URL."
+        : "Authorization code not found in redirect URL.")
+    : !creds
+      ? "Broker credentials not found. Please connect the broker first."
+      : null;
+
   useEffect(() => {
-    if (calledRef.current) return;
+    if (calledRef.current || validationError || !brokerId || !authParam || !creds) return;
     calledRef.current = true;
-
-    // Zerodha sends `request_token`; Upstox sends `code`
-    const isZerodha     = brokerId === "zerodha";
-    const code          = searchParams.get("code");
-    const requestToken  = searchParams.get("request_token");
-    const authParam     = isZerodha ? requestToken : code;
-
-    if (!authParam || !brokerId) {
-      setStatus("error");
-      setError(
-        isZerodha
-          ? "request_token not found in redirect URL."
-          : "Authorization code not found in redirect URL.",
-      );
-      return;
-    }
-
-    const creds = getCredentials(brokerId);
-    if (!creds) {
-      setStatus("error");
-      setError("Broker credentials not found. Please connect the broker first.");
-      return;
-    }
 
     (async () => {
       try {
@@ -94,11 +84,14 @@ export function BrokerRedirectPage() {
         setStatus("error");
       }
     })();
-  }, [brokerId, searchParams, getCredentials, setAccessToken, setTradingSettings]);
+  }, [authParam, brokerId, creds, isZerodha, setAccessToken, setIndexContracts, setTradingSettings, validationError]);
 
   if (!broker) {
     return <Navigate to="/connect-brokers" replace />;
   }
+
+  const currentStatus = validationError ? "error" : status;
+  const currentError = validationError ?? error;
 
   return (
     <div className="flex min-h-[calc(100svh-3.5rem)] items-center justify-center px-4">
@@ -115,39 +108,39 @@ export function BrokerRedirectPage() {
               transition={{ duration: 0.3, delay: 0.15 }}
               className="flex items-center gap-3"
             >
-              {status === "loading" && (
+              {currentStatus === "loading" && (
                 <Loader2 className="size-8 shrink-0 animate-spin text-muted-foreground" />
               )}
-              {status === "success" && (
+              {currentStatus === "success" && (
                 <CheckCircle2 className="size-8 shrink-0 text-green-500" />
               )}
-              {status === "error" && (
+              {currentStatus === "error" && (
                 <AlertCircle className="size-8 shrink-0 text-destructive" />
               )}
               <CardTitle className="whitespace-nowrap text-xl">
-                {status === "loading" && "Authenticating…"}
-                {status === "success" && "Authentication Successful"}
-                {status === "error" && "Authentication Failed"}
+                {currentStatus === "loading" && "Authenticating…"}
+                {currentStatus === "success" && "Authentication Successful"}
+                {currentStatus === "error" && "Authentication Failed"}
               </CardTitle>
             </motion.div>
 
-            {status === "error" && (
+            {currentStatus === "error" && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, delay: 0.3 }}
               >
                 <CardDescription className="pt-2 text-sm text-destructive">
-                  {error}
+                  {currentError}
                 </CardDescription>
               </motion.div>
             )}
           </CardHeader>
 
-          {(steps.length > 0 || status === "loading") && <Separator />}
+          {(steps.length > 0 || currentStatus === "loading") && <Separator />}
 
           {/* Step list */}
-          {(steps.length > 0 || status === "loading") && (
+          {(steps.length > 0 || currentStatus === "loading") && (
             <CardContent className="pb-4 pt-4">
               <div className="space-y-2">
                 <AnimatePresence initial={false}>
@@ -165,7 +158,7 @@ export function BrokerRedirectPage() {
                   ))}
                 </AnimatePresence>
 
-                {status === "loading" && (
+                {currentStatus === "loading" && (
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -185,7 +178,7 @@ export function BrokerRedirectPage() {
           )}
 
           {/* Action buttons */}
-          {status !== "loading" && (
+          {currentStatus !== "loading" && (
             <CardContent className={steps.length > 0 ? "pt-2" : ""}>
               <motion.div
                 initial={{ opacity: 0 }}
@@ -193,7 +186,7 @@ export function BrokerRedirectPage() {
                 transition={{ duration: 0.3, delay: 0.2 }}
                 className="flex gap-3"
               >
-                {status === "success" ? (
+                {currentStatus === "success" ? (
                   <>
                     <Button asChild className="flex-1">
                       <Link to="/terminal">

@@ -83,14 +83,13 @@ export const PayoffChart = memo(function PayoffChart({ groups, spot }: PayoffCha
   const spotX  = spot > 0 ? toX(spot) : -999;
   const inside = (x: number) => x >= PAD.left && x <= PAD.left + DW;
 
-  // Memoize all per-group SVG strings together since they share the same coordinate transform
-  const renderedCurves = useMemo(() => groupCurves.map((gc, gi) => {
+  const renderedCurves = groupCurves.map((gc, gi) => {
     const color    = GROUP_COLORS[gi % GROUP_COLORS.length];
     const linePath = gc.pts.map(([s, v], i) => `${i === 0 ? "M" : "L"}${toX(s).toFixed(1)},${toY(v).toFixed(1)}`).join(" ");
     const profitPts = gc.pts.map(([s, v]) => `${toX(s).toFixed(1)},${toY(Math.max(v, 0)).toFixed(1)}`).join(" ");
     const lossPts   = gc.pts.map(([s, v]) => `${toX(s).toFixed(1)},${toY(Math.min(v, 0)).toFixed(1)}`).join(" ");
     return { ...gc, color, linePath, profitPts, lossPts };
-  }), [groupCurves, xMin, xMax, yMin, yMax]);
+  });
 
   const yTicks = [-1, -0.5, 0, 0.5, 1]
     .map((t) => yMin + (t + 1) / 2 * yR)

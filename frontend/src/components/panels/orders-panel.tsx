@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useReducer } from "react";
+import { useEffect, useState, useCallback, useReducer } from "react";
 import { useNewRows } from "@/hooks/use-new-rows";
 import { RefreshCw, XCircle, AlertCircle, ChevronUp, ChevronDown, Inbox, CheckCircle2 } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -63,8 +63,8 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
   const [tab, setTab] = useState<Tab>("open");
   const [brokerFilter, setBrokerFilter] = useState<string | null>(null);
   const riskLogEntryCount = useRiskLogStore((s) => s.entries.length);
-  const lastSeenRiskCount = useRef(0);
-  const hasUnreadRisk = tab !== "risk-log" && riskLogEntryCount > lastSeenRiskCount.current;
+  const [lastSeenRiskCount, setLastSeenRiskCount] = useState(0);
+  const hasUnreadRisk = tab !== "risk-log" && riskLogEntryCount > lastSeenRiskCount;
 
   const load = useCallback(async () => {
     const activeBrokers = BROKERS
@@ -172,7 +172,7 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
           onClick={(e) => {
             if (expanded) e.stopPropagation();
             setTab("risk-log");
-            lastSeenRiskCount.current = riskLogEntryCount;
+            setLastSeenRiskCount(riskLogEntryCount);
             if (!expanded) onToggle();
           }}
         >

@@ -37,6 +37,5 @@ export function useOptionContractsPrefetch() {
         .then((d) => setIndexContracts(d))
         .catch(() => {});
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 }

@@ -11,9 +11,12 @@ export function useValueFlash(value: number, durationMs = 600): FlashDirection {
     if (value === prevRef.current) return;
     const direction: FlashDirection = value > prevRef.current ? "up" : "down";
     prevRef.current = value;
-    setFlash(direction);
-    const id = setTimeout(() => setFlash(null), durationMs);
-    return () => clearTimeout(id);
+    const showId = setTimeout(() => setFlash(direction), 0);
+    const clearId = setTimeout(() => setFlash(null), durationMs);
+    return () => {
+      clearTimeout(showId);
+      clearTimeout(clearId);
+    };
   }, [value, durationMs]);
 
   return flash;

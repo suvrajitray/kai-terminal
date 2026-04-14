@@ -19,13 +19,6 @@ export interface Draft {
   autoShiftStrikeGap: string;
 }
 
-// @ts-ignore -- intentionally unused; will be consumed in a future task
-const DRAFT_KEYS: (keyof Draft)[] = [
-  "enabled","watchedProducts","mtmTarget","mtmSl","trailingEnabled",
-  "trailingActivateAt","lockProfitAt","increaseBy","trailBy",
-  "autoShiftEnabled","autoShiftThresholdPct","autoShiftMaxCount","autoShiftStrikeGap",
-];
-
 function makeDraft(broker: string): Draft {
   const p = useProfitProtectionStore.getState().getConfig(broker);
   return {

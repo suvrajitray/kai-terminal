@@ -15,6 +15,7 @@ import { useOptionContractsStore } from "@/stores/option-contracts-store";
 import { getLotSize } from "@/lib/lot-sizes";
 import { cn } from "@/lib/utils";
 import { convertPosition, placeStoplossOrder } from "@/services/trading-api";
+import { parseTradingSymbol } from "./trading-symbol";
 import type { Position } from "@/types";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -32,10 +33,12 @@ function useQtyState(initialQty: number, open: boolean, lotSize: number) {
   const [qtyMode, setQtyMode]   = useState<QtyMode>("qty");
 
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+    const resetId = setTimeout(() => {
       setQtyValue(String(initialQty));
       setQtyMode("qty");
-    }
+    }, 0);
+    return () => clearTimeout(resetId);
   }, [open, initialQty]);
 
   const toggleQtyMode = () => {
@@ -57,22 +60,6 @@ function useQtyState(initialQty: number, open: boolean, lotSize: number) {
   const qty = isNaN(num) || num <= 0 ? 0 : qtyMode === "lot" ? num * lotSize : num;
 
   return { qtyValue, setQtyValue, qtyMode, toggleQtyMode, qty };
-}
-
-// ── Symbol formatting fallback ────────────────────────────────────────────────
-
-export const INDEX_PREFIXES = ["BANKNIFTY", "FINNIFTY", "SENSEX", "BANKEX", "NIFTY"];
-
-export function parseTradingSymbol(symbol: string) {
-  const upper = symbol.toUpperCase();
-  const type  = upper.endsWith("CE") ? "CE" : upper.endsWith("PE") ? "PE" : null;
-  if (!type) return null;
-  const without = upper.slice(0, -2);
-  const index   = INDEX_PREFIXES.find((i) => without.startsWith(i));
-  if (!index) return null;
-  const strike  = without.match(/(\d+)$/)?.[1];
-  if (!strike) return null;
-  return { index, strike, type: type as "CE" | "PE" };
 }
 
 // ── Symbol chip (no LTP — shown in the order-type row below) ─────────────────

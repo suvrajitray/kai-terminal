@@ -10,8 +10,8 @@ import { BrokerBadge } from "@/components/ui/broker-badge";
 import {
   ConvertPositionDialog,
   AddStoplossDialog,
-  parseTradingSymbol,
 } from "./position-action-dialogs";
+import { parseTradingSymbol } from "./trading-symbol";
 import {
   OrderDialog,
   type OrderIntent,

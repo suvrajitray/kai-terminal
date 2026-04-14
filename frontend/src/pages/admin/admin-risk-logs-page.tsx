@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { RefreshCw, ShieldAlert, Loader2, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -40,22 +40,22 @@ export function AdminRiskLogsPage() {
   const [selectedUser, setSelectedUser] = useState("All Users");
   const [days, setDays] = useState("1");
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const data = await getAdminRiskLogs(undefined, parseInt(days, 10));
       setLogs(data);
-    } catch (e: any) {
-      setError(e.message || "Failed to fetch risk logs");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to fetch risk logs");
     } finally {
       setLoading(false);
     }
-  };
+  }, [days]);
 
   useEffect(() => {
-    fetchLogs();
-  }, [days]);
+    void fetchLogs();
+  }, [fetchLogs]);
 
   const users = useMemo(() => {
     const list = Array.from(new Set(logs.map(l => l.user || "Unknown")));

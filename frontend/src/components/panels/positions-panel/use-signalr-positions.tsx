@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState, useEffectEvent } from "react";
 import * as signalR from "@microsoft/signalr";
 import { toast as sonner } from "sonner";
 import { toast } from "@/lib/toast";
@@ -81,19 +81,18 @@ export function useSignalrPositions({
 }: UseSignalrPositionsOptions) {
   const [isLive, setIsLive] = useState(false);
 
-  // Use refs so the effect captures the latest callbacks without re-running
-  const onPositionsRef    = useRef(onPositions);
-  const onLtpBatchRef     = useRef(onLtpBatch);
-  const onOrderUpdateRef  = useRef(onOrderUpdate);
-  const onFallbackLoadRef = useRef(onFallbackLoad);
-  const setLoadingRef     = useRef(setLoading);
+  const handlePositions = useEffectEvent((incoming: Position[]) => {
+    onPositions(incoming);
+    setLoading(false);
+  });
 
-  // Keep refs current on every render
-  onPositionsRef.current    = onPositions;
-  onLtpBatchRef.current     = onLtpBatch;
-  onOrderUpdateRef.current  = onOrderUpdate;
-  onFallbackLoadRef.current = onFallbackLoad;
-  setLoadingRef.current     = setLoading;
+  const handleLtpBatch = useEffectEvent((updates: Array<{ instrumentToken: string; ltp: number }>) => {
+    onLtpBatch(updates);
+  });
+
+  const handleFallbackLoad = useEffectEvent(() => onFallbackLoad());
+  const handleOrderUpdate = useEffectEvent(() => onOrderUpdate?.());
+  const setLoadingState = useEffectEvent((loading: boolean) => setLoading(loading));
 
   useEffect(() => {
     const { getCredentials } = useBrokerStore.getState();
@@ -123,12 +122,11 @@ export function useSignalrPositions({
 
     // Backend sends combined positions for all connected brokers
     conn.on("ReceivePositions", (incoming: Position[]) => {
-      onPositionsRef.current(incoming);
-      setLoadingRef.current(false);
+      handlePositions(incoming);
     });
 
     conn.on("ReceiveLtpBatch", (updates: Array<{ instrumentToken: string; ltp: number }>) => {
-      onLtpBatchRef.current(updates);
+      handleLtpBatch(updates);
     });
 
     conn.on("ReceiveOrderUpdate", (update: {
@@ -176,27 +174,26 @@ export function useSignalrPositions({
           </div>
         );
         sonner.success("Complete", { description: desc });
-        onFallbackLoadRef.current(); // refresh positions immediately on fill
+        handleFallbackLoad(); // refresh positions immediately on fill
       }
-      onOrderUpdateRef.current?.();
+      handleOrderUpdate();
     });
 
     conn.onreconnecting(() => setIsLive(false));
     conn.onreconnected(() => setIsLive(true));
     conn.onclose(() => setIsLive(false));
 
-    setLoadingRef.current(true);
+    setLoadingState(true);
     conn.start()
       .then(() => setIsLive(true))
       .catch(() => {
         setIsLive(false);
-        onFallbackLoadRef.current()?.catch(() => {});
+        handleFallbackLoad()?.catch(() => {});
       });
 
     return () => {
       conn.stop();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return { isLive };

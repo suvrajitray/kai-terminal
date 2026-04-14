@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -9,13 +9,14 @@ import {
   DialogContent,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { placeOrder, fetchFunds, fetchZerodhaFunds, type MarginInstrument } from "@/services/trading-api";
+import { placeOrder, type MarginInstrument } from "@/services/trading-api";
 import { useBrokerStore } from "@/stores/broker-store";
 import { useOptionContractsStore, formatExpiryLabel } from "@/stores/option-contracts-store";
 import { getLotSize } from "@/lib/lot-sizes";
 import { BROKERS } from "@/lib/constants";
 import { isBrokerTokenExpired } from "@/lib/token-utils";
 import { useDirectMarginEstimate } from "@/components/layout/use-margin-estimate";
+import { useAvailableMargin, useOrderDialogForm } from "./use-order-dialog-state";
 
 export interface OrderIntent {
   instrumentKey: string;
@@ -42,41 +43,6 @@ interface Props {
   defaultQtyOverride?: { value: number; mode: "qty" | "lot" };
 }
 
-interface FormState {
-  broker: string;
-  direction: "Buy" | "Sell";
-  qtyValue: string;
-  qtyMode: "qty" | "lot";
-  product: "Intraday" | "Delivery";
-  orderType: "market" | "limit";
-  limitPrice: string;
-}
-
-type FormAction =
-  | { type: "RESET"; payload: FormState }
-  | { type: "SET_BROKER"; broker: string }
-  | { type: "SET_DIRECTION"; direction: "Buy" | "Sell" }
-  | { type: "SET_QTY_VALUE"; value: string }
-  | { type: "SET_QTY_MODE"; mode: "qty" | "lot"; newValue: string }
-  | { type: "SET_PRODUCT"; product: "Intraday" | "Delivery" }
-  | { type: "SET_ORDER_TYPE"; orderType: "market" | "limit"; limitPrice?: string }
-  | { type: "SET_LIMIT_PRICE"; price: string };
-
-function formReducer(state: FormState, action: FormAction): FormState {
-  switch (action.type) {
-    case "RESET":         return action.payload;
-    case "SET_BROKER":    return { ...state, broker: action.broker };
-    case "SET_DIRECTION": return { ...state, direction: action.direction };
-    case "SET_QTY_VALUE": return { ...state, qtyValue: action.value };
-    case "SET_QTY_MODE":  return { ...state, qtyMode: action.mode, qtyValue: action.newValue };
-    case "SET_PRODUCT":   return { ...state, product: action.product };
-    case "SET_ORDER_TYPE":
-      return { ...state, orderType: action.orderType, ...(action.limitPrice !== undefined ? { limitPrice: action.limitPrice } : {}) };
-    case "SET_LIMIT_PRICE": return { ...state, limitPrice: action.price };
-    default: return state;
-  }
-}
-
 export function OrderDialog({
   intent,
   currentLtp,
@@ -90,55 +56,20 @@ export function OrderDialog({
   const getByInstrumentKey = useOptionContractsStore((s) => s.getByInstrumentKey);
 
   const activeBrokers = BROKERS.filter(
-    (b) => !isBrokerTokenExpired(b.id, credentials[b.id]?.accessToken),
+    (b) => (b.id === "upstox" || b.id === "zerodha") && !isBrokerTokenExpired(b.id, credentials[b.id]?.accessToken),
   );
+  const defaultBrokerId = activeBrokers[0]?.id;
 
-  const [form, dispatch] = useReducer(formReducer, {
-    broker:     lockedBroker ?? activeBrokers[0]?.id ?? "upstox",
-    direction:  intent?.transactionType ?? "Buy",
-    qtyValue:   defaultQtyOverride ? String(defaultQtyOverride.value) : "1",
-    qtyMode:    defaultQtyOverride?.mode ?? "lot",
-    product:    lockedProduct ?? "Intraday",
-    orderType:  "market" as const,
-    limitPrice: intent?.ltp.toFixed(2) ?? "0",
+  const { form, dispatch } = useOrderDialogForm({
+    activeBrokerId: defaultBrokerId,
+    intent,
+    lockedBroker,
+    lockedProduct,
+    defaultQtyOverride,
   });
   const { broker, direction, qtyValue, qtyMode, product, orderType, limitPrice } = form;
-  const [placing, setPlacing]           = useState(false);
-  const [availableMargin, setAvailable] = useState<number | null>(null);
-
-  // Reset to defaults every time the dialog opens for a new intent
-  useEffect(() => {
-    if (!intent) return;
-    dispatch({
-      type: "RESET",
-      payload: {
-        direction:  intent.transactionType,
-        orderType:  "market",
-        product:    lockedProduct ?? "Intraday",
-        broker:     lockedBroker ?? activeBrokers[0]?.id ?? "upstox",
-        qtyValue:   defaultQtyOverride ? String(defaultQtyOverride.value) : "1",
-        qtyMode:    defaultQtyOverride?.mode ?? "lot",
-        limitPrice: intent.ltp.toFixed(2),
-      },
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [intent?.instrumentKey]);
-
-  useEffect(() => {
-    setAvailable(null);
-    if (!intent) return;
-    const creds = useBrokerStore.getState().getCredentials(broker);
-    if (broker === "zerodha" && creds?.apiKey && creds?.accessToken) {
-      fetchZerodhaFunds(creds.apiKey, creds.accessToken)
-        .then((f) => setAvailable(f.availableMargin))
-        .catch(() => {});
-    } else if (broker === "upstox") {
-      fetchFunds()
-        .then((f) => setAvailable(f.availableMargin))
-        .catch(() => {});
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [broker, !!intent]);
+  const [placing, setPlacing] = useState(false);
+  const availableMargin = useAvailableMargin(broker, !!intent);
 
   // Derived values — computed before early return so hook order is stable
   const isBuy    = direction === "Buy";
@@ -261,7 +192,7 @@ export function OrderDialog({
                     {activeBrokers.map((b) => (
                       <button
                         key={b.id}
-                        onClick={() => dispatch({ type: "SET_BROKER", broker: b.id })}
+                        onClick={() => dispatch({ type: "SET_BROKER", broker: b.id as "upstox" | "zerodha" })}
                         className={cn(
                           "cursor-pointer rounded px-3 py-1 text-xs font-semibold transition-all",
                           broker === b.id

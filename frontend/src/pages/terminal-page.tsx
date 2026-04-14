@@ -134,7 +134,7 @@ function TerminalPageInner() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [load, positions]);
+  }, [load, openCount]);
 
   const onDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();

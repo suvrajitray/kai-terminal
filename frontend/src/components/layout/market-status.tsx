@@ -1,4 +1,4 @@
-import { useMemo, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 import { cn } from "@/lib/utils";
 
 type MarketStatus = "open" | "pre-open" | "closed";
@@ -28,7 +28,7 @@ const getSnapshot = () => Date.now();
 
 export function MarketStatus() {
   useSyncExternalStore(subscribe, getSnapshot);
-  const status = useMemo(getMarketStatus, []);
+  const status = getMarketStatus();
 
   const config = {
     open:     { label: "Market Open",     dot: "bg-green-500 animate-pulse", text: "text-green-500",  border: "border-green-500/20 bg-green-500/10"  },

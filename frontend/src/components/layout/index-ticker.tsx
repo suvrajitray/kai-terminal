@@ -24,7 +24,9 @@ function loadVisible(): (keyof IndexPrices)[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw) as (keyof IndexPrices)[];
-  } catch {}
+  } catch {
+    return DEFAULT_VISIBLE;
+  }
   return DEFAULT_VISIBLE;
 }
 

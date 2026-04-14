@@ -55,7 +55,6 @@ export function useRiskConfig(brokerType: string = "upstox") {
     }).catch(() => {
       store.markLoaded(brokerType);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [brokerType, isAuthenticated]);
 
   async function save(config: ProfitProtectionConfig) {

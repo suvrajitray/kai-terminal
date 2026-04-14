@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useEffectEvent } from "react";
 import * as signalR from "@microsoft/signalr";
 import { API_BASE_URL } from "@/lib/constants";
 
@@ -9,10 +9,9 @@ interface UseOptionChainFeedOptions {
 export function useOptionChainFeed({ onLtpBatch }: UseOptionChainFeedOptions) {
   const connectionRef  = useRef<signalR.HubConnection | null>(null);
   const liveTokensRef  = useRef<string[]>([]);
-  const onLtpBatchRef  = useRef(onLtpBatch);
-
-  // Keep ref current on every render
-  onLtpBatchRef.current = onLtpBatch;
+  const handleLtpBatch = useEffectEvent((updates: Array<{ instrumentToken: string; ltp: number }>) => {
+    onLtpBatch(updates);
+  });
 
   const setLiveTokens = useCallback((tokens: string[]) => {
     liveTokensRef.current = tokens;
@@ -31,7 +30,7 @@ export function useOptionChainFeed({ onLtpBatch }: UseOptionChainFeedOptions) {
       .withAutomaticReconnect()
       .build();
 
-    conn.on("ReceiveLtpBatch", (updates) => onLtpBatchRef.current(updates));
+    conn.on("ReceiveLtpBatch", handleLtpBatch);
 
     conn.onreconnected(() => {
       const tokens = liveTokensRef.current;
@@ -46,7 +45,6 @@ export function useOptionChainFeed({ onLtpBatch }: UseOptionChainFeedOptions) {
       conn.stop();
       connectionRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return { setLiveTokens, invokeSubscribe };

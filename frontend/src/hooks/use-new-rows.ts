@@ -30,9 +30,12 @@ export function useNewRows<T>(
 
     if (fresh.size === 0) return;
 
-    setNewKeys(fresh);
-    const t = setTimeout(() => setNewKeys(new Set()), durationMs);
-    return () => clearTimeout(t);
+    const showId = setTimeout(() => setNewKeys(fresh), 0);
+    const clearId = setTimeout(() => setNewKeys(new Set()), durationMs);
+    return () => {
+      clearTimeout(showId);
+      clearTimeout(clearId);
+    };
   }, [items, getKey, durationMs]);
 
   return newKeys;
