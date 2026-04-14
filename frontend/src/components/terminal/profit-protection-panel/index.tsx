@@ -28,9 +28,6 @@ export function ProfitProtectionPanel({ open, onClose, positions }: ProfitProtec
   const upstoxConfig  = useRiskConfig("upstox");
   const zerodhaConfig = useRiskConfig("zerodha");
   const dhanConfig    = useRiskConfig("dhan");
-  const riskConfigs: Record<string, ReturnType<typeof useRiskConfig>> = {
-    upstox: upstoxConfig, zerodha: zerodhaConfig, dhan: dhanConfig,
-  };
 
   const {
     draft, setField, toggleEnabled, resetToBroker,
@@ -53,12 +50,13 @@ export function ProfitProtectionPanel({ open, onClose, positions }: ProfitProtec
 
   const handleSave = useCallback(async () => {
     if (!canSave) return;
-    const { save } = riskConfigs[activeBroker] ?? upstoxConfig;
+    const configMap: Record<string, ReturnType<typeof useRiskConfig>> = { upstox: upstoxConfig, zerodha: zerodhaConfig, dhan: dhanConfig };
+    const { save } = configMap[activeBroker] ?? upstoxConfig;
     await save(toSavePayload());
     const name = connectedBrokers.find((b) => b.id === activeBroker)?.name ?? activeBroker;
     toast.success(`${name} — configuration saved`);
     onClose();
-  }, [canSave, activeBroker, riskConfigs, upstoxConfig, toSavePayload, connectedBrokers, onClose]);
+  }, [canSave, activeBroker, upstoxConfig, zerodhaConfig, dhanConfig, toSavePayload, connectedBrokers, onClose]);
 
   const activeBrokerName = connectedBrokers.find((b) => b.id === activeBroker)?.name ?? activeBroker;
 
@@ -152,7 +150,6 @@ export function ProfitProtectionPanel({ open, onClose, positions }: ProfitProtec
         <BrokerPpForm
           draft={draft}
           onField={setField}
-          toggleEnabled={toggleEnabled}
           targetWarning={warnings.targetWarning}
           slWarning={warnings.slWarning}
           activateAtWarning={warnings.activateAtWarning}

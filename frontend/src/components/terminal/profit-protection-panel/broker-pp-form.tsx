@@ -11,7 +11,6 @@ import type { Draft } from "./use-pp-draft";
 interface BrokerPpFormProps {
   draft: Draft;
   onField: <K extends keyof Draft>(key: K, value: Draft[K]) => void;
-  toggleEnabled: () => void;
   targetWarning: boolean;
   slWarning: boolean;
   activateAtWarning: boolean;
@@ -24,7 +23,7 @@ interface BrokerPpFormProps {
 }
 
 export const BrokerPpForm = memo(function BrokerPpForm({
-  draft, onField, toggleEnabled: _toggleEnabled,
+  draft, onField,
   targetWarning, slWarning, activateAtWarning, lockProfitWarning,
   increaseByVal, trailByVal, slVal, activateAtVal, lockProfitAtVal,
 }: BrokerPpFormProps) {
