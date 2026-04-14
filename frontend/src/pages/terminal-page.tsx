@@ -1,10 +1,12 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, lazy, Suspense } from "react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { PositionsPanel } from "@/components/panels/positions-panel";
 import { OrdersPanel } from "@/components/panels/orders-panel";
 import { StatsBar } from "@/components/terminal/stats-bar";
-import { ProfitProtectionPanel } from "@/components/terminal/profit-protection-panel";
+const ProfitProtectionPanel = lazy(() =>
+  import("@/components/terminal/profit-protection-panel").then((m) => ({ default: m.ProfitProtectionPanel }))
+);
 import { BrokerAuthRequired } from "@/components/terminal/broker-auth-required";
 import { usePositionsFeed } from "@/components/panels/positions-panel/use-positions-feed";
 import { useProfitProtection } from "./use-profit-protection";
@@ -212,11 +214,13 @@ function TerminalPageInner() {
       {chainOpen && <OptionChainPanel width={chainWidth} onResize={setChainWidth} onClose={() => setChainOpen(false)} netDelta={netDelta} />}
 
       {/* Profit Protection config dialog */}
-      <ProfitProtectionPanel
-        open={ppOpen}
-        onClose={() => setPpOpen(false)}
-        positions={positions}
-      />
+      <Suspense fallback={<div className="flex items-center justify-center p-8 text-muted-foreground text-sm">Loading…</div>}>
+        <ProfitProtectionPanel
+          open={ppOpen}
+          onClose={() => setPpOpen(false)}
+          positions={positions}
+        />
+      </Suspense>
 
       {/* Exit All confirmation (triggered by E key or button) */}
       <AlertDialog open={exitAllConfirmOpen} onOpenChange={setExitAllConfirmOpen}>
