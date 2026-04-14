@@ -75,26 +75,5 @@ public sealed class UserRiskState
 
     public void MarkChainExited(string chainKey) => _exitedChainKeys.Add(chainKey);
 
-    public UserRiskState Clone()
-    {
-        var copy = new UserRiskState
-        {
-            LastResetDate = LastResetDate,
-            IsSquaredOff = IsSquaredOff,
-            TrailingActive = TrailingActive,
-            TrailingStop = TrailingStop,
-            TrailingLastTrigger = TrailingLastTrigger,
-        };
-
-        foreach (var (key, value) in _reentryCounts)
-            copy._reentryCounts[key] = value;
-        foreach (var (key, value) in _autoShiftCounts)
-            copy._autoShiftCounts[key] = value;
-        foreach (var (key, value) in _shiftOriginMap)
-            copy._shiftOriginMap[key] = value;
-        foreach (var key in _exitedChainKeys)
-            copy._exitedChainKeys.Add(key);
-
-        return copy;
-    }
+    public RiskStateSnapshot ToSnapshot() => RiskStateSnapshot.From(this);
 }

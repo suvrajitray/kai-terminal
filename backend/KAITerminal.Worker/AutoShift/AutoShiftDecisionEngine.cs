@@ -53,7 +53,7 @@ internal static class AutoShiftDecisionEngine
     /// </summary>
     public static IReadOnlyList<AutoShiftDecision> Evaluate(
         IReadOnlyList<(BrokerPosition Position, decimal Ltp)> crossings,
-        UserRiskState state,
+        RiskStateSnapshot state,
         UserConfig config,
         IReadOnlyList<ZerodhaOptionContract> contracts,
         string brokerType)

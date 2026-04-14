@@ -13,7 +13,7 @@ public class TrailingStopCalculatorTests
     public void ReturnsNull_WhenTrailingDisabled()
     {
         var config = new UserConfig { TrailingEnabled = false };
-        TrailingStopCalculator.Evaluate(50_000m, config, new UserRiskState())
+        TrailingStopCalculator.Evaluate(50_000m, config, new UserRiskState().ToSnapshot())
             .Should().BeNull();
     }
 
@@ -23,7 +23,7 @@ public class TrailingStopCalculatorTests
     public void ReturnsNull_WhenNotActiveAndBelowThreshold()
     {
         var config = new UserConfig { TrailingEnabled = true, TrailingActivateAt = 10_000m };
-        TrailingStopCalculator.Evaluate(9_999m, config, new UserRiskState())
+        TrailingStopCalculator.Evaluate(9_999m, config, new UserRiskState().ToSnapshot())
             .Should().BeNull();
     }
 
@@ -37,7 +37,7 @@ public class TrailingStopCalculatorTests
             LockProfitAt       = 3_000m,
         };
 
-        var result = TrailingStopCalculator.Evaluate(10_000m, config, new UserRiskState());
+        var result = TrailingStopCalculator.Evaluate(10_000m, config, new UserRiskState().ToSnapshot());
 
         result.Should().NotBeNull();
         result!.IsActivation.Should().BeTrue();
@@ -55,7 +55,7 @@ public class TrailingStopCalculatorTests
             LockProfitAt       = 3_000m,
         };
 
-        var result = TrailingStopCalculator.Evaluate(12_000m, config, new UserRiskState());
+        var result = TrailingStopCalculator.Evaluate(12_000m, config, new UserRiskState().ToSnapshot());
 
         result.Should().NotBeNull();
         result!.IsActivation.Should().BeTrue();
@@ -79,7 +79,7 @@ public class TrailingStopCalculatorTests
         };
 
         // gain = 10_999 - 10_000 = 999, which is < 1 step (1_000)
-        TrailingStopCalculator.Evaluate(10_999m, config, state)
+        TrailingStopCalculator.Evaluate(10_999m, config, state.ToSnapshot())
             .Should().BeNull();
     }
 
@@ -100,7 +100,7 @@ public class TrailingStopCalculatorTests
         };
 
         // gain = 11_000 - 10_000 = 1_000 = exactly 1 step
-        var result = TrailingStopCalculator.Evaluate(11_000m, config, state);
+        var result = TrailingStopCalculator.Evaluate(11_000m, config, state.ToSnapshot());
 
         result.Should().NotBeNull();
         result!.IsActivation.Should().BeFalse();
@@ -125,7 +125,7 @@ public class TrailingStopCalculatorTests
         };
 
         // gain = 12_500 - 10_000 = 2_500 = 2.5 steps → only 2 steps used
-        var result = TrailingStopCalculator.Evaluate(12_500m, config, state);
+        var result = TrailingStopCalculator.Evaluate(12_500m, config, state.ToSnapshot());
 
         result.Should().NotBeNull();
         result!.NewStop.Should().Be(4_000m);          // 3_000 + 2 × 500

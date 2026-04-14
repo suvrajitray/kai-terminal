@@ -10,10 +10,10 @@ public static class RiskDecisionCalculator
 {
     /// <param name="mtm">Current portfolio MTM from the position cache.</param>
     /// <param name="config">User's risk configuration.</param>
-    /// <param name="state">Current in-memory risk state (read-only here — caller mutates).</param>
+    /// <param name="state">Current immutable risk-state snapshot.</param>
     /// <param name="nowIst">Current time-of-day in IST (trading timezone), used for auto square-off.</param>
     public static RiskDecision Evaluate(
-        decimal mtm, UserConfig config, UserRiskState state, TimeSpan nowIst)
+        decimal mtm, UserConfig config, RiskStateSnapshot state, TimeSpan nowIst)
     {
         // 1. Hard stop loss
         if (mtm <= config.MtmSl)

@@ -12,7 +12,7 @@ public static class TrailingStopCalculator
     /// or its floor raised, or null if no change is needed.
     /// </summary>
     public static TrailingStateUpdate? Evaluate(
-        decimal mtm, UserConfig config, UserRiskState state)
+        decimal mtm, UserConfig config, RiskStateSnapshot state)
     {
         if (!config.TrailingEnabled) return null;
 

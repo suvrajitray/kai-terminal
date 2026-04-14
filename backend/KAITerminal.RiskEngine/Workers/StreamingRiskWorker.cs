@@ -162,7 +162,7 @@ public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTri
 
         // Guard against forgotten daily restart — reset state if it belongs to a previous day.
         var today    = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, _tradingTz).DateTime);
-        var existing = await _repo.ReadAsync(stateKey, s => s.Clone());
+        var existing = await _repo.ReadAsync(stateKey, s => s.ToSnapshot());
         if (existing.LastResetDate < today)
         {
             _logger.LogInformation("New trading day — resetting risk state for {UserId} ({Broker})",

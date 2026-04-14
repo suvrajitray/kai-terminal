@@ -70,7 +70,7 @@ public sealed class RiskEvaluator
         string userId, decimal mtm, UserConfig config, IBrokerClient broker, CancellationToken ct = default)
     {
         var stateKey = $"{userId}::{config.BrokerType}";
-        var state = await _repo.ReadAsync(stateKey, s => s.Clone());
+        var state = await _repo.ReadAsync(stateKey, s => s.ToSnapshot());
 
         if (state.IsSquaredOff)
         {
@@ -94,9 +94,12 @@ public sealed class RiskEvaluator
                 s.TrailingLastTrigger = update.NewLastTrigger;
             });
 
-            state.TrailingActive      = true;
-            state.TrailingStop        = update.NewStop;
-            state.TrailingLastTrigger = update.NewLastTrigger;
+            state = state with
+            {
+                TrailingActive = true,
+                TrailingStop = update.NewStop,
+                TrailingLastTrigger = update.NewLastTrigger,
+            };
 
             if (update.IsActivation)
             {
@@ -165,7 +168,7 @@ public sealed class RiskEvaluator
     }
 
     private async Task LogStatusAsync(
-        string userId, decimal mtm, UserRiskState state, UserConfig config, CancellationToken ct)
+        string userId, decimal mtm, RiskStateSnapshot state, UserConfig config, CancellationToken ct)
     {
         var watch = config.WatchedProducts switch
         {
@@ -202,7 +205,7 @@ public sealed class RiskEvaluator
 
     private async Task SquareOffAsync(
         string userId, string brokerType, string stateKey, decimal mtm,
-        UserRiskState state, IBrokerClient broker, UserConfig config, CancellationToken ct)
+        RiskStateSnapshot state, IBrokerClient broker, UserConfig config, CancellationToken ct)
     {
         try
         {
@@ -236,7 +239,7 @@ public sealed class RiskEvaluator
             }
 
             await _repo.MutateAsync(stateKey, s => s.IsSquaredOff = true);
-            state.IsSquaredOff = true;
+            state = state with { IsSquaredOff = true };
 
             if (toExit.Count > 0)
             {
@@ -257,7 +260,7 @@ public sealed class RiskEvaluator
         catch (Exception ex)
         {
             await _repo.MutateAsync(stateKey, s => s.IsSquaredOff = true);
-            state.IsSquaredOff = true;
+            state = state with { IsSquaredOff = true };
             _logger.LogError(ex,
                 "Square-off FAILED — {UserId} ({Broker}) — marked as squared-off; manual verification required",
                 userId, brokerType);

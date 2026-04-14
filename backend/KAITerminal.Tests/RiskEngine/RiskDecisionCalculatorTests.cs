@@ -28,7 +28,7 @@ public class RiskDecisionCalculatorTests
     public void ExitMtmSl_WhenMtmAtSlBoundary()
     {
         var config   = BaseConfig();
-        var decision = RiskDecisionCalculator.Evaluate(config.MtmSl, config, new UserRiskState(), TimeSpan.Zero);
+        var decision = RiskDecisionCalculator.Evaluate(config.MtmSl, config, new UserRiskState().ToSnapshot(), TimeSpan.Zero);
         decision.Kind.Should().Be(RiskDecisionKind.ExitMtmSl);
     }
 
@@ -36,7 +36,7 @@ public class RiskDecisionCalculatorTests
     public void ExitMtmSl_WhenMtmBelowSl()
     {
         var config   = BaseConfig();
-        var decision = RiskDecisionCalculator.Evaluate(config.MtmSl - 1m, config, new UserRiskState(), TimeSpan.Zero);
+        var decision = RiskDecisionCalculator.Evaluate(config.MtmSl - 1m, config, new UserRiskState().ToSnapshot(), TimeSpan.Zero);
         decision.Kind.Should().Be(RiskDecisionKind.ExitMtmSl);
     }
 
@@ -46,7 +46,7 @@ public class RiskDecisionCalculatorTests
     public void ExitTarget_WhenMtmAtTargetBoundary()
     {
         var config   = BaseConfig();
-        var decision = RiskDecisionCalculator.Evaluate(config.MtmTarget, config, new UserRiskState(), TimeSpan.Zero);
+        var decision = RiskDecisionCalculator.Evaluate(config.MtmTarget, config, new UserRiskState().ToSnapshot(), TimeSpan.Zero);
         decision.Kind.Should().Be(RiskDecisionKind.ExitTarget);
     }
 
@@ -54,7 +54,7 @@ public class RiskDecisionCalculatorTests
     public void ExitTarget_WhenMtmAboveTarget()
     {
         var config   = BaseConfig();
-        var decision = RiskDecisionCalculator.Evaluate(config.MtmTarget + 1m, config, new UserRiskState(), TimeSpan.Zero);
+        var decision = RiskDecisionCalculator.Evaluate(config.MtmTarget + 1m, config, new UserRiskState().ToSnapshot(), TimeSpan.Zero);
         decision.Kind.Should().Be(RiskDecisionKind.ExitTarget);
     }
 
@@ -65,7 +65,7 @@ public class RiskDecisionCalculatorTests
     {
         var config = BaseConfig() with { AutoSquareOffEnabled = true };
         // nowIst exactly equals configured time
-        var decision = RiskDecisionCalculator.Evaluate(0m, config, new UserRiskState(), config.AutoSquareOffTime);
+        var decision = RiskDecisionCalculator.Evaluate(0m, config, new UserRiskState().ToSnapshot(), config.AutoSquareOffTime);
         decision.Kind.Should().Be(RiskDecisionKind.ExitAutoSquareOff);
     }
 
@@ -73,7 +73,7 @@ public class RiskDecisionCalculatorTests
     public void ExitAutoSquareOff_WhenEnabledAndTimePassed()
     {
         var config = BaseConfig() with { AutoSquareOffEnabled = true };
-        var decision = RiskDecisionCalculator.Evaluate(0m, config, new UserRiskState(), config.AutoSquareOffTime + TimeSpan.FromMinutes(1));
+        var decision = RiskDecisionCalculator.Evaluate(0m, config, new UserRiskState().ToSnapshot(), config.AutoSquareOffTime + TimeSpan.FromMinutes(1));
         decision.Kind.Should().Be(RiskDecisionKind.ExitAutoSquareOff);
     }
 
@@ -81,7 +81,7 @@ public class RiskDecisionCalculatorTests
     public void None_WhenAutoSquareOffDisabled()
     {
         var config = BaseConfig() with { AutoSquareOffEnabled = false };
-        var decision = RiskDecisionCalculator.Evaluate(0m, config, new UserRiskState(), new TimeSpan(23, 59, 59));
+        var decision = RiskDecisionCalculator.Evaluate(0m, config, new UserRiskState().ToSnapshot(), new TimeSpan(23, 59, 59));
         decision.Kind.Should().Be(RiskDecisionKind.None);
     }
 
@@ -91,7 +91,7 @@ public class RiskDecisionCalculatorTests
     public void None_WhenTrailingInactiveAndBelowThreshold()
     {
         var config = BaseConfig() with { TrailingEnabled = true };
-        var decision = RiskDecisionCalculator.Evaluate(5_000m, config, new UserRiskState(), TimeSpan.Zero);
+        var decision = RiskDecisionCalculator.Evaluate(5_000m, config, new UserRiskState().ToSnapshot(), TimeSpan.Zero);
         decision.Kind.Should().Be(RiskDecisionKind.None);
         decision.TrailingUpdate.Should().BeNull();
     }
@@ -101,7 +101,7 @@ public class RiskDecisionCalculatorTests
     {
         var config = BaseConfig() with { TrailingEnabled = true };
         // MTM exactly at activation threshold
-        var decision = RiskDecisionCalculator.Evaluate(config.TrailingActivateAt, config, new UserRiskState(), TimeSpan.Zero);
+        var decision = RiskDecisionCalculator.Evaluate(config.TrailingActivateAt, config, new UserRiskState().ToSnapshot(), TimeSpan.Zero);
         decision.Kind.Should().Be(RiskDecisionKind.None);
         decision.TrailingUpdate.Should().NotBeNull();
         decision.TrailingUpdate!.IsActivation.Should().BeTrue();
@@ -114,7 +114,7 @@ public class RiskDecisionCalculatorTests
         var config = BaseConfig() with { TrailingEnabled = true };
         var state  = new UserRiskState { TrailingActive = true, TrailingStop = 5_000m };
         // MTM exactly at existing floor
-        var decision = RiskDecisionCalculator.Evaluate(5_000m, config, state, TimeSpan.Zero);
+        var decision = RiskDecisionCalculator.Evaluate(5_000m, config, state.ToSnapshot(), TimeSpan.Zero);
         decision.Kind.Should().Be(RiskDecisionKind.ExitTrailingSl);
     }
 
@@ -139,7 +139,7 @@ public class RiskDecisionCalculatorTests
             TrailingLastTrigger = 0m,
         };
 
-        var decision = RiskDecisionCalculator.Evaluate(100m, config, state, TimeSpan.Zero);
+        var decision = RiskDecisionCalculator.Evaluate(100m, config, state.ToSnapshot(), TimeSpan.Zero);
         decision.Kind.Should().Be(RiskDecisionKind.ExitTrailingSl);
     }
 
@@ -151,7 +151,7 @@ public class RiskDecisionCalculatorTests
         // Degenerate config: target (−2) is below SL (−1), so MTM = −1 satisfies both.
         // Correct order: SL fires first.
         var config = BaseConfig() with { MtmSl = -1m, MtmTarget = -2m };
-        var decision = RiskDecisionCalculator.Evaluate(-1m, config, new UserRiskState(), TimeSpan.Zero);
+        var decision = RiskDecisionCalculator.Evaluate(-1m, config, new UserRiskState().ToSnapshot(), TimeSpan.Zero);
         decision.Kind.Should().Be(RiskDecisionKind.ExitMtmSl);
     }
 }

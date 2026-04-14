@@ -71,7 +71,7 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
     {
         var userId   = config.UserId;
         var stateKey = $"{userId}::{config.BrokerType}";
-        var state    = await _repo.ReadAsync(stateKey, s => s.Clone());
+        var state    = await _repo.ReadAsync(stateKey, s => s.ToSnapshot());
         if (state.IsSquaredOff)
             return;
 

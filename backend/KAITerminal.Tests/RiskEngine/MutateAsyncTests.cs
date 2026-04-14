@@ -69,7 +69,7 @@ public class MutateAsyncTests
 
         await Task.WhenAll(taskA, taskB);
 
-        var final = await repo.ReadAsync(key, s => s.Clone());
+        var final = await repo.ReadAsync(key, s => s.ToSnapshot());
         final.TrailingActive.Should().BeTrue("trailing-stop write must not be lost");
         final.TrailingStop.Should().Be(1500m);
         final.AutoShiftCounts.Should().Contain("NIFTY_2026-04-17_PE_22000", 1,
@@ -89,7 +89,7 @@ public class MutateAsyncTests
 
         await Task.WhenAll(tasks);
 
-        var final = await repo.ReadAsync(key, s => s.Clone());
+        var final = await repo.ReadAsync(key, s => s.ToSnapshot());
         final.AutoShiftCounts[chainKey].Should().Be(50);
     }
 
@@ -112,7 +112,7 @@ public class MutateAsyncTests
 
         for (var i = 0; i < 10; i++)
         {
-            var s = await repo.ReadAsync($"user{i}::upstox", state => state.Clone());
+            var s = await repo.ReadAsync($"user{i}::upstox", state => state.ToSnapshot());
             s.TrailingActive.Should().BeTrue();
         }
     }
