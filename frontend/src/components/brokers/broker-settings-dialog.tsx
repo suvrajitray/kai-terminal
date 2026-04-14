@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useReducer } from "react";
 import { Copy, Check, Trash2 } from "lucide-react";
 import {
   Dialog,
@@ -15,6 +15,38 @@ import { useBrokerStore } from "@/stores/broker-store";
 import { saveBrokerCredential, deleteBrokerCredential } from "@/services/broker-api";
 import type { BrokerInfo } from "@/types";
 
+interface SettingsFormState {
+  apiKey: string;
+  apiSecret: string;
+  copiedRedirect: boolean;
+  copiedWebhook: boolean;
+  saving: boolean;
+  disconnecting: boolean;
+  error: string | null;
+}
+
+type SettingsFormAction =
+  | { type: "SET_API_KEY"; value: string }
+  | { type: "SET_API_SECRET"; value: string }
+  | { type: "SET_COPIED_REDIRECT"; copied: boolean }
+  | { type: "SET_COPIED_WEBHOOK"; copied: boolean }
+  | { type: "SET_SAVING"; saving: boolean }
+  | { type: "SET_DISCONNECTING"; disconnecting: boolean }
+  | { type: "SET_ERROR"; error: string | null };
+
+function settingsFormReducer(state: SettingsFormState, action: SettingsFormAction): SettingsFormState {
+  switch (action.type) {
+    case "SET_API_KEY":         return { ...state, apiKey: action.value };
+    case "SET_API_SECRET":      return { ...state, apiSecret: action.value };
+    case "SET_COPIED_REDIRECT": return { ...state, copiedRedirect: action.copied };
+    case "SET_COPIED_WEBHOOK":  return { ...state, copiedWebhook: action.copied };
+    case "SET_SAVING":          return { ...state, saving: action.saving };
+    case "SET_DISCONNECTING":   return { ...state, disconnecting: action.disconnecting };
+    case "SET_ERROR":           return { ...state, error: action.error };
+    default: return state;
+  }
+}
+
 interface BrokerSettingsDialogProps {
   broker: BrokerInfo;
   open: boolean;
@@ -25,13 +57,16 @@ export function BrokerSettingsDialog({ broker, open, onOpenChange }: BrokerSetti
   const credentials = useBrokerStore((s) => s.credentials[broker.id]);
   const saveCredentials = useBrokerStore((s) => s.saveCredentials);
   const removeCredentials = useBrokerStore((s) => s.removeCredentials);
-  const [apiKey, setApiKey] = useState(credentials?.apiKey ?? "");
-  const [apiSecret, setApiSecret] = useState(credentials?.apiSecret ?? "");
-  const [copiedRedirect, setCopiedRedirect] = useState(false);
-  const [copiedWebhook, setCopiedWebhook]   = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [disconnecting, setDisconnecting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [form, dispatch] = useReducer(settingsFormReducer, {
+    apiKey:        credentials?.apiKey ?? "",
+    apiSecret:     credentials?.apiSecret ?? "",
+    copiedRedirect: false,
+    copiedWebhook:  false,
+    saving:         false,
+    disconnecting:  false,
+    error:          null,
+  });
+  const { apiKey, apiSecret, copiedRedirect, copiedWebhook, saving, disconnecting, error } = form;
 
   const redirectUrl = `${window.location.origin}${broker.redirectPath}`;
   const webhookUrl = broker.id === "upstox"
@@ -40,22 +75,22 @@ export function BrokerSettingsDialog({ broker, open, onOpenChange }: BrokerSetti
 
   const handleCopyRedirect = async () => {
     await navigator.clipboard.writeText(redirectUrl);
-    setCopiedRedirect(true);
-    setTimeout(() => setCopiedRedirect(false), 2000);
+    dispatch({ type: "SET_COPIED_REDIRECT", copied: true });
+    setTimeout(() => dispatch({ type: "SET_COPIED_REDIRECT", copied: false }), 2000);
   };
 
   const handleCopyWebhook = async () => {
     await navigator.clipboard.writeText(webhookUrl);
-    setCopiedWebhook(true);
-    setTimeout(() => setCopiedWebhook(false), 2000);
+    dispatch({ type: "SET_COPIED_WEBHOOK", copied: true });
+    setTimeout(() => dispatch({ type: "SET_COPIED_WEBHOOK", copied: false }), 2000);
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!apiKey.trim() || !apiSecret.trim()) return;
 
-    setSaving(true);
-    setError(null);
+    dispatch({ type: "SET_SAVING", saving: true });
+    dispatch({ type: "SET_ERROR", error: null });
     try {
       await saveBrokerCredential(broker.id, apiKey.trim(), apiSecret.trim());
       saveCredentials(broker.id, {
@@ -65,23 +100,23 @@ export function BrokerSettingsDialog({ broker, open, onOpenChange }: BrokerSetti
       });
       onOpenChange(false);
     } catch {
-      setError("Failed to save. Please try again.");
+      dispatch({ type: "SET_ERROR", error: "Failed to save. Please try again." });
     } finally {
-      setSaving(false);
+      dispatch({ type: "SET_SAVING", saving: false });
     }
   };
 
   const handleDisconnect = async () => {
-    setDisconnecting(true);
-    setError(null);
+    dispatch({ type: "SET_DISCONNECTING", disconnecting: true });
+    dispatch({ type: "SET_ERROR", error: null });
     try {
       await deleteBrokerCredential(broker.id);
       removeCredentials(broker.id);
       onOpenChange(false);
     } catch {
-      setError("Failed to disconnect. Please try again.");
+      dispatch({ type: "SET_ERROR", error: "Failed to disconnect. Please try again." });
     } finally {
-      setDisconnecting(false);
+      dispatch({ type: "SET_DISCONNECTING", disconnecting: false });
     }
   };
 
@@ -104,7 +139,7 @@ export function BrokerSettingsDialog({ broker, open, onOpenChange }: BrokerSetti
               id="settings-api-key"
               placeholder="Enter your API key"
               value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
+              onChange={(e) => dispatch({ type: "SET_API_KEY", value: e.target.value })}
             />
           </div>
           <div className="space-y-2">
@@ -114,7 +149,7 @@ export function BrokerSettingsDialog({ broker, open, onOpenChange }: BrokerSetti
               type="password"
               placeholder="Enter your API secret"
               value={apiSecret}
-              onChange={(e) => setApiSecret(e.target.value)}
+              onChange={(e) => dispatch({ type: "SET_API_SECRET", value: e.target.value })}
             />
           </div>
           <div className="space-y-2">

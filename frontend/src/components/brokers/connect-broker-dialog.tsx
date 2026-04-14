@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useReducer } from "react";
 import { Copy, Check } from "lucide-react";
 import {
   Dialog,
@@ -15,6 +15,37 @@ import { useBrokerStore } from "@/stores/broker-store";
 import { saveBrokerCredential } from "@/services/broker-api";
 import type { BrokerInfo } from "@/types";
 
+interface ConnectFormState {
+  apiKey: string;
+  apiSecret: string;
+  copiedRedirect: boolean;
+  copiedWebhook: boolean;
+  saving: boolean;
+  error: string | null;
+}
+
+type ConnectFormAction =
+  | { type: "SET_API_KEY"; value: string }
+  | { type: "SET_API_SECRET"; value: string }
+  | { type: "SET_COPIED_REDIRECT"; copied: boolean }
+  | { type: "SET_COPIED_WEBHOOK"; copied: boolean }
+  | { type: "SET_SAVING"; saving: boolean }
+  | { type: "SET_ERROR"; error: string | null }
+  | { type: "RESET" };
+
+function connectFormReducer(state: ConnectFormState, action: ConnectFormAction): ConnectFormState {
+  switch (action.type) {
+    case "SET_API_KEY":         return { ...state, apiKey: action.value };
+    case "SET_API_SECRET":      return { ...state, apiSecret: action.value };
+    case "SET_COPIED_REDIRECT": return { ...state, copiedRedirect: action.copied };
+    case "SET_COPIED_WEBHOOK":  return { ...state, copiedWebhook: action.copied };
+    case "SET_SAVING":          return { ...state, saving: action.saving };
+    case "SET_ERROR":           return { ...state, error: action.error };
+    case "RESET":               return { apiKey: "", apiSecret: "", copiedRedirect: false, copiedWebhook: false, saving: false, error: null };
+    default: return state;
+  }
+}
+
 interface ConnectBrokerDialogProps {
   broker: BrokerInfo;
   open: boolean;
@@ -23,34 +54,30 @@ interface ConnectBrokerDialogProps {
 
 export function ConnectBrokerDialog({ broker, open, onOpenChange }: ConnectBrokerDialogProps) {
   const saveCredentials = useBrokerStore((s) => s.saveCredentials);
-  const [apiKey, setApiKey] = useState("");
-  const [apiSecret, setApiSecret] = useState("");
-  const [copiedRedirect, setCopiedRedirect] = useState(false);
-  const [copiedWebhook, setCopiedWebhook]   = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [form, dispatch] = useReducer(connectFormReducer, { apiKey: "", apiSecret: "", copiedRedirect: false, copiedWebhook: false, saving: false, error: null });
+  const { apiKey, apiSecret, copiedRedirect, copiedWebhook, saving, error } = form;
 
   const redirectUrl = `${window.location.origin}${broker.redirectPath}`;
   const webhookUrl = `${window.location.origin}/api/webhooks/${broker.id}/order?apiKey=${apiKey || "YOUR_API_KEY"}`;
 
   const handleCopyRedirect = async () => {
     await navigator.clipboard.writeText(redirectUrl);
-    setCopiedRedirect(true);
-    setTimeout(() => setCopiedRedirect(false), 2000);
+    dispatch({ type: "SET_COPIED_REDIRECT", copied: true });
+    setTimeout(() => dispatch({ type: "SET_COPIED_REDIRECT", copied: false }), 2000);
   };
 
   const handleCopyWebhook = async () => {
     await navigator.clipboard.writeText(webhookUrl);
-    setCopiedWebhook(true);
-    setTimeout(() => setCopiedWebhook(false), 2000);
+    dispatch({ type: "SET_COPIED_WEBHOOK", copied: true });
+    setTimeout(() => dispatch({ type: "SET_COPIED_WEBHOOK", copied: false }), 2000);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!apiKey.trim() || !apiSecret.trim()) return;
 
-    setSaving(true);
-    setError(null);
+    dispatch({ type: "SET_SAVING", saving: true });
+    dispatch({ type: "SET_ERROR", error: null });
     try {
       await saveBrokerCredential(broker.id, apiKey.trim(), apiSecret.trim());
       saveCredentials(broker.id, {
@@ -58,13 +85,12 @@ export function ConnectBrokerDialog({ broker, open, onOpenChange }: ConnectBroke
         apiSecret: apiSecret.trim(),
         redirectUrl,
       });
-      setApiKey("");
-      setApiSecret("");
+      dispatch({ type: "RESET" });
       onOpenChange(false);
     } catch {
-      setError("Failed to save. Please try again.");
+      dispatch({ type: "SET_ERROR", error: "Failed to save. Please try again." });
     } finally {
-      setSaving(false);
+      dispatch({ type: "SET_SAVING", saving: false });
     }
   };
 
@@ -87,7 +113,7 @@ export function ConnectBrokerDialog({ broker, open, onOpenChange }: ConnectBroke
               id="api-key"
               placeholder="Enter your API key"
               value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
+              onChange={(e) => dispatch({ type: "SET_API_KEY", value: e.target.value })}
             />
           </div>
           <div className="space-y-2">
@@ -97,7 +123,7 @@ export function ConnectBrokerDialog({ broker, open, onOpenChange }: ConnectBroke
               type="password"
               placeholder="Enter your API secret"
               value={apiSecret}
-              onChange={(e) => setApiSecret(e.target.value)}
+              onChange={(e) => dispatch({ type: "SET_API_SECRET", value: e.target.value })}
             />
           </div>
           <div className="space-y-2">
