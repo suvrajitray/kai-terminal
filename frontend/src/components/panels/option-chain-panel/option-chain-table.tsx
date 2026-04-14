@@ -1,3 +1,4 @@
+import { memo, useMemo } from "react";
 import type { OptionChainEntry } from "@/types";
 import { OptionChainRow } from "./option-chain-row";
 import type { OrderIntent } from "@/components/panels/order-dialog";
@@ -11,12 +12,11 @@ interface Props {
   onOrder: (intent: OrderIntent) => void;
 }
 
-export function OptionChainTable({ rows, atmStrike, spotPrice, underlying, liveStrikeSet, onOrder }: Props) {
-  const maxOi = rows.reduce((max, row) => Math.max(
-    max,
-    row.callOptions?.marketData?.oi ?? 0,
-    row.putOptions?.marketData?.oi  ?? 0,
-  ), 0);
+export const OptionChainTable = memo(function OptionChainTable({ rows, atmStrike, spotPrice, underlying, liveStrikeSet, onOrder }: Props) {
+  const maxOi = useMemo(
+    () => rows.reduce((max, row) => Math.max(max, row.callOptions?.marketData?.oi ?? 0, row.putOptions?.marketData?.oi ?? 0), 0),
+    [rows],
+  );
 
   return (
     <table className="w-full border-collapse text-[10px]">
@@ -47,4 +47,4 @@ export function OptionChainTable({ rows, atmStrike, spotPrice, underlying, liveS
       </tbody>
     </table>
   );
-}
+});
