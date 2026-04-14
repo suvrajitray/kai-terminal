@@ -11,7 +11,9 @@ interface Props {
 }
 
 export function PayoffChartDialog({ open, onOpenChange, positions }: Props) {
-  const { groups, indexName, spot } = usePayoffData(positions);
+  const { groups, indexName, spot } = usePayoffData(positions, open);
+
+  if (!open) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

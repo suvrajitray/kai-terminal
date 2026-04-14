@@ -35,11 +35,12 @@ export function payoffAt(legs: Leg[], spot: number): number {
   }, 0);
 }
 
-export function usePayoffData(positions: Position[]) {
+export function usePayoffData(positions: Position[], open: boolean) {
   const getByInstrumentKey = useOptionContractsStore((s) => s.getByInstrumentKey);
   const feed = useIndicesFeed();
 
   const { groups, indexName } = useMemo(() => {
+    if (!open) return { groups: [], indexName: "" };
     const allLegs: Leg[] = [];
     const indexCount: Record<string, number> = {};
 
@@ -73,10 +74,10 @@ export function usePayoffData(positions: Position[]) {
       .map(([expiry, legs]) => ({ expiry, legs }));
 
     return { groups, indexName: primaryIndex };
-  }, [positions, getByInstrumentKey]);
+  }, [positions, getByInstrumentKey, open]);
 
   // Spot price for the primary index — live, not memoized
-  const feedKey = INDEX_TO_FEED[indexName];
+  const feedKey = open ? INDEX_TO_FEED[indexName] : undefined;
   const spot = feedKey ? (feed[feedKey].ltp ?? 0) : 0;
 
   return { groups, indexName, spot };
