@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, lazy, Suspense } from "react";
+import { useState, useRef, useCallback, useEffect, lazy, Suspense, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { PositionsPanel } from "@/components/panels/positions-panel";
@@ -112,6 +112,16 @@ function TerminalPageInner() {
 
   const openCount = positions.filter((p) => p.quantity !== 0).length;
 
+  const ppBrokers = useMemo(() => [
+    upstoxPp.enabled ? { broker: "upstox",  target: upstoxPp.mtmTarget, currentSl: upstoxSl,  trailing: upstoxPp.trailingEnabled } : null,
+    zerodhaP.enabled ? { broker: "zerodha", target: zerodhaP.mtmTarget, currentSl: zerodhasl, trailing: zerodhaP.trailingEnabled } : null,
+    dhanPp.enabled   ? { broker: "dhan",    target: dhanPp.mtmTarget,   currentSl: dhanSl,    trailing: dhanPp.trailingEnabled }   : null,
+  ].filter((x): x is NonNullable<typeof x> => x !== null), [
+    upstoxPp.enabled, upstoxPp.mtmTarget, upstoxPp.trailingEnabled, upstoxSl,
+    zerodhaP.enabled, zerodhaP.mtmTarget, zerodhaP.trailingEnabled, zerodhasl,
+    dhanPp.enabled,   dhanPp.mtmTarget,   dhanPp.trailingEnabled,   dhanSl,
+  ]);
+
   // Keyboard shortcuts: R = refresh, E = exit all (with confirm)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -168,11 +178,7 @@ function TerminalPageInner() {
           onToggleChain={() => setChainOpen((v) => !v)}
           chainOpen={chainOpen}
           productFilter={productFilter}
-          ppBrokers={[
-            upstoxPp.enabled ? { broker: "upstox",  target: upstoxPp.mtmTarget, currentSl: upstoxSl,  trailing: upstoxPp.trailingEnabled } : null,
-            zerodhaP.enabled ? { broker: "zerodha", target: zerodhaP.mtmTarget, currentSl: zerodhasl, trailing: zerodhaP.trailingEnabled } : null,
-            dhanPp.enabled   ? { broker: "dhan",    target: dhanPp.mtmTarget,   currentSl: dhanSl,    trailing: dhanPp.trailingEnabled }   : null,
-          ].filter((x): x is NonNullable<typeof x> => x !== null)}
+          ppBrokers={ppBrokers}
         />
 
         {/* Positions — flex-1, scrollable */}
