@@ -85,20 +85,11 @@ public sealed class RiskEvaluator
         var nowIst = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, _tz).TimeOfDay;
         var decision = RiskDecisionCalculator.Evaluate(mtm, config, state, nowIst);
 
-        // Apply trailing state changes (activation or floor raise) regardless of exit.
-        // MutateAsync serialises this write with the fire-and-forget shift-count write
-        // that may be running concurrently on the same Redis key.
         if (decision.TrailingUpdate is { } update)
         {
             state.TrailingActive      = true;
             state.TrailingStop        = update.NewStop;
             state.TrailingLastTrigger = update.NewLastTrigger;
-            await _repo.MutateAsync(stateKey, s =>
-            {
-                s.TrailingActive      = true;
-                s.TrailingStop        = update.NewStop;
-                s.TrailingLastTrigger = update.NewLastTrigger;
-            });
 
             if (update.IsActivation)
             {
@@ -238,7 +229,6 @@ public sealed class RiskEvaluator
             }
 
             state.IsSquaredOff = true;
-            await _repo.MutateAsync(stateKey, s => s.IsSquaredOff = true);
 
             if (toExit.Count > 0)
             {
@@ -259,7 +249,6 @@ public sealed class RiskEvaluator
         catch (Exception ex)
         {
             state.IsSquaredOff = true;
-            await _repo.MutateAsync(stateKey, s => s.IsSquaredOff = true);
             _logger.LogError(ex,
                 "Square-off FAILED — {UserId} ({Broker}) — marked as squared-off; manual verification required",
                 userId, brokerType);

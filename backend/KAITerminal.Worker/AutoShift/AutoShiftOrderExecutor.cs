@@ -16,21 +16,34 @@ namespace KAITerminal.Worker;
 /// </summary>
 internal sealed class AutoShiftOrderExecutor
 {
-    private readonly OptionStrikeService _strikeSvc;
-    private readonly IRiskRepository             _repo;
-    private readonly IRiskEventNotifier          _notifier;
-    private readonly IPositionCache              _cache;
+    private readonly OptionStrikeService              _strikeSvc;
+    private readonly IRiskRepository                  _repo;
+    private readonly IRiskEventNotifier               _notifier;
+    private readonly IPositionCache                   _cache;
     // Func<T> breaks the circular DI dependency — resolved lazily on first use.
-    private readonly Func<IPositionRefreshTrigger> _refreshTriggerFactory;
-    private readonly ILogger<AutoShiftOrderExecutor> _logger;
+    private readonly Func<IPositionRefreshTrigger>    _refreshTriggerFactory;
+    private readonly ILogger<AutoShiftOrderExecutor>  _logger;
+
+    /// <summary>All context needed to complete the open leg after the close fill arrives.</summary>
+    private sealed record ShiftCompletion(
+        string             CloseToken,
+        string             CloseOrderId,
+        BrokerOrderRequest OpenOrder,
+        string             OpenSymbol,
+        string             ChainKey,
+        decimal            OriginalStrike,
+        int                MaxShiftCount,
+        string             StateKey,
+        string             UserId,
+        int                Qty);
 
     public AutoShiftOrderExecutor(
-        OptionStrikeService strikeSvc,
-        IRiskRepository                  repo,
-        IRiskEventNotifier               notifier,
-        IPositionCache                   cache,
-        Func<IPositionRefreshTrigger>    refreshTriggerFactory,
-        ILogger<AutoShiftOrderExecutor>  logger)
+        OptionStrikeService               strikeSvc,
+        IRiskRepository                   repo,
+        IRiskEventNotifier                notifier,
+        IPositionCache                    cache,
+        Func<IPositionRefreshTrigger>     refreshTriggerFactory,
+        ILogger<AutoShiftOrderExecutor>   logger)
     {
         _strikeSvc             = strikeSvc;
         _repo                  = repo;
@@ -48,12 +61,10 @@ internal sealed class AutoShiftOrderExecutor
         var position  = decision.Position;
         var contract  = decision.Contract!;
         var chainKey  = decision.ChainKey!;
-        var shiftCount = decision.ShiftCount;
 
         _logger.LogInformation(
             "AutoShift state — chain={ChainKey} shifts={ShiftCount}/{MaxShifts} isShiftedLeg={IsShifted} [{Broker} / {UserId}]",
-            chainKey, shiftCount, config.AutoShiftMaxCount,
-            decision.IsShiftedLeg,
+            chainKey, decision.ShiftCount, config.AutoShiftMaxCount, decision.IsShiftedLeg,
             broker.BrokerType, userId);
 
         _logger.LogWarning(
@@ -88,7 +99,8 @@ internal sealed class AutoShiftOrderExecutor
 
         _logger.LogInformation(
             "AutoShift placing orders — chain={ChainKey} shift {From}→{To} | close={CloseSymbol} qty={Qty} | open={OpenSymbol} qty={Qty} [{Broker} / {UserId}]",
-            chainKey, shiftCount, shiftCount + 1, position.InstrumentToken, qty, openSymbol, qty, broker.BrokerType, userId);
+            chainKey, decision.ShiftCount, decision.ShiftCount + 1, position.InstrumentToken, qty, openSymbol, qty,
+            broker.BrokerType, userId);
 
         string closeOrderId;
         try
@@ -109,82 +121,93 @@ internal sealed class AutoShiftOrderExecutor
                 Timestamp:       DateTimeOffset.UtcNow), ct);
             throw;
         }
+
         _logger.LogInformation(
             "AutoShift close order placed — {CloseSymbol} qty={Qty} orderId={OrderId} [{Broker} / {UserId}]",
             position.InstrumentToken, qty, closeOrderId, broker.BrokerType, userId);
 
-        // Mark the old token so subsequent LTP ticks don't re-trigger a second shift before
-        // the next poll.
+        // Mark the old token so subsequent LTP ticks don't re-trigger a second shift before the next poll.
         _cache.MarkShifted(stateKey, position.InstrumentToken);
-
-        // Capture locals for the fire-and-forget task.
-        var capturedOpenSymbol = openSymbol;
-        var capturedChainKey   = chainKey;
-        var capturedContract   = contract;
 
         // Fire-and-forget: wait for the close fill then open the new short.
         // CancellationToken.None is intentional — the close order is already sent to the
         // exchange, so we must complete the open leg even if the session is cancelled.
-        // State is written via MutateAsync to prevent a read/modify/write race with the
-        // session loop's trailing-stop updates that run concurrently on the same Redis key.
-        _ = Task.Run(async () =>
+        var completion = new ShiftCompletion(
+            CloseToken:     position.InstrumentToken,
+            CloseOrderId:   closeOrderId,
+            OpenOrder:      openOrder,
+            OpenSymbol:     openSymbol,
+            ChainKey:       chainKey,
+            OriginalStrike: contract.Strike,
+            MaxShiftCount:  config.AutoShiftMaxCount,
+            StateKey:       stateKey,
+            UserId:         userId,
+            Qty:            qty);
+
+        _ = Task.Run(() => CompleteShiftAsync(completion, broker));
+    }
+
+    /// <summary>
+    /// Runs fire-and-forget after the close order is placed: polls for fill, opens the new
+    /// short, commits shift state, and notifies. Uses <see cref="CancellationToken.None"/>
+    /// throughout — the close is already at the exchange and must be paired.
+    /// </summary>
+    private async Task CompleteShiftAsync(ShiftCompletion ctx, IBrokerClient broker)
+    {
+        try
         {
+            await FillPoller.WaitForFillAsync(broker, ctx.CloseOrderId, timeoutSeconds: 15,
+                ctx.UserId, ctx.ChainKey, _logger, CancellationToken.None);
+
+            await broker.PlaceOrderAsync(ctx.OpenOrder, CancellationToken.None);
+            _logger.LogInformation(
+                "AutoShift open order placed — {OpenSymbol} qty={Qty} [{Broker} / {UserId}]",
+                ctx.OpenSymbol, ctx.Qty, broker.BrokerType, ctx.UserId);
+
+            // MutateAsync serialises Dictionary writes against concurrent session-loop reads.
+            int newCount = 0;
+            await _repo.MutateAsync(ctx.StateKey, s =>
+            {
+                newCount = s.IncrementAutoShiftCount(ctx.ChainKey);
+                s.MapShiftOrigin(ctx.OpenSymbol, ctx.ChainKey);
+            });
+
+            _logger.LogInformation(
+                "AutoShift COMPLETE — chain={ChainKey} shift {NewCount}/{MaxCount} done | strike {OldStrike}→{OpenSymbol} | remaining={Remaining} [{Broker} / {UserId}]",
+                ctx.ChainKey, newCount, ctx.MaxShiftCount, ctx.OriginalStrike, ctx.OpenSymbol,
+                ctx.MaxShiftCount - newCount, broker.BrokerType, ctx.UserId);
+
+            // Brief delay for fill propagation, then wake the position poller.
+            await Task.Delay(500);
+            _refreshTriggerFactory().RequestRefresh(ctx.StateKey);
+
+            await _notifier.NotifyAsync(new RiskNotification(
+                UserId:          ctx.UserId,
+                Broker:          broker.BrokerType,
+                Type:            RiskNotificationType.AutoShiftTriggered,
+                Mtm:             _cache.GetMtm(ctx.StateKey),
+                InstrumentToken: ctx.CloseToken,
+                NewToken:        ctx.OpenSymbol,
+                ShiftCount:      newCount,
+                Timestamp:       DateTimeOffset.UtcNow), CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "AutoShift PARTIAL FAILURE — close={CloseToken} succeeded but open={OpenSymbol} FAILED for chain={ChainKey} [{Broker} / {UserId}]. Manual intervention required.",
+                ctx.CloseToken, ctx.OpenSymbol, ctx.ChainKey, broker.BrokerType, ctx.UserId);
             try
             {
-                await FillPoller.WaitForFillAsync(broker, closeOrderId, timeoutSeconds: 15,
-                    userId, capturedChainKey, _logger, CancellationToken.None);
-
-                await broker.PlaceOrderAsync(openOrder, CancellationToken.None);
-                _logger.LogInformation(
-                    "AutoShift open order placed — {OpenSymbol} qty={Qty} [{Broker} / {UserId}]",
-                    capturedOpenSymbol, qty, broker.BrokerType, userId);
-
-                // Atomic read/modify/write — prevents last-writer-wins race with
-                // RiskEvaluator writing trailing-stop state on the same key.
-                int newCount = 0;
-                await _repo.MutateAsync(stateKey, s =>
-                {
-                    newCount = s.IncrementAutoShiftCount(capturedChainKey);
-                    s.MapShiftOrigin(capturedOpenSymbol, capturedChainKey);
-                });
-
-                _logger.LogInformation(
-                    "AutoShift COMPLETE — chain={ChainKey} shift {NewCount}/{MaxCount} done | {OldStrike}→{OpenSymbol} | remaining shifts={Remaining} [{Broker} / {UserId}]",
-                    capturedChainKey, newCount, config.AutoShiftMaxCount, capturedContract.Strike, capturedOpenSymbol,
-                    config.AutoShiftMaxCount - newCount, broker.BrokerType, userId);
-
-                // Trigger an immediate position poll so the new leg is subscribed to the LTP feed.
-                await Task.Delay(500);
-                _refreshTriggerFactory().RequestRefresh(stateKey);
-
                 await _notifier.NotifyAsync(new RiskNotification(
-                    UserId:          userId,
+                    UserId:          ctx.UserId,
                     Broker:          broker.BrokerType,
-                    Type:            RiskNotificationType.AutoShiftTriggered,
-                    Mtm:             _cache.GetMtm(stateKey),
-                    InstrumentToken: position.InstrumentToken,
-                    NewToken:        capturedOpenSymbol,
-                    ShiftCount:      newCount,
+                    Type:            RiskNotificationType.AutoShiftFailed,
+                    Mtm:             _cache.GetMtm(ctx.StateKey),
+                    InstrumentToken: ctx.CloseToken,
                     Timestamp:       DateTimeOffset.UtcNow), CancellationToken.None);
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex,
-                    "AutoShift PARTIAL FAILURE — close={CloseSymbol} succeeded but open={OpenSymbol} FAILED for chain={ChainKey} [{Broker} / {UserId}]. Manual intervention required.",
-                    position.InstrumentToken, capturedOpenSymbol, capturedChainKey, broker.BrokerType, userId);
-                try
-                {
-                    await _notifier.NotifyAsync(new RiskNotification(
-                        UserId:          userId,
-                        Broker:          broker.BrokerType,
-                        Type:            RiskNotificationType.AutoShiftFailed,
-                        Mtm:             _cache.GetMtm(stateKey),
-                        InstrumentToken: position.InstrumentToken,
-                        Timestamp:       DateTimeOffset.UtcNow), CancellationToken.None);
-                }
-                catch { /* best-effort */ }
-            }
-        });
+            catch { /* best-effort */ }
+        }
     }
 
     public async Task ExitExhaustedAsync(
@@ -193,7 +216,6 @@ internal sealed class AutoShiftOrderExecutor
     {
         var position  = decision.Position;
         var chainKey  = decision.ChainKey!;
-        var shiftCount = decision.ShiftCount;
 
         _logger.LogWarning(
             "AutoShift EXHAUSTED — {UserId} ({Broker}) | token={Token} has used all {MaxCount} shift(s) — placing exit order now",
@@ -203,18 +225,18 @@ internal sealed class AutoShiftOrderExecutor
 
         _logger.LogInformation(
             "AutoShift EXHAUSTED exit order placed — {Token} exited after {Count}/{MaxCount} shift(s) [{Broker} / {UserId}]",
-            position.InstrumentToken, shiftCount, decision.MaxShiftCount, broker.BrokerType, userId);
+            position.InstrumentToken, decision.ShiftCount, decision.MaxShiftCount, broker.BrokerType, userId);
 
         // Mark this token so subsequent LTP ticks don't re-trigger before the next poll.
         _cache.MarkShifted(stateKey, position.InstrumentToken);
 
-        // Atomic write — mark chain exited to guard against duplicate exhausted-exit orders.
+        // MutateAsync serialises HashSet write against concurrent session-loop reads.
         await _repo.MutateAsync(stateKey, s => s.MarkChainExited(chainKey));
         _logger.LogInformation(
             "AutoShift EXHAUSTED chain={ChainKey} marked exited — duplicate exits suppressed [{Broker} / {UserId}]",
             chainKey, broker.BrokerType, userId);
 
-        // Trigger an immediate position poll (~500 ms delay for fill propagation).
+        // Brief delay for fill propagation, then wake the position poller.
         await Task.Delay(500, ct);
         _refreshTriggerFactory().RequestRefresh(stateKey);
 
@@ -224,7 +246,7 @@ internal sealed class AutoShiftOrderExecutor
             Type:            RiskNotificationType.AutoShiftExhausted,
             Mtm:             _cache.GetMtm(stateKey),
             InstrumentToken: position.InstrumentToken,
-            ShiftCount:      shiftCount,
+            ShiftCount:      decision.ShiftCount,
             Timestamp:       DateTimeOffset.UtcNow), ct);
     }
 
@@ -240,7 +262,6 @@ internal sealed class AutoShiftOrderExecutor
         if (string.Equals(brokerType, BrokerNames.Upstox, StringComparison.OrdinalIgnoreCase))
             return (upstoxKey, null);
 
-        // Zerodha: derive exchange_token from the Upstox key, look up the trading symbol + exchange
         var exchangeToken = upstoxKey.Contains('|') ? upstoxKey.Split('|')[1] : upstoxKey;
         var match = contracts.FirstOrDefault(c =>
             c.ExchangeToken.Equals(exchangeToken, StringComparison.OrdinalIgnoreCase));

@@ -1,5 +1,3 @@
-using System.Text.Json.Serialization;
-
 namespace KAITerminal.RiskEngine.Models;
 
 /// <summary>
@@ -8,34 +6,31 @@ namespace KAITerminal.RiskEngine.Models;
 public sealed class UserRiskState
 {
     // ── Session tracking ────────────────────────────────────────────────────
-    /// <summary>Calendar date (trading timezone) when this state was last initialised.
-    /// Used to detect a new trading day so stale state is discarded on Worker restart.</summary>
-    public DateOnly LastSessionDate { get; set; }
+    /// <summary>Trading date when this state was last initialised.
+    /// Guards against a forgotten daily restart carrying stale state into a new session.</summary>
+    public DateOnly LastResetDate { get; set; }
 
     // ── Portfolio ───────────────────────────────────────────────────────────
     /// <summary>True once a portfolio-level trigger fires and positions are squared off.</summary>
     public bool IsSquaredOff { get; set; }
 
     // ── Trailing stop loss ──────────────────────────────────────────────────
-    public bool TrailingActive { get; set; }
-    public decimal TrailingStop { get; set; }
+    public bool    TrailingActive      { get; set; }
+    public decimal TrailingStop        { get; set; }
     /// <summary>The MTM value at the point the trailing stop was last moved up.</summary>
     public decimal TrailingLastTrigger { get; set; }
 
     // ── Strike re-entry counts ──────────────────────────────────────────────
-    [JsonInclude]
-    public Dictionary<string, int> ReentryCountsData { get; private set; } = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> _reentryCounts = new(StringComparer.Ordinal);
 
     /// <summary>Keyed by trading symbol (e.g. "NIFTY25JAN2323000CE"). Value = number of re-entries used.</summary>
-    [JsonIgnore]
-    public IReadOnlyDictionary<string, int> ReentryCounts => ReentryCountsData;
+    public IReadOnlyDictionary<string, int> ReentryCounts => _reentryCounts;
 
-    /// <summary>Increments the re-entry count for the given symbol and returns the new value.</summary>
     public int IncrementReentryCount(string symbol)
     {
-        ReentryCountsData.TryGetValue(symbol, out var current);
+        _reentryCounts.TryGetValue(symbol, out var current);
         var next = current + 1;
-        ReentryCountsData[symbol] = next;
+        _reentryCounts[symbol] = next;
         return next;
     }
 
@@ -43,51 +38,40 @@ public sealed class UserRiskState
     /// <summary>
     /// Tracks how many auto-shifts have been performed per original position leg.
     /// Key format: "{underlying}_{expiry}_{optionType}_{strike}" e.g. "NIFTY_2026-04-17_PE_22000".
-    /// Each original leg has its own independent counter so multiple shorts of the same
-    /// type/expiry do not share a shift pool.
     /// </summary>
-    [JsonInclude]
-    public Dictionary<string, int> AutoShiftCountsData { get; private set; } = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> _autoShiftCounts = new(StringComparer.Ordinal);
 
-    [JsonIgnore]
-    public IReadOnlyDictionary<string, int> AutoShiftCounts => AutoShiftCountsData;
+    public IReadOnlyDictionary<string, int> AutoShiftCounts => _autoShiftCounts;
 
     public int IncrementAutoShiftCount(string chainKey)
     {
-        AutoShiftCountsData.TryGetValue(chainKey, out var current);
+        _autoShiftCounts.TryGetValue(chainKey, out var current);
         var next = current + 1;
-        AutoShiftCountsData[chainKey] = next;
+        _autoShiftCounts[chainKey] = next;
         return next;
     }
 
     // ── Auto-shift origin map ─────────────────────────────────────────────────
     /// <summary>
     /// Maps an instrument token to the chain key of the original position it was shifted from.
-    /// Allows the shift counter to follow a position across strike changes while keeping
-    /// each original leg's allowance independent.
     /// Key: instrument token of the shifted-into position.
-    /// Value: originalChainKey (format: "{underlying}_{expiry}_{type}_{strike}").
+    /// Value: chain key (format: "{underlying}_{expiry}_{type}_{strike}").
     /// </summary>
-    [JsonInclude]
-    public Dictionary<string, string> ShiftOriginMapData { get; private set; } = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _shiftOriginMap = new(StringComparer.Ordinal);
 
-    [JsonIgnore]
-    public IReadOnlyDictionary<string, string> ShiftOriginMap => ShiftOriginMapData;
+    public IReadOnlyDictionary<string, string> ShiftOriginMap => _shiftOriginMap;
 
     public void MapShiftOrigin(string newToken, string originalChainKey) =>
-        ShiftOriginMapData[newToken] = originalChainKey;
+        _shiftOriginMap[newToken] = originalChainKey;
 
     // ── Exhausted-exit guard ──────────────────────────────────────────────────
     /// <summary>
     /// Chain keys for which an exhausted-exit order has already been placed this session.
-    /// Prevents duplicate exit orders being fired on repeated ticks before the position
-    /// poll updates the cache (market orders typically fill in &lt;1 s, but this is a safety guard).
+    /// Prevents duplicate exit orders on repeated ticks before the next position poll.
     /// </summary>
-    [JsonInclude]
-    public HashSet<string> ExitedChainKeysData { get; private set; } = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _exitedChainKeys = new(StringComparer.Ordinal);
 
-    [JsonIgnore]
-    public IReadOnlySet<string> ExitedChainKeys => ExitedChainKeysData;
+    public IReadOnlySet<string> ExitedChainKeys => _exitedChainKeys;
 
-    public void MarkChainExited(string chainKey) => ExitedChainKeysData.Add(chainKey);
+    public void MarkChainExited(string chainKey) => _exitedChainKeys.Add(chainKey);
 }

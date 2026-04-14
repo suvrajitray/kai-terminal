@@ -158,15 +158,17 @@ public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTri
 
     private async Task RunUserAsync(UserConfig user, CancellationToken ct)
     {
-        // Reset risk state on a new trading day
         var stateKey = Key(user);
+
+        // Guard against forgotten daily restart — reset state if it belongs to a previous day.
         var today    = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, _tradingTz).DateTime);
         var existing = await _repo.GetOrCreateAsync(stateKey);
-        if (existing.LastSessionDate < today)
+        if (existing.LastResetDate < today)
         {
             _logger.LogInformation("New trading day — resetting risk state for {UserId} ({Broker})",
                 user.UserId, user.BrokerType);
-            await _repo.UpdateAsync(stateKey, new UserRiskState { LastSessionDate = today });
+            await _repo.ResetAsync(stateKey);
+            await _repo.MutateAsync(stateKey, s => s.LastResetDate = today);
         }
 
         var broker = _brokerFactory.Create(user.BrokerType, user.AccessToken, user.ApiKey);

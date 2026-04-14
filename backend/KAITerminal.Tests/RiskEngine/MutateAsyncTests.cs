@@ -19,47 +19,24 @@ public class MutateAsyncTests
     /// locking logic as RedisRiskRepository (one SemaphoreSlim per key).
     /// Used to verify the contract without a real Redis connection.
     /// </summary>
-    private sealed class InMemoryRiskRepository : IRiskRepository
+    private sealed class StubRepository : IRiskRepository
     {
-        private readonly Dictionary<string, UserRiskState> _store = new();
-        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, SemaphoreSlim> _locks = new();
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, UserRiskState> _store = new();
 
         public Task<UserRiskState> GetOrCreateAsync(string stateKey)
-        {
-            lock (_store)
-            {
-                if (!_store.TryGetValue(stateKey, out var s))
-                    _store[stateKey] = s = new UserRiskState();
-                return Task.FromResult(s);
-            }
-        }
-
-        public Task UpdateAsync(string stateKey, UserRiskState state)
-        {
-            lock (_store) { _store[stateKey] = state; }
-            return Task.CompletedTask;
-        }
+            => Task.FromResult(_store.GetOrAdd(stateKey, _ => new UserRiskState()));
 
         public Task ResetAsync(string stateKey)
         {
-            lock (_store) { _store.Remove(stateKey); }
+            _store.TryRemove(stateKey, out _);
             return Task.CompletedTask;
         }
 
-        public async Task MutateAsync(string stateKey, Action<UserRiskState> mutate)
+        public Task MutateAsync(string stateKey, Action<UserRiskState> mutate)
         {
-            var sem = _locks.GetOrAdd(stateKey, _ => new SemaphoreSlim(1, 1));
-            await sem.WaitAsync();
-            try
-            {
-                var state = await GetOrCreateAsync(stateKey);
-                mutate(state);
-                await UpdateAsync(stateKey, state);
-            }
-            finally
-            {
-                sem.Release();
-            }
+            var state = _store.GetOrAdd(stateKey, _ => new UserRiskState());
+            lock (state) { mutate(state); }
+            return Task.CompletedTask;
         }
     }
 
@@ -73,7 +50,7 @@ public class MutateAsyncTests
         //   Task B (shift count):   reads state → increments AutoShiftCounts → writes
         // Without MutateAsync, last-writer-wins. With it, each sees the other's change.
 
-        var repo     = new InMemoryRiskRepository();
+        var repo     = new StubRepository();
         const string key = "user1::upstox";
 
         var taskA = repo.MutateAsync(key, s =>
@@ -100,7 +77,7 @@ public class MutateAsyncTests
     public async Task MutateAsync_HighConcurrency_ShiftCountIsAccurate()
     {
         // 50 concurrent IncrementAutoShiftCount calls — result must equal 50, not less.
-        var repo     = new InMemoryRiskRepository();
+        var repo     = new StubRepository();
         const string key      = "user1::upstox";
         const string chainKey = "NIFTY_2026-04-17_PE_22000";
 
@@ -117,7 +94,7 @@ public class MutateAsyncTests
     public async Task MutateAsync_DifferentKeys_DoNotBlockEachOther()
     {
         // Mutations on different stateKeys must proceed in parallel (no shared lock).
-        var repo = new InMemoryRiskRepository();
+        var repo = new StubRepository();
 
         var sw = System.Diagnostics.Stopwatch.StartNew();
 
