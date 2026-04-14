@@ -14,8 +14,11 @@ internal sealed class InMemoryRiskRepository : IRiskRepository
 {
     private readonly ConcurrentDictionary<string, UserRiskState> _states = new(StringComparer.Ordinal);
 
-    public Task<UserRiskState> GetOrCreateAsync(string stateKey)
-        => Task.FromResult(_states.GetOrAdd(stateKey, _ => new UserRiskState()));
+    public Task<T> ReadAsync<T>(string stateKey, Func<UserRiskState, T> read)
+    {
+        var state = _states.GetOrAdd(stateKey, _ => new UserRiskState());
+        lock (state) { return Task.FromResult(read(state)); }
+    }
 
     public Task MutateAsync(string stateKey, Action<UserRiskState> mutate)
     {

@@ -70,7 +70,7 @@ public sealed class RiskEvaluator
         string userId, decimal mtm, UserConfig config, IBrokerClient broker, CancellationToken ct = default)
     {
         var stateKey = $"{userId}::{config.BrokerType}";
-        var state = await _repo.GetOrCreateAsync(stateKey);
+        var state = await _repo.ReadAsync(stateKey, s => s.Clone());
 
         if (state.IsSquaredOff)
         {
@@ -87,6 +87,13 @@ public sealed class RiskEvaluator
 
         if (decision.TrailingUpdate is { } update)
         {
+            await _repo.MutateAsync(stateKey, s =>
+            {
+                s.TrailingActive      = true;
+                s.TrailingStop        = update.NewStop;
+                s.TrailingLastTrigger = update.NewLastTrigger;
+            });
+
             state.TrailingActive      = true;
             state.TrailingStop        = update.NewStop;
             state.TrailingLastTrigger = update.NewLastTrigger;
@@ -228,6 +235,7 @@ public sealed class RiskEvaluator
                 await broker.ExitPositionAsync(pos.InstrumentToken, pos.Product, ct);
             }
 
+            await _repo.MutateAsync(stateKey, s => s.IsSquaredOff = true);
             state.IsSquaredOff = true;
 
             if (toExit.Count > 0)
@@ -248,6 +256,7 @@ public sealed class RiskEvaluator
         }
         catch (Exception ex)
         {
+            await _repo.MutateAsync(stateKey, s => s.IsSquaredOff = true);
             state.IsSquaredOff = true;
             _logger.LogError(ex,
                 "Square-off FAILED — {UserId} ({Broker}) — marked as squared-off; manual verification required",

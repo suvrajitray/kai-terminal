@@ -4,7 +4,11 @@ namespace KAITerminal.RiskEngine.Abstractions;
 
 public interface IRiskRepository
 {
-    Task<UserRiskState> GetOrCreateAsync(string stateKey);
+    /// <summary>
+    /// Computes a value from the state for <paramref name="stateKey"/> under the repository's
+    /// synchronization strategy. Use this instead of reading the live mutable state directly.
+    /// </summary>
+    Task<T> ReadAsync<T>(string stateKey, Func<UserRiskState, T> read);
 
     /// <summary>
     /// Atomically applies <paramref name="mutate"/> to the state for <paramref name="stateKey"/>.

@@ -23,8 +23,11 @@ public class MutateAsyncTests
     {
         private readonly System.Collections.Concurrent.ConcurrentDictionary<string, UserRiskState> _store = new();
 
-        public Task<UserRiskState> GetOrCreateAsync(string stateKey)
-            => Task.FromResult(_store.GetOrAdd(stateKey, _ => new UserRiskState()));
+        public Task<T> ReadAsync<T>(string stateKey, Func<UserRiskState, T> read)
+        {
+            var state = _store.GetOrAdd(stateKey, _ => new UserRiskState());
+            lock (state) { return Task.FromResult(read(state)); }
+        }
 
         public Task ResetAsync(string stateKey)
         {
@@ -66,7 +69,7 @@ public class MutateAsyncTests
 
         await Task.WhenAll(taskA, taskB);
 
-        var final = await repo.GetOrCreateAsync(key);
+        var final = await repo.ReadAsync(key, s => s.Clone());
         final.TrailingActive.Should().BeTrue("trailing-stop write must not be lost");
         final.TrailingStop.Should().Be(1500m);
         final.AutoShiftCounts.Should().Contain("NIFTY_2026-04-17_PE_22000", 1,
@@ -86,7 +89,7 @@ public class MutateAsyncTests
 
         await Task.WhenAll(tasks);
 
-        var final = await repo.GetOrCreateAsync(key);
+        var final = await repo.ReadAsync(key, s => s.Clone());
         final.AutoShiftCounts[chainKey].Should().Be(50);
     }
 
@@ -109,7 +112,7 @@ public class MutateAsyncTests
 
         for (var i = 0; i < 10; i++)
         {
-            var s = await repo.GetOrCreateAsync($"user{i}::upstox");
+            var s = await repo.ReadAsync($"user{i}::upstox", state => state.Clone());
             s.TrailingActive.Should().BeTrue();
         }
     }
