@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import * as signalR from "@microsoft/signalr";
-import { fetchOptionChain, fetchIvHistory } from "@/services/trading-api";
-import { API_BASE_URL } from "@/lib/constants";
+import { useState, useEffect, useCallback } from "react";
+import { fetchOptionChain } from "@/services/trading-api";
 import { useOptionContractsStore } from "@/stores/option-contracts-store";
 import { UNDERLYING_KEYS } from "@/lib/shift-config";
-import type { OptionChainEntry, IvSnapshot } from "@/types";
+import { useIvHistory } from "./use-iv-history";
+import { useOptionChainFeed } from "./use-option-chain-feed";
+import type { OptionChainEntry } from "@/types";
 
 const LIVE_WINDOW_SIZE = 20; // OTM rows on each side of ATM (for SignalR subscriptions)
 const VISIBLE_SIDE = 20;    // OTM rows shown on each side of ATM initially
@@ -23,14 +23,36 @@ export function useOptionChain() {
   const [visibleHigh, setVisibleHigh] = useState(VISIBLE_SIDE); // strikes above ATM
   const [loading, setLoading] = useState(false);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
-  const [ivHistory, setIvHistory] = useState<IvSnapshot[]>([]);
   const [scrollSignal, setScrollSignal] = useState(0);
 
-  const connectionRef  = useRef<signalR.HubConnection | null>(null);
-  const liveTokensRef  = useRef<string[]>([]);
-  const ivHistoryCache = useRef<Record<string, IvSnapshot[]>>({});
-
   const expiries = getExpiries(underlying);
+
+  const ivHistory = useIvHistory(underlying);
+
+  const handleLtpBatch = useCallback((updates: Array<{ instrumentToken: string; ltp: number }>) => {
+    const map = new Map(updates.map((u) => [u.instrumentToken, u.ltp]));
+    setAllChain((prev) => {
+      if (prev.length === 0 || map.size === 0) return prev;
+      let changed = false;
+      const next = prev.map((entry) => {
+        let callOpts = entry.callOptions;
+        let putOpts = entry.putOptions;
+        if (callOpts?.marketData && map.has(callOpts.instrumentKey)) {
+          callOpts = { ...callOpts, marketData: { ...callOpts.marketData, ltp: map.get(callOpts.instrumentKey)! } };
+          changed = true;
+        }
+        if (putOpts?.marketData && map.has(putOpts.instrumentKey)) {
+          putOpts = { ...putOpts, marketData: { ...putOpts.marketData, ltp: map.get(putOpts.instrumentKey)! } };
+          changed = true;
+        }
+        if (callOpts === entry.callOptions && putOpts === entry.putOptions) return entry;
+        return { ...entry, callOptions: callOpts, putOptions: putOpts };
+      });
+      return changed ? next : prev;
+    });
+  }, []);
+
+  const { setLiveTokens, invokeSubscribe } = useOptionChainFeed({ onLtpBatch: handleLtpBatch });
 
   // Default expiry to the nearest one when underlying changes
   useEffect(() => {
@@ -54,18 +76,15 @@ export function useOptionChain() {
   }, []);
 
   const subscribeLiveTokens = useCallback((chain: OptionChainEntry[], liveSet: Set<number>) => {
-    const conn = connectionRef.current;
-    if (conn?.state !== signalR.HubConnectionState.Connected) return;
     const tokens: string[] = [];
     for (const entry of chain) {
       if (!liveSet.has(entry.strikePrice)) continue;
       if (entry.callOptions?.instrumentKey) tokens.push(entry.callOptions.instrumentKey);
       if (entry.putOptions?.instrumentKey) tokens.push(entry.putOptions.instrumentKey);
     }
-    liveTokensRef.current = tokens;
-    conn.invoke("ClearSubscriptions").catch(() => {});
-    if (tokens.length > 0) conn.invoke("SubscribeToInstruments", tokens).catch(() => {});
-  }, []);
+    setLiveTokens(tokens);
+    invokeSubscribe(tokens);
+  }, [setLiveTokens, invokeSubscribe]);
 
   const fetchAndSubscribe = useCallback(async (u: string, exp: string, scrollAtm = false) => {
     const underlyingKey = UNDERLYING_KEYS[u];
@@ -101,70 +120,10 @@ export function useOptionChain() {
     return () => clearInterval(id);
   }, [underlying, expiry, fetchAndSubscribe]);
 
-  // SignalR connection — one per panel mount, dedicated option-chain hub
-  useEffect(() => {
-    const conn = new signalR.HubConnectionBuilder()
-      .withUrl(`${API_BASE_URL}/hubs/option-chain`)
-      .withAutomaticReconnect()
-      .build();
-
-    conn.on("ReceiveLtpBatch", (updates: Array<{ instrumentToken: string; ltp: number }>) => {
-      const map = new Map(updates.map((u) => [u.instrumentToken, u.ltp]));
-      setAllChain((prev) => {
-        if (prev.length === 0 || map.size === 0) return prev;
-        let changed = false;
-        const next = prev.map((entry) => {
-          let callOpts = entry.callOptions;
-          let putOpts = entry.putOptions;
-          if (callOpts?.marketData && map.has(callOpts.instrumentKey)) {
-            callOpts = { ...callOpts, marketData: { ...callOpts.marketData, ltp: map.get(callOpts.instrumentKey)! } };
-            changed = true;
-          }
-          if (putOpts?.marketData && map.has(putOpts.instrumentKey)) {
-            putOpts = { ...putOpts, marketData: { ...putOpts.marketData, ltp: map.get(putOpts.instrumentKey)! } };
-            changed = true;
-          }
-          if (callOpts === entry.callOptions && putOpts === entry.putOptions) return entry;
-          return { ...entry, callOptions: callOpts, putOptions: putOpts };
-        });
-        return changed ? next : prev;
-      });
-    });
-
-    // On reconnect, re-subscribe live tokens
-    conn.onreconnected(() => {
-      const tokens = liveTokensRef.current;
-      if (tokens.length > 0) conn.invoke("SubscribeToInstruments", tokens).catch(() => {});
-    });
-
-    connectionRef.current = conn;
-    conn.start().catch(() => {});
-
-    return () => {
-      conn.invoke("ClearSubscriptions").catch(() => {});
-      conn.stop();
-      connectionRef.current = null;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // Fetch chain when underlying/expiry changes — always scroll to ATM on these triggers
   useEffect(() => {
     if (underlying && expiry) fetchAndSubscribe(underlying, expiry, true);
   }, [underlying, expiry, fetchAndSubscribe]);
-
-  // Fetch IV history when underlying changes (cached — doesn't need expiry)
-  useEffect(() => {
-    if (!underlying) return;
-    const cached = ivHistoryCache.current[underlying];
-    if (cached) { setIvHistory(cached); return; }
-    fetchIvHistory(underlying)
-      .then((data) => {
-        ivHistoryCache.current[underlying] = data;
-        setIvHistory(data);
-      })
-      .catch(() => {});
-  }, [underlying]);
 
   // ATM IV + Expected Move — computed from ATM straddle price
   const atmEntry    = atmStrike > 0 ? allChain.find((e) => e.strikePrice === atmStrike) : undefined;
