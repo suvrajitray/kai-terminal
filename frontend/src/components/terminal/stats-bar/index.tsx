@@ -1,8 +1,5 @@
-import { useState, lazy, Suspense } from "react";
+import { useState, lazy, Suspense, Fragment } from "react";
 import { RefreshCw, LogOut, Wifi, WifiOff, ShieldCheck, PanelRight, BarChart2, Filter } from "lucide-react";
-const PayoffChartDialog = lazy(() =>
-  import("../payoff-chart-dialog").then((m) => ({ default: m.PayoffChartDialog }))
-);
 import { SessionTimer } from "../session-timer";
 import { MtmDisplay } from "../mtm-display";
 import { PositionCountBadges } from "../position-count-badges";
@@ -18,6 +15,10 @@ import { BrokerBadge } from "@/components/ui/broker-badge";
 import type { Position } from "@/types";
 import { useSessionExtremes } from "./use-session-extremes";
 import { PnlBadge } from "./pnl-badge";
+
+const PayoffChartDialog = lazy(() =>
+  import("../payoff-chart-dialog").then((m) => ({ default: m.PayoffChartDialog }))
+);
 
 
 export interface PpBrokerEntry {
@@ -156,9 +157,9 @@ export function StatsBar({
                 </>
               ) : (
                 ppBrokers.map((b, i) => (
-                  <>
+                  <Fragment key={b.broker}>
                     {i > 0 && <div key={`sep-${i}`} className="h-4 w-px bg-border" />}
-                    <span key={b.broker} className="flex items-center gap-1">
+                    <span className="flex items-center gap-1">
                       <BrokerBadge brokerId={b.broker} />
                       <span className="text-muted-foreground">TGT</span>
                       <span className="font-mono font-medium tabular-nums text-emerald-500">
@@ -169,7 +170,7 @@ export function StatsBar({
                         ₹{b.currentSl.toLocaleString("en-IN")}
                       </span>
                     </span>
-                  </>
+                  </Fragment>
                 ))
               )}
             </span>

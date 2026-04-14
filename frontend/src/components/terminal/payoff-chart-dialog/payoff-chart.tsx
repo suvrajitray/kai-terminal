@@ -24,11 +24,10 @@ function fmtY(v: number): string {
 interface PayoffChartProps {
   groups: ExpiryGroup[];
   spot: number;
-  indexName: string;
 }
 
-export const PayoffChart = memo(function PayoffChart({ groups, spot, indexName: _indexName }: PayoffChartProps) {
-  const allLegs = groups.flatMap((g) => g.legs);
+export const PayoffChart = memo(function PayoffChart({ groups, spot }: PayoffChartProps) {
+  const allLegs = useMemo(() => groups.flatMap((g) => g.legs), [groups]);
 
   const { xMin, xMax, yMin, yMax, groupCurves } = useMemo(() => {
     if (allLegs.length === 0 || spot === 0)
@@ -72,7 +71,6 @@ export const PayoffChart = memo(function PayoffChart({ groups, spot, indexName: 
       yMax: Math.max(0, globalMax) + yPad,
       groupCurves,
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allLegs, spot, groups]);
 
   const xR = xMax - xMin;
@@ -92,7 +90,6 @@ export const PayoffChart = memo(function PayoffChart({ groups, spot, indexName: 
     const profitPts = gc.pts.map(([s, v]) => `${toX(s).toFixed(1)},${toY(Math.max(v, 0)).toFixed(1)}`).join(" ");
     const lossPts   = gc.pts.map(([s, v]) => `${toX(s).toFixed(1)},${toY(Math.min(v, 0)).toFixed(1)}`).join(" ");
     return { ...gc, color, linePath, profitPts, lossPts };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [groupCurves, xMin, xMax, yMin, yMax]);
 
   const yTicks = [-1, -0.5, 0, 0.5, 1]
@@ -159,7 +156,7 @@ export const PayoffChart = memo(function PayoffChart({ groups, spot, indexName: 
                 <line
                   x1={PAD.left} y1={y}
                   x2={PAD.left + DW} y2={y}
-                  stroke={isZ ? "hsl(var(--border))" : "hsl(var(--border))"}
+                  stroke="hsl(var(--border))"
                   strokeWidth={isZ ? 1 : 0.5}
                   strokeDasharray={isZ ? "none" : "3 3"}
                   opacity={isZ ? 1 : 0.6}

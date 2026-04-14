@@ -27,7 +27,7 @@ export function PayoffChartDialog({ open, onOpenChange, positions }: Props) {
             )}
           </DialogTitle>
         </DialogHeader>
-        <PayoffChart groups={groups} spot={spot} indexName={indexName} />
+        <PayoffChart groups={groups} spot={spot} />
       </DialogContent>
     </Dialog>
   );
