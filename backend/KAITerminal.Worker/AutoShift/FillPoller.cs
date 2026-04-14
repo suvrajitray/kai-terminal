@@ -16,7 +16,7 @@ internal static class FillPoller
     /// </summary>
     public static async Task WaitForFillAsync(
         IBrokerClient broker, string orderIds, int timeoutSeconds,
-        string userId, string chainKey, ILogger logger)
+        string userId, string chainKey, ILogger logger, CancellationToken ct)
     {
         var ids = orderIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                           .ToHashSet(StringComparer.Ordinal);
@@ -31,7 +31,7 @@ internal static class FillPoller
         {
             try
             {
-                var orders  = await broker.GetAllOrdersAsync(CancellationToken.None);
+                var orders  = await broker.GetAllOrdersAsync(ct);
                 var matched = orders.Where(o => ids.Contains(o.OrderId)).ToList();
 
                 var rejected = matched.FirstOrDefault(o =>
@@ -57,7 +57,7 @@ internal static class FillPoller
                     "AutoShift WaitForFillAsync: transient error polling orders, retrying [{UserId}]", userId);
             }
 
-            await Task.Delay(500, CancellationToken.None);
+            await Task.Delay(500, ct);
         }
 
         logger.LogWarning(

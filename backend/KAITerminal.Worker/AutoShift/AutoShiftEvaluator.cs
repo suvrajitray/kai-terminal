@@ -122,7 +122,7 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
                     break;
 
                 case AutoShiftDecisionKind.ExitExhausted:
-                    await _executor.ExitExhaustedAsync(decision, broker, state, userId, stateKey, ct);
+                    await _executor.ExitExhaustedAsync(decision, broker, userId, stateKey, ct);
                     break;
 
                 case AutoShiftDecisionKind.Shift:

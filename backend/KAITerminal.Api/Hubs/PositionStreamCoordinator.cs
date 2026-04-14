@@ -142,6 +142,7 @@ public sealed class PositionStreamCoordinator : IAsyncDisposable
             var ct = _cts.Token;
             var allPositions = await FetchAllPositionsAsync(ct);
             var filtered     = ApplyFilter(allPositions);
+            await RefreshSubscriptionsAsync(filtered, ct);
             await _hub.Clients.Client(_connectionId)
                 .SendAsync("ReceivePositions", filtered.Select(p => p.ToResponse()).ToList(), ct);
             _logger.LogInformation(

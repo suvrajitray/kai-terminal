@@ -117,28 +117,36 @@ internal sealed class AutoShiftOrderExecutor
         // the next poll.
         _cache.MarkShifted(stateKey, position.InstrumentToken);
 
-        // Capture locals for the fire-and-forget task
+        // Capture locals for the fire-and-forget task.
         var capturedOpenSymbol = openSymbol;
         var capturedChainKey   = chainKey;
         var capturedContract   = contract;
 
-        // Fire-and-forget: wait for the close order to actually fill, then open the new short.
+        // Fire-and-forget: wait for the close fill then open the new short.
+        // CancellationToken.None is intentional — the close order is already sent to the
+        // exchange, so we must complete the open leg even if the session is cancelled.
+        // State is written via MutateAsync to prevent a read/modify/write race with the
+        // session loop's trailing-stop updates that run concurrently on the same Redis key.
         _ = Task.Run(async () =>
         {
             try
             {
-                await FillPoller.WaitForFillAsync(broker, closeOrderId, timeoutSeconds: 15, userId, capturedChainKey, _logger);
+                await FillPoller.WaitForFillAsync(broker, closeOrderId, timeoutSeconds: 15,
+                    userId, capturedChainKey, _logger, CancellationToken.None);
 
                 await broker.PlaceOrderAsync(openOrder, CancellationToken.None);
                 _logger.LogInformation(
                     "AutoShift open order placed — {OpenSymbol} qty={Qty} [{Broker} / {UserId}]",
                     capturedOpenSymbol, qty, broker.BrokerType, userId);
 
-                // Fetch fresh state — other evaluations may have run while we waited.
-                var freshState = await _repo.GetOrCreateAsync(stateKey);
-                var newCount   = freshState.IncrementAutoShiftCount(capturedChainKey);
-                freshState.MapShiftOrigin(capturedOpenSymbol, capturedChainKey);
-                await _repo.UpdateAsync(stateKey, freshState);
+                // Atomic read/modify/write — prevents last-writer-wins race with
+                // RiskEvaluator writing trailing-stop state on the same key.
+                int newCount = 0;
+                await _repo.MutateAsync(stateKey, s =>
+                {
+                    newCount = s.IncrementAutoShiftCount(capturedChainKey);
+                    s.MapShiftOrigin(capturedOpenSymbol, capturedChainKey);
+                });
 
                 _logger.LogInformation(
                     "AutoShift COMPLETE — chain={ChainKey} shift {NewCount}/{MaxCount} done | {OldStrike}→{OpenSymbol} | remaining shifts={Remaining} [{Broker} / {UserId}]",
@@ -181,7 +189,7 @@ internal sealed class AutoShiftOrderExecutor
 
     public async Task ExitExhaustedAsync(
         AutoShiftDecision decision, IBrokerClient broker,
-        UserRiskState state, string userId, string stateKey, CancellationToken ct)
+        string userId, string stateKey, CancellationToken ct)
     {
         var position  = decision.Position;
         var chainKey  = decision.ChainKey!;
@@ -200,19 +208,15 @@ internal sealed class AutoShiftOrderExecutor
         // Mark this token so subsequent LTP ticks don't re-trigger before the next poll.
         _cache.MarkShifted(stateKey, position.InstrumentToken);
 
-        // Also mark chain exited to guard against duplicate exhausted-exit orders.
-        state.MarkChainExited(chainKey);
-        await _repo.UpdateAsync(stateKey, state);
+        // Atomic write — mark chain exited to guard against duplicate exhausted-exit orders.
+        await _repo.MutateAsync(stateKey, s => s.MarkChainExited(chainKey));
         _logger.LogInformation(
             "AutoShift EXHAUSTED chain={ChainKey} marked exited — duplicate exits suppressed [{Broker} / {UserId}]",
             chainKey, broker.BrokerType, userId);
 
         // Trigger an immediate position poll (~500 ms delay for fill propagation).
-        _ = Task.Run(async () =>
-        {
-            await Task.Delay(500);
-            _refreshTriggerFactory().RequestRefresh(stateKey);
-        });
+        await Task.Delay(500, ct);
+        _refreshTriggerFactory().RequestRefresh(stateKey);
 
         await _notifier.NotifyAsync(new RiskNotification(
             UserId:          userId,

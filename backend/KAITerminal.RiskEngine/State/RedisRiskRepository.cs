@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using KAITerminal.RiskEngine.Abstractions;
 using KAITerminal.RiskEngine.Models;
@@ -14,6 +15,10 @@ public sealed class RedisRiskRepository : IRiskRepository
 {
     private readonly IConnectionMultiplexer _redis;
     private static readonly JsonSerializerOptions _json = new() { PropertyNameCaseInsensitive = true };
+
+    // One semaphore per stateKey — serialises all read/modify/write cycles for the same user
+    // while letting different users proceed in parallel.
+    private readonly ConcurrentDictionary<string, SemaphoreSlim> _locks = new();
 
     public RedisRiskRepository(IConnectionMultiplexer redis)
     {
@@ -39,6 +44,22 @@ public sealed class RedisRiskRepository : IRiskRepository
     {
         var db = _redis.GetDatabase();
         await db.KeyDeleteAsync(Key(userId));
+    }
+
+    public async Task MutateAsync(string stateKey, Action<UserRiskState> mutate)
+    {
+        var sem = _locks.GetOrAdd(stateKey, _ => new SemaphoreSlim(1, 1));
+        await sem.WaitAsync();
+        try
+        {
+            var state = await GetOrCreateAsync(stateKey);
+            mutate(state);
+            await UpdateAsync(stateKey, state);
+        }
+        finally
+        {
+            sem.Release();
+        }
     }
 
     private static string Key(string stateKey) => $"risk-state:{stateKey}";
