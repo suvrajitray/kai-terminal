@@ -124,7 +124,7 @@ public sealed class PositionStreamCoordinator : IAsyncDisposable
         var zerodhaCount = await _zerodha.RefreshAsync(allPositions, ct);
 
         if (upstoxCount == 0 && zerodhaCount == 0)
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "PositionStreamCoordinator [{Id}] ({User}): no open positions — no LTP subscriptions requested",
                 _connectionId, Username);
     }

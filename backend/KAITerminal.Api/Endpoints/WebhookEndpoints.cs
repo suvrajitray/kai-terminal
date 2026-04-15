@@ -34,7 +34,7 @@ public static class WebhookEndpoints
                 return Results.BadRequest();
             }
 
-            logger.LogInformation(
+            logger.LogDebug(
                 "Zerodha webhook received — apiKey={ApiKey} orderId={OrderId} symbol={Symbol} status={Status}",
                 apiKey, payload.OrderId, payload.TradingSymbol, payload.Status);
 
@@ -49,7 +49,7 @@ public static class WebhookEndpoints
                 return Results.Unauthorized();
             }
 
-            logger.LogInformation(
+            logger.LogDebug(
                 "Zerodha webhook: resolved apiKey={ApiKey} → user={User}",
                 apiKey, cred.Username);
 
@@ -62,13 +62,13 @@ public static class WebhookEndpoints
                 return Results.Unauthorized();
             }
 
-            logger.LogInformation(
+            logger.LogDebug(
                 "Zerodha webhook: checksum verified — user={User} orderId={OrderId}",
                 cred.Username, payload.OrderId);
 
             if (!processor.IsActionableStatus(payload.Status))
             {
-                logger.LogInformation(
+                logger.LogDebug(
                     "Zerodha webhook: ignoring intermediate status={Status} for orderId={OrderId}",
                     payload.Status, payload.OrderId);
                 return Results.Ok();
@@ -85,7 +85,7 @@ public static class WebhookEndpoints
                 payload.AveragePrice, payload.TransactionType ?? "", payload.FilledQuantity,
                 refresh: status == "complete", logger);
 
-            logger.LogInformation(
+            logger.LogDebug(
                 "Zerodha webhook: done — orderId={OrderId} refresh={Refresh}",
                 payload.OrderId, status == "complete");
 
@@ -104,7 +104,7 @@ public static class WebhookEndpoints
             WebhookOrderProcessor processor,
             ILogger<UpstoxOrderPostback> logger) =>
         {
-            logger.LogInformation(
+            logger.LogDebug(
                 "Upstox webhook received — apiKey={ApiKey}",
                 apiKey);
 
@@ -120,7 +120,7 @@ public static class WebhookEndpoints
                 return Results.Unauthorized();
             }
 
-            logger.LogInformation(
+            logger.LogDebug(
                 "Upstox webhook: resolved apiKey={ApiKey} → user={User}",
                 apiKey, cred.Username);
 
@@ -142,14 +142,14 @@ public static class WebhookEndpoints
                 return Results.Unauthorized();
             }
 
-            logger.LogInformation(
+            logger.LogDebug(
                 "Upstox webhook parsed — user={User} upstoxUserId={UpstoxUserId} orderId={OrderId} symbol={Symbol} status={Status}",
                 cred.Username, payload.UserId, payload.OrderId, payload.TradingSymbol, payload.Status);
 
             var status = payload.Status?.ToLowerInvariant() ?? "";
             if (!processor.IsActionableStatus(payload.Status))
             {
-                logger.LogInformation(
+                logger.LogDebug(
                     "Upstox webhook: ignoring intermediate status={Status} for orderId={OrderId}",
                     payload.Status, payload.OrderId);
                 return Results.Ok();
@@ -168,7 +168,7 @@ public static class WebhookEndpoints
                 payload.AveragePrice, payload.TransactionType ?? "", payload.FilledQuantity,
                 refresh: status == "complete", logger);
 
-            logger.LogInformation(
+            logger.LogDebug(
                 "Upstox webhook: done — orderId={OrderId} refresh={Refresh}",
                 payload.OrderId, status == "complete");
 

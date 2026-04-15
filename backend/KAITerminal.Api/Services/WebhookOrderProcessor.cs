@@ -27,19 +27,19 @@ internal sealed class WebhookOrderProcessor(PositionStreamManager manager)
         bool refresh, ILogger logger)
     {
         var coordinators = manager.GetAllForUser(username).ToList();
-        logger.LogInformation(
+        logger.LogDebug(
             "{Broker} webhook: pushing to {Count} active connection(s) for user={User}",
             broker, coordinators.Count, username);
 
         var tasks = coordinators.Select(async coord =>
         {
-            logger.LogInformation(
+            logger.LogDebug(
                 "{Broker} webhook: sending ReceiveOrderUpdate to connection={Connection} — orderId={OrderId} status={Status}",
                 broker, coord.Username, orderId, status);
             await coord.PushOrderUpdateAsync(orderId, status, statusMessage, tradingSymbol, averagePrice, transactionType, filledQuantity);
             if (refresh)
             {
-                logger.LogInformation(
+                logger.LogDebug(
                     "{Broker} webhook: triggering position refresh for connection={Connection}",
                     broker, coord.Username);
                 await coord.TriggerRefreshAsync();
