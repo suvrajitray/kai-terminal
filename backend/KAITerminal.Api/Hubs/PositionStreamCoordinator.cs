@@ -125,8 +125,8 @@ public sealed class PositionStreamCoordinator : IAsyncDisposable
 
         if (upstoxCount == 0 && zerodhaCount == 0)
             _logger.LogInformation(
-                "PositionStreamCoordinator [{Id}]: no open positions — no LTP subscriptions requested",
-                _connectionId);
+                "PositionStreamCoordinator [{Id}] ({User}): no open positions — no LTP subscriptions requested",
+                _connectionId, Username);
     }
 
     // ── Webhook-triggered actions ─────────────────────────────────────────────

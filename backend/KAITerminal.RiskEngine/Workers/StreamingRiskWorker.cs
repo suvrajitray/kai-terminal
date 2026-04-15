@@ -173,6 +173,10 @@ public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTri
 
         var broker = _brokerFactory.Create(user.BrokerType, user.AccessToken, user.ApiKey);
 
+        // Clear any stale LTP values from a previous session so the first evaluation
+        // falls back to the broker's REST P&L rather than using stale feed prices.
+        _cache.ResetLtp(stateKey);
+
         // ── Initial position fetch and feed subscription ──────────────────
         await PollPositionsAsync(user, broker, isStartup: true, ct);
 

@@ -73,16 +73,24 @@ public sealed class PositionCache : IPositionCache
         decimal total = 0m;
         foreach (var p in e.Positions)
         {
-            // Closed positions always use the broker's realized P&L — never LTP.
-            // Open positions: realised (locked-in intraday P&L from partial closes) + live
-            // unrealised (quantity × (ltp − avgPrice)).  Fall back to broker's computed P&L
-            // when no LTP is cached yet (e.g. newly-added position after a manual shift).
+            // Closed positions always use the broker's P&L — never LTP.
+            // Open positions with a live LTP tick: start from the broker's own verified
+            // p.Pnl and apply only the incremental price delta since the last REST poll.
+            // This avoids issues with blended average-price in NET positions where the
+            // same instrument was traded multiple times intraday (e.g. exit + re-entry).
+            // Fall back to p.Pnl when no LTP tick has arrived yet.
             if (p.IsOpen && e.Ltp.TryGetValue(p.InstrumentToken, out var ltp))
-                total += p.Realised + p.Quantity * (ltp - p.AveragePrice);
+                total += p.Pnl + p.Quantity * (ltp - p.Ltp);
             else
                 total += p.Pnl;
         }
         return total;
+    }
+
+    public void ResetLtp(string userId)
+    {
+        if (_data.TryGetValue(userId, out var e))
+            e.Ltp.Clear();
     }
 
     public IReadOnlyList<string> GetOpenInstrumentTokens(string userId)

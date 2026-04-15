@@ -30,10 +30,19 @@ public interface IPositionCache
 
     /// <summary>
     /// Computes total MTM from the last REST poll, enhanced with live LTP for open positions.
-    /// Open positions with a live LTP tick: <c>quantity × (ltp − avgPrice)</c>.
+    /// Open positions with a live LTP tick: <c>p.Pnl + quantity × (ltp − p.Ltp)</c> —
+    /// uses the broker's own verified P&amp;L as the base and applies only the incremental
+    /// LTP delta since the last REST poll. This avoids issues with blended average-price
+    /// calculations in NET positions where the same instrument was traded multiple times.
     /// Closed positions and open positions awaiting their first tick: broker's <c>p.Pnl</c>.
     /// </summary>
     decimal GetMtm(string userId);
+
+    /// <summary>
+    /// Clears all cached LTP values for a user. Call at session startup to prevent
+    /// stale ticks from a previous session corrupting the first MTM evaluation.
+    /// </summary>
+    void ResetLtp(string userId);
 
     /// <summary>Returns instrument tokens of all open positions (quantity != 0).</summary>
     IReadOnlyList<string> GetOpenInstrumentTokens(string userId);
