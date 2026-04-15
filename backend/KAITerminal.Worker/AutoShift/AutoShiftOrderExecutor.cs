@@ -62,14 +62,10 @@ internal sealed class AutoShiftOrderExecutor
         var contract  = decision.Contract!;
         var chainKey  = decision.ChainKey!;
 
-        _logger.LogInformation(
-            "AutoShift state — chain={ChainKey} shifts={ShiftCount}/{MaxShifts} isShiftedLeg={IsShifted} [{Broker} / {UserId}]",
-            chainKey, decision.ShiftCount, config.AutoShiftMaxCount, decision.IsShiftedLeg,
-            broker.BrokerType, userId);
-
         _logger.LogWarning(
-            "AutoShift SHIFTING — chain={ChainKey} current strike={Strike} moving {Gap} strike(s) OTM [{Broker} / {UserId}]",
-            chainKey, contract.Strike, config.AutoShiftStrikeGap, broker.BrokerType, userId);
+            "AutoShift SHIFTING — chain={ChainKey} shift {ShiftCount}/{MaxShifts} | strike={Strike} moving {Gap} OTM | isShiftedLeg={IsShifted} [{Broker} / {UserId}]",
+            chainKey, decision.ShiftCount + 1, config.AutoShiftMaxCount, contract.Strike,
+            config.AutoShiftStrikeGap, decision.IsShiftedLeg, broker.BrokerType, userId);
 
         var newUpstoxKey = await _strikeSvc.FindByStrikeGapAsync(
             decision.UnderlyingKey!, contract.Expiry, contract.InstrumentType,
@@ -232,7 +228,7 @@ internal sealed class AutoShiftOrderExecutor
 
         // MutateAsync serialises HashSet write against concurrent session-loop reads.
         await _repo.MutateAsync(stateKey, s => s.MarkChainExited(chainKey));
-        _logger.LogInformation(
+        _logger.LogDebug(
             "AutoShift EXHAUSTED chain={ChainKey} marked exited — duplicate exits suppressed [{Broker} / {UserId}]",
             chainKey, broker.BrokerType, userId);
 

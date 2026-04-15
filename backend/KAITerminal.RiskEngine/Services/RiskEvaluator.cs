@@ -184,7 +184,7 @@ public sealed class RiskEvaluator
         }
         else
         {
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "{UserId} ({Broker})  PnL ₹{Mtm:+#,##0;-#,##0}  |  SL ₹{Sl:+#,##0;-#,##0}  |  Target ₹{Target:+#,##0}  |  TSL off — activates at ₹{Threshold:+#,##0}  [{Watch}]",
                 userId, config.BrokerType, mtm, config.MtmSl, config.MtmTarget, config.TrailingActivateAt, watch);
         }
@@ -195,6 +195,11 @@ public sealed class RiskEvaluator
         if ((now - _lastStatusPushed.GetValueOrDefault(key, DateTimeOffset.MinValue)).TotalMinutes >= 15)
         {
             _lastStatusPushed[key] = now;
+            _logger.LogInformation(
+                "Status update — {UserId} ({Broker})  PnL ₹{Mtm:+#,##0;-#,##0}  |  SL ₹{Sl:+#,##0;-#,##0}  |  Target ₹{Target:+#,##0}  |  TSL {TslState}  [{Watch}]",
+                userId, config.BrokerType, mtm, config.MtmSl, config.MtmTarget,
+                state.TrailingActive ? $"₹{state.TrailingStop:+#,##0;-#,##0}" : "off",
+                watch);
             await _notifier.NotifyAsync(new RiskNotification(
                 userId, config.BrokerType, RiskNotificationType.StatusUpdate,
                 mtm, Sl: config.MtmSl, Target: config.MtmTarget,
