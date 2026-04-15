@@ -109,12 +109,14 @@ export function useOrderDialogForm(args: OrderDialogDefaultsArgs) {
           : { value: qtyValue, mode: qtyMode },
       }),
     });
+  // intentionally exclude ltp: live LTP ticks must not reset the form
+  // (user may have switched to limit mode; resetting would revert to market)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     activeBrokerId,
     qtyMode,
     qtyValue,
     instrumentKey,
-    ltp,
     transactionType,
     lockedBroker,
     lockedProduct,
