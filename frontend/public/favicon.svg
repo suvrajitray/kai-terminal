@@ -1,44 +1,39 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
-    <!-- Background Gradient -->
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0f172a" />
+    <!-- Deep glossy radial background specifically engineered for premium app icons -->
+    <radialGradient id="bgGrad" cx="50%" cy="20%" r="80%" fx="50%" fy="20%">
+      <stop offset="0%" stop-color="#1e293b" />
       <stop offset="100%" stop-color="#020617" />
-    </linearGradient>
+    </radialGradient>
     
-    <!-- Text Gradient mapped perfectly to the new KAI + underline bounds -->
-    <linearGradient id="textGrad" x1="81" y1="100" x2="421" y2="410" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#3b82f6" />
-      <stop offset="50%" stop-color="#8b5cf6" />
-      <stop offset="100%" stop-color="#ec4899" />
+    <!-- Bold Tech Purple-to-Blue sweep for the terminal prompt -->
+    <linearGradient id="promptGrad" x1="111" y1="136" x2="231" y2="376" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#c084fc" />
+      <stop offset="100%" stop-color="#3b82f6" />
     </linearGradient>
+
+    <!-- Bullish glowing neon green for the trading candle -->
+    <linearGradient id="candleGrad" x1="371" y1="100" x2="371" y2="412" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#34d399" />
+      <stop offset="100%" stop-color="#047857" />
+    </linearGradient>
+
+    <!-- Subtle soft shadow to give depth to the geometric elements -->
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.4" />
+    </filter>
   </defs>
 
   <rect width="512" height="512" rx="100" fill="url(#bgGrad)" />
-  <rect x="24" y="24" width="464" height="464" rx="76" fill="none" stroke="#1e293b" stroke-width="8" />
+  <!-- Sleek interior gloss border -->
+  <rect x="24" y="24" width="464" height="464" rx="76" fill="none" stroke="#334155" stroke-width="4" opacity="0.5" />
 
-  <!-- Letter K -->
-  <!-- Vertical line -->
-  <path d="M 81 100 L 81.1 340" fill="none" stroke="url(#textGrad)" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" />
-  <!-- Chevrons -->
-  <path d="M 171 100 L 81 220 L 171 340" fill="none" stroke="url(#textGrad)" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" />
+  <g filter="url(#shadow)">
+    <!-- The Terminal Shape (Left) -->
+    <path d="M 111 136 L 231 256 L 111 376" fill="none" stroke="url(#promptGrad)" stroke-width="44" stroke-linecap="round" stroke-linejoin="round" />
 
-  <!-- Letter A -->
-  <!-- Left leg -->
-  <path d="M 256 100 L 206 340" fill="none" stroke="url(#textGrad)" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" />
-  <!-- Right leg -->
-  <path d="M 256 100 L 306 340" fill="none" stroke="url(#textGrad)" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" />
-  <!-- Crossbar -->
-  <path d="M 224 254 L 288 254.1" fill="none" stroke="url(#textGrad)" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" />
-
-  <!-- Letter I -->
-  <!-- Vertical line -->
-  <path d="M 381 100 L 381.1 340" fill="none" stroke="url(#textGrad)" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" />
-  <!-- Top serif -->
-  <path d="M 341 100 L 421 100.1" fill="none" stroke="url(#textGrad)" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" />
-  <!-- Bottom serif -->
-  <path d="M 341 340 L 421 340.1" fill="none" stroke="url(#textGrad)" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" />
-
-  <!-- Full-width Underscore -->
-  <path d="M 81 410 L 421 410.1" fill="none" stroke="url(#textGrad)" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" />
+    <!-- The Trading Shape (Right) -->
+    <path d="M 371 100 L 371.1 412" fill="none" stroke="url(#candleGrad)" stroke-width="36" stroke-linecap="round" stroke-linejoin="round" />
+    <rect x="319" y="176" width="104" height="160" rx="32" fill="url(#candleGrad)" />
+  </g>
 </svg>
