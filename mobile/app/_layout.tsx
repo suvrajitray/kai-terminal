@@ -14,10 +14,12 @@ export default function RootLayout() {
   useEffect(() => {
     if (!isHydrated) return; // Wait for SecureStore read before navigating
     const inTabs = segments[0] === '(tabs)';
+    const inConnectBrokers = segments[0] === 'connect-brokers';
     if (!token || !isActive) {
-      if (inTabs) router.replace('/login');
+      if (inTabs || inConnectBrokers) router.replace('/login');
     } else {
-      if (!inTabs) router.replace('/(tabs)/');
+      // Allow connect-brokers without redirecting to tabs
+      if (!inTabs && !inConnectBrokers) router.replace('/(tabs)/');
     }
   }, [token, isActive, segments, isHydrated]);
 
