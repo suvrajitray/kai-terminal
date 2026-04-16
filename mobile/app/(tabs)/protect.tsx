@@ -1,5 +1,5 @@
-import { ScrollView, View, Text, Switch, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { useState, useMemo } from 'react';
+import { ScrollView, View, Text, Switch, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { useState, useMemo, useEffect } from 'react';
 import { ShieldCheck, ShieldOff } from 'lucide-react-native';
 import { useBrokerStore } from '../../stores/broker-store';
 import { useRiskConfig } from '../../hooks/use-risk-config';
@@ -10,16 +10,18 @@ import { BrokerPills } from '../../components/BrokerPills';
 import { PpForm } from '../../components/PpForm';
 
 export default function ProtectScreen() {
-  const isAuthenticated = useBrokerStore((s) => s.isAuthenticated);
+  const authenticated = useBrokerStore((s) => s.authenticated);
   const connectedBrokers = useMemo(
-    () => BROKERS.filter((b) => isAuthenticated(b.id)),
-    [isAuthenticated]
+    () => BROKERS.filter((b) => authenticated[b.id] ?? false),
+    [authenticated]
   );
   const [activeBroker, setActiveBroker] = useState(connectedBrokers[0]?.id ?? 'upstox');
 
-  // Sync activeBroker when connected brokers list changes (hydration)
-  // If currently selected broker is no longer available, switch to first available
-  // (useEffect omitted for simplicity — BrokerPills hides when only 1 broker)
+  useEffect(() => {
+    if (connectedBrokers.length > 0 && !connectedBrokers.find((b) => b.id === activeBroker)) {
+      setActiveBroker(connectedBrokers[0].id);
+    }
+  }, [connectedBrokers, activeBroker]);
 
   const { config, loading, save } = useRiskConfig(activeBroker);
   const { positions } = useLivePositions();
@@ -45,9 +47,7 @@ export default function ProtectScreen() {
       setSavedFlash(true);
       setTimeout(() => setSavedFlash(false), 2000);
     } catch (e: any) {
-      // Error already surfaced by the API client (401 → logout, etc.)
-      // For save failures, show a brief status
-      console.error('PP save failed:', e?.message);
+      Alert.alert('Save failed', (e as Error)?.message ?? 'Please try again');
     } finally {
       setSaving(false);
     }
