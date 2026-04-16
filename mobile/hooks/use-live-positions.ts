@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import * as signalR from '@microsoft/signalr';
 import { useAuthStore } from '../stores/auth-store';
+import { useBrokerStore } from '../stores/broker-store';
 import { API_BASE_URL } from '../constants';
 
 export interface LivePosition {
@@ -32,7 +33,13 @@ export function useLivePositions() {
       .withAutomaticReconnect()
       .build();
 
-    conn.on('ReceivePositions', (data: LivePosition[]) => setPositions(data));
+    conn.on('ReceivePositions', (data: LivePosition[]) => {
+      setPositions(data);
+      // Auto-detect and mark authenticated brokers from live position data
+      const uniqueBrokers = [...new Set(data.map((p: LivePosition) => p.broker ?? 'upstox'))];
+      const { setAuthenticated } = useBrokerStore.getState();
+      uniqueBrokers.forEach((b) => setAuthenticated(b, true));
+    });
 
     conn.on('ReceiveLtpBatch', (batch: Record<string, number>) => {
       setPositions((prev) =>

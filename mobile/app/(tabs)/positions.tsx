@@ -1,11 +1,11 @@
 import { ScrollView, View, Text, RefreshControl } from 'react-native';
 import { useState } from 'react';
-import { useLivePositions } from '../../hooks/use-live-positions';
+import { useLivePositionsContext } from '../../hooks/use-live-positions-context';
 import { PositionCard } from '../../components/PositionCard';
 import { ExitBar } from '../../components/ExitBar';
 
 export default function PositionsScreen() {
-  const { positions } = useLivePositions();
+  const { positions } = useLivePositionsContext();
   const [refreshing, setRefreshing] = useState(false);
 
   const open   = positions.filter((p) => p.quantity !== 0);

@@ -1,7 +1,7 @@
 import { ScrollView, View, Text, TouchableOpacity, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { useLivePositions } from '../../hooks/use-live-positions';
+import { useLivePositionsContext } from '../../hooks/use-live-positions-context';
 import { useRiskConfig } from '../../hooks/use-risk-config';
 import { fetchFunds } from '../../services/trading';
 import { useBrokerStore } from '../../stores/broker-store';
@@ -12,7 +12,7 @@ import { RiskEventBanner } from '../../components/RiskEventBanner';
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { positions, connected } = useLivePositions();
+  const { positions, connected } = useLivePositionsContext();
   const isAuthenticated = useBrokerStore((s) => s.isAuthenticated);
   const connectedBrokers = BROKERS.filter((b) => isAuthenticated(b.id));
 

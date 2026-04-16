@@ -4,7 +4,7 @@ import { ShieldCheck, ShieldOff } from 'lucide-react-native';
 import { useBrokerStore } from '../../stores/broker-store';
 import { useRiskConfig } from '../../hooks/use-risk-config';
 import { usePpDraft } from '../../hooks/use-pp-draft';
-import { useLivePositions } from '../../hooks/use-live-positions';
+import { useLivePositionsContext } from '../../hooks/use-live-positions-context';
 import { BROKERS } from '../../constants';
 import { BrokerPills } from '../../components/BrokerPills';
 import { PpForm } from '../../components/PpForm';
@@ -24,7 +24,7 @@ export default function ProtectScreen() {
   }, [connectedBrokers, activeBroker]);
 
   const { config, loading, save } = useRiskConfig(activeBroker);
-  const { positions } = useLivePositions();
+  const { positions } = useLivePositionsContext();
 
   const mtm = useMemo(
     () =>
