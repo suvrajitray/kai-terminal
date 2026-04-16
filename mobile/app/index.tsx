@@ -1,8 +1,4 @@
-import { Text, View } from 'react-native';
+import { Redirect } from 'expo-router';
 export default function Index() {
-  return (
-    <View className="flex-1 bg-zinc-950 items-center justify-center">
-      <Text className="text-white">KAI Terminal</Text>
-    </View>
-  );
+  return <Redirect href="/(tabs)/" />;
 }
