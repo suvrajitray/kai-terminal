@@ -1,35 +1,44 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
+    <!-- Background Gradient -->
     <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#0f172a" />
       <stop offset="100%" stop-color="#020617" />
     </linearGradient>
-    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#60a5fa" />
-      <stop offset="100%" stop-color="#3b82f6" />
-    </linearGradient>
-    <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#34d399" />
-      <stop offset="100%" stop-color="#10b981" />
+    
+    <!-- Text Gradient mapped perfectly to the new KAI + underline bounds -->
+    <linearGradient id="textGrad" x1="81" y1="100" x2="421" y2="410" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#3b82f6" />
+      <stop offset="50%" stop-color="#8b5cf6" />
+      <stop offset="100%" stop-color="#ec4899" />
     </linearGradient>
   </defs>
-  
-  <!-- Sleek dark background with rounded corners -->
-  <rect width="512" height="512" rx="120" fill="url(#bgGrad)" />
-  
-  <!-- Outer glowing stroke (subtle) -->
-  <rect x="16" y="16" width="480" height="480" rx="104" fill="none" stroke="#1e293b" stroke-width="8" />
-  
-  <!-- The 'K' combined with a terminal prompt -->
-  <g transform="translate(130, 140)">
-    <!-- Vertical line of K -->
-    <path d="M 40 20 L 40 220" stroke="url(#accentGrad)" stroke-width="45" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-    <!-- Top arm of K -->
-    <path d="M 40 120 L 140 20" stroke="url(#accentGrad)" stroke-width="45" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-    <!-- Bottom arm of K -->
-    <path d="M 40 120 L 140 220" stroke="url(#accentGrad)" stroke-width="45" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-    
-    <!-- Terminal Underscore/Cursor in bright green -->
-    <path d="M 170 220 L 250 220" stroke="url(#greenGrad)" stroke-width="45" stroke-linecap="round" fill="none" />
-  </g>
+
+  <rect width="512" height="512" rx="100" fill="url(#bgGrad)" />
+  <rect x="24" y="24" width="464" height="464" rx="76" fill="none" stroke="#1e293b" stroke-width="8" />
+
+  <!-- Letter K -->
+  <!-- Vertical line -->
+  <path d="M 81 100 L 81.1 340" fill="none" stroke="url(#textGrad)" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" />
+  <!-- Chevrons -->
+  <path d="M 171 100 L 81 220 L 171 340" fill="none" stroke="url(#textGrad)" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- Letter A -->
+  <!-- Left leg -->
+  <path d="M 256 100 L 206 340" fill="none" stroke="url(#textGrad)" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" />
+  <!-- Right leg -->
+  <path d="M 256 100 L 306 340" fill="none" stroke="url(#textGrad)" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" />
+  <!-- Crossbar -->
+  <path d="M 224 254 L 288 254.1" fill="none" stroke="url(#textGrad)" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- Letter I -->
+  <!-- Vertical line -->
+  <path d="M 381 100 L 381.1 340" fill="none" stroke="url(#textGrad)" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" />
+  <!-- Top serif -->
+  <path d="M 341 100 L 421 100.1" fill="none" stroke="url(#textGrad)" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" />
+  <!-- Bottom serif -->
+  <path d="M 341 340 L 421 340.1" fill="none" stroke="url(#textGrad)" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- Full-width Underscore -->
+  <path d="M 81 410 L 421 410.1" fill="none" stroke="url(#textGrad)" stroke-width="40" stroke-linecap="round" stroke-linejoin="round" />
 </svg>
