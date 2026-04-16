@@ -7,13 +7,13 @@
     </radialGradient>
     
     <!-- Bold Tech Purple-to-Blue sweep for the terminal prompt -->
-    <linearGradient id="promptGrad" x1="111" y1="136" x2="231" y2="376" gradientUnits="userSpaceOnUse">
+    <linearGradient id="promptGrad" x1="125" y1="136" x2="245" y2="376" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#c084fc" />
       <stop offset="100%" stop-color="#3b82f6" />
     </linearGradient>
 
     <!-- Bullish glowing neon green for the trading candle -->
-    <linearGradient id="candleGrad" x1="371" y1="100" x2="371" y2="412" gradientUnits="userSpaceOnUse">
+    <linearGradient id="candleGrad" x1="353" y1="100" x2="353" y2="412" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#34d399" />
       <stop offset="100%" stop-color="#047857" />
     </linearGradient>
@@ -24,16 +24,17 @@
     </filter>
   </defs>
 
-  <rect width="512" height="512" rx="100" fill="url(#bgGrad)" />
+  <!-- iOS-style Squircle background -->
+  <rect width="512" height="512" rx="115" fill="url(#bgGrad)" />
   <!-- Sleek interior gloss border -->
-  <rect x="24" y="24" width="464" height="464" rx="76" fill="none" stroke="#334155" stroke-width="4" opacity="0.5" />
+  <rect x="24" y="24" width="464" height="464" rx="91" fill="none" stroke="#334155" stroke-width="4" opacity="0.5" />
 
   <g filter="url(#shadow)">
-    <!-- The Terminal Shape (Left) -->
-    <path d="M 111 136 L 231 256 L 111 376" fill="none" stroke="url(#promptGrad)" stroke-width="44" stroke-linecap="round" stroke-linejoin="round" />
+    <!-- The Terminal Shape (Left - Mathematically balanced) -->
+    <path d="M 125 136 L 245 256 L 125 376" fill="none" stroke="url(#promptGrad)" stroke-width="44" stroke-linecap="round" stroke-linejoin="round" />
 
-    <!-- The Trading Shape (Right) -->
-    <path d="M 371 100 L 371.1 412" fill="none" stroke="url(#candleGrad)" stroke-width="36" stroke-linecap="round" stroke-linejoin="round" />
-    <rect x="319" y="176" width="104" height="160" rx="32" fill="url(#candleGrad)" />
+    <!-- The Trading Shape (Right - Proportionally refined) -->
+    <path d="M 353 100 L 353.1 412" fill="none" stroke="url(#candleGrad)" stroke-width="32" stroke-linecap="round" stroke-linejoin="round" />
+    <rect x="297" y="176" width="112" height="160" rx="32" fill="url(#candleGrad)" />
   </g>
 </svg>
