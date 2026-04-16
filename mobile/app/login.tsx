@@ -12,16 +12,22 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     const url = `${API_BASE_URL}/auth/google?platform=mobile`;
-    await WebBrowser.openAuthSessionAsync(url, 'kaiterminal://auth/callback');
+    const result = await WebBrowser.openAuthSessionAsync(url, 'kaiterminal://auth/callback');
+    // iOS: token comes back in the return value (ASWebAuthenticationSession)
+    if (result.type === 'success') {
+      const { queryParams } = Linking.parse(result.url);
+      if (queryParams?.token) await setToken(queryParams.token as string);
+    }
   };
 
   useEffect(() => {
-    const sub = Linking.addEventListener('url', ({ url }) => {
+    // Android: token comes via Linking event (cold-start deep link)
+    const sub = Linking.addEventListener('url', async ({ url }) => {
       const { queryParams } = Linking.parse(url);
-      if (queryParams?.token) setToken(queryParams.token as string);
+      if (queryParams?.token) await setToken(queryParams.token as string);
     });
     return () => sub.remove();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <View className="flex-1 bg-zinc-950 items-center justify-center gap-6 p-8">
