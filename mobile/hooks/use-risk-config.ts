@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchRiskConfig, saveRiskConfig, RiskConfig } from '../services/risk-config';
+import { useAuthStore } from '../stores/auth-store';
 
 const DEFAULT: RiskConfig = {
   enabled: false, watchedProducts: 'All', mtmTarget: 0, mtmSl: 0,
@@ -9,14 +10,15 @@ const DEFAULT: RiskConfig = {
 };
 
 export function useRiskConfig(broker: string) {
+  const token = useAuthStore((s) => s.token);
   const [config, setConfig] = useState<RiskConfig>(DEFAULT);
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
-    if (!broker) return;
+    if (!broker || !token) return;
     setLoading(true);
     try { setConfig(await fetchRiskConfig(broker)); } finally { setLoading(false); }
-  }, [broker]);
+  }, [broker, token]);
 
   useEffect(() => { load(); }, [load]);
 

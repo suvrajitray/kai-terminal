@@ -1,10 +1,11 @@
 import { ScrollView, View, Text, TouchableOpacity, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useLivePositionsContext } from '../../hooks/use-live-positions-context';
 import { useRiskConfig } from '../../hooks/use-risk-config';
 import { fetchFunds } from '../../services/trading';
 import { useBrokerStore } from '../../stores/broker-store';
+import { useAuthStore } from '../../stores/auth-store';
 import { BROKERS } from '../../constants';
 import { MtmCard } from '../../components/MtmCard';
 import { StatsRow } from '../../components/StatsRow';
@@ -13,8 +14,12 @@ import { RiskEventBanner } from '../../components/RiskEventBanner';
 export default function DashboardScreen() {
   const router = useRouter();
   const { positions, connected } = useLivePositionsContext();
-  const isAuthenticated = useBrokerStore((s) => s.isAuthenticated);
-  const connectedBrokers = BROKERS.filter((b) => isAuthenticated(b.id));
+  const token = useAuthStore((s) => s.token);
+  const authenticated = useBrokerStore((s) => s.authenticated);
+  const connectedBrokers = useMemo(
+    () => BROKERS.filter((b) => authenticated[b.id] ?? false),
+    [authenticated]
+  );
 
   const upstoxCfg  = useRiskConfig('upstox');
   const zerodhaCfg = useRiskConfig('zerodha');
@@ -24,6 +29,7 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const loadMargin = async () => {
+    if (!token || connectedBrokers.length === 0) return;
     const results = await Promise.allSettled(
       connectedBrokers.map(async (b) => {
         const f = await fetchFunds(b.id);
@@ -35,7 +41,7 @@ export default function DashboardScreen() {
     setMargin(map);
   };
 
-  useEffect(() => { loadMargin(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadMargin(); }, [token, connectedBrokers.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onRefresh = async () => {
     setRefreshing(true);
