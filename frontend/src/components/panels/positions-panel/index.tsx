@@ -109,8 +109,8 @@ export function PositionsPanel({
       const strikeGap = getShiftOffset(index);
       const underlyingKey = UNDERLYING_KEYS[index];
 
-      return withActing(token + ":shift-" + direction, () =>
-        shiftPosition(broker, {
+      return withActing(token + ":shift-" + direction, async () => {
+        const result = await shiftPosition(broker, {
           instrumentToken: token,
           exchange,
           qty,
@@ -122,8 +122,9 @@ export function PositionsPanel({
           expiry: contract.expiry,
           instrumentType: contract.instrumentType,
           isShort: position.quantity < 0,
-        })
-      );
+        });
+        if (result.warning) toast.warning(result.warning);
+      });
     };
   }, [positions, qtys, qtyMode, getByInstrumentKey, withActing]);
 

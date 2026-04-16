@@ -197,8 +197,9 @@ export interface ShiftPositionPayload {
   isShort: boolean;
 }
 
-export async function shiftPosition(broker: string, payload: ShiftPositionPayload): Promise<void> {
-  await apiClient.post(`/api/${broker}/positions/shift`, payload);
+export async function shiftPosition(broker: string, payload: ShiftPositionPayload): Promise<{ warning?: string }> {
+  const res = await apiClient.post(`/api/${broker}/positions/shift`, payload);
+  return (res.data as { warning?: string }) ?? {};
 }
 
 export interface ByPriceOrderPayload {
