@@ -38,7 +38,7 @@ export function useLivePositions() {
       setPositions((prev) =>
         prev.map((p) => {
           const ltp = batch[p.instrumentToken] ?? p.ltp;
-          const pnl = p.quantity * (ltp - p.averagePrice);
+          const pnl = p.realised + p.quantity * (ltp - p.averagePrice);
           return { ...p, ltp, pnl };
         })
       );

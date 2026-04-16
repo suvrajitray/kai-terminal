@@ -15,7 +15,7 @@ export function ExitBar({ positions, onRefresh }: { positions: LivePosition[]; o
 
   const act = async (key: string, fn: () => Promise<void>) => {
     setActing(key);
-    try { await fn(); await onRefresh(); } catch { /* toast */ } finally { setActing(null); }
+    try { await fn(); await onRefresh(); } catch (e) { Alert.alert('Action failed', (e as Error).message ?? 'Unknown error'); } finally { setActing(null); }
   };
 
   const confirmExitAll = () =>

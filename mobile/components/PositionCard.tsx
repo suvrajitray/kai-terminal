@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { exitPosition } from '../services/trading';
 import { BROKERS } from '../constants';
 import type { LivePosition } from '../hooks/use-live-positions';
@@ -11,7 +11,7 @@ export function PositionCard({ position: p, onRefresh }: { position: LivePositio
   const handleExit = async () => {
     setExiting(true);
     try { await exitPosition(p.instrumentToken, p.product, p.broker); await onRefresh(); }
-    catch { /* toast error — will be handled in later improvement */ }
+    catch (e) { Alert.alert('Exit failed', (e as Error).message ?? 'Unknown error'); }
     finally { setExiting(false); }
   };
 
