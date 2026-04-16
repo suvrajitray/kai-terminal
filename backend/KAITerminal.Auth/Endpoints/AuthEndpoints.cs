@@ -60,8 +60,9 @@ public static class AuthEndpoints
 
             var token = jwtService.GenerateToken(email, name, email, isActive: true, isAdmin: user.IsAdmin);
 
-            var platform = result.Properties?.Items.GetValueOrDefault("platform");
-            if (platform == "mobile")
+            var isMobile = result.Properties?.Items.ContainsKey("platform") == true
+                        && result.Properties.Items["platform"] == "mobile";
+            if (isMobile)
             {
                 var mobileScheme = config["Frontend:MobileCallbackScheme"] ?? "kaiterminal";
                 return Results.Redirect($"{mobileScheme}://auth/callback?token={token}");
