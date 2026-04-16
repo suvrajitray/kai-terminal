@@ -14,6 +14,9 @@ apiClient.interceptors.response.use(
   (r) => r,
   (err) => {
     if (err.response?.status === 401) useAuthStore.getState().logout();
+    if (err.response?.status === 404) {
+      console.warn('[API 404]', err.config?.method?.toUpperCase(), err.config?.url);
+    }
     return Promise.reject(err);
   }
 );
