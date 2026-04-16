@@ -47,7 +47,10 @@ function PillRow<T extends string>({ options, value, onChange, colorOf }: {
 
 export default function TradeScreen() {
   const isAuthenticated = useBrokerStore((s) => s.isAuthenticated);
-  const connectedBrokers = BROKERS.filter((b) => isAuthenticated(b.id));
+  const connectedBrokers = useMemo(
+    () => BROKERS.filter((b) => isAuthenticated(b.id)),
+    [isAuthenticated]
+  );
 
   const [contracts, setContracts] = useState<IndexContracts[]>([]);
   const [index, setIndex] = useState<typeof INDICES[number]>('NIFTY');
@@ -58,6 +61,12 @@ export default function TradeScreen() {
   const [lots, setLots] = useState('1');
   const [product, setProduct] = useState<'Intraday' | 'Delivery'>('Intraday');
   const [broker, setBroker] = useState(connectedBrokers[0]?.id ?? 'upstox');
+
+  useEffect(() => {
+    if (connectedBrokers.length > 0 && !connectedBrokers.some((b) => b.id === broker)) {
+      setBroker(connectedBrokers[0].id);
+    }
+  }, [connectedBrokers]);
   const [placing, setPlacing] = useState(false);
   const [status, setStatus] = useState<{ text: string; success: boolean } | null>(null);
 
