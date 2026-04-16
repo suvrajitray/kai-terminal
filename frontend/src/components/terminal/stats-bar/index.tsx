@@ -6,6 +6,7 @@ import { PositionCountBadges } from "../position-count-badges";
 import { KeyboardShortcutsHelp } from "../keyboard-shortcuts-help";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useRiskConfig } from "@/hooks/use-risk-config";
 import { useBrokerStore } from "@/stores/broker-store";
@@ -35,7 +36,7 @@ interface StatsBarProps {
   acting: string | null;
   onRefresh: () => void;
   onExitAll: () => void;
-  onOpenProfitProtection: () => void;
+  onOpenProfitProtection: (brokerId?: string) => void;
   ppBrokers: PpBrokerEntry[];
   onToggleChain: () => void;
   chainOpen: boolean;
@@ -180,21 +181,51 @@ export function StatsBar({
 
       {/* Row 2 (lg: right) — actions; subtle top border only below lg */}
       <div className="flex h-9 items-center gap-2 shrink-0 lg:ml-auto border-t border-border/40 lg:border-t-0">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={onOpenProfitProtection}
-              className={cn(
-                "flex cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-xs font-medium transition-colors",
-                ppEnabled
-                  ? "text-green-500 hover:bg-green-500/10"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
-            >
-              <ShieldCheck className="size-3.5" />
-              <span>Profit Protection</span>
-              {/* inline toggle — only shown for single-broker sessions */}
-              {!multipleConnected && (
+        {multipleConnected ? (
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className={cn(
+                      "flex cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-xs font-medium transition-colors",
+                      ppEnabled
+                        ? "text-green-500 hover:bg-green-500/10"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
+                  >
+                    <ShieldCheck className="size-3.5" />
+                    <span>Profit Protection</span>
+                  </button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{ppEnabled ? "Profit Protection ON — click to configure" : "Click to configure Profit Protection"}</p>
+              </TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent align="end">
+              {connectedBrokers.map((b) => (
+                <DropdownMenuItem key={b.id} onClick={() => onOpenProfitProtection(b.id)}>
+                  {b.name}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => onOpenProfitProtection(singleBroker)}
+                className={cn(
+                  "flex cursor-pointer items-center gap-1.5 rounded px-2 py-1 text-xs font-medium transition-colors",
+                  ppEnabled
+                    ? "text-green-500 hover:bg-green-500/10"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                <ShieldCheck className="size-3.5" />
+                <span>Profit Protection</span>
+                {/* inline toggle — only shown for single-broker sessions */}
                 <span
                   onClick={(e) => { e.stopPropagation(); setEnabled(!ppEnabled); }}
                   className={cn(
@@ -209,13 +240,13 @@ export function StatsBar({
                     )}
                   />
                 </span>
-              )}
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{ppEnabled ? "Profit Protection ON — click to configure" : "Click to configure Profit Protection"}</p>
-          </TooltipContent>
-        </Tooltip>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>{ppEnabled ? "Profit Protection ON — click to configure" : "Click to configure Profit Protection"}</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
 
         <div className="h-4 w-px bg-border" />
 

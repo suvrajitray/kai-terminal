@@ -55,6 +55,7 @@ function TerminalPageInner() {
   const [ordersHeight, setOrdersHeight] = useState(MIN_HEIGHT);
   const [ordersExpanded, setOrdersExpanded] = useState(false);
   const [ppOpen, setPpOpen] = useState(false);
+  const [ppBrokerId, setPpBrokerId] = useState<string | null>(null);
   const [chainOpen, setChainOpen] = useState(true);
   const [chainWidth, setChainWidth] = useState(400);
   const [exitAllConfirmOpen, setExitAllConfirmOpen] = useState(false);
@@ -174,7 +175,7 @@ function TerminalPageInner() {
           acting={acting}
           onRefresh={load}
           onExitAll={() => setExitAllConfirmOpen(true)}
-          onOpenProfitProtection={() => setPpOpen(true)}
+          onOpenProfitProtection={(brokerId?: string) => { setPpBrokerId(brokerId || null); setPpOpen(true); }}
           onToggleChain={() => setChainOpen((v) => !v)}
           chainOpen={chainOpen}
           productFilter={productFilter}
@@ -223,8 +224,9 @@ function TerminalPageInner() {
       <Suspense fallback={<div className="flex items-center justify-center p-8 text-muted-foreground text-sm">Loading…</div>}>
         <ProfitProtectionPanel
           open={ppOpen}
-          onClose={() => setPpOpen(false)}
+          onClose={() => { setPpOpen(false); setPpBrokerId(null); }}
           positions={positions}
+          brokerId={ppBrokerId}
         />
       </Suspense>
 

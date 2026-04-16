@@ -1,5 +1,5 @@
 // frontend/src/components/terminal/profit-protection-panel/index.tsx
-import { useState, useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { ShieldCheck, ShieldOff } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -17,13 +17,12 @@ interface ProfitProtectionPanelProps {
   open: boolean;
   onClose: () => void;
   positions: Position[];
+  brokerId?: string | null;
 }
 
-export function ProfitProtectionPanel({ open, onClose, positions }: ProfitProtectionPanelProps) {
+export function ProfitProtectionPanel({ open, onClose, positions, brokerId }: ProfitProtectionPanelProps) {
   const connectedBrokers = useBrokerStore(useShallow((s) => BROKERS.filter((b) => s.isAuthenticated(b.id))));
-  const multipleConnected = connectedBrokers.length > 1;
-  const defaultBroker = connectedBrokers[0]?.id ?? "upstox";
-  const [activeBroker, setActiveBroker] = useState(defaultBroker);
+  const activeBroker = brokerId ?? connectedBrokers[0]?.id ?? "";
 
   const upstoxConfig  = useRiskConfig("upstox");
   const zerodhaConfig = useRiskConfig("zerodha");
@@ -35,24 +34,24 @@ export function ProfitProtectionPanel({ open, onClose, positions }: ProfitProtec
     increaseByVal, trailByVal, slVal, activateAtVal, lockProfitAtVal,
   } = usePpDraft(activeBroker, positions);
 
-  // Reset when dialog opens
-  const handleOpenChange = useCallback((isOpen: boolean) => {
-    if (!isOpen) { onClose(); return; }
-    const broker = connectedBrokers[0]?.id ?? "upstox";
-    setActiveBroker(broker);
-    resetToBroker(broker);
-  }, [connectedBrokers, onClose, resetToBroker]);
+  // Reset draft whenever the dialog opens or the broker changes.
+  // useEffect is required here — Radix never fires onOpenChange(true) for
+  // externally-controlled dialogs, so the previous resetToBroker call in
+  // the true-branch of handleOpenChange was dead code.
+  useEffect(() => {
+    if (open && activeBroker) resetToBroker(activeBroker);
+  }, [open, activeBroker, resetToBroker]);
 
-  const handleBrokerSwitch = useCallback((broker: string) => {
-    setActiveBroker(broker);
-    resetToBroker(broker);
-  }, [resetToBroker]);
+  const handleOpenChange = useCallback((isOpen: boolean) => {
+    if (!isOpen) onClose();
+  }, [onClose]);
 
   const handleSave = useCallback(async () => {
     if (!canSave) return;
     const configMap: Record<string, ReturnType<typeof useRiskConfig>> = { upstox: upstoxConfig, zerodha: zerodhaConfig, dhan: dhanConfig };
-    const { save } = configMap[activeBroker] ?? upstoxConfig;
-    await save(toSavePayload());
+    const brokerConfig = configMap[activeBroker];
+    if (!brokerConfig) { toast.error("Unknown broker — cannot save"); return; }
+    await brokerConfig.save(toSavePayload());
     const name = connectedBrokers.find((b) => b.id === activeBroker)?.name ?? activeBroker;
     toast.success(`${name} — configuration saved`);
     onClose();
@@ -67,11 +66,9 @@ export function ProfitProtectionPanel({ open, onClose, positions }: ProfitProtec
           <DialogTitle className="flex items-center gap-2 text-base">
             <ShieldCheck className="size-4 text-green-500" />
             Profit Protection
-            {multipleConnected && (
-              <span className="text-sm font-normal text-muted-foreground">
-                — {activeBrokerName}
-              </span>
-            )}
+            <span className="text-sm font-normal text-muted-foreground">
+              — {activeBrokerName}
+            </span>
           </DialogTitle>
         </DialogHeader>
 
@@ -84,27 +81,8 @@ export function ProfitProtectionPanel({ open, onClose, positions }: ProfitProtec
         )}>
           <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-4">
-            {/* Left: broker selector or broker name */}
-            {multipleConnected ? (
-              <div className="flex gap-1.5">
-                {connectedBrokers.map((b) => (
-                  <button
-                    key={b.id}
-                    onClick={() => handleBrokerSwitch(b.id)}
-                    className={cn(
-                      "rounded-md border px-3 py-1 text-xs font-semibold transition-all",
-                      activeBroker === b.id
-                        ? "border-primary/60 bg-primary/10 text-primary"
-                        : "border-border/50 bg-background/40 text-muted-foreground hover:border-border hover:text-foreground",
-                    )}
-                  >
-                    {b.name}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <span className="text-sm font-medium text-muted-foreground">{activeBrokerName}</span>
-            )}
+            {/* Left: broker name */}
+            <span className="text-sm font-medium text-muted-foreground">{activeBrokerName}</span>
 
             {/* Center: MTM */}
             <div className="flex flex-col items-center">

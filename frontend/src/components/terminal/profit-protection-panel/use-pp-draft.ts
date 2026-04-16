@@ -50,11 +50,16 @@ export function usePpDraft(broker: string, positions: Position[]) {
   }, []);
 
   const toggleEnabled = useCallback(() => {
-    setDraft((d) => ({
-      ...d,
-      enabled: !d.enabled,
-      ...(!d.enabled ? {} : { autoShiftEnabled: false, trailingEnabled: false }),
-    }));
+    setDraft((d) => {
+      const isEnabling = !d.enabled;
+      return {
+        ...d,
+        enabled: isEnabling,
+        // When disabling, also turn off dependent toggles so they don't
+        // silently re-activate if the user re-enables PP later.
+        ...(!isEnabling && { autoShiftEnabled: false, trailingEnabled: false }),
+      };
+    });
   }, []);
 
   // Derived numeric values
