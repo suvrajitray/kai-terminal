@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "KAI Terminal",
+    "slug": "kaiterminal",
+    "scheme": "kaiterminal",
+    "version": "1.0.0",
+    "userInterfaceStyle": "dark",
+    "platforms": ["ios", "android"],
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#09090b"
+    },
+    "ios": { "bundleIdentifier": "com.kaiterminal.app" },
+    "android": {
+      "package": "com.kaiterminal.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#09090b"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-notifications"
+    ],
+    "experiments": { "typedRoutes": true }
+  }
+}

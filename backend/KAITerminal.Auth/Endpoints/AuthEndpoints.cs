@@ -15,12 +15,14 @@ public static class AuthEndpoints
 {
     public static void MapAuthEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/auth/google", async (HttpContext context) =>
+        app.MapGet("/auth/google", async (HttpContext context, HttpRequest request) =>
         {
+            var platform = request.Query["platform"].FirstOrDefault() ?? "web";
             await context.ChallengeAsync(GoogleDefaults.AuthenticationScheme,
                 new AuthenticationProperties
                 {
-                    RedirectUri = "/auth/google/callback"
+                    RedirectUri = "/auth/google/callback",
+                    Items = { ["platform"] = platform }
                 });
         });
 
@@ -43,7 +45,6 @@ public static class AuthEndpoints
             var principal = result.Principal!;
             var email = principal.FindFirstValue(ClaimTypes.Email)!;
             var name  = principal.FindFirstValue(ClaimTypes.Name)!;
-            var sub   = principal.FindFirstValue(ClaimTypes.NameIdentifier)!;
 
             var user = await userService.EnsureExistsAsync(email, name);
 
@@ -59,9 +60,14 @@ public static class AuthEndpoints
 
             var token = jwtService.GenerateToken(email, name, email, isActive: true, isAdmin: user.IsAdmin);
 
-            return Results.Redirect(
-                $"{config["Frontend:Url"]}/auth/callback?token={token}"
-            );
+            var platform = result.Properties?.Items.GetValueOrDefault("platform");
+            if (platform == "mobile")
+            {
+                var mobileScheme = config["Frontend:MobileCallbackScheme"] ?? "kaiterminal";
+                return Results.Redirect($"{mobileScheme}://auth/callback?token={token}");
+            }
+
+            return Results.Redirect($"{config["Frontend:Url"]}/auth/callback?token={token}");
         });
     }
 }
