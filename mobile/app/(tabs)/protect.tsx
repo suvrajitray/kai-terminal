@@ -61,7 +61,7 @@ export default function ProtectScreen() {
         {/* Broker pill selector */}
         <BrokerPills
           active={activeBroker}
-          onChange={setActiveBroker}
+          onChange={(id) => setActiveBroker(id as typeof activeBroker)}
           available={connectedBrokers.map((b) => b.id)}
         />
 

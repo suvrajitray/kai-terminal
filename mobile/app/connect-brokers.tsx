@@ -263,7 +263,7 @@ export default function ConnectBrokersScreen() {
         {/* All active → back to dashboard */}
         {configuredBrokers.length > 0 && configuredBrokers.every((b) => isSessionActive(b.id)) && (
           <TouchableOpacity
-            onPress={() => router.replace('/(tabs)/')}
+            onPress={() => router.replace('/(tabs)')}
             className="bg-emerald-600 py-4 rounded-2xl items-center mt-2"
           >
             <Text className="text-white font-bold text-base">All Set — Go to Dashboard</Text>

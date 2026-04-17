@@ -19,7 +19,7 @@ export default function RootLayout() {
       if (inTabs || inConnectBrokers) router.replace('/login');
     } else {
       // Allow connect-brokers without redirecting to tabs
-      if (!inTabs && !inConnectBrokers) router.replace('/(tabs)/');
+      if (!inTabs && !inConnectBrokers) router.replace('/(tabs)');
     }
   }, [token, isActive, segments, isHydrated]);
 

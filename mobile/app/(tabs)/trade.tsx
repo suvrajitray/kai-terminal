@@ -249,7 +249,7 @@ export default function TradeScreen() {
             <PillRow
               options={connectedBrokers.map((b) => b.id) as unknown as readonly string[]}
               value={broker}
-              onChange={setBroker}
+              onChange={(v) => setBroker(v as typeof broker)}
               colorOf={(id) => BROKERS.find((b) => b.id === id)?.color ?? '#7B2FF7'}
             />
           </View>
