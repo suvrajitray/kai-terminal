@@ -38,7 +38,7 @@ export const useBrokerStore = create<BrokerState>()(
       isAuthenticated: (broker) => get().authenticated[broker] ?? false,
       isSessionActive: (broker) => {
         const token = get().credentials[broker]?.accessToken;
-        return !!token && token !== 'NA';
+        return !!token; // backend returns "" for stale/expired tokens, non-empty = valid
       },
       hasCredentials: (broker) => broker in get().credentials,
       getCredentials: (broker) => get().credentials[broker],

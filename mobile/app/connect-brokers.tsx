@@ -2,6 +2,32 @@ import { useState, useCallback, useEffect } from 'react';
 import {
   ScrollView, View, Text, TouchableOpacity, ActivityIndicator, AppState, AppStateStatus,
 } from 'react-native';
+
+function secondsUntilEightAmIst(): number {
+  const istOffsetMs = 5.5 * 60 * 60 * 1000;
+  const nowIst = new Date(Date.now() + istOffsetMs);
+  const h = nowIst.getUTCHours();
+  const m = nowIst.getUTCMinutes();
+  const s = nowIst.getUTCSeconds();
+  if (h >= 8) return 0;
+  return (8 - h) * 3600 - m * 60 - s;
+}
+
+function formatCountdown(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function useCountdownToEightAmIst() {
+  const [seconds, setSeconds] = useState(secondsUntilEightAmIst);
+  useEffect(() => {
+    const id = setInterval(() => setSeconds(secondsUntilEightAmIst()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return { isBeforeEight: seconds > 0, countdown: formatCountdown(seconds) };
+}
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
@@ -54,6 +80,7 @@ export default function ConnectBrokersScreen() {
   const getCredentials  = useBrokerStore((s) => s.getCredentials);
   const hasCredentials  = useBrokerStore((s) => s.hasCredentials);
   const isSessionActive = useBrokerStore((s) => s.isSessionActive);
+  const { isBeforeEight, countdown } = useCountdownToEightAmIst();
 
   const [loading, setLoading]   = useState(true);
   const [authing, setAuthing]   = useState<string | null>(null);
@@ -210,17 +237,24 @@ export default function ConnectBrokersScreen() {
 
                 <TouchableOpacity
                   onPress={() => handleAuth(broker.id)}
-                  disabled={busy}
-                  className={`py-3 rounded-xl items-center ${busy ? 'bg-zinc-800' : 'bg-violet-600'}`}
+                  disabled={busy || isBeforeEight}
+                  className={`py-3 rounded-xl items-center ${busy || isBeforeEight ? 'bg-zinc-800' : 'bg-violet-600'}`}
                 >
                   {busy ? (
                     <ActivityIndicator size="small" color="#a78bfa" />
+                  ) : isBeforeEight ? (
+                    <Text className="text-zinc-400 font-semibold text-sm">Opens in {countdown}</Text>
                   ) : (
                     <Text className="text-white font-semibold text-sm">
                       {active ? 'Re-authenticate' : 'Authenticate'}
                     </Text>
                   )}
                 </TouchableOpacity>
+                {isBeforeEight && (
+                  <Text className="text-zinc-500 text-xs text-center mt-1">
+                    Brokers invalidate tokens created before 8:00 AM IST
+                  </Text>
+                )}
               </View>
             );
           })

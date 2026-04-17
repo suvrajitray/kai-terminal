@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
+import { useBrokerStore } from './broker-store';
 
 interface AuthState {
   token: string | null;
@@ -35,6 +36,11 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
   logout: async () => {
     await SecureStore.deleteItemAsync('jwt');
+    // Reset broker access tokens so stale sessions don't show as active after re-login
+    const { credentials, setCredentials } = useBrokerStore.getState();
+    for (const [broker, creds] of Object.entries(credentials)) {
+      setCredentials(broker, { ...creds, accessToken: '' });
+    }
     set({ token: null, email: null, name: null, isActive: false, isAdmin: false });
   },
   hydrate: async () => {

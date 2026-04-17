@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "motion/react";
-import { KeyRound, Settings, Plug } from "lucide-react";
+import { KeyRound, Settings, Plug, Clock } from "lucide-react";
 import { CopyTokenButton } from "@/components/layout/copy-token-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ConnectBrokerDialog } from "./connect-broker-dialog";
 import { BrokerSettingsDialog } from "./broker-settings-dialog";
 import { useBrokerStore } from "@/stores/broker-store";
+import { useCountdownToEightAmIst } from "@/lib/token-utils";
 import { UPSTOX_OAUTH_URL, ZERODHA_OAUTH_URL } from "@/lib/constants";
 import type { BrokerInfo, BrokerCredentials } from "@/types";
 
@@ -34,6 +35,7 @@ export function BrokerCard({ broker }: BrokerCardProps) {
   const getCredentials = useBrokerStore((s) => s.getCredentials);
   const [connectOpen, setConnectOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const { isBeforeEight, countdown } = useCountdownToEightAmIst();
 
   const handleAuthenticate = () => {
     const creds = getCredentials(broker.id);
@@ -71,15 +73,37 @@ export function BrokerCard({ broker }: BrokerCardProps) {
               ))}
             </div>
             {isConnected ? (
-              <div className="flex gap-2">
-                <Button className="flex-1" variant="default" onClick={handleAuthenticate}>
-                  <KeyRound className="mr-2 size-4" />
-                  Authenticate
-                </Button>
-                <CopyTokenButton brokerId={broker.id} />
-                <Button variant="outline" size="icon" onClick={() => setSettingsOpen(true)}>
-                  <Settings className="size-4" />
-                </Button>
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <Button
+                    className="flex-1"
+                    variant="default"
+                    onClick={handleAuthenticate}
+                    disabled={isBeforeEight}
+                    title={isBeforeEight ? `Available after 8:00 AM IST` : undefined}
+                  >
+                    {isBeforeEight ? (
+                      <>
+                        <Clock className="mr-2 size-4" />
+                        Opens in {countdown}
+                      </>
+                    ) : (
+                      <>
+                        <KeyRound className="mr-2 size-4" />
+                        Authenticate
+                      </>
+                    )}
+                  </Button>
+                  <CopyTokenButton brokerId={broker.id} />
+                  <Button variant="outline" size="icon" onClick={() => setSettingsOpen(true)}>
+                    <Settings className="size-4" />
+                  </Button>
+                </div>
+                {isBeforeEight && (
+                  <p className="text-center text-[11px] text-muted-foreground">
+                    Brokers invalidate tokens created before 8:00 AM IST
+                  </p>
+                )}
               </div>
             ) : (
               <Button

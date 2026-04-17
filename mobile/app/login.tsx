@@ -3,12 +3,26 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { useAuthStore } from '../stores/auth-store';
+import { useBrokerStore } from '../stores/broker-store';
+import { fetchBrokerCredentials } from '../services/broker';
 import { API_BASE_URL } from '../constants';
 
 WebBrowser.maybeCompleteAuthSession();
 
+async function hydrateBrokerStore(setCredentials: ReturnType<typeof useBrokerStore.getState>['setCredentials']) {
+  try {
+    const creds = await fetchBrokerCredentials();
+    for (const c of creds) {
+      if (c.accessToken) {
+        setCredentials(c.brokerName, { apiKey: c.apiKey, apiSecret: c.apiSecret, accessToken: c.accessToken });
+      }
+    }
+  } catch {}
+}
+
 export default function LoginScreen() {
   const setToken = useAuthStore((s) => s.setToken);
+  const setCredentials = useBrokerStore((s) => s.setCredentials);
 
   const handleLogin = async () => {
     const url = `${API_BASE_URL}/auth/google?platform=mobile`;
@@ -16,7 +30,10 @@ export default function LoginScreen() {
     // iOS: token comes back in the return value (ASWebAuthenticationSession)
     if (result.type === 'success') {
       const { queryParams } = Linking.parse(result.url);
-      if (queryParams?.token) await setToken(queryParams.token as string);
+      if (queryParams?.token) {
+        await setToken(queryParams.token as string);
+        await hydrateBrokerStore(setCredentials);
+      }
     }
   };
 
@@ -24,7 +41,10 @@ export default function LoginScreen() {
     // Android: token comes via Linking event (cold-start deep link)
     const sub = Linking.addEventListener('url', async ({ url }) => {
       const { queryParams } = Linking.parse(url);
-      if (queryParams?.token) await setToken(queryParams.token as string);
+      if (queryParams?.token) {
+        await setToken(queryParams.token as string);
+        await hydrateBrokerStore(setCredentials);
+      }
     });
     return () => sub.remove();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
