@@ -5,15 +5,10 @@ import { useRiskStateStore } from "@/stores/risk-state-store";
 import { useUserTradingSettingsStore } from "@/stores/user-trading-settings-store";
 import { useOptionContractsStore } from "@/stores/option-contracts-store";
 
-/**
- * Clears all auth and app state, then redirects to /login.
- * Safe to call outside React components (e.g. API interceptors).
- *
- * localStorage is cleared FIRST so that Zustand persist subscribers
- * cannot write stale state back after the clear.
- */
 export function performLogout() {
+  const savedTheme = localStorage.getItem("theme-store");
   localStorage.clear();
+  if (savedTheme) localStorage.setItem("theme-store", savedTheme);
   useAuthStore.getState().logout();
   useBrokerStore.getState().clearAll();
   useProfitProtectionStore.getState().reset();
