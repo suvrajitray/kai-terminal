@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Routes, Route, Outlet, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/protected-route";
 import { AppLayout } from "@/components/layout/app-layout";
@@ -16,6 +17,7 @@ import { AdminRiskLogsPage } from "@/pages/admin/admin-risk-logs-page";
 import { AdminUsersPage } from "@/pages/admin/admin-users-page";
 import { AdminSettingsPage } from "@/pages/admin/admin-settings-page";
 import { useRiskFeed } from "@/hooks/use-risk-feed";
+import { useThemeStore } from "@/stores/theme-store";
 import { MobileRoutes } from '@/mobile';
 
 function RiskFeedMount() {
@@ -24,6 +26,17 @@ function RiskFeedMount() {
 }
 
 function App() {
+  const theme = useThemeStore((s) => s.theme);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === "dark") {
+      root.classList.add("dark");
+    } else {
+      root.classList.remove("dark");
+    }
+  }, [theme]);
+
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
