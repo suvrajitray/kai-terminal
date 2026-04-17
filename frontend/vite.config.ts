@@ -23,6 +23,12 @@ export default defineConfig({
         scope: "/",
         icons: [
           {
+            src: "/favicon.svg",
+            sizes: "any",
+            type: "image/svg+xml",
+            purpose: "any",
+          },
+          {
             src: "/icons/icon-192.png",
             sizes: "192x192",
             type: "image/png",
@@ -38,6 +44,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        // Prevent SW from intercepting backend routes (OAuth, API, SignalR)
+        navigateFallbackDenylist: [/^\/auth\/google/, /^\/signin-google/, /^\/api\//, /^\/hubs\//, /^\/scalar\//],
         runtimeCaching: [
           {
             urlPattern: /^https?:\/\/.*\/api\/.*/i,

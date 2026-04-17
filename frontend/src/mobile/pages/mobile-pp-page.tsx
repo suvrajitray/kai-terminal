@@ -191,6 +191,64 @@ function BrokerPPForm({ broker }: { broker: "upstox" | "zerodha" }) {
             </div>
           )}
         </div>
+
+        {/* Auto Shift */}
+        <div className="px-4 space-y-3">
+          <div className="flex items-center justify-between rounded-md border border-border/40 bg-muted/20 px-4 py-3">
+            <div>
+              <p className="text-sm font-medium">Auto Shift</p>
+              <p className="text-xs text-muted-foreground">Roll short options further OTM on breach</p>
+            </div>
+            <Switch
+              checked={draft.autoShiftEnabled}
+              onCheckedChange={(v: boolean) => setField("autoShiftEnabled", v)}
+            />
+          </div>
+
+          {draft.autoShiftEnabled && (
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor={`${broker}-shift-threshold`} className="text-xs">
+                  Threshold (%)
+                </Label>
+                <Input
+                  id={`${broker}-shift-threshold`}
+                  type="number"
+                  min={1}
+                  value={draft.autoShiftThresholdPct}
+                  onChange={(e) => setField("autoShiftThresholdPct", e.target.value)}
+                  className="tabular-nums"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor={`${broker}-shift-max`} className="text-xs">
+                  Max Shifts
+                </Label>
+                <Input
+                  id={`${broker}-shift-max`}
+                  type="number"
+                  min={1}
+                  value={draft.autoShiftMaxCount}
+                  onChange={(e) => setField("autoShiftMaxCount", e.target.value)}
+                  className="tabular-nums"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor={`${broker}-shift-gap`} className="text-xs">
+                  Strike Gap
+                </Label>
+                <Input
+                  id={`${broker}-shift-gap`}
+                  type="number"
+                  min={1}
+                  value={draft.autoShiftStrikeGap}
+                  onChange={(e) => setField("autoShiftStrikeGap", e.target.value)}
+                  className="tabular-nums"
+                />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Save button */}

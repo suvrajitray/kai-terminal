@@ -1,4 +1,4 @@
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import { motion } from "motion/react";
 import { Activity, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,12 +18,16 @@ function GoogleIcon() {
 
 export function LoginPage() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const location = useLocation();
 
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
   }
 
   const handleLogin = () => {
+    if (location.state?.from?.pathname?.startsWith("/m/")) {
+      sessionStorage.setItem("loginReturnMobile", "1");
+    }
     window.location.href = `${API_BASE_URL}/auth/google`;
   };
 

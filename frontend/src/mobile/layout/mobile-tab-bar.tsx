@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutList, BarChart2, Zap, Shield, Building2 } from 'lucide-react'
+import { LayoutList, BarChart2, Zap, Shield, Building2, Activity } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const TABS = [
@@ -7,6 +7,7 @@ const TABS = [
   { to: '/m/chain',     label: 'Chain',     Icon: BarChart2  },
   { to: '/m/trade',     label: 'Trade',     Icon: Zap        },
   { to: '/m/pp',        label: 'PP',        Icon: Shield     },
+  { to: '/m/events',    label: 'Events',    Icon: Activity   },
   { to: '/m/brokers',   label: 'Brokers',   Icon: Building2  },
 ] as const
 

@@ -123,6 +123,8 @@ function BrokerCard({ broker }: BrokerCardProps) {
     const storedKey = creds?.apiKey
     if (!storedKey) return
 
+    sessionStorage.setItem("brokerAuthReturnMobile", "1")
+
     let oauthUrl: string
     if (broker.id === 'upstox') {
       const sep = UPSTOX_OAUTH_URL.includes('?') ? '&' : '?'

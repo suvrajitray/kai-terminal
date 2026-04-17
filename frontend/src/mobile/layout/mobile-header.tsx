@@ -1,10 +1,11 @@
+import { LogOut } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { MarketStatus } from '@/components/layout/market-status'
 import { useMobileMtmStore } from '@/mobile/mobile-mtm-store'
+import { performLogout } from '@/lib/logout'
 
 export function MobileHeader() {
   const totalMtm = useMobileMtmStore((s) => s.totalMtm)
-  // format INR: +1,234.50 or -234.00
   const mtmLabel = totalMtm == null
     ? null
     : (totalMtm >= 0 ? '+' : '') + totalMtm.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -18,7 +19,16 @@ export function MobileHeader() {
           {mtmLabel}
         </span>
       )}
-      <MarketStatus />
+      <div className="flex items-center gap-3">
+        <MarketStatus />
+        <button
+          onClick={performLogout}
+          className="flex items-center justify-center text-muted-foreground active:text-foreground"
+          aria-label="Log out"
+        >
+          <LogOut className="h-4 w-4" />
+        </button>
+      </div>
     </header>
   )
 }

@@ -49,21 +49,29 @@ export function AuthCallbackPage() {
 
       login({ id: claims.sub, name: claims.name, email: claims.email }, token, claims.isActive, claims.isAdmin);
 
-      // Hydrate broker store from DB — restores valid tokens across logout/login cycles
+      // Hydrate broker store from DB — restores credentials across browsers/devices
       try {
         const stored = await fetchBrokerCredentials();
         for (const cred of stored) {
-          if (cred.accessToken) {
+          if (cred.apiKey) {
             useBrokerStore.getState().saveCredentials(cred.brokerName, {
               apiKey: cred.apiKey,
               apiSecret: cred.apiSecret,
               redirectUrl: "",
-              accessToken: cred.accessToken,
+              accessToken: cred.accessToken ?? "",
             });
           }
         }
       } catch {
         // ignore — fall through to connect-brokers if fetch fails
+      }
+
+      // If login was initiated from the mobile app, return there.
+      const isMobile = sessionStorage.getItem("loginReturnMobile") === "1";
+      sessionStorage.removeItem("loginReturnMobile");
+      if (isMobile) {
+        navigate("/m/", { replace: true });
+        return;
       }
 
       // If any broker has a non-expired token, go straight to terminal.

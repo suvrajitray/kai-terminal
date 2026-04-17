@@ -32,6 +32,7 @@ export function BrokerRedirectPage() {
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
   const [steps, setSteps] = useState<Step[]>([]);
+  const [returnToMobile] = useState(() => sessionStorage.getItem("brokerAuthReturnMobile") === "1");
   const calledRef = useRef(false);
 
   const addStep = (message: string) =>
@@ -78,6 +79,7 @@ export function BrokerRedirectPage() {
         addStep(`Option contracts loaded (${data.map((d) => d.index).join(", ")})`);
 
         setStatus("success");
+        sessionStorage.removeItem("brokerAuthReturnMobile");
         toast.success("Happy Trading! 🎉");
       } catch (err) {
         setError(err instanceof Error ? err.message : "An unexpected error occurred.");
@@ -187,17 +189,26 @@ export function BrokerRedirectPage() {
                 className="flex gap-3"
               >
                 {currentStatus === "success" ? (
-                  <>
+                  returnToMobile ? (
                     <Button asChild className="flex-1">
-                      <Link to="/terminal">
-                        Open Terminal
+                      <Link to="/m/positions">
+                        Open Mobile App
                         <ArrowRight className="ml-2 size-4" />
                       </Link>
                     </Button>
-                    <Button asChild variant="outline" className="flex-1">
-                      <Link to="/dashboard">Dashboard</Link>
-                    </Button>
-                  </>
+                  ) : (
+                    <>
+                      <Button asChild className="flex-1">
+                        <Link to="/terminal">
+                          Open Terminal
+                          <ArrowRight className="ml-2 size-4" />
+                        </Link>
+                      </Button>
+                      <Button asChild variant="outline" className="flex-1">
+                        <Link to="/dashboard">Dashboard</Link>
+                      </Button>
+                    </>
+                  )
                 ) : (
                   <Button asChild variant="outline" className="flex-1">
                     <Link to="/connect-brokers">Back to Brokers</Link>
