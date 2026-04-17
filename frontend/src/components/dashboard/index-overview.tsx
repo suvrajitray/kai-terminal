@@ -60,15 +60,15 @@ function IndexCard({ label, quote, delay }: { label: string; quote: IndexQuote; 
       {/* Right: OHL vertical mini-column */}
       <div className="flex flex-col gap-px border-l border-border/25 pl-3 text-[9px] tabular-nums">
         <span className="flex items-center gap-1 leading-tight">
-          <span className="w-2 font-bold text-sky-400/70">O</span>
+          <span className="w-2 font-bold text-sky-600/70 dark:text-sky-400/70">O</span>
           <span className="text-muted-foreground/55">{fmt(quote.open)}</span>
         </span>
         <span className="flex items-center gap-1 leading-tight">
-          <span className="w-2 font-bold text-emerald-400/70">H</span>
+          <span className="w-2 font-bold text-emerald-600/70 dark:text-emerald-400/70">H</span>
           <span className="text-muted-foreground/55">{fmt(quote.high)}</span>
         </span>
         <span className="flex items-center gap-1 leading-tight">
-          <span className="w-2 font-bold text-rose-400/70">L</span>
+          <span className="w-2 font-bold text-rose-600/70 dark:text-rose-400/70">L</span>
           <span className="text-muted-foreground/55">{fmt(quote.low)}</span>
         </span>
       </div>

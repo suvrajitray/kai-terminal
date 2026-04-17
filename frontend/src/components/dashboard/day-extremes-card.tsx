@@ -30,7 +30,7 @@ export function DayExtremesCard({ positions }: DayExtremesCardProps) {
           <Tooltip>
             <TooltipTrigger asChild>
               <div className="flex items-center gap-2 text-sm text-muted-foreground cursor-default">
-                <TrendingUp className="size-3.5 text-emerald-400" />
+                <TrendingUp className="size-3.5 text-emerald-600 dark:text-emerald-400" />
                 Peak Profit
               </div>
             </TooltipTrigger>
@@ -50,7 +50,7 @@ export function DayExtremesCard({ positions }: DayExtremesCardProps) {
           <Tooltip>
             <TooltipTrigger asChild>
               <div className="flex items-center gap-2 text-sm text-muted-foreground cursor-default">
-                <TrendingDown className="size-3.5 text-rose-400" />
+                <TrendingDown className="size-3.5 text-rose-600 dark:text-rose-400" />
                 Peak Loss
               </div>
             </TooltipTrigger>

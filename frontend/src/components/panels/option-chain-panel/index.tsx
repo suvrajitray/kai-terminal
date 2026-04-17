@@ -240,7 +240,7 @@ export function OptionChainPanel({ width, onResize, onClose, netDelta }: Props) 
               <FooterStat
                 label="PCR"
                 value={pcr.toFixed(2)}
-                valueClass={pcr >= 1 ? "text-emerald-400" : "text-rose-400"}
+                valueClass={pcr >= 1 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}
               />
             </>
           )}
@@ -250,7 +250,7 @@ export function OptionChainPanel({ width, onResize, onClose, netDelta }: Props) 
               <FooterStat
                 label="IVR"
                 value={ivRank.toFixed(0)}
-                valueClass={ivRank >= 50 ? "text-emerald-400" : ivRank >= 30 ? "text-amber-400" : "text-rose-400"}
+                valueClass={ivRank >= 50 ? "text-emerald-600 dark:text-emerald-400" : ivRank >= 30 ? "text-amber-600 dark:text-amber-400" : "text-rose-600 dark:text-rose-400"}
                 title={`IV Rank ${ivRank.toFixed(0)}/100 — higher than ${ivPercentile?.toFixed(0)}% of past ${ivHistoryDays} days`}
               />
             </>

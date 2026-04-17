@@ -303,16 +303,16 @@ export const ByChainTab = React.memo(function ByChainTab({
               <th className="py-2 pl-3 w-14 text-left font-semibold uppercase tracking-wider text-muted-foreground/60">
                 Diff
               </th>
-              <th className="py-2 w-20 text-center font-semibold uppercase tracking-wider text-sky-400/80">
+              <th className="py-2 w-20 text-center font-semibold uppercase tracking-wider text-sky-600/80 dark:text-sky-400/80">
                 Call
               </th>
-              <th className="py-2 w-20 text-center font-semibold uppercase tracking-wider text-sky-400/60">
+              <th className="py-2 w-20 text-center font-semibold uppercase tracking-wider text-sky-600/60 dark:text-sky-400/60">
                 LTP
               </th>
-              <th className="py-2 w-20 text-center font-semibold uppercase tracking-wider text-red-400/80">
+              <th className="py-2 w-20 text-center font-semibold uppercase tracking-wider text-red-600/80 dark:text-red-400/80">
                 Put
               </th>
-              <th className="py-2 w-20 text-center font-semibold uppercase tracking-wider text-red-400/60">
+              <th className="py-2 w-20 text-center font-semibold uppercase tracking-wider text-red-600/60 dark:text-red-400/60">
                 LTP
               </th>
               <th className="py-2 pr-3 w-20 text-right font-semibold uppercase tracking-wider text-muted-foreground/60">
@@ -363,7 +363,7 @@ export const ByChainTab = React.memo(function ByChainTab({
                           className={cn(
                             "text-[11px] tabular-nums font-semibold",
                             row.diff === 0
-                              ? "text-amber-400"
+                              ? "text-amber-600 dark:text-amber-400"
                               : isSelected
                                 ? "text-primary"
                                 : "text-muted-foreground/70",
@@ -371,7 +371,7 @@ export const ByChainTab = React.memo(function ByChainTab({
                         >
                           {row.diff === 0 ? (
                             <span className="flex items-center gap-1">
-                              <span className="inline-block size-1.5 rounded-full bg-amber-400" />
+                              <span className="inline-block size-1.5 rounded-full bg-amber-500 dark:bg-amber-400" />
                               0
                             </span>
                           ) : (
@@ -385,7 +385,7 @@ export const ByChainTab = React.memo(function ByChainTab({
                         <span
                           className={cn(
                             "text-xs font-bold tabular-nums",
-                            row.diff === 0 ? "text-amber-400" : "text-sky-400/90",
+                            row.diff === 0 ? "text-amber-600 dark:text-amber-400" : "text-sky-600/90 dark:text-sky-400/90",
                           )}
                         >
                           {row.ceStrike}
@@ -393,7 +393,7 @@ export const ByChainTab = React.memo(function ByChainTab({
                       </td>
 
                       {/* CE LTP */}
-                      <td className="py-2.5 w-20 text-center tabular-nums font-mono text-[12px] text-sky-300">
+                      <td className="py-2.5 w-20 text-center tabular-nums font-mono text-[12px] text-sky-600 dark:text-sky-300">
                         {fmt(row.ceLtp)}
                       </td>
 
@@ -402,7 +402,7 @@ export const ByChainTab = React.memo(function ByChainTab({
                         <span
                           className={cn(
                             "text-xs font-bold tabular-nums",
-                            row.diff === 0 ? "text-amber-400" : "text-red-400/90",
+                            row.diff === 0 ? "text-amber-600 dark:text-amber-400" : "text-red-600/90 dark:text-red-400/90",
                           )}
                         >
                           {row.peStrike}
@@ -410,7 +410,7 @@ export const ByChainTab = React.memo(function ByChainTab({
                       </td>
 
                       {/* PE LTP */}
-                      <td className="py-2.5 w-20 text-center tabular-nums font-mono text-[12px] text-red-300">
+                      <td className="py-2.5 w-20 text-center tabular-nums font-mono text-[12px] text-red-600 dark:text-red-300">
                         {fmt(row.peLtp)}
                       </td>
 
@@ -435,15 +435,15 @@ export const ByChainTab = React.memo(function ByChainTab({
             <span className="font-bold tabular-nums">{selected.ceStrike}</span>
           ) : (
             <>
-              <span className="text-sky-400 font-bold tabular-nums">CE {selected.ceStrike}</span>
+              <span className="text-sky-600 dark:text-sky-400 font-bold tabular-nums">CE {selected.ceStrike}</span>
               <span className="text-border/50">+</span>
-              <span className="text-red-400 font-bold tabular-nums">PE {selected.peStrike}</span>
+              <span className="text-red-600 dark:text-red-400 font-bold tabular-nums">PE {selected.peStrike}</span>
             </>
           )}
           <span className="text-border/50 mx-0.5">·</span>
-          <span className="text-sky-400 tabular-nums">{fmt(selected.ceLtp)}</span>
+          <span className="text-sky-600 dark:text-sky-400 tabular-nums">{fmt(selected.ceLtp)}</span>
           <span className="text-muted-foreground/50">+</span>
-          <span className="text-red-400 tabular-nums">{fmt(selected.peLtp)}</span>
+          <span className="text-red-600 dark:text-red-400 tabular-nums">{fmt(selected.peLtp)}</span>
           {selected.ceLtp != null && selected.peLtp != null && (
             <>
               <span className="text-border/50 mx-0.5">·</span>

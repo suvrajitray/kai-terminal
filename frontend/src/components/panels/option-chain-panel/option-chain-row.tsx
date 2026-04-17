@@ -107,7 +107,7 @@ export const OptionChainRow = memo(function OptionChainRow({ entry, isAtm, isLiv
         <span className="group-hover:hidden flex flex-col items-end leading-none gap-0.5">
           <span className="text-muted-foreground/70">{formatOi(callOi)}</span>
           {callOiChange !== 0 && (
-            <span className={cn("text-[9px]", callOiChange > 0 ? "text-emerald-400/80" : "text-rose-400/80")}>
+            <span className={cn("text-[9px]", callOiChange > 0 ? "text-emerald-600/80 dark:text-emerald-400/80" : "text-rose-600/80 dark:text-rose-400/80")}>
               {formatOiChange(callOiChange)}
             </span>
           )}
@@ -148,7 +148,7 @@ export const OptionChainRow = memo(function OptionChainRow({ entry, isAtm, isLiv
       <td className={cn(
         "px-1 py-1 text-right font-mono tabular-nums font-medium text-[11px]",
         callItm ? "bg-red-500/10" : "opacity-40",
-        callLtp ? "text-rose-400" : "text-muted-foreground/50",
+        callLtp ? "text-rose-600 dark:text-rose-400" : "text-muted-foreground/50",
       )}>
         {formatLtp(callLtp)}
       </td>
@@ -162,7 +162,7 @@ export const OptionChainRow = memo(function OptionChainRow({ entry, isAtm, isLiv
       <td className={cn(
         "px-1 py-1 text-left font-mono tabular-nums font-medium text-[11px]",
         putItm ? "bg-green-500/10" : "opacity-40",
-        putLtp ? "text-emerald-400" : "text-muted-foreground/50",
+        putLtp ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground/50",
       )}>
         {formatLtp(putLtp)}
       </td>
@@ -194,7 +194,7 @@ export const OptionChainRow = memo(function OptionChainRow({ entry, isAtm, isLiv
         <span className="group-hover:hidden flex flex-col items-start leading-none gap-0.5">
           <span className="text-muted-foreground/70">{formatOi(putOi)}</span>
           {putOiChange !== 0 && (
-            <span className={cn("text-[9px]", putOiChange > 0 ? "text-emerald-400/80" : "text-rose-400/80")}>
+            <span className={cn("text-[9px]", putOiChange > 0 ? "text-emerald-600/80 dark:text-emerald-400/80" : "text-rose-600/80 dark:text-rose-400/80")}>
               {formatOiChange(putOiChange)}
             </span>
           )}
