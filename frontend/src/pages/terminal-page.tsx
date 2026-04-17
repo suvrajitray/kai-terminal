@@ -96,7 +96,7 @@ function TerminalPageInner() {
   };
 
   useOptionContractsPrefetch();
-  const { netDelta, thetaPerDay, netGamma, netVega } = usePortfolioGreeks(positions);
+  const { netDelta, thetaPerDay } = usePortfolioGreeks(positions);
 
   // Hooks must be called unconditionally — one set per known broker in BROKERS.
   // When adding a new broker (e.g. "dhan"), add useRiskConfig, useProfitProtection,
@@ -192,8 +192,6 @@ function TerminalPageInner() {
             onProductFilterChange={setProductFilter}
             netDelta={netDelta}
             thetaPerDay={thetaPerDay}
-            netGamma={netGamma}
-            netVega={netVega}
           />
         </div>
 

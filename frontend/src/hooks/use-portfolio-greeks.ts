@@ -7,8 +7,6 @@ import type { Position } from "@/types";
 export interface PortfolioGreeks {
   netDelta: number;
   thetaPerDay: number;
-  netGamma: number;
-  netVega: number;
 }
 
 type GreeksMap = Map<string, { delta: number; theta: number; gamma: number; vega: number }>;
@@ -87,8 +85,6 @@ export function usePortfolioGreeks(positions: Position[]): PortfolioGreeks {
   // Aggregate greeks weighted by signed position quantity
   let netDelta = 0;
   let thetaPerDay = 0;
-  let netGamma = 0;
-  let netVega = 0;
 
   for (const p of positions.filter((pos) => pos.quantity !== 0)) {
     const lookup = getByInstrumentKey(p.instrumentToken, p.tradingSymbol);
@@ -99,9 +95,7 @@ export function usePortfolioGreeks(positions: Position[]): PortfolioGreeks {
     if (!g) continue;
     netDelta    += g.delta * p.quantity;
     thetaPerDay += g.theta * p.quantity;
-    netGamma    += g.gamma * p.quantity;
-    netVega     += g.vega  * p.quantity;
   }
 
-  return { netDelta, thetaPerDay, netGamma, netVega };
+  return { netDelta, thetaPerDay };
 }

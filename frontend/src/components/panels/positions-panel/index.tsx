@@ -16,8 +16,6 @@ interface PositionsPanelProps {
   load: () => void;
   netDelta?: number;
   thetaPerDay?: number;
-  netGamma?: number;
-  netVega?: number;
   productFilter: "Intraday" | "Delivery" | null;
   onProductFilterChange: (v: "Intraday" | "Delivery" | null) => void;
 }
@@ -30,8 +28,6 @@ export function PositionsPanel({
   load,
   netDelta,
   thetaPerDay = 0,
-  netGamma = 0,
-  netVega = 0,
   productFilter,
   onProductFilterChange,
 }: PositionsPanelProps) {
@@ -288,8 +284,6 @@ export function PositionsPanel({
           selectedCount={selectedCount}
           showGreeks={showGreeks}
           netDelta={netDelta}
-          netGamma={netGamma}
-          netVega={netVega}
           thetaPerDay={thetaPerDay}
           thetaEarnedToday={thetaEarnedToday}
           toggleSelectAll={toggleSelectAll}

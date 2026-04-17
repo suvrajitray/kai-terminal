@@ -23,8 +23,6 @@ interface PositionTableProps {
   selectedCount: number;
   showGreeks: boolean;
   netDelta: number | undefined;
-  netGamma: number;
-  netVega: number;
   thetaPerDay: number;
   thetaEarnedToday: number;
   toggleSelectAll: () => void;
@@ -53,8 +51,6 @@ export const PositionTable = memo(function PositionTable({
   selectedCount,
   showGreeks,
   netDelta,
-  netGamma,
-  netVega,
   thetaPerDay,
   thetaEarnedToday,
   toggleSelectAll,
@@ -129,8 +125,6 @@ export const PositionTable = memo(function PositionTable({
           onExitByType={onExitByType}
           showGreeks={showGreeks}
           netDelta={netDelta}
-          netGamma={netGamma}
-          netVega={netVega}
           thetaPerDay={thetaPerDay}
           thetaEarnedToday={thetaEarnedToday}
         />
