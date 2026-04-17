@@ -22,7 +22,7 @@ public static class TrailingStopCalculator
                 return new TrailingStateUpdate(
                     IsActivation: true,
                     NewStop: config.LockProfitAt,
-                    NewLastTrigger: mtm);
+                    NewLastTrigger: config.TrailingActivateAt);
             return null;
         }
 

@@ -178,7 +178,7 @@ public sealed class RiskEvaluator
         };
         if (state.TrailingActive)
         {
-            _logger.LogInformation(
+            _logger.LogDebug(
                 "{UserId} ({Broker})  PnL ₹{Mtm:+#,##0;-#,##0}  |  Target ₹{Target:+#,##0}  |  TSL ₹{Stop:+#,##0;-#,##0}  [{Watch}]",
                 userId, config.BrokerType, mtm, config.MtmTarget, state.TrailingStop, watch);
         }
