@@ -10,10 +10,10 @@ export interface RiskConfig {
 }
 
 export async function fetchRiskConfig(broker: string): Promise<RiskConfig> {
-  const res = await apiClient.get<RiskConfig>(`/api/risk-config/${broker}`);
+  const res = await apiClient.get<RiskConfig>(`/api/risk-config`, { params: { broker } });
   return res.data;
 }
 
 export async function saveRiskConfig(broker: string, config: Partial<RiskConfig>): Promise<void> {
-  await apiClient.put(`/api/risk-config/${broker}`, config);
+  await apiClient.put(`/api/risk-config`, config, { params: { broker } });
 }
