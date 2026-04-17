@@ -4,7 +4,16 @@ import { useOptionContractsStore } from "@/stores/option-contracts-store";
 import { UNDERLYING_KEYS } from "@/lib/shift-config";
 import { useIvHistory } from "./use-iv-history";
 import { useOptionChainFeed } from "./use-option-chain-feed";
+import { useIndicesFeed, type IndexPrices } from "@/hooks/use-indices-feed";
 import type { OptionChainEntry } from "@/types";
+
+const UNDERLYING_TO_INDEX: Record<string, keyof IndexPrices> = {
+  NIFTY:     "nifty",
+  BANKNIFTY: "bankNifty",
+  SENSEX:    "sensex",
+  FINNIFTY:  "finNifty",
+  BANKEX:    "bankex",
+};
 
 const LIVE_WINDOW_SIZE = 20; // OTM rows on each side of ATM (for SignalR subscriptions)
 const VISIBLE_SIDE = 20;    // OTM rows shown on each side of ATM initially
@@ -28,6 +37,15 @@ export function useOptionChain() {
   const expiries = getExpiries(underlying);
 
   const ivHistory = useIvHistory(underlying);
+
+  // Keep spot price live from the indices SignalR feed
+  const indexPrices = useIndicesFeed();
+  useEffect(() => {
+    const key = UNDERLYING_TO_INDEX[underlying];
+    if (!key) return;
+    const ltp = indexPrices[key]?.ltp;
+    if (ltp != null && ltp > 0) setSpotPrice(ltp);
+  }, [indexPrices, underlying]);
 
   const handleLtpBatch = useCallback((updates: Array<{ instrumentToken: string; ltp: number }>) => {
     const map = new Map(updates.map((u) => [u.instrumentToken, u.ltp]));
