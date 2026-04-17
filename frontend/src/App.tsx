@@ -16,6 +16,7 @@ import { AdminRiskLogsPage } from "@/pages/admin/admin-risk-logs-page";
 import { AdminUsersPage } from "@/pages/admin/admin-users-page";
 import { AdminSettingsPage } from "@/pages/admin/admin-settings-page";
 import { useRiskFeed } from "@/hooks/use-risk-feed";
+import { MobileRoutes } from '@/mobile';
 
 function RiskFeedMount() {
   useRiskFeed();
@@ -46,6 +47,7 @@ function App() {
         </Route>
       </Route>
       <Route path="/" element={<LandingPage />} />
+      <Route path="/m/*" element={<MobileRoutes />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
