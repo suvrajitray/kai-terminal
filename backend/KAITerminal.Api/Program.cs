@@ -134,8 +134,6 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseHttpsRedirection();
-
 app.MapAuthEndpoints();
 app.MapUpstoxEndpoints();
 app.MapZerodhaEndpoints();

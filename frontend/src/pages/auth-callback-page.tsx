@@ -4,6 +4,8 @@ import { Loader2 } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
 import { useBrokerStore } from "@/stores/broker-store";
 import { BROKERS } from "@/lib/constants";
+import { fetchBrokerCredentials } from "@/services/broker-api";
+import { isBrokerTokenExpired } from "@/lib/token-utils";
 
 function parseJwtPayload(token: string): { sub: string; name: string; email: string; isActive: boolean; isAdmin: boolean } | null {
   try {
@@ -32,24 +34,46 @@ export function AuthCallbackPage() {
   const login = useAuthStore((s) => s.login);
 
   useEffect(() => {
-    const token = searchParams.get("token");
-    if (!token) {
-      navigate("/login", { replace: true });
-      return;
-    }
+    const run = async () => {
+      const token = searchParams.get("token");
+      if (!token) {
+        navigate("/login", { replace: true });
+        return;
+      }
 
-    const claims = parseJwtPayload(token);
-    if (!claims) {
-      navigate("/login", { replace: true });
-      return;
-    }
+      const claims = parseJwtPayload(token);
+      if (!claims) {
+        navigate("/login", { replace: true });
+        return;
+      }
 
-    login({ id: claims.sub, name: claims.name, email: claims.email }, token, claims.isActive, claims.isAdmin);
+      login({ id: claims.sub, name: claims.name, email: claims.email }, token, claims.isActive, claims.isAdmin);
 
-    // If any broker already has a valid access token, go straight to terminal.
-    // Otherwise send to connect-brokers so they can authenticate.
-    const anyAuthenticated = BROKERS.some((b) => useBrokerStore.getState().isAuthenticated(b.id));
-    navigate(anyAuthenticated ? "/terminal" : "/connect-brokers", { replace: true });
+      // Hydrate broker store from DB — restores valid tokens across logout/login cycles
+      try {
+        const stored = await fetchBrokerCredentials();
+        for (const cred of stored) {
+          if (cred.accessToken) {
+            useBrokerStore.getState().saveCredentials(cred.brokerName, {
+              apiKey: cred.apiKey,
+              apiSecret: cred.apiSecret,
+              redirectUrl: "",
+              accessToken: cred.accessToken,
+            });
+          }
+        }
+      } catch {
+        // ignore — fall through to connect-brokers if fetch fails
+      }
+
+      // If any broker has a non-expired token, go straight to terminal.
+      const anyValid = BROKERS.some((b) => {
+        const t = useBrokerStore.getState().getCredentials(b.id)?.accessToken;
+        return !isBrokerTokenExpired(b.id, t);
+      });
+      navigate(anyValid ? "/terminal" : "/connect-brokers", { replace: true });
+    };
+    run();
   }, [searchParams, login, navigate]);
 
   return (

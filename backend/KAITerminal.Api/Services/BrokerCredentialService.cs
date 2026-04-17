@@ -22,11 +22,25 @@ public class BrokerCredentialService(
 
     // ── Public read methods ───────────────────────────────────────────────────
 
-    public async Task<List<BrokerCredentialResponse>> GetAsync(string username) =>
-        await db.BrokerCredentials
+    public async Task<List<BrokerCredentialResponse>> GetAsync(string username)
+    {
+        // Tokens updated before 8 AM IST today are from a previous session — return empty so the
+        // frontend skips hydrating them and sends the user back through broker OAuth.
+        var istOffset  = TimeSpan.FromHours(5.5);
+        var todayIst   = (DateTime.UtcNow + istOffset).Date;
+        var cutoffUtc  = todayIst + TimeSpan.FromHours(8) - istOffset; // 8 AM IST → UTC
+
+        return await db.BrokerCredentials
             .Where(x => x.Username == username)
-            .Select(x => new BrokerCredentialResponse(x.BrokerName, x.ApiKey, x.ApiSecret, string.IsNullOrEmpty(x.AccessToken) ? "NA" : x.AccessToken))
+            .Select(x => new BrokerCredentialResponse(
+                x.BrokerName,
+                x.ApiKey,
+                x.ApiSecret,
+                string.IsNullOrEmpty(x.AccessToken) || x.AccessToken == "NA" || x.UpdatedAt < cutoffUtc
+                    ? ""
+                    : x.AccessToken))
             .ToListAsync();
+    }
 
     // ── Webhook-optimised cache-first lookups ─────────────────────────────────
 

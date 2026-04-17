@@ -94,7 +94,8 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
   const handleCancelAll = async () => {
     dispatch({ type: "CANCEL_START", id: "all" });
     try {
-      await cancelAllOrders();
+      const brokersWithOpenOrders = [...new Set(openOrders.map((o) => o.broker).filter(Boolean))] as string[];
+      await Promise.all(brokersWithOpenOrders.map((b) => cancelAllOrders(b)));
       await load();
       dispatch({ type: "CANCEL_DONE" });
     } catch (e) {
@@ -102,10 +103,10 @@ export function OrdersPanel({ expanded, onToggle, onRegisterRefresh }: OrdersPan
     }
   };
 
-  const handleCancel = async (orderId: string) => {
+  const handleCancel = async (orderId: string, broker?: string) => {
     dispatch({ type: "CANCEL_START", id: orderId });
     try {
-      await cancelOrder(orderId);
+      await cancelOrder(orderId, broker);
       await load();
       dispatch({ type: "CANCEL_DONE" });
     } catch (e) {

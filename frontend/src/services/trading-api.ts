@@ -63,12 +63,16 @@ export async function fetchOrders(brokers: string[] = ["upstox"]): Promise<Order
   return results.flatMap((r) => r.status === "fulfilled" ? r.value : []);
 }
 
-export async function cancelAllOrders(): Promise<void> {
-  await apiClient.post("/api/upstox/orders/cancel-all");
+export async function cancelAllOrders(broker: string = "upstox"): Promise<void> {
+  await apiClient.post(`/api/${broker}/orders/cancel-all`);
 }
 
-export async function cancelOrder(orderId: string): Promise<void> {
-  await apiClient.delete(`/api/upstox/orders/${encodeURIComponent(orderId)}/v3`);
+export async function cancelOrder(orderId: string, broker: string = "upstox"): Promise<void> {
+  if (broker === "zerodha") {
+    await apiClient.delete(`/api/zerodha/orders/${encodeURIComponent(orderId)}`);
+  } else {
+    await apiClient.delete(`/api/upstox/orders/${encodeURIComponent(orderId)}/v3`);
+  }
 }
 
 // Maps ProductType enum strings (or legacy "I"/"D") to Upstox numeric enum for order placement

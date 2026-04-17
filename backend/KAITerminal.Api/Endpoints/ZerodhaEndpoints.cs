@@ -177,6 +177,33 @@ public static class ZerodhaEndpoints
             return Results.Ok(new { orderId });
         });
 
+        group.MapPost("/orders/cancel-all", async (
+            ZerodhaClient zerodha,
+            ClaimsPrincipal user,
+            ILoggerFactory lf,
+            CancellationToken ct) =>
+        {
+            var ids = await zerodha.Orders.CancelAllPendingOrdersAsync(ct);
+            lf.CreateLogger("ZerodhaEndpoints").LogInformation(
+                "Cancel all pending orders — {User} — {Count} order(s) cancelled",
+                user.GetEmail() ?? "unknown", ids.Count);
+            return Results.Ok(new { OrderIds = ids });
+        });
+
+        group.MapDelete("/orders/{orderId}", async (
+            string orderId,
+            ZerodhaClient zerodha,
+            ClaimsPrincipal user,
+            ILoggerFactory lf,
+            CancellationToken ct) =>
+        {
+            var id = await zerodha.Orders.CancelOrderAsync(orderId, ct);
+            lf.CreateLogger("ZerodhaEndpoints").LogInformation(
+                "Order cancelled — {User} — {OrderId}",
+                user.GetEmail() ?? "unknown", id);
+            return Results.Ok(new { OrderId = id });
+        });
+
         group.MapPost("/orders/by-price", async (
             [FromBody] ByPriceOrderRequest request,
             ByPriceOrderService byPriceSvc,

@@ -89,7 +89,7 @@ export interface OrdersTableProps {
   orders: Order[];
   cancelling: string | null;
   newOrderKeys: Set<string>;
-  onCancel: (orderId: string) => void;
+  onCancel: (orderId: string, broker?: string) => void;
 }
 
 export const OrdersTable = memo(function OrdersTable({ orders, cancelling, newOrderKeys, onCancel }: OrdersTableProps) {
@@ -172,7 +172,7 @@ export const OrdersTable = memo(function OrdersTable({ orders, cancelling, newOr
                     size="sm"
                     variant="ghost"
                     className="h-6 px-2 text-xs text-destructive hover:text-destructive active:scale-[0.98]"
-                    onClick={() => onCancel(o.orderId)}
+                    onClick={() => onCancel(o.orderId, o.broker)}
                     disabled={cancelling === o.orderId}
                   >
                     Cancel

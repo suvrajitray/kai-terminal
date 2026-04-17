@@ -4,6 +4,7 @@ export interface BrokerCredentialResponse {
   brokerName: string;
   apiKey: string;
   apiSecret: string;
+  accessToken: string;
 }
 
 export async function fetchBrokerCredentials(): Promise<BrokerCredentialResponse[]> {
