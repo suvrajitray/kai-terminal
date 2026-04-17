@@ -8,6 +8,7 @@ import { IndexTicker } from "./index-ticker";
 import { QuickTradeButton } from "./quick-trade-button";
 import { MarketStatus } from "./market-status";
 import { BrokerStatusChips } from "./broker-status-chips";
+import { ThemeToggle } from "./theme-toggle";
 import { useBrokerStore } from "@/stores/broker-store";
 
 const NAV_ICONS: Record<string, LucideIcon> = {
@@ -70,6 +71,7 @@ export function Header() {
           {brokerAuthenticated && <IndexTicker />}
           <BrokerStatusChips />
           {brokerAuthenticated && <QuickTradeButton />}
+          <ThemeToggle />
           <UserMenu />
         </div>
       </div>
