@@ -108,8 +108,8 @@ internal sealed class AutoEntryJob : BackgroundService
         var todayIst    = DateOnly.FromDateTime(nowIst.DateTime);
         var todayIstStr = todayIst.ToString("yyyy-MM-dd");
 
-        // 1. Day check
-        if (!IsTradingDay(config.TradingDays, nowIst.DayOfWeek))
+        // 1. Day check — skipped when OnlyExpiryDay is set (expiry check happens later)
+        if (!config.OnlyExpiryDay && !IsTradingDay(config.TradingDays, nowIst.DayOfWeek))
             return;
 
         // 2. Time window check
@@ -170,8 +170,14 @@ internal sealed class AutoEntryJob : BackgroundService
         var expiry      = upcomingExpiries[config.ExpiryOffset];
         var expiryDate  = DateOnly.Parse(expiry);
 
-        // 6. Expiry exclusion
-        if (config.ExcludeExpiryDay && expiryDate == todayIst)
+        // 6. Expiry day gate
+        if (config.OnlyExpiryDay && expiryDate != todayIst)
+        {
+            _logger.LogInformation("AutoEntry — OnlyExpiryDay set but today is not expiry, skipping [{User} / {Broker}]",
+                config.Username, config.BrokerType);
+            return;
+        }
+        if (!config.OnlyExpiryDay && config.ExcludeExpiryDay && expiryDate == todayIst)
         {
             _logger.LogInformation("AutoEntry — {Instrument} expiry today, skipping [{User} / {Broker}]",
                 config.Instrument, config.Username, config.BrokerType);

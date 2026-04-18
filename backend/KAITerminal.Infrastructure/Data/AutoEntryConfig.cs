@@ -14,6 +14,7 @@ public class AutoEntryConfig
     public string NoEntryAfterTime { get; set; } = "11:30";
     public string TradingDays      { get; set; } = "Mon,Tue,Wed,Thu,Fri";
     public bool   ExcludeExpiryDay { get; set; } = false;
+    public bool   OnlyExpiryDay   { get; set; } = false;
     public int ExpiryOffset { get; set; } = 0;
     public string  StrikeMode  { get; set; } = "ATM";
     public decimal StrikeParam { get; set; } = 0m;

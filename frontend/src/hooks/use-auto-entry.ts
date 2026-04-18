@@ -13,6 +13,7 @@ export interface AutoEntryStrategy {
   noEntryAfterTime: string;
   tradingDays: string[];
   excludeExpiryDay: boolean;
+  onlyExpiryDay: boolean;
   expiryOffset: number;
   strikeMode: string;
   strikeParam: number;

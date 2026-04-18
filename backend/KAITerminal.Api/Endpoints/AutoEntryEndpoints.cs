@@ -68,7 +68,7 @@ public static class AutoEntryEndpoints
         c.Id, c.BrokerType, c.Name, c.Enabled, c.Instrument, c.OptionType, c.Lots,
         c.EntryAfterTime, c.NoEntryAfterTime,
         c.TradingDays.Split(',', StringSplitOptions.RemoveEmptyEntries),
-        c.ExcludeExpiryDay, c.ExpiryOffset, c.StrikeMode, c.StrikeParam,
+        c.ExcludeExpiryDay, c.OnlyExpiryDay, c.ExpiryOffset, c.StrikeMode, c.StrikeParam,
         c.CreatedAt, c.UpdatedAt);
 
     private static AutoEntryConfig FromDto(AutoEntryDto d) => new()
@@ -83,6 +83,7 @@ public static class AutoEntryEndpoints
         NoEntryAfterTime = d.NoEntryAfterTime,
         TradingDays      = string.Join(",", d.TradingDays),
         ExcludeExpiryDay = d.ExcludeExpiryDay,
+        OnlyExpiryDay   = d.OnlyExpiryDay,
         ExpiryOffset    = d.ExpiryOffset,
         StrikeMode      = d.StrikeMode,
         StrikeParam     = d.StrikeParam,
@@ -101,6 +102,7 @@ public record AutoEntryDto(
     string   NoEntryAfterTime,
     string[] TradingDays,
     bool     ExcludeExpiryDay,
+    bool     OnlyExpiryDay,
     int      ExpiryOffset,
     string   StrikeMode,
     decimal  StrikeParam,
