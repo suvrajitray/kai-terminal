@@ -10,7 +10,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<UserRiskConfig> UserRiskConfigs => Set<UserRiskConfig>();
     public DbSet<AppSetting>    AppSettings    => Set<AppSetting>();
     public DbSet<IvSnapshot>    IvSnapshots    => Set<IvSnapshot>();
-    public DbSet<RiskEngineLog> RiskEngineLogs => Set<RiskEngineLog>();
+    public DbSet<RiskEngineLog>   RiskEngineLogs   => Set<RiskEngineLog>();
+    public DbSet<AutoEntryConfig> AutoEntryConfigs  => Set<AutoEntryConfig>();
+    public DbSet<AutoEntryLog>    AutoEntryLogs     => Set<AutoEntryLog>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<BrokerCredential>()
@@ -42,5 +44,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         modelBuilder.Entity<IvSnapshot>()
             .HasIndex(x => new { x.Underlying, x.Date });
 
+        modelBuilder.Entity<AutoEntryConfig>()
+            .HasIndex(x => x.Username);
+
+        modelBuilder.Entity<AutoEntryLog>()
+            .HasIndex(x => x.StrategyId);
     }
 }

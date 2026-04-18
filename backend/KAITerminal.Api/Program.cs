@@ -140,6 +140,7 @@ app.MapZerodhaEndpoints();
 app.MapBrokerCredentialsEndpoints();
 app.MapUserSettingsEndpoints();
 app.MapRiskConfigEndpoints();
+app.MapAutoEntryEndpoints();
 app.MapRiskLogEndpoints();
 app.MapMasterDataEndpoints();
 app.MapRiskNotificationEndpoints();

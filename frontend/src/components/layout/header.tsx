@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "motion/react";
-import { Activity, LayoutDashboard, MonitorDot, type LucideIcon } from "lucide-react";
+import { Activity, Bot, LayoutDashboard, MonitorDot, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { APP_NAME, NAV_ITEMS } from "@/lib/constants";
 import { UserMenu } from "./user-menu";
@@ -12,8 +12,9 @@ import { ThemeToggle } from "./theme-toggle";
 import { useBrokerStore } from "@/stores/broker-store";
 
 const NAV_ICONS: Record<string, LucideIcon> = {
-  "/dashboard": LayoutDashboard,
-  "/terminal":  MonitorDot,
+  "/dashboard":  LayoutDashboard,
+  "/terminal":   MonitorDot,
+  "/auto-entry": Bot,
 };
 
 export function Header() {
