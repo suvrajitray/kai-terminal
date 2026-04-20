@@ -1,6 +1,5 @@
-using System.Text;
-using System.Text.Json;
 using KAITerminal.Contracts;
+using KAITerminal.Infrastructure;
 using KAITerminal.Infrastructure.Data;
 using KAITerminal.Api.Models;
 using Microsoft.EntityFrameworkCore;
@@ -27,40 +26,17 @@ public class BrokerCredentialService(
 
     public async Task<List<BrokerCredentialResponse>> GetAsync(string username)
     {
-        var istOffset = TimeSpan.FromHours(5.5);
-        var todayIst  = (DateTime.UtcNow + istOffset).Date;
-        var cutoffUtc = todayIst + TimeSpan.FromHours(8) - istOffset; // 8 AM IST → UTC
-
         var rows = await db.BrokerCredentials
             .Where(x => x.Username == username)
             .ToListAsync();
 
         return rows.Select(x =>
         {
-            var token = x.AccessToken;
-            if (string.IsNullOrEmpty(token) || token == "NA" || x.UpdatedAt < cutoffUtc)
-                token = "";
-            // Upstox issues JWTs — also verify the token hasn't expired mid-day
-            if (token != "" && x.BrokerName == BrokerNames.Upstox && IsJwtExpired(token))
-                token = "";
+            var token = BrokerTokenHelper.IsTokenValid(x.AccessToken, x.UpdatedAt, x.BrokerName)
+                ? x.AccessToken
+                : "";
             return new BrokerCredentialResponse(x.BrokerName, x.ApiKey, x.ApiSecret, token);
         }).ToList();
-    }
-
-    private static bool IsJwtExpired(string token)
-    {
-        try
-        {
-            var parts = token.Split('.');
-            if (parts.Length != 3) return true;
-            var padded = parts[1].Replace('-', '+').Replace('_', '/');
-            padded += (padded.Length % 4) switch { 2 => "==", 3 => "=", _ => "" };
-            var json = Encoding.UTF8.GetString(Convert.FromBase64String(padded));
-            var payload = JsonSerializer.Deserialize<JsonElement>(json);
-            return !payload.TryGetProperty("exp", out var exp)
-                || DateTimeOffset.UtcNow.ToUnixTimeSeconds() >= exp.GetInt64();
-        }
-        catch { return true; }
     }
 
     // ── Webhook-optimised cache-first lookups ─────────────────────────────────

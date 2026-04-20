@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { BROKERS, UPSTOX_OAUTH_URL, ZERODHA_OAUTH_URL } from '@/lib/constants'
 import { useBrokerStore } from '@/stores/broker-store'
 import { saveBrokerCredential } from '@/services/broker-api'
-import { isBrokerTokenExpired, useCountdownToEightAmIst } from '@/lib/token-utils'
+import { isBrokerTokenExpired, useBrokerCutoffCountdown, TOKEN_CUTOFF_LABEL } from '@/lib/token-utils'
 import { toast } from '@/lib/toast'
 import type { BrokerInfo } from '@/types'
 
@@ -79,7 +79,7 @@ function BrokerCard({ broker }: BrokerCardProps) {
   const [saving, setSaving] = useState(false)
 
   const { isConnected, isAuthenticated, getCredentials, saveCredentials } = useBrokerStore()
-  const { isBeforeEight, countdown } = useCountdownToEightAmIst()
+  const { isBeforeCutoff, countdown } = useBrokerCutoffCountdown()
 
   const creds = getCredentials(broker.id)
   const connected = isConnected(broker.id)
@@ -163,9 +163,9 @@ function BrokerCard({ broker }: BrokerCardProps) {
         {/* Actions */}
         <div className="flex flex-col gap-2 px-4 py-3">
           {/* Countdown chip */}
-          {connected && isBeforeEight && (
+          {connected && isBeforeCutoff && (
             <p className="text-[11px] text-amber-400/80 tabular-nums">
-              Available at 08:00 IST &mdash; {countdown}
+              Available at {TOKEN_CUTOFF_LABEL} &mdash; {countdown}
             </p>
           )}
 
@@ -184,9 +184,9 @@ function BrokerCard({ broker }: BrokerCardProps) {
                 size="sm"
                 className={cn(
                   'flex-1 h-8 text-xs gap-1',
-                  isBeforeEight && 'opacity-50 cursor-not-allowed',
+                  isBeforeCutoff && 'opacity-50 cursor-not-allowed',
                 )}
-                disabled={isBeforeEight}
+                disabled={isBeforeCutoff}
                 onClick={handleAuthenticate}
               >
                 Authenticate

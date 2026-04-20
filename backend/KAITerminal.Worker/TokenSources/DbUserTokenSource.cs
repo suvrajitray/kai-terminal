@@ -1,10 +1,9 @@
+using KAITerminal.Infrastructure;
 using KAITerminal.Infrastructure.Data;
 using KAITerminal.RiskEngine.Abstractions;
-using KAITerminal.RiskEngine.Configuration;
 using KAITerminal.RiskEngine.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 
 namespace KAITerminal.Worker;
 
@@ -12,22 +11,14 @@ namespace KAITerminal.Worker;
 /// Reads enabled users and their risk configs from the database on every call.
 /// Joins on (Username, BrokerType) so one user can have independent risk sessions per broker.
 /// Automatically picks up DB changes without a Worker restart.
-/// Only includes credentials whose <c>UpdatedAt</c> (UTC) falls on or after today's midnight
-/// in the configured trading timezone — stale tokens from previous days are excluded.
+/// Only includes credentials validated by BrokerTokenHelper (non-empty, non-NA, updated after 7:30 AM IST today).
 /// </summary>
 public sealed class DbUserTokenSource(
     IServiceScopeFactory scopeFactory,
-    IOptions<RiskEngineConfig> cfg,
     ILogger<DbUserTokenSource> logger) : IUserTokenSource
 {
     public async Task<IReadOnlyList<UserConfig>> GetUsersAsync(CancellationToken ct = default)
     {
-        // Compute today's midnight in the trading timezone, then convert to UTC for the DB filter.
-        // UpdatedAt is stored as UTC (DateTime.UtcNow) so this comparison is timezone-correct.
-        var tz = TimeZoneInfo.FindSystemTimeZoneById(cfg.Value.TradingTimeZone);
-        var todayIst       = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, tz).Date;
-        var todayStartUtc  = TimeZoneInfo.ConvertTimeToUtc(todayIst, tz);
-
         await using var scope = scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
@@ -39,14 +30,16 @@ public sealed class DbUserTokenSource(
                 r => new { r.Username, BrokerName = r.BrokerType },
                 c => new { c.Username, c.BrokerName },
                 (r, c) => new { r, c })
-            .Where(x => x.c.AccessToken != null && x.c.AccessToken != "" && x.c.AccessToken != "NA"
-                     && x.c.UpdatedAt >= todayStartUtc)
             .ToListAsync(ct);
+
+        // Filter in-memory so BrokerTokenHelper (including JWT check) can be applied.
+        configs = configs
+            .Where(x => BrokerTokenHelper.IsTokenValid(x.c.AccessToken, x.c.UpdatedAt, x.c.BrokerName))
+            .ToList();
 
         if (configs.Count == 0)
         {
-            logger.LogDebug("DbUserTokenSource: no active configs found (all disabled or tokens stale/missing) | todayUtc={TodayUtc}",
-                todayStartUtc);
+            logger.LogDebug("DbUserTokenSource: no active configs found (all disabled or tokens stale/missing)");
             return Array.Empty<UserConfig>();
         }
 

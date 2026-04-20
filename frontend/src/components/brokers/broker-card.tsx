@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ConnectBrokerDialog } from "./connect-broker-dialog";
 import { BrokerSettingsDialog } from "./broker-settings-dialog";
 import { useBrokerStore } from "@/stores/broker-store";
-import { useCountdownToEightAmIst } from "@/lib/token-utils";
+import { useBrokerCutoffCountdown, TOKEN_CUTOFF_LABEL } from "@/lib/token-utils";
 import { UPSTOX_OAUTH_URL, ZERODHA_OAUTH_URL } from "@/lib/constants";
 import type { BrokerInfo, BrokerCredentials } from "@/types";
 
@@ -35,7 +35,7 @@ export function BrokerCard({ broker }: BrokerCardProps) {
   const getCredentials = useBrokerStore((s) => s.getCredentials);
   const [connectOpen, setConnectOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const { isBeforeEight, countdown } = useCountdownToEightAmIst();
+  const { isBeforeCutoff, countdown } = useBrokerCutoffCountdown();
 
   const handleAuthenticate = () => {
     const creds = getCredentials(broker.id);
@@ -79,10 +79,10 @@ export function BrokerCard({ broker }: BrokerCardProps) {
                     className="flex-1"
                     variant="default"
                     onClick={handleAuthenticate}
-                    disabled={isBeforeEight}
-                    title={isBeforeEight ? `Available after 8:00 AM IST` : undefined}
+                    disabled={isBeforeCutoff}
+                    title={isBeforeCutoff ? `Available after ${TOKEN_CUTOFF_LABEL}` : undefined}
                   >
-                    {isBeforeEight ? (
+                    {isBeforeCutoff ? (
                       <>
                         <Clock className="mr-2 size-4" />
                         Opens in {countdown}
@@ -99,9 +99,9 @@ export function BrokerCard({ broker }: BrokerCardProps) {
                     <Settings className="size-4" />
                   </Button>
                 </div>
-                {isBeforeEight && (
+                {isBeforeCutoff && (
                   <p className="text-center text-[11px] text-muted-foreground">
-                    Brokers invalidate tokens created before 8:00 AM IST
+                    {`Brokers invalidate tokens created before ${TOKEN_CUTOFF_LABEL}`}
                   </p>
                 )}
               </div>

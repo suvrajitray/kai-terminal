@@ -23,14 +23,17 @@ export function getUpstoxToken(): string | null {
   return useBrokerStore.getState().getCredentials("upstox")?.accessToken ?? null;
 }
 
-function secondsUntilEightAmIst(): number {
+// Single source of truth for the broker token cutoff time (IST).
+// Update here to change the cutoff everywhere in the UI.
+export const TOKEN_CUTOFF_IST = { hours: 7, minutes: 30 };
+export const TOKEN_CUTOFF_LABEL = `${String(TOKEN_CUTOFF_IST.hours).padStart(2, "0")}:${String(TOKEN_CUTOFF_IST.minutes).padStart(2, "0")} AM IST`;
+
+function secondsUntilCutoff(): number {
   const istOffsetMs = 5.5 * 60 * 60 * 1000;
   const nowIst = new Date(Date.now() + istOffsetMs);
-  const h = nowIst.getUTCHours();
-  const m = nowIst.getUTCMinutes();
-  const s = nowIst.getUTCSeconds();
-  if (h >= 8) return 0;
-  return (8 - h) * 3600 - m * 60 - s;
+  const totalSeconds = nowIst.getUTCHours() * 3600 + nowIst.getUTCMinutes() * 60 + nowIst.getUTCSeconds();
+  const cutoffSeconds = TOKEN_CUTOFF_IST.hours * 3600 + TOKEN_CUTOFF_IST.minutes * 60;
+  return Math.max(0, cutoffSeconds - totalSeconds);
 }
 
 function formatCountdown(seconds: number): string {
@@ -40,13 +43,13 @@ function formatCountdown(seconds: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-export function useCountdownToEightAmIst(): { isBeforeEight: boolean; countdown: string } {
-  const [seconds, setSeconds] = useState(secondsUntilEightAmIst);
+export function useBrokerCutoffCountdown(): { isBeforeCutoff: boolean; countdown: string } {
+  const [seconds, setSeconds] = useState(secondsUntilCutoff);
 
   useEffect(() => {
-    const id = setInterval(() => setSeconds(secondsUntilEightAmIst()), 1000);
+    const id = setInterval(() => setSeconds(secondsUntilCutoff()), 1000);
     return () => clearInterval(id);
   }, []);
 
-  return { isBeforeEight: seconds > 0, countdown: formatCountdown(seconds) };
+  return { isBeforeCutoff: seconds > 0, countdown: formatCountdown(seconds) };
 }

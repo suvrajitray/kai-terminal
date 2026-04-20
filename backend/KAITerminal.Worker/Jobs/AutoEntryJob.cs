@@ -3,6 +3,7 @@ using KAITerminal.Contracts;
 using KAITerminal.Contracts.Broker;
 using KAITerminal.Contracts.Domain;
 using KAITerminal.Contracts.Options;
+using KAITerminal.Infrastructure;
 using KAITerminal.Infrastructure.Data;
 using KAITerminal.Infrastructure.Services;
 using KAITerminal.MarketData.Services;
@@ -148,12 +149,10 @@ internal sealed class AutoEntryJob : BackgroundService
         // 4. Broker credentials
         var brokerType = config.BrokerType.ToLower();
         var cred = await db.BrokerCredentials.FirstOrDefaultAsync(
-            c => c.Username == config.Username
-              && c.BrokerName.ToLower() == brokerType
-              && !string.IsNullOrEmpty(c.AccessToken), ct);
-        if (cred is null)
+            c => c.Username == config.Username && c.BrokerName.ToLower() == brokerType, ct);
+        if (cred is null || !BrokerTokenHelper.IsTokenValid(cred.AccessToken, cred.UpdatedAt, cred.BrokerName))
         {
-            _logger.LogWarning("AutoEntry — no valid credentials for {User} ({Broker}), skipping",
+            _logger.LogWarning("AutoEntry — invalid or stale token for {User} ({Broker}), skipping",
                 config.Username, config.BrokerType);
             return;
         }
