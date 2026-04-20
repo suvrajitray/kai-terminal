@@ -16,6 +16,8 @@ import { AdminDashboardPage } from "@/pages/admin/admin-dashboard-page";
 import { AdminRiskLogsPage } from "@/pages/admin/admin-risk-logs-page";
 import { AdminUsersPage } from "@/pages/admin/admin-users-page";
 import { AdminSettingsPage } from "@/pages/admin/admin-settings-page";
+import { AutoEntryPage } from "@/pages/auto-entry-page";
+import { AutoEntryFormPage } from "@/pages/auto-entry-form-page";
 import { useRiskFeed } from "@/hooks/use-risk-feed";
 import { useThemeStore } from "@/stores/theme-store";
 import { MobileRoutes } from '@/mobile';
@@ -47,6 +49,9 @@ function App() {
         <Route element={<AppLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/terminal" element={<TerminalPage />} />
+          <Route path="/auto-entry" element={<AutoEntryPage />} />
+          <Route path="/auto-entry/new" element={<AutoEntryFormPage />} />
+          <Route path="/auto-entry/:id/edit" element={<AutoEntryFormPage />} />
           <Route path="/connect-brokers" element={<ConnectBrokersPage />} />
           <Route path="/redirect/:brokerId" element={<BrokerRedirectPage />} />
           <Route path="/admin" element={<AdminLayout />}>

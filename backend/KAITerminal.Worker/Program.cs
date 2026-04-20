@@ -88,6 +88,7 @@ try
     builder.Services.AddRiskEngine<DbUserTokenSource>(builder.Configuration);
 
     builder.Services.AddHostedService<IvSnapshotJob>();
+    builder.Services.AddHostedService<KAITerminal.Worker.Jobs.AutoEntryJob>();
 
     var host = builder.Build();
 
