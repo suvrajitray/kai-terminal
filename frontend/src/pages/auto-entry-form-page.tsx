@@ -201,7 +201,7 @@ export function AutoEntryFormPage() {
               <button
                 type="button"
                 onClick={() => { setEditingName(true); setTimeout(() => nameInputRef.current?.focus(), 0); }}
-                className="flex items-center gap-2 group/name"
+                className="flex items-center gap-2 group/name cursor-pointer"
               >
                 <span className="text-xl font-semibold text-foreground">
                   {draft.name || <span className="text-muted-foreground/30">Unnamed Strategy</span>}
@@ -216,7 +216,7 @@ export function AutoEntryFormPage() {
               <div className="px-5 py-4 flex flex-col justify-center w-[300px] shrink-0">
                 <p className="text-[10px] uppercase tracking-widest font-medium text-muted-foreground/50 mb-2">Broker</p>
                 <Select value={draft.brokerType} onValueChange={(v) => field("brokerType", v)}>
-                  <SelectTrigger className="h-auto border-0 bg-transparent dark:bg-transparent dark:hover:bg-transparent p-0 shadow-none ring-0 outline-none text-sm font-semibold gap-1.5 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 [&>svg]:text-muted-foreground/50">
+                  <SelectTrigger className="h-auto border-0 bg-transparent dark:bg-transparent dark:hover:bg-transparent p-0 shadow-none ring-0 outline-none text-sm font-semibold gap-1.5 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 cursor-pointer [&>svg]:text-muted-foreground/50">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
