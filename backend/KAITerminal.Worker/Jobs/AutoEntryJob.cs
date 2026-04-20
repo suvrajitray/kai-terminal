@@ -133,9 +133,10 @@ internal sealed class AutoEntryJob : BackgroundService
         if (alreadyEntered) return;
 
         // 4. Broker credentials
+        var brokerType = config.BrokerType.ToLower();
         var cred = await db.BrokerCredentials.FirstOrDefaultAsync(
             c => c.Username == config.Username
-              && c.BrokerName.Equals(config.BrokerType, StringComparison.OrdinalIgnoreCase)
+              && c.BrokerName.ToLower() == brokerType
               && !string.IsNullOrEmpty(c.AccessToken), ct);
         if (cred is null)
         {

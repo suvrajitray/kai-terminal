@@ -27,6 +27,7 @@ public class AutoEntryConfigService(AppDbContext db) : IAutoEntryConfigService
             NoEntryAfterTime = template.NoEntryAfterTime,
             TradingDays      = template.TradingDays,
             ExcludeExpiryDay = template.ExcludeExpiryDay,
+            OnlyExpiryDay   = template.OnlyExpiryDay,
             ExpiryOffset    = template.ExpiryOffset,
             StrikeMode      = template.StrikeMode,
             StrikeParam     = template.StrikeParam,
@@ -53,6 +54,7 @@ public class AutoEntryConfigService(AppDbContext db) : IAutoEntryConfigService
         entity.NoEntryAfterTime = patch.NoEntryAfterTime;
         entity.TradingDays      = patch.TradingDays;
         entity.ExcludeExpiryDay = patch.ExcludeExpiryDay;
+        entity.OnlyExpiryDay   = patch.OnlyExpiryDay;
         entity.ExpiryOffset    = patch.ExpiryOffset;
         entity.StrikeMode      = patch.StrikeMode;
         entity.StrikeParam     = patch.StrikeParam;
