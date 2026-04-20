@@ -142,6 +142,7 @@ app.MapUserSettingsEndpoints();
 app.MapRiskConfigEndpoints();
 app.MapAutoEntryEndpoints();
 app.MapRiskLogEndpoints();
+app.MapClientLogEndpoints();
 app.MapMasterDataEndpoints();
 app.MapRiskNotificationEndpoints();
 app.MapWebhookEndpoints();

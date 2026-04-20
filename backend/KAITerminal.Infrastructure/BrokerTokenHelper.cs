@@ -3,29 +3,34 @@ using System.Text.Json;
 
 namespace KAITerminal.Infrastructure;
 
+public enum TokenValidationResult { Valid, Missing, Stale, JwtExpired }
+
 public static class BrokerTokenHelper
 {
     private static readonly TimeSpan IstOffset = TimeSpan.FromHours(5.5);
 
     /// <summary>
-    /// Returns true when the token is present, non-stale (updated today after 7:30 AM IST),
-    /// and — for Upstox — the JWT has not expired.
+    /// Returns the specific reason a token is invalid, or <see cref="TokenValidationResult.Valid"/>.
     /// </summary>
-    public static bool IsTokenValid(string? token, DateTime updatedAt, string? brokerName = null)
+    public static TokenValidationResult Validate(string? token, DateTime updatedAt, string? brokerName = null)
     {
         if (string.IsNullOrEmpty(token) || token == "NA")
-            return false;
+            return TokenValidationResult.Missing;
 
         var todayIst  = (DateTime.UtcNow + IstOffset).Date;
         var cutoffUtc = todayIst + TimeSpan.FromHours(7.5) - IstOffset; // 7:30 AM IST → UTC
         if (updatedAt < cutoffUtc)
-            return false;
+            return TokenValidationResult.Stale;
 
         if (string.Equals(brokerName, "upstox", StringComparison.OrdinalIgnoreCase) && IsJwtExpired(token))
-            return false;
+            return TokenValidationResult.JwtExpired;
 
-        return true;
+        return TokenValidationResult.Valid;
     }
+
+    /// <summary>Convenience wrapper — returns true only when <see cref="Validate"/> is <see cref="TokenValidationResult.Valid"/>.</summary>
+    public static bool IsTokenValid(string? token, DateTime updatedAt, string? brokerName = null)
+        => Validate(token, updatedAt, brokerName) == TokenValidationResult.Valid;
 
     private static bool IsJwtExpired(string token)
     {

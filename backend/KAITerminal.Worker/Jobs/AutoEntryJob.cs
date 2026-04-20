@@ -150,10 +150,17 @@ internal sealed class AutoEntryJob : BackgroundService
         var brokerType = config.BrokerType.ToLower();
         var cred = await db.BrokerCredentials.FirstOrDefaultAsync(
             c => c.Username == config.Username && c.BrokerName.ToLower() == brokerType, ct);
-        if (cred is null || !BrokerTokenHelper.IsTokenValid(cred.AccessToken, cred.UpdatedAt, cred.BrokerName))
+        if (cred is null)
         {
-            _logger.LogWarning("AutoEntry — invalid or stale token for {User} ({Broker}), skipping",
-                config.Username, config.BrokerType);
+            _logger.LogWarning("AutoEntry — token {Reason} for {User} ({Broker}), skipping",
+                TokenValidationResult.Missing, config.Username, config.BrokerType);
+            return;
+        }
+        var tokenResult = BrokerTokenHelper.Validate(cred.AccessToken, cred.UpdatedAt, cred.BrokerName);
+        if (tokenResult != TokenValidationResult.Valid)
+        {
+            _logger.LogWarning("AutoEntry — token {Reason} for {User} ({Broker}), skipping",
+                tokenResult, config.Username, config.BrokerType);
             return;
         }
 

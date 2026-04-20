@@ -9,6 +9,9 @@ import { ConnectBrokerDialog } from "./connect-broker-dialog";
 import { BrokerSettingsDialog } from "./broker-settings-dialog";
 import { useBrokerStore } from "@/stores/broker-store";
 import { useBrokerCutoffCountdown, TOKEN_CUTOFF_LABEL } from "@/lib/token-utils";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("BrokerAuth");
 import { UPSTOX_OAUTH_URL, ZERODHA_OAUTH_URL } from "@/lib/constants";
 import type { BrokerInfo, BrokerCredentials } from "@/types";
 
@@ -40,6 +43,7 @@ export function BrokerCard({ broker }: BrokerCardProps) {
   const handleAuthenticate = () => {
     const creds = getCredentials(broker.id);
     if (!creds) return;
+    log.info("initiating OAuth flow for", broker.id);
     window.location.href = buildAuthUrl(broker.id, creds);
   };
 

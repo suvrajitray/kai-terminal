@@ -10,7 +10,8 @@ namespace KAITerminal.Api.Services;
 public class BrokerCredentialService(
     AppDbContext db,
     IMemoryCache cache,
-    BrokerCredentialCacheInvalidator cacheInvalidator)
+    BrokerCredentialCacheInvalidator cacheInvalidator,
+    ILogger<BrokerCredentialService> logger)
 {
     // Cache keys
     private static string ApiKeyLookupKey(string brokerName, string apiKey) => $"brokercred:{brokerName}:apikey:{apiKey}";
@@ -32,10 +33,12 @@ public class BrokerCredentialService(
 
         return rows.Select(x =>
         {
-            var token = BrokerTokenHelper.IsTokenValid(x.AccessToken, x.UpdatedAt, x.BrokerName)
-                ? x.AccessToken
-                : "";
-            return new BrokerCredentialResponse(x.BrokerName, x.ApiKey, x.ApiSecret, token);
+            var result = BrokerTokenHelper.Validate(x.AccessToken, x.UpdatedAt, x.BrokerName);
+            if (result != TokenValidationResult.Valid)
+                logger.LogDebug("BrokerCredentials — token masked for {User} / {Broker}: {Reason}",
+                    username, x.BrokerName, result);
+            return new BrokerCredentialResponse(x.BrokerName, x.ApiKey, x.ApiSecret,
+                result == TokenValidationResult.Valid ? x.AccessToken : "");
         }).ToList();
     }
 

@@ -34,7 +34,14 @@ public sealed class DbUserTokenSource(
 
         // Filter in-memory so BrokerTokenHelper (including JWT check) can be applied.
         configs = configs
-            .Where(x => BrokerTokenHelper.IsTokenValid(x.c.AccessToken, x.c.UpdatedAt, x.c.BrokerName))
+            .Where(x =>
+            {
+                var result = BrokerTokenHelper.Validate(x.c.AccessToken, x.c.UpdatedAt, x.c.BrokerName);
+                if (result != TokenValidationResult.Valid)
+                    logger.LogDebug("DbUserTokenSource — skipping {User} / {Broker}: token {Reason}",
+                        x.r.Username, x.r.BrokerType, result);
+                return result == TokenValidationResult.Valid;
+            })
             .ToList();
 
         if (configs.Count == 0)

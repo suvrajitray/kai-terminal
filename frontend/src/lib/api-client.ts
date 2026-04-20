@@ -4,6 +4,9 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useBrokerStore } from "@/stores/broker-store";
 import { isTokenExpired } from "@/lib/token-utils";
 import { performLogout } from "@/lib/logout";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("ApiClient");
 
 export const apiClient = axios.create({ baseURL: API_BASE_URL });
 
@@ -14,6 +17,7 @@ apiClient.interceptors.request.use((config) => {
 
   if (token) {
     if (isTokenExpired(token)) {
+      log.warn("session JWT expired — logging out");
       performLogout();
       return Promise.reject(new Error("Session expired. Please log in again."));
     }
@@ -30,9 +34,11 @@ apiClient.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
+      log.warn("401 received — logging out");
       performLogout();
       return Promise.reject(new Error("Session expired. Please log in again."));
     }
+    log.error("request failed", err.config?.url, err.response?.status, err.response?.data?.message ?? err.message);
     return Promise.reject(new Error(err.response?.data?.message ?? err.message));
   },
 );

@@ -11,7 +11,10 @@ import { useBrokerStore } from '@/stores/broker-store'
 import { saveBrokerCredential } from '@/services/broker-api'
 import { isBrokerTokenExpired, useBrokerCutoffCountdown, TOKEN_CUTOFF_LABEL } from '@/lib/token-utils'
 import { toast } from '@/lib/toast'
+import { createLogger } from '@/lib/logger'
 import type { BrokerInfo } from '@/types'
+
+const log = createLogger("BrokerAuth")
 
 function getStatus(
   brokerId: string,
@@ -123,6 +126,7 @@ function BrokerCard({ broker }: BrokerCardProps) {
     const storedKey = creds?.apiKey
     if (!storedKey) return
 
+    log.info("initiating OAuth flow for", broker.id)
     sessionStorage.setItem("brokerAuthReturnMobile", "1")
 
     let oauthUrl: string

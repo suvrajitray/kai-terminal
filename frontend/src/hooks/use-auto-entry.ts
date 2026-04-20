@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { apiClient } from "@/lib/api-client";
+import { createLogger } from "@/lib/logger";
+
+const log = createLogger("AutoEntry");
 
 export interface AutoEntryStrategy {
   id: number;
@@ -46,7 +49,9 @@ export function useAutoEntry() {
       ]);
       setStrategies(stratsRes.data);
       setStatuses(statsRes.data);
-    } catch {
+      log.debug("loaded", stratsRes.data.length, "strategies");
+    } catch (err) {
+      log.error("failed to load strategies", err);
       setError("Failed to load strategies");
     } finally {
       setLoading(false);
