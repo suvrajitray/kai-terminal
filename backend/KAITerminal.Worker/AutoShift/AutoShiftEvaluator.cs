@@ -63,7 +63,12 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
                     Mtm:       _cache.GetMtm($"{userId}::{config.BrokerType}"),
                     Timestamp: DateTimeOffset.UtcNow), ct);
             }
-            catch { /* best-effort */ }
+            catch (Exception notifyEx)
+            {
+                _logger.LogWarning(notifyEx,
+                    "Failed to notify frontend of AutoShift failure — {UserId} ({Broker}) — check API health",
+                    userId, broker.BrokerType);
+            }
         }
     }
 

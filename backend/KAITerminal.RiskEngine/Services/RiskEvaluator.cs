@@ -21,6 +21,7 @@ public sealed class RiskEvaluator
 {
     private readonly IRiskRepository        _repo;
     private readonly IRiskEventNotifier     _notifier;
+    private readonly IPositionCache         _cache;
     private readonly RiskEngineConfig       _cfg;
     private readonly TimeZoneInfo           _tz;
     private readonly ILogger<RiskEvaluator> _logger;
@@ -29,11 +30,13 @@ public sealed class RiskEvaluator
     public RiskEvaluator(
         IRiskRepository        repo,
         IRiskEventNotifier     notifier,
+        IPositionCache         cache,
         IOptions<RiskEngineConfig> cfg,
         ILogger<RiskEvaluator> logger)
     {
         _repo     = repo;
         _notifier = notifier;
+        _cache    = cache;
         _cfg      = cfg.Value;
         _tz       = TimeZoneInfo.FindSystemTimeZoneById(_cfg.TradingTimeZone);
         _logger   = logger;
@@ -121,27 +124,65 @@ public sealed class RiskEvaluator
             }
         }
 
+        // For MTM-driven exits, confirm with a fresh broker fetch before acting.
+        // This guards against stale cache (e.g. closed legs disappearing from the list
+        // during auto-shift, webhook lag, or any other transient position state).
+        // Auto square-off is time-driven — no MTM confirmation needed there.
+        decimal exitMtm = mtm;
+        if (decision.Kind is RiskDecisionKind.ExitMtmSl
+                          or RiskDecisionKind.ExitTarget
+                          or RiskDecisionKind.ExitTrailingSl)
+        {
+            var confirmed = await ConfirmMtmAsync(stateKey, userId, config, broker, ct);
+            if (confirmed is null)
+            {
+                _logger.LogWarning(
+                    "Exit skipped — broker MTM confirmation failed while checking {Kind} for {UserId} ({Broker}) | cachedMtm ₹{CacheMtm:+#,##0;-#,##0} | will retry next tick",
+                    decision.Kind, userId, config.BrokerType, mtm);
+                return;
+            }
+
+            var drift = confirmed.Value - mtm;
+            var recheck = RiskDecisionCalculator.Evaluate(confirmed.Value, config, state, nowIst);
+            if (recheck.Kind != decision.Kind)
+            {
+                _logger.LogWarning(
+                    "EXIT SUPPRESSED — {UserId} ({Broker}) | trigger={Kind} | cachedMtm ₹{CacheMtm:+#,##0;-#,##0} vs confirmedMtm ₹{ConfirmedMtm:+#,##0;-#,##0} (drift ₹{Drift:+#,##0;-#,##0}) | cache was stale — exit cancelled",
+                    userId, config.BrokerType, decision.Kind, mtm, confirmed.Value, drift);
+                return;
+            }
+
+            if (Math.Abs(drift) > 500)
+            {
+                _logger.LogWarning(
+                    "MTM drift detected — {UserId} ({Broker}) | trigger={Kind} | cachedMtm ₹{CacheMtm:+#,##0;-#,##0} vs confirmedMtm ₹{ConfirmedMtm:+#,##0;-#,##0} (drift ₹{Drift:+#,##0;-#,##0}) | proceeding with confirmed value",
+                    userId, config.BrokerType, decision.Kind, mtm, confirmed.Value, drift);
+            }
+
+            exitMtm = confirmed.Value;
+        }
+
         // Act on the exit decision
         switch (decision.Kind)
         {
             case RiskDecisionKind.ExitMtmSl:
                 _logger.LogWarning(
                     "HARD SL HIT — {UserId} ({Broker})  PnL ₹{Mtm:+#,##0;-#,##0}  ≤  SL ₹{Sl:+#,##0;-#,##0} — exiting all",
-                    userId, config.BrokerType, mtm, config.MtmSl);
+                    userId, config.BrokerType, exitMtm, config.MtmSl);
                 await _notifier.NotifyAsync(new RiskNotification(
                     userId, config.BrokerType, RiskNotificationType.HardSlHit,
-                    mtm, Sl: config.MtmSl, Timestamp: DateTimeOffset.UtcNow), ct);
-                await SquareOffAsync(userId, config.BrokerType, stateKey, mtm, state, broker, config, ct);
+                    exitMtm, Sl: config.MtmSl, Timestamp: DateTimeOffset.UtcNow), ct);
+                await SquareOffAsync(userId, config.BrokerType, stateKey, exitMtm, state, broker, config, ct);
                 break;
 
             case RiskDecisionKind.ExitTarget:
                 _logger.LogInformation(
                     "TARGET HIT — {UserId} ({Broker})  PnL ₹{Mtm:+#,##0;-#,##0}  ≥  Target ₹{Target:+#,##0} — exiting all",
-                    userId, config.BrokerType, mtm, config.MtmTarget);
+                    userId, config.BrokerType, exitMtm, config.MtmTarget);
                 await _notifier.NotifyAsync(new RiskNotification(
                     userId, config.BrokerType, RiskNotificationType.TargetHit,
-                    mtm, Target: config.MtmTarget, Timestamp: DateTimeOffset.UtcNow), ct);
-                await SquareOffAsync(userId, config.BrokerType, stateKey, mtm, state, broker, config, ct);
+                    exitMtm, Target: config.MtmTarget, Timestamp: DateTimeOffset.UtcNow), ct);
+                await SquareOffAsync(userId, config.BrokerType, stateKey, exitMtm, state, broker, config, ct);
                 break;
 
             case RiskDecisionKind.ExitAutoSquareOff:
@@ -151,19 +192,85 @@ public sealed class RiskEvaluator
                     nowIst.ToString(@"HH\:mm"), config.AutoSquareOffTime.ToString(@"HH\:mm"));
                 await _notifier.NotifyAsync(new RiskNotification(
                     userId, config.BrokerType, RiskNotificationType.AutoSquareOff,
-                    mtm, Timestamp: DateTimeOffset.UtcNow), ct);
-                await SquareOffAsync(userId, config.BrokerType, stateKey, mtm, state, broker, config, ct);
+                    exitMtm, Timestamp: DateTimeOffset.UtcNow), ct);
+                await SquareOffAsync(userId, config.BrokerType, stateKey, exitMtm, state, broker, config, ct);
                 break;
 
             case RiskDecisionKind.ExitTrailingSl:
                 _logger.LogWarning(
                     "TSL HIT — {UserId} ({Broker})  PnL ₹{Mtm:+#,##0;-#,##0}  ≤  floor ₹{Stop:+#,##0;-#,##0} — exiting all",
-                    userId, config.BrokerType, mtm, state.TrailingStop);
+                    userId, config.BrokerType, exitMtm, state.TrailingStop);
                 await _notifier.NotifyAsync(new RiskNotification(
                     userId, config.BrokerType, RiskNotificationType.TslHit,
-                    mtm, TslFloor: state.TrailingStop, Timestamp: DateTimeOffset.UtcNow), ct);
-                await SquareOffAsync(userId, config.BrokerType, stateKey, mtm, state, broker, config, ct);
+                    exitMtm, TslFloor: state.TrailingStop, Timestamp: DateTimeOffset.UtcNow), ct);
+                await SquareOffAsync(userId, config.BrokerType, stateKey, exitMtm, state, broker, config, ct);
                 break;
+        }
+    }
+
+    /// <summary>
+    /// Fetches fresh positions from the broker and computes a confirmed MTM:
+    /// closed positions (qty=0) contribute their broker-reported realized P&amp;L;
+    /// open positions use the broker P&amp;L adjusted by the live LTP delta from the feed cache.
+    /// Returns null if the broker fetch fails (caller should skip the exit for this tick).
+    /// </summary>
+    private async Task<decimal?> ConfirmMtmAsync(
+        string stateKey, string userId, UserConfig config, IBrokerClient broker, CancellationToken ct)
+    {
+        try
+        {
+            var positions = await broker.GetAllPositionsAsync(ct);
+            decimal total = 0m;
+            int openCount = 0, closedCount = 0;
+
+            foreach (var p in positions)
+            {
+                if (!ProductTypeFilter.Matches(p.Product, config.WatchedProducts)) continue;
+
+                decimal contribution;
+                string ltpNote;
+
+                if (!p.IsOpen)
+                {
+                    contribution = p.Pnl;
+                    ltpNote      = "closed — realized pnl";
+                    closedCount++;
+                }
+                else
+                {
+                    var liveLtp = _cache.TryGetLiveLtp(stateKey, p.InstrumentToken);
+                    if (liveLtp.HasValue)
+                    {
+                        var adj  = p.Quantity * (liveLtp.Value - p.Ltp);
+                        contribution = p.Pnl + adj;
+                        ltpNote = $"open — brokerPnl ₹{p.Pnl:+#,##0;-#,##0} + liveAdj ₹{adj:+#,##0;-#,##0} (ltp={liveLtp.Value} ref={p.Ltp})";
+                    }
+                    else
+                    {
+                        contribution = p.Pnl;
+                        ltpNote = "open — no live LTP, using broker pnl";
+                    }
+                    openCount++;
+                }
+
+                total += contribution;
+                _logger.LogDebug(
+                    "  MTM confirm [{UserId}] {Token} qty={Qty}: {LtpNote} → ₹{Contribution:+#,##0;-#,##0}",
+                    userId, p.InstrumentToken, p.Quantity, ltpNote, contribution);
+            }
+
+            _logger.LogInformation(
+                "MTM confirmed — {UserId} ({Broker}) | {OpenCount} open + {ClosedCount} closed position(s) | confirmedMtm ₹{Total:+#,##0;-#,##0}",
+                userId, config.BrokerType, openCount, closedCount, total);
+
+            return total;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "MTM confirmation fetch failed — {UserId} ({Broker}) — broker positions unavailable",
+                userId, config.BrokerType);
+            return null;
         }
     }
 
@@ -221,18 +328,19 @@ public sealed class RiskEvaluator
                 .Where(p => p.IsOpen && ProductTypeFilter.Matches(p.Product, config.WatchedProducts))
                 .OrderBy(p => p.Quantity < 0 ? 0 : 1)   // sells first → releases margin
                 .ToList();
+            var excluded = fresh.Count(p => p.IsOpen && !ProductTypeFilter.Matches(p.Product, config.WatchedProducts));
 
             if (toExit.Count == 0)
             {
                 _logger.LogWarning(
-                    "Square-off — {UserId} ({Broker}) filter={Filter} — no open positions found (already closed?)",
-                    userId, brokerType, config.WatchedProducts);
+                    "Square-off — {UserId} ({Broker}) filter={Filter} — no open positions found (already closed?) | total={Total} excluded={Excluded}",
+                    userId, brokerType, config.WatchedProducts, fresh.Count, excluded);
             }
             else
             {
                 _logger.LogWarning(
-                    "Square-off — {UserId} ({Broker}) filter={Filter} — {Count} position(s) to exit (sells first)",
-                    userId, brokerType, config.WatchedProducts, toExit.Count);
+                    "Square-off — {UserId} ({Broker}) filter={Filter} — {Count} position(s) to exit (sells first) | total={Total} excluded={Excluded}",
+                    userId, brokerType, config.WatchedProducts, toExit.Count, fresh.Count, excluded);
             }
 
             foreach (var pos in toExit)

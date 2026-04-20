@@ -94,8 +94,10 @@ internal sealed class AutoShiftOrderExecutor
         var openOrder  = new BrokerOrderRequest(openSymbol,               qty, "SELL", position.Product, "MARKET", Exchange: openExchange);
 
         _logger.LogInformation(
-            "AutoShift placing orders — chain={ChainKey} shift {From}→{To} | close={CloseSymbol} qty={Qty} | open={OpenSymbol} qty={Qty} [{Broker} / {UserId}]",
-            chainKey, decision.ShiftCount, decision.ShiftCount + 1, position.InstrumentToken, qty, openSymbol, qty,
+            "AutoShift placing orders — chain={ChainKey} shift {From}→{To} | close={CloseSymbol} qty={Qty} exch={CloseExch} | open={OpenSymbol} qty={Qty} exch={OpenExch} [{Broker} / {UserId}]",
+            chainKey, decision.ShiftCount, decision.ShiftCount + 1,
+            position.InstrumentToken, qty, position.Exchange ?? "N/A",
+            openSymbol, qty, openExchange ?? "N/A",
             broker.BrokerType, userId);
 
         string closeOrderId;
@@ -140,7 +142,17 @@ internal sealed class AutoShiftOrderExecutor
             UserId:         userId,
             Qty:            qty);
 
-        _ = Task.Run(() => CompleteShiftAsync(completion, broker));
+        _ = Task.Run(async () =>
+        {
+            try   { await CompleteShiftAsync(completion, broker); }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "AutoShift background task CRASHED — chain={ChainKey} close={CloseToken} open={OpenSymbol} [{Broker} / {UserId}]. Manual intervention required.",
+                    completion.ChainKey, completion.CloseToken, completion.OpenSymbol,
+                    broker.BrokerType, completion.UserId);
+            }
+        });
     }
 
     /// <summary>

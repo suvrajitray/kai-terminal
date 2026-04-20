@@ -110,7 +110,11 @@ internal sealed class AutoEntryJob : BackgroundService
 
         // 1. Day check — skipped when OnlyExpiryDay is set (expiry check happens later)
         if (!config.OnlyExpiryDay && !IsTradingDay(config.TradingDays, nowIst.DayOfWeek))
+        {
+            _logger.LogDebug("AutoEntry skipped — {Day} not in trading days [{User} / {Broker} / {Strategy}]",
+                nowIst.DayOfWeek, config.Username, config.BrokerType, config.Name);
             return;
+        }
 
         // 2. Time window check
         if (!TimeOnly.TryParse(config.EntryAfterTime,   out var entryAfter)   ||
@@ -123,14 +127,23 @@ internal sealed class AutoEntryJob : BackgroundService
 
         var nowTime = TimeOnly.FromTimeSpan(nowIst.TimeOfDay);
         if (nowTime < entryAfter || nowTime >= noEntryAfter)
+        {
+            _logger.LogDebug("AutoEntry skipped — time {Now} outside window {After}–{Before} [{User} / {Broker} / {Strategy}]",
+                nowTime, entryAfter, noEntryAfter, config.Username, config.BrokerType, config.Name);
             return;
+        }
 
         // 3. Already entered today (safe-restart guard)
         using var scope = _scopeFactory.CreateScope();
         var db  = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var svc = scope.ServiceProvider.GetRequiredService<IAutoEntryConfigService>();
         var alreadyEntered = await svc.HasEnteredTodayAsync(config.Id, todayIstStr, ct);
-        if (alreadyEntered) return;
+        if (alreadyEntered)
+        {
+            _logger.LogDebug("AutoEntry skipped — already entered today [{User} / {Broker} / {Strategy}]",
+                config.Username, config.BrokerType, config.Name);
+            return;
+        }
 
         // 4. Broker credentials
         var brokerType = config.BrokerType.ToLower();
@@ -240,8 +253,8 @@ internal sealed class AutoEntryJob : BackgroundService
             var order = new BrokerOrderRequest(token, qty, "SELL", "I", "MARKET", Exchange: exchange);
 
             _logger.LogInformation(
-                "AutoEntry placing SELL {OptionType} {Instrument} expiry={Expiry} token={Token} qty={Qty} [{User} / {Broker}]",
-                optionType, config.Instrument, expiry, token, qty, config.Username, config.BrokerType);
+                "AutoEntry placing SELL {OptionType} {Instrument} expiry={Expiry} token={Token} qty={Qty} lots={Lots} lotSize={LotSize} mode={Mode} [{User} / {Broker}]",
+                optionType, config.Instrument, expiry, token, qty, config.Lots, lotSize, config.StrikeMode, config.Username, config.BrokerType);
 
             try
             {
@@ -340,6 +353,9 @@ internal sealed class AutoEntryJob : BackgroundService
             .MinBy(x => Math.Abs(Math.Abs((double)x.side!.OptionGreeks!.Delta) - targetDelta));
 
         if (best == default) return (null, null);
+        _logger.LogInformation(
+            "AutoEntry Delta — selected {OptionType} strike={Strike} delta={Delta:F3} (target={Target}) [{User} / {Broker}]",
+            optionType, best.entry.StrikePrice, best.side!.OptionGreeks!.Delta, targetDelta, config.Username, config.BrokerType);
         return ResolveUpstoxKeyToToken(best.side!.InstrumentKey, config.BrokerType, contracts, config.Instrument);
     }
 
@@ -366,6 +382,9 @@ internal sealed class AutoEntryJob : BackgroundService
             .MinBy(x => Math.Abs(x.side!.MarketData!.Ltp - targetPremium));
 
         if (best == default) return (null, null);
+        _logger.LogInformation(
+            "AutoEntry Premium — selected {OptionType} strike={Strike} ltp=₹{Ltp} (target=₹{Target}) [{User} / {Broker}]",
+            optionType, best.entry.StrikePrice, best.side!.MarketData!.Ltp, targetPremium, config.Username, config.BrokerType);
         return ResolveUpstoxKeyToToken(best.side!.InstrumentKey, config.BrokerType, contracts, config.Instrument);
     }
 

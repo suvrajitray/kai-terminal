@@ -26,14 +26,24 @@ internal sealed class HttpRiskEventNotifier : IRiskEventNotifier
 
             if (!response.IsSuccessStatusCode)
                 _logger.LogWarning(
-                    "Risk event POST returned {Status} for {UserId} ({Type})",
-                    (int)response.StatusCode, notification.UserId, notification.Type);
+                    "Risk event POST returned {Status} for {UserId} ({Broker}) type={Type}",
+                    (int)response.StatusCode, notification.UserId, notification.Broker, notification.Type);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex,
-                "Failed to POST risk event {Type} for {UserId} — frontend will not receive alert",
-                notification.Type, notification.UserId);
+            // Critical events (square-off failures, SL hits) are logged as Error —
+            // the trader may not be alerted at all if the notifier is down.
+            var isCritical = notification.Type is RiskNotificationType.SquareOffFailed
+                                               or RiskNotificationType.HardSlHit
+                                               or RiskNotificationType.AutoShiftFailed;
+            if (isCritical)
+                _logger.LogError(ex,
+                    "CRITICAL — failed to POST {Type} for {UserId} ({Broker}) — trader will NOT receive alert. Check API health.",
+                    notification.Type, notification.UserId, notification.Broker);
+            else
+                _logger.LogWarning(ex,
+                    "Failed to POST risk event {Type} for {UserId} ({Broker}) — frontend will not receive alert",
+                    notification.Type, notification.UserId, notification.Broker);
         }
     }
 }

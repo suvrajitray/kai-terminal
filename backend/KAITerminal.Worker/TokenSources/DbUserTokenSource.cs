@@ -17,7 +17,8 @@ namespace KAITerminal.Worker;
 /// </summary>
 public sealed class DbUserTokenSource(
     IServiceScopeFactory scopeFactory,
-    IOptions<RiskEngineConfig> cfg) : IUserTokenSource
+    IOptions<RiskEngineConfig> cfg,
+    ILogger<DbUserTokenSource> logger) : IUserTokenSource
 {
     public async Task<IReadOnlyList<UserConfig>> GetUsersAsync(CancellationToken ct = default)
     {
@@ -42,7 +43,14 @@ public sealed class DbUserTokenSource(
                      && x.c.UpdatedAt >= todayStartUtc)
             .ToListAsync(ct);
 
-        if (configs.Count == 0) return Array.Empty<UserConfig>();
+        if (configs.Count == 0)
+        {
+            logger.LogDebug("DbUserTokenSource: no active configs found (all disabled or tokens stale/missing) | todayUtc={TodayUtc}",
+                todayStartUtc);
+            return Array.Empty<UserConfig>();
+        }
+
+        logger.LogDebug("DbUserTokenSource: loaded {Count} active user-broker session(s)", configs.Count);
 
         var usernames = configs.Select(x => x.r.Username).Distinct().ToList();
         var tradingSettings = await db.UserTradingSettings

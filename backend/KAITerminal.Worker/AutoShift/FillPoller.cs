@@ -52,9 +52,9 @@ internal static class FillPoller
             catch (InvalidOperationException) { throw; }
             catch (Exception ex)
             {
-                // Network blip — keep polling
-                logger.LogDebug(ex,
-                    "AutoShift WaitForFillAsync: transient error polling orders, retrying [{UserId}]", userId);
+                logger.LogWarning(ex,
+                    "AutoShift WaitForFillAsync: transient error polling orders — will retry | chain={ChainKey} orderIds={OrderIds} [{UserId}]",
+                    chainKey, orderIds, userId);
             }
 
             await Task.Delay(500, ct);

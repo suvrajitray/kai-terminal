@@ -46,17 +46,24 @@ internal sealed class UserSessionRegistry
 
         foreach (var (key, entry) in toStop)
         {
-            bool configChanged = freshByKey.ContainsKey(key);
-            _logger.LogInformation(
-                "Stopping session ({Reason}) — {UserId} ({Broker})",
-                configChanged ? "config changed" : "disabled or token expired",
-                entry.Config.UserId, entry.Config.BrokerType);
+            bool configChanged = freshByKey.TryGetValue(key, out var fresh);
+            if (configChanged && fresh is not null)
+            {
+                var changedFields = DescribeConfigChanges(entry.Config, fresh);
+                _logger.LogInformation(
+                    "Stopping session (config changed: {Changes}) — {UserId} ({Broker})",
+                    changedFields, entry.Config.UserId, entry.Config.BrokerType);
+                await _repo.ResetAsync(key);
+            }
+            else
+            {
+                _logger.LogInformation(
+                    "Stopping session (disabled or token expired) — {UserId} ({Broker})",
+                    entry.Config.UserId, entry.Config.BrokerType);
+            }
             entry.Cts.Cancel();
             _sessions.TryRemove(key, out _);
             _onSessionRemoved(key);
-
-            if (configChanged)
-                await _repo.ResetAsync(key);
         }
 
         if (toStop.Count > 0)
@@ -90,4 +97,26 @@ internal sealed class UserSessionRegistry
         old.AutoSquareOffEnabled  != next.AutoSquareOffEnabled  ||
         old.AutoSquareOffTime     != next.AutoSquareOffTime     ||
         old.WatchedProducts       != next.WatchedProducts;
+
+    private static string DescribeConfigChanges(UserConfig old, UserConfig next)
+    {
+        var changes = new List<string>();
+        if (old.AccessToken           != next.AccessToken)           changes.Add("AccessToken");
+        if (old.ApiKey                != next.ApiKey)                changes.Add("ApiKey");
+        if (old.MtmTarget             != next.MtmTarget)             changes.Add($"MtmTarget {old.MtmTarget}→{next.MtmTarget}");
+        if (old.MtmSl                 != next.MtmSl)                 changes.Add($"MtmSl {old.MtmSl}→{next.MtmSl}");
+        if (old.TrailingEnabled       != next.TrailingEnabled)       changes.Add($"TrailingEnabled {old.TrailingEnabled}→{next.TrailingEnabled}");
+        if (old.TrailingActivateAt    != next.TrailingActivateAt)    changes.Add($"TrailingActivateAt {old.TrailingActivateAt}→{next.TrailingActivateAt}");
+        if (old.LockProfitAt          != next.LockProfitAt)          changes.Add($"LockProfitAt {old.LockProfitAt}→{next.LockProfitAt}");
+        if (old.WhenProfitIncreasesBy != next.WhenProfitIncreasesBy) changes.Add($"WhenProfitIncreasesBy {old.WhenProfitIncreasesBy}→{next.WhenProfitIncreasesBy}");
+        if (old.IncreaseTrailingBy    != next.IncreaseTrailingBy)    changes.Add($"IncreaseTrailingBy {old.IncreaseTrailingBy}→{next.IncreaseTrailingBy}");
+        if (old.AutoShiftEnabled      != next.AutoShiftEnabled)      changes.Add($"AutoShiftEnabled {old.AutoShiftEnabled}→{next.AutoShiftEnabled}");
+        if (old.AutoShiftThresholdPct != next.AutoShiftThresholdPct) changes.Add($"AutoShiftThresholdPct {old.AutoShiftThresholdPct}→{next.AutoShiftThresholdPct}");
+        if (old.AutoShiftMaxCount     != next.AutoShiftMaxCount)     changes.Add($"AutoShiftMaxCount {old.AutoShiftMaxCount}→{next.AutoShiftMaxCount}");
+        if (old.AutoShiftStrikeGap    != next.AutoShiftStrikeGap)    changes.Add($"AutoShiftStrikeGap {old.AutoShiftStrikeGap}→{next.AutoShiftStrikeGap}");
+        if (old.AutoSquareOffEnabled  != next.AutoSquareOffEnabled)  changes.Add($"AutoSquareOffEnabled {old.AutoSquareOffEnabled}→{next.AutoSquareOffEnabled}");
+        if (old.AutoSquareOffTime     != next.AutoSquareOffTime)     changes.Add($"AutoSquareOffTime {old.AutoSquareOffTime}→{next.AutoSquareOffTime}");
+        if (old.WatchedProducts       != next.WatchedProducts)       changes.Add($"WatchedProducts {old.WatchedProducts}→{next.WatchedProducts}");
+        return changes.Count > 0 ? string.Join(", ", changes) : "unknown";
+    }
 }

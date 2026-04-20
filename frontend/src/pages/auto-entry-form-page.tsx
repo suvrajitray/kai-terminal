@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Activity, ArrowLeft, Calendar, Clock,
@@ -42,10 +42,10 @@ function makeDefault(brokerType: string): AutoEntryStrategyInput {
     name: "Morning Sell",
     enabled: true,
     instrument: "NIFTY",
-    optionType: "PE",
+    optionType: "CE+PE",
     lots: 1,
-    entryAfterTime: "09:30",
-    noEntryAfterTime: "11:30",
+    entryAfterTime: "09:15",
+    noEntryAfterTime: "12:15",
     tradingDays: ["Mon", "Tue", "Wed", "Thu", "Fri"],
     excludeExpiryDay: false,
     onlyExpiryDay: false,
@@ -77,6 +77,8 @@ export function AutoEntryFormPage() {
   const [draft, setDraft] = useState<AutoEntryStrategyInput>(() =>
     makeDefault(connectedBrokers[0]?.id ?? "upstox")
   );
+  const [editingName, setEditingName] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-select first connected broker when brokers load
   useEffect(() => {
@@ -140,25 +142,27 @@ export function AutoEntryFormPage() {
   }
 
   return (
-    <div className="pb-24">
+    <div className="max-w-[1440px] mx-auto pb-24">
 
       {/* ── Page header ── */}
-      <div className="mb-8 flex items-start justify-between">
-        <div className="flex-1 min-w-0">
-          <button
-            onClick={() => navigate("/auto-entry")}
-            className="mb-2 flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="size-3.5" />
-            Auto Entry
-          </button>
-          <h1 className="text-3xl font-bold tracking-tight">{isNew ? "Create Strategy" : "Edit Strategy"}</h1>
-
-          {/* Subtitle + Enabled pill on same line */}
-          <div className="mt-1.5 flex flex-wrap items-center gap-4">
-            <p className="text-sm text-muted-foreground">
+      <div className="mb-8">
+        <div className="flex items-start justify-between mb-5">
+          <div>
+            <button
+              onClick={() => navigate("/auto-entry")}
+              className="mb-2 flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ArrowLeft className="size-3.5" />
+              Auto Entry
+            </button>
+            <h1 className="text-3xl font-bold tracking-tight">{isNew ? "Create Strategy" : "Edit Strategy"}</h1>
+            <p className="mt-1.5 text-sm text-muted-foreground">
               Build and automate your trades with precision.
             </p>
+          </div>
+
+          {/* Enabled toggle */}
+          <div className="shrink-0 flex items-center gap-3 ml-6 mt-1">
             <div
               className={cn(
                 "flex items-center gap-2 rounded-full border px-3.5 py-1 cursor-pointer select-none transition-all",
@@ -177,22 +181,42 @@ export function AutoEntryFormPage() {
               />
             </div>
           </div>
+        </div>
 
-          {/* Name + Broker row */}
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Name</span>
-              <Input
+        {/* Name + Broker identity card — full width */}
+        <div className="rounded-xl border border-border/40 bg-card overflow-hidden flex items-stretch">
+          <div className="flex-1 px-5 py-4">
+            <p className="text-[10px] uppercase tracking-widest font-medium text-muted-foreground/50 mb-2">Strategy Name</p>
+            {editingName ? (
+              <input
+                ref={nameInputRef}
                 value={draft.name}
                 onChange={(e) => field("name", e.target.value)}
-                className="h-9 w-72 border-border/40 text-sm"
+                onBlur={() => setEditingName(false)}
+                onKeyDown={(e) => e.key === "Enter" && setEditingName(false)}
+                placeholder="Unnamed Strategy"
+                className="bg-transparent border-0 outline-none text-xl font-semibold text-foreground placeholder:text-muted-foreground/30 w-full"
               />
-            </div>
-            {connectedBrokers.length > 0 && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">Broker</span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => { setEditingName(true); setTimeout(() => nameInputRef.current?.focus(), 0); }}
+                className="flex items-center gap-2 group/name"
+              >
+                <span className="text-xl font-semibold text-foreground">
+                  {draft.name || <span className="text-muted-foreground/30">Unnamed Strategy</span>}
+                </span>
+                <Pencil className="size-3.5 text-muted-foreground/40 group-hover/name:text-muted-foreground/70 transition-colors" />
+              </button>
+            )}
+          </div>
+          {connectedBrokers.length > 0 && (
+            <>
+              <div className="w-px bg-border/40 my-3" />
+              <div className="px-5 py-4 flex flex-col justify-center w-[300px] shrink-0">
+                <p className="text-[10px] uppercase tracking-widest font-medium text-muted-foreground/50 mb-2">Broker</p>
                 <Select value={draft.brokerType} onValueChange={(v) => field("brokerType", v)}>
-                  <SelectTrigger className="h-9 w-32 border-border/40 text-sm">
+                  <SelectTrigger className="h-auto border-0 bg-transparent dark:bg-transparent dark:hover:bg-transparent p-0 shadow-none ring-0 outline-none text-sm font-semibold gap-1.5 focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 [&>svg]:text-muted-foreground/50">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -202,39 +226,9 @@ export function AutoEntryFormPage() {
                   </SelectContent>
                 </Select>
               </div>
-            )}
-          </div>
+            </>
+          )}
         </div>
-
-        {/* Load Preset */}
-        <Button variant="outline" className="shrink-0 border-border/40 gap-2 text-sm ml-6 mt-1">
-          Load Preset
-          <span className="text-muted-foreground">›</span>
-        </Button>
-      </div>
-
-      {/* ── Step progress bar ── */}
-      <div className="mb-8 flex items-start">
-        {[
-          { num: 1, label: "What to Trade",       sub: "Choose instrument & things" },
-          { num: 2, label: "When to Trade",        sub: "Schedule & Expiry Days"     },
-          { num: 3, label: "How to Select Strike", sub: "Selection Method & target"  },
-          { num: 4, label: "Expiry Selection",     sub: "Pick expiry Oricat"         },
-        ].map((s, i) => (
-          <div key={s.num} className="flex items-start flex-1 min-w-0">
-            <div className="flex items-center shrink-0">
-              <div className="flex size-8 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white shadow-md shadow-indigo-600/30">
-                {s.num}
-              </div>
-              {i < 3 && <div className="w-8 sm:w-16 md:w-24 border-t border-border/40 mt-0" />}
-            </div>
-            <div className="ml-2 min-w-0 hidden sm:block">
-              <p className="text-xs font-semibold leading-tight truncate">{s.label}</p>
-              <p className="text-[10px] text-muted-foreground truncate">{s.sub}</p>
-            </div>
-            {i < 3 && <div className="flex-1" />}
-          </div>
-        ))}
       </div>
 
       {/* ── Body ── */}
@@ -253,7 +247,7 @@ export function AutoEntryFormPage() {
                 <div className="relative">
                   <Activity className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-indigo-400" />
                   <Select value={draft.instrument} onValueChange={(v) => field("instrument", v)}>
-                    <SelectTrigger className="border-border/50 bg-background pl-8">
+                    <SelectTrigger className="w-full border-border/50 bg-background pl-8">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -355,23 +349,26 @@ export function AutoEntryFormPage() {
                 {/* Entry Window */}
                 <div className="space-y-2">
                   <p className="text-xs font-medium text-foreground/70">Entry Window</p>
-                  <div className="flex items-center gap-2 rounded-md border border-border/50 bg-background px-3 py-2 focus-within:border-indigo-500/40 transition-colors">
-                    <Clock className="size-3.5 shrink-0 text-indigo-400" />
+                  <div className="flex items-center rounded-md border border-border/50 bg-background px-3 py-2 focus-within:border-indigo-500/40 transition-colors">
+                    <Clock className="size-3.5 shrink-0 text-indigo-400 mr-2" />
                     <input
                       type="time"
                       value={draft.entryAfterTime}
                       onChange={(e) => field("entryAfterTime", e.target.value)}
                       className="bg-transparent border-0 outline-none tabular-nums text-sm font-medium text-foreground w-[5.5rem] [&::-webkit-calendar-picker-indicator]:hidden"
                     />
-                    <span className="text-muted-foreground text-xs shrink-0">→</span>
-                    <input
-                      type="time"
-                      value={draft.noEntryAfterTime}
-                      onChange={(e) => field("noEntryAfterTime", e.target.value)}
-                      className="bg-transparent border-0 outline-none tabular-nums text-sm font-medium text-foreground w-[5.5rem] [&::-webkit-calendar-picker-indicator]:hidden"
-                    />
+                    <span className="flex-1 text-center text-muted-foreground text-xs">→</span>
+                    <div className="ml-auto flex items-center">
+                      <Clock className="size-3.5 shrink-0 text-indigo-400 mr-2" />
+                      <input
+                        type="time"
+                        value={draft.noEntryAfterTime}
+                        onChange={(e) => field("noEntryAfterTime", e.target.value)}
+                        className="bg-transparent border-0 outline-none tabular-nums text-sm font-medium text-foreground w-[5.5rem] text-right [&::-webkit-calendar-picker-indicator]:hidden"
+                      />
+                    </div>
                   </div>
-                  <p className="text-[11px] text-muted-foreground">IST · Time when strategy can enter trades</p>
+                  <p className="text-[11px] text-muted-foreground">IST · New positions will only be opened within this time range</p>
                 </div>
               </div>
 
@@ -620,7 +617,7 @@ export function AutoEntryFormPage() {
           </div>
 
           {/* Strategy Summary */}
-          <div>
+          <div className="rounded-xl border border-border/40 bg-card p-4">
             <div className="flex items-center gap-3 mb-3">
               <span className="text-sm font-bold">Strategy Summary</span>
               <div className="flex-1 border-t border-border/40" />
@@ -636,7 +633,6 @@ export function AutoEntryFormPage() {
                 { label: "Days",          value: draft.onlyExpiryDay ? "Expiry only" : draft.tradingDays.join(", ") || "—", colored: false },
                 { label: "Time Window",   value: `${draft.entryAfterTime} – ${draft.noEntryAfterTime} IST`, colored: false },
                 { label: "Expiry",        value: draft.expiryOffset === 0 ? "Nearest Expiry" : `Expiry +${draft.expiryOffset}`, colored: false },
-                { label: "Note",          value: "—", colored: false },
               ].map(({ label, value, colored, editPen }) => (
                 <div key={label} className="flex items-baseline justify-between gap-2">
                   <span className="shrink-0 text-muted-foreground text-xs">{label}</span>
