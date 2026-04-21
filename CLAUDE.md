@@ -102,7 +102,7 @@ No test project exists. `@` alias resolves to `frontend/src/`.
 
 ## Data Storage
 
-PostgreSQL via Neon. Tables auto-created on first start; **new tables require manual `CREATE TABLE` on Neon**.
+PostgreSQL on a self-hosted Linux server. Tables auto-created on first start; **new tables require manual `CREATE TABLE` on the server**.
 
 | Table | Key notes |
 |-------|-----------|
