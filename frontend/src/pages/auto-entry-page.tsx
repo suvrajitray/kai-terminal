@@ -94,7 +94,7 @@ function StrategyCard({
   const brokerLabel = strategy.brokerType === "zerodha" ? "Zerodha" : "Upstox";
 
   const enteredAt = status?.enteredAtUtc
-    ? new Date(status.enteredAtUtc).toLocaleTimeString("en-IN", {
+    ? new Date(status.enteredAtUtc.endsWith("Z") ? status.enteredAtUtc : status.enteredAtUtc + "Z").toLocaleTimeString("en-IN", {
         hour: "2-digit",
         minute: "2-digit",
         timeZone: "Asia/Kolkata",

@@ -205,7 +205,7 @@ export function BrokerRedirectPage() {
                         </Link>
                       </Button>
                       <Button asChild variant="outline" className="flex-1">
-                        <Link to="/dashboard">Dashboard</Link>
+                        <Link to="/connect-brokers">Connect another broker</Link>
                       </Button>
                     </>
                   )
