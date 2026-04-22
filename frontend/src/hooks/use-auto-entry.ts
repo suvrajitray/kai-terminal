@@ -92,9 +92,28 @@ export function useAutoEntry() {
     }
   }, [loadAll]);
 
+  const toggle = useCallback(async (strategy: AutoEntryStrategy): Promise<void> => {
+    const newEnabled = !strategy.enabled;
+    setStrategies(prev => prev.map(s => s.id === strategy.id ? { ...s, enabled: newEnabled } : s));
+    try {
+      await apiClient.put(`/api/auto-entry/${strategy.id}`, {
+        brokerType: strategy.brokerType, name: strategy.name, enabled: newEnabled,
+        instrument: strategy.instrument, optionType: strategy.optionType, lots: strategy.lots,
+        entryAfterTime: strategy.entryAfterTime, noEntryAfterTime: strategy.noEntryAfterTime,
+        tradingDays: strategy.tradingDays, excludeExpiryDay: strategy.excludeExpiryDay,
+        onlyExpiryDay: strategy.onlyExpiryDay, expiryOffset: strategy.expiryOffset,
+        strikeMode: strategy.strikeMode, strikeParam: strategy.strikeParam,
+      });
+    } catch (err) {
+      log.error("failed to toggle strategy", err);
+      setStrategies(prev => prev.map(s => s.id === strategy.id ? { ...s, enabled: strategy.enabled } : s));
+      throw err;
+    }
+  }, []);
+
   const getStatus = useCallback((id: number): AutoEntryStatus | undefined =>
     statuses.find(s => s.strategyId === id),
   [statuses]);
 
-  return { strategies, statuses, loading, saving, error, create, update, remove, getStatus, reload: loadAll };
+  return { strategies, statuses, loading, saving, error, create, update, remove, toggle, getStatus, reload: loadAll };
 }
