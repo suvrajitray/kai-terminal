@@ -55,7 +55,7 @@ internal sealed class UpstoxOptionContractProvider : IOptionContractProvider
                 .Select(c => new ContractEntry(
                     c.Expiry, c.ExchangeToken, (int)c.LotSize,
                     c.InstrumentType,
-                    UpstoxToken: c.InstrumentKey,
+                    UpstoxToken: c.InstrumentKey.Replace(':', '|'),
                     ZerodhaToken: "",
                     c.StrikePrice))
                 .ToList();

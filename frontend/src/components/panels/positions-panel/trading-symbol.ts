@@ -1,4 +1,5 @@
-const INDEX_PREFIXES = ["BANKNIFTY", "FINNIFTY", "SENSEX", "BANKEX", "NIFTY"];
+import { INSTRUMENTS } from "@/lib/lot-sizes";
+const INDEX_PREFIXES = [...INSTRUMENTS].sort((a, b) => b.length - a.length);
 
 export function parseTradingSymbol(symbol: string) {
   const upper = symbol.toUpperCase();

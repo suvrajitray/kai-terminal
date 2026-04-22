@@ -8,8 +8,9 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useOptionContractsStore } from "@/stores/option-contracts-store";
 import { isBrokerTokenExpired } from "@/lib/token-utils";
 import type { Position } from "@/types";
+import { INSTRUMENTS } from "@/lib/lot-sizes";
 
-const KNOWN_UNDERLYINGS = ["BANKNIFTY", "MIDCPNIFTY", "FINNIFTY", "SENSEX", "BANKEX", "NIFTY"];
+const KNOWN_UNDERLYINGS = [...INSTRUMENTS].sort((a, b) => b.length - a.length);
 const MONTH_ABBR       = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
 const WEEKLY_MONTH_CODE: Record<string, number> = {
   "1":1,"2":2,"3":3,"4":4,"5":5,"6":6,"7":7,"8":8,"9":9,"O":10,"N":11,"D":12,

@@ -1,3 +1,7 @@
+/** Canonical list of supported F&O underlyings. */
+export const INSTRUMENTS = ["NIFTY", "BANKNIFTY", "SENSEX", "FINNIFTY", "BANKEX"] as const;
+export type Instrument = (typeof INSTRUMENTS)[number];
+
 /**
  * Lot sizes by underlying name prefix (case-insensitive).
  * Order matters: more specific entries (BANKNIFTY) must come before shorter prefixes (NIFTY).

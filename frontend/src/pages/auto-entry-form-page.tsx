@@ -16,8 +16,9 @@ import { BROKERS } from "@/lib/constants";
 import { useShallow } from "zustand/react/shallow";
 import { useAutoEntry } from "@/hooks/use-auto-entry";
 import type { AutoEntryStrategyInput } from "@/hooks/use-auto-entry";
+import { getLotSize, INSTRUMENTS } from "@/lib/lot-sizes";
 
-const INSTRUMENTS  = ["NIFTY", "BANKNIFTY", "SENSEX", "FINNIFTY", "BANKEX"] as const;
+
 const OPTION_TYPES: { id: string; label: string }[] = [
   { id: "CE", label: "CE" },
   { id: "PE", label: "PE" },
@@ -25,9 +26,6 @@ const OPTION_TYPES: { id: string; label: string }[] = [
 ];
 const TRADING_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri"] as const;
 
-const LOT_SIZES: Record<string, number> = {
-  NIFTY: 75, BANKNIFTY: 35, SENSEX: 10, FINNIFTY: 40, BANKEX: 15,
-};
 
 const STRIKE_MODES = [
   { id: "ATM",     label: "ATM",     sub: "At-the-money strike",      Icon: Crosshair   },
@@ -131,7 +129,7 @@ export function AutoEntryFormPage() {
     }
   }
 
-  const lotSize    = LOT_SIZES[draft.instrument] ?? 1;
+  const lotSize    = getLotSize(draft.instrument);
 
   function strikeLabel(mode: string) {
     return mode === "OTM" ? "Strikes from ATM" : mode === "Delta" ? "Delta Value" : "Target Premium (₹)";

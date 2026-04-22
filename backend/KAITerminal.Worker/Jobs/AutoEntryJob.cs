@@ -28,12 +28,13 @@ internal sealed class AutoEntryJob : BackgroundService
     private static readonly TimeSpan     TradingEnd   = new(15, 30, 0);
     private static readonly TimeSpan     CheckInterval = TimeSpan.FromSeconds(30);
 
-    private readonly IOptionContractProvider _contractProvider;
-    private readonly IOptionChainProvider    _chainProvider;
-    private readonly IMarketQuoteService     _quoteService;
-    private readonly IBrokerClientFactory    _brokerFactory;
-    private readonly IServiceScopeFactory    _scopeFactory;
-    private readonly ILogger<AutoEntryJob>   _logger;
+    private readonly IOptionContractProvider  _contractProvider;
+    private readonly IOptionContractProvider? _zerodhaContractProvider;
+    private readonly IOptionChainProvider     _chainProvider;
+    private readonly IMarketQuoteService      _quoteService;
+    private readonly IBrokerClientFactory     _brokerFactory;
+    private readonly IServiceScopeFactory     _scopeFactory;
+    private readonly ILogger<AutoEntryJob>    _logger;
 
     public AutoEntryJob(
         IEnumerable<IOptionContractProvider> contractProviders,
@@ -43,7 +44,9 @@ internal sealed class AutoEntryJob : BackgroundService
         IServiceScopeFactory                 scopeFactory,
         ILogger<AutoEntryJob>                logger)
     {
-        _contractProvider = contractProviders.First(p => p.BrokerType == BrokerNames.Upstox);
+        var providers = contractProviders.ToList();
+        _contractProvider        = providers.First(p => p.BrokerType == BrokerNames.Upstox);
+        _zerodhaContractProvider = providers.FirstOrDefault(p => p.BrokerType == BrokerNames.Zerodha);
         _chainProvider    = chainProvider;
         _quoteService     = quoteService;
         _brokerFactory    = brokerFactory;
@@ -76,10 +79,32 @@ internal sealed class AutoEntryJob : BackgroundService
         if (configs.Count == 0) return;
 
         // Fetch contracts once — shared across all configs for efficiency.
+        // Merge Upstox + Zerodha contracts by ExchangeToken so each entry has both tokens.
         IReadOnlyList<IndexContracts> allContracts;
         try
         {
-            allContracts = await _contractProvider.GetContractsAsync("", null, ct);
+            var upstoxContracts = await _contractProvider.GetContractsAsync("", null, ct);
+
+            if (_zerodhaContractProvider is not null)
+            {
+                var zerodhaContracts = await _zerodhaContractProvider.GetContractsAsync("", null, ct);
+                var zerodhaByExchangeToken = zerodhaContracts
+                    .SelectMany(ic => ic.Contracts)
+                    .Where(c => !string.IsNullOrEmpty(c.ZerodhaToken) && !string.IsNullOrEmpty(c.ExchangeToken))
+                    .ToDictionary(c => c.ExchangeToken, c => c.ZerodhaToken, StringComparer.OrdinalIgnoreCase);
+
+                allContracts = upstoxContracts
+                    .Select(ic => new IndexContracts(
+                        ic.Index,
+                        ic.Contracts
+                            .Select(c => c with { ZerodhaToken = zerodhaByExchangeToken.GetValueOrDefault(c.ExchangeToken, "") })
+                            .ToList()))
+                    .ToList();
+            }
+            else
+            {
+                allContracts = upstoxContracts;
+            }
         }
         catch (Exception ex)
         {
@@ -217,9 +242,19 @@ internal sealed class AutoEntryJob : BackgroundService
         try
         {
             var quotes = await _quoteService.GetMarketQuotesAsync([underlyingKey], ct);
-            if (!quotes.TryGetValue(underlyingKey, out var quote) || quote.LastPrice <= 0)
+            // Upstox REST market-quote API returns ':' in keys (e.g. "NSE_INDEX:Nifty 50")
+            // while UnderlyingFeedKeys uses '|' — convert for lookup only
+            var quoteKey = underlyingKey.Replace('|', ':');
+            _logger.LogInformation("AutoEntry — quote keys returned: [{Keys}]; looking up {Key}",
+                string.Join(", ", quotes.Keys), quoteKey);
+            if (!quotes.TryGetValue(quoteKey, out var quote))
             {
-                _logger.LogWarning("AutoEntry — could not get spot price for {Instrument}", config.Instrument);
+                _logger.LogWarning("AutoEntry — key {Key} not found in quote response for {Instrument}", quoteKey, config.Instrument);
+                return;
+            }
+            if (quote.LastPrice <= 0)
+            {
+                _logger.LogWarning("AutoEntry — spot price is {Price} (≤ 0) for {Instrument}", quote.LastPrice, config.Instrument);
                 return;
             }
             spot = quote.LastPrice;
@@ -410,10 +445,13 @@ internal sealed class AutoEntryJob : BackgroundService
         string upstoxKey, string brokerType,
         IReadOnlyList<ContractEntry> contracts, string instrument)
     {
-        if (brokerType.Equals(BrokerNames.Upstox, StringComparison.OrdinalIgnoreCase))
-            return (upstoxKey, null);
+        // Option chain InstrumentKey uses ':' (e.g. "NSE_FO:57520"); ContractEntry.UpstoxToken uses '|'
+        var normalizedKey = upstoxKey.Replace(':', '|');
 
-        var exchangeToken = upstoxKey.Contains('|') ? upstoxKey.Split('|')[1] : upstoxKey;
+        if (brokerType.Equals(BrokerNames.Upstox, StringComparison.OrdinalIgnoreCase))
+            return (normalizedKey, null);
+
+        var exchangeToken = normalizedKey.Contains('|') ? normalizedKey.Split('|')[1] : normalizedKey;
         var match = contracts.FirstOrDefault(c =>
             c.UpstoxToken.Contains('|') &&
             c.UpstoxToken.Split('|')[1].Equals(exchangeToken, StringComparison.OrdinalIgnoreCase));

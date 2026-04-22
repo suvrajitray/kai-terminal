@@ -69,7 +69,7 @@ export function Header() {
         </div>
         <div className="flex items-center gap-4">
           <MarketStatus />
-          {brokerAuthenticated && <IndexTicker />}
+          <IndexTicker />
           <BrokerStatusChips />
           {brokerAuthenticated && <QuickTradeButton />}
           <ThemeToggle />

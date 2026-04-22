@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { BrokerBadge } from "@/components/ui/broker-badge";
 import { OptionTypeBadge } from "@/components/panels/positions-panel/option-type-badge";
 import type { Order } from "@/types";
+import { INSTRUMENTS } from "@/lib/lot-sizes";
 
 const TERMINAL_STATUSES = new Set(["complete", "rejected", "cancelled"]);
 
@@ -19,7 +20,7 @@ const MONTH_ABBR = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT",
 const WEEKLY_MONTH: Record<string, number> = {
   "1":1,"2":2,"3":3,"4":4,"5":5,"6":6,"7":7,"8":8,"9":9,"O":10,"N":11,"D":12,
 };
-const KNOWN_UNDERLYINGS = ["BANKNIFTY","MIDCPNIFTY","FINNIFTY","SENSEX","BANKEX","NIFTY"];
+const KNOWN_UNDERLYINGS = [...INSTRUMENTS].sort((a, b) => b.length - a.length);
 
 interface ParsedOption { underlying: string; strike: number; type: "CE" | "PE"; expiryLabel: string; }
 
