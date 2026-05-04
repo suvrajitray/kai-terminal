@@ -1579,6 +1579,152 @@ Shutting down the VM over the weekend is safe. On Monday restart, all systemd se
 
 ---
 
+## AssetLens Deployment — assetlens.in (Same VM, Docker)
+
+AssetLens is a FastAPI + SQLite portfolio tracker. It runs in a Docker container on the same VM as KAI Terminal — isolated from the main app, and trivial to tear down when no longer needed.
+
+Docker is already on the VM (used for Seq).
+
+### Architecture on the VM
+
+```
+Internet → Nginx (443/80)
+             └── assetlens.in → http://127.0.0.1:8002 (Docker container)
+
+Docker container: assetlens  (port 8002 on host)
+/app/data/ inside container  SQLite databases (data lives in the container — fine for temp use)
+```
+
+### Step 1 — DNS (Hostinger)
+
+In **Hostinger DNS** for `assetlens.in`, add A records pointing to the same VM IP:
+
+| Type | Name | Value |
+|------|------|-------|
+| A | `@` | `<vm-public-ip>` |
+| A | `www` | `<vm-public-ip>` |
+
+Verify before running Certbot:
+```bash
+dig assetlens.in +short
+```
+
+### Step 2 — Copy Code to VM
+
+```bash
+# On your Mac
+scp -r assetlens/ kaiterminal:/opt/assetlens
+```
+
+### Step 3 — Configure Environment
+
+`.env.production` is already created in the repo with all production values filled in and is copied to the VM as part of Step 2 (`scp`). No manual setup needed.
+
+```bash
+chmod 600 /opt/assetlens/.env.production
+```
+
+### Step 4 — Build and Run the Container
+
+```bash
+cd /opt/assetlens
+
+# Build the image
+docker build -t assetlens .
+
+# Run the container
+docker run -d \
+  --name assetlens \
+  --restart unless-stopped \
+  -p 127.0.0.1:8002:8000 \
+  --env-file .env.production \
+  assetlens
+```
+
+Verify it's running:
+```bash
+docker ps
+docker logs assetlens
+```
+
+### Step 5 — Nginx Server Block
+
+```bash
+sudo nano /etc/nginx/sites-available/assetlens
+```
+
+```nginx
+server {
+    listen 80;
+    server_name assetlens.in www.assetlens.in;
+
+    location / {
+        proxy_pass http://127.0.0.1:8002;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+```bash
+sudo ln -s /etc/nginx/sites-available/assetlens /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+### Step 6 — SSL Certificate
+
+```bash
+sudo certbot --nginx -d assetlens.in -d www.assetlens.in
+```
+
+### Step 7 — Google OAuth Redirect URI
+
+In Google Cloud Console → OAuth 2.0 credentials, add to **Authorized redirect URIs**:
+
+```
+https://assetlens.in/auth/callback
+```
+
+### Deploying Updates
+
+```bash
+ssh kaiterminal
+cd /opt/assetlens
+
+# Pull or copy new code, then rebuild
+docker build -t assetlens .
+docker stop assetlens && docker rm assetlens
+docker run -d \
+  --name assetlens \
+  --restart unless-stopped \
+  -p 127.0.0.1:8002:8000 \
+  --env-file .env.production \
+  assetlens
+```
+
+### Tearing Down (when done)
+
+```bash
+docker stop assetlens && docker rm assetlens
+docker rmi assetlens
+sudo rm /etc/nginx/sites-enabled/assetlens /etc/nginx/sites-available/assetlens
+sudo nginx -t && sudo systemctl reload nginx
+sudo rm -rf /opt/assetlens
+```
+
+### Container Management
+
+```bash
+docker ps                        # check running
+docker logs assetlens -f         # live logs
+docker restart assetlens         # restart
+docker exec -it assetlens bash   # shell into container
+```
+
+---
+
 ## Configuration Reference
 
 | File | Key settings |

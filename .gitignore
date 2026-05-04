@@ -31,3 +31,8 @@ Network Trash Folder
 Temporary Items
 .apdisk
 .worktrees/
+graphify-out/
+
+# AssetLens secrets
+assetlens/
+
