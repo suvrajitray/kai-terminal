@@ -7,7 +7,7 @@ import { BROKERS, UNDERLYING_KEYS } from '../../constants';
 
 const INDICES = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'SENSEX', 'BANKEX'] as const;
 const LOT_SIZES: Record<string, number> = {
-  NIFTY: 75, BANKNIFTY: 30, FINNIFTY: 40, SENSEX: 10, BANKEX: 15,
+  NIFTY: 75, BANKNIFTY: 30, FINNIFTY: 60, SENSEX: 10, BANKEX: 30,
 };
 
 type Side = 'Buy' | 'Sell';
