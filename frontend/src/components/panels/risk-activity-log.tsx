@@ -50,7 +50,7 @@ function buildMessage(entry: RiskLogEntry): string {
     case "TslActivated":
       return `TSL activated — floor locked at ${entry.tslFloor != null ? fmt(entry.tslFloor) : "—"}${watch}`;
     case "TslRaised":
-      return `TSL raised — new floor ${entry.tslFloor != null ? fmt(entry.tslFloor) : "—"}${watch}`;
+      return `TSL raised — PnL ${fmt(entry.mtm)} | new floor ${entry.tslFloor != null ? fmt(entry.tslFloor) : "—"}${watch}`;
     case "TslHit":
       return `TSL hit — PnL ${fmt(entry.mtm)}${entry.tslFloor != null ? ` ≤ floor ${fmt(entry.tslFloor)}` : ""}${watch}`;
     case "SquareOffComplete":

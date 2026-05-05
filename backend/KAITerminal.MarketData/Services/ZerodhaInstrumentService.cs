@@ -39,7 +39,7 @@ public sealed class ZerodhaInstrumentService : IZerodhaInstrumentService
             .ToList()
             .AsReadOnly();
 
-        _logger.LogInformation(
+        _logger.LogDebug(
             "GetCurrentYearContractsAsync({Symbol}): {Count} contracts (from cache)",
             underlyingSymbol, filtered.Count);
 
