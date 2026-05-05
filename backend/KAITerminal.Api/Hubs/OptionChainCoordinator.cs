@@ -68,7 +68,7 @@ internal sealed class OptionChainCoordinator : IAsyncDisposable
     public ValueTask DisposeAsync()
     {
         _sharedMarketData.FeedReceived -= _feedHandler;
-        _logger.LogInformation(
+        _logger.LogDebug(
             "OptionChainCoordinator [{Id}]: disposed — detached from feed", _connectionId);
         return ValueTask.CompletedTask;
     }

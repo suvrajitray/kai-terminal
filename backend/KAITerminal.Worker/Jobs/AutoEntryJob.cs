@@ -218,13 +218,13 @@ internal sealed class AutoEntryJob : BackgroundService
         // 6. Expiry day gate
         if (config.OnlyExpiryDay && expiryDate != todayIst)
         {
-            _logger.LogInformation("AutoEntry — OnlyExpiryDay set but today is not expiry, skipping [{User} / {Broker}]",
+            _logger.LogDebug("AutoEntry — OnlyExpiryDay set but today is not expiry, skipping [{User} / {Broker}]",
                 config.Username, config.BrokerType);
             return;
         }
         if (!config.OnlyExpiryDay && config.ExcludeExpiryDay && expiryDate == todayIst)
         {
-            _logger.LogInformation("AutoEntry — {Instrument} expiry today, skipping [{User} / {Broker}]",
+            _logger.LogDebug("AutoEntry — {Instrument} expiry today, skipping [{User} / {Broker}]",
                 config.Instrument, config.Username, config.BrokerType);
             return;
         }
@@ -245,7 +245,7 @@ internal sealed class AutoEntryJob : BackgroundService
             // Upstox REST market-quote API returns ':' in keys (e.g. "NSE_INDEX:Nifty 50")
             // while UnderlyingFeedKeys uses '|' — convert for lookup only
             var quoteKey = underlyingKey.Replace('|', ':');
-            _logger.LogInformation("AutoEntry — quote keys returned: [{Keys}]; looking up {Key}",
+            _logger.LogDebug("AutoEntry — quote keys returned: [{Keys}]; looking up {Key}",
                 string.Join(", ", quotes.Keys), quoteKey);
             if (!quotes.TryGetValue(quoteKey, out var quote))
             {

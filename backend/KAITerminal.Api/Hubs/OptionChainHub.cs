@@ -53,14 +53,14 @@ public sealed class OptionChainHub : Hub
         var connectionId = Context.ConnectionId;
         var coordinator  = new OptionChainCoordinator(_hubContext, _sharedMarketData, connectionId, _logger);
         _manager.Add(connectionId, coordinator);
-        _logger.LogInformation("OptionChainHub: client {Id} connected", connectionId);
+        _logger.LogDebug("OptionChainHub: client {Id} connected", connectionId);
         return base.OnConnectedAsync();
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         if (exception is null)
-            _logger.LogInformation("OptionChainHub: client {Id} disconnected", Context.ConnectionId);
+            _logger.LogDebug("OptionChainHub: client {Id} disconnected", Context.ConnectionId);
         else
             _logger.LogWarning(exception, "OptionChainHub: client {Id} disconnected with error", Context.ConnectionId);
 

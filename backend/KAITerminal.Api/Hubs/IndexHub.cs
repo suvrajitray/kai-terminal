@@ -67,7 +67,7 @@ public sealed class IndexHub : Hub
             if (snapshot.Count > 0)
             {
                 await Clients.Caller.SendAsync("ReceiveIndexSnapshot", snapshot, ct);
-                _logger.LogInformation(
+                _logger.LogDebug(
                     "IndexHub [{Id}]: initial snapshot sent — {Count} index/indices",
                     connectionId, snapshot.Count);
             }

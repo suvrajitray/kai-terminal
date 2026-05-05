@@ -66,7 +66,7 @@ public sealed class MasterDataService(
 
         if (cache.TryGetValue(key, out IReadOnlyList<IndexContracts>? cached))
         {
-            logger.LogInformation("MasterData cache hit for broker={Broker}", provider.BrokerType);
+            logger.LogDebug("MasterData cache hit for broker={Broker}", provider.BrokerType);
             return cached!;
         }
 
