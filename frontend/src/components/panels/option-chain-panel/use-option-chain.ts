@@ -5,6 +5,7 @@ import { UNDERLYING_KEYS } from "@/lib/shift-config";
 import { useIvHistory } from "./use-iv-history";
 import { useOptionChainFeed } from "./use-option-chain-feed";
 import { useIndicesFeed, type IndexPrices } from "@/hooks/use-indices-feed";
+import { calculateMaxPain, calculatePcr, calculateAtmIv, calculateExpectedMove, calculateIvRankMetrics } from "./chain-analytics";
 import type { OptionChainEntry } from "@/types";
 
 const UNDERLYING_TO_INDEX: Record<string, keyof IndexPrices> = {
@@ -144,38 +145,11 @@ export function useOptionChain() {
   }, [underlying, expiry, fetchAndSubscribe]);
 
   // ATM IV + Expected Move — computed from ATM straddle price
-  const atmEntry    = atmStrike > 0 ? allChain.find((e) => e.strikePrice === atmStrike) : undefined;
-  const callIv      = atmEntry?.callOptions?.optionGreeks?.iv ?? 0;
-  const putIv       = atmEntry?.putOptions?.optionGreeks?.iv  ?? 0;
-  const atmIv       = callIv > 0 && putIv > 0 ? (callIv + putIv) / 2
-                    : callIv > 0 ? callIv
-                    : putIv  > 0 ? putIv
-                    : null;
-  const atmCallLtp  = atmEntry?.callOptions?.marketData?.ltp ?? 0;
-  const atmPutLtp   = atmEntry?.putOptions?.marketData?.ltp  ?? 0;
-  const straddlePremium  = atmCallLtp > 0 && atmPutLtp > 0 ? atmCallLtp + atmPutLtp : 0;
-  const expectedMovePct  = spotPrice > 0 && straddlePremium > 0 ? (straddlePremium / spotPrice) * 100 : null;
-  const expectedMovePts  = straddlePremium > 0 ? straddlePremium : null;
+  const atmIv = calculateAtmIv(allChain, atmStrike);
+  const { pct: expectedMovePct, pts: expectedMovePts } = calculateExpectedMove(allChain, atmStrike, spotPrice);
 
   // Max Pain — strike that minimises total in-the-money payout from option writers
-  const maxPain = (() => {
-    if (allChain.length === 0) return null;
-    let minPain = Infinity;
-    let mpStrike = 0;
-    for (const row of allChain) {
-      const S = row.strikePrice;
-      let pain = 0;
-      for (const r of allChain) {
-        const K = r.strikePrice;
-        const callOi = r.callOptions?.marketData?.oi ?? 0;
-        const putOi  = r.putOptions?.marketData?.oi  ?? 0;
-        if (K <= S) pain += (S - K) * callOi;
-        if (K >= S) pain += (K - S) * putOi;
-      }
-      if (pain < minPain) { minPain = pain; mpStrike = S; }
-    }
-    return mpStrike > 0 ? mpStrike : null;
-  })();
+  const maxPain = calculateMaxPain(allChain);
 
   // Slice ATM ± visibleLow/High rows independently
   const atmIdx = allChain.findIndex((e) => e.strikePrice === atmStrike);
@@ -189,23 +163,11 @@ export function useOptionChain() {
   const loadMoreHigh = useCallback(() => setVisibleHigh((s) => s + VISIBLE_STEP), []);
 
   // Compute PCR from total OI across all strikes (more reliable than Upstox's per-row pcr field)
-  const pcr = (() => {
-    const totalCallOi = allChain.reduce((s, e) => s + (e.callOptions?.marketData?.oi ?? 0), 0);
-    const totalPutOi  = allChain.reduce((s, e) => s + (e.putOptions?.marketData?.oi  ?? 0), 0);
-    return totalCallOi > 0 ? totalPutOi / totalCallOi : null;
-  })();
+  const pcr = calculatePcr(allChain);
 
   // IV Rank + IV Percentile from historical snapshots
   const ivHistoryDays = ivHistory.length;
-  const { ivRank, ivPercentile } = (() => {
-    if (ivHistoryDays < 2 || atmIv === null) return { ivRank: null, ivPercentile: null };
-    const ivs = ivHistory.map((s) => s.atmIv);
-    const lo  = Math.min(...ivs);
-    const hi  = Math.max(...ivs);
-    const ivRank      = hi > lo ? ((atmIv - lo) / (hi - lo)) * 100 : null;
-    const ivPercentile = (ivs.filter((v) => v < atmIv).length / ivs.length) * 100;
-    return { ivRank, ivPercentile };
-  })();
+  const { ivRank, ivPercentile } = calculateIvRankMetrics(atmIv, ivHistory);
 
   return {
     underlying, setUnderlying,

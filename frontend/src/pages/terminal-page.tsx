@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, lazy, Suspense, useMemo } from "react";
+import { useState, useRef, useEffect, lazy, Suspense, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { PositionsPanel } from "@/components/panels/positions-panel";
@@ -18,19 +18,8 @@ import { OptionChainPanel } from "@/components/panels/option-chain-panel";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
 import { useBrokerStore } from "@/stores/broker-store";
 import { isBrokerTokenExpired } from "@/lib/token-utils";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-
-const DEFAULT_ORDERS_HEIGHT = 300;
-const MIN_HEIGHT = 32;
+import { useOrdersPanelResize } from "./use-orders-panel-resize";
+import { ExitAllDialog } from "./exit-all-dialog";
 
 export function TerminalPage() {
   const credentials = useBrokerStore((s) => s.credentials);
@@ -52,29 +41,13 @@ function TerminalPageInner() {
     () => loadOrdersRef.current?.()
   );
   const [acting, setActing] = useState<string | null>(null);
-  const [ordersHeight, setOrdersHeight] = useState(MIN_HEIGHT);
-  const [ordersExpanded, setOrdersExpanded] = useState(false);
   const [ppOpen, setPpOpen] = useState(false);
   const [ppBrokerId, setPpBrokerId] = useState<string | null>(null);
   const [chainOpen, setChainOpen] = useState(true);
   const [chainWidth, setChainWidth] = useState(400);
   const [exitAllConfirmOpen, setExitAllConfirmOpen] = useState(false);
   const [productFilter, setProductFilter] = useState<"Intraday" | "Delivery" | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const dragStartY = useRef<number | null>(null);
-  const dragStartHeight = useRef<number>(DEFAULT_ORDERS_HEIGHT);
-  const lastExpandedHeight = useRef<number>(DEFAULT_ORDERS_HEIGHT);
-
-  const handleOrdersToggle = () => {
-    if (ordersExpanded) {
-      lastExpandedHeight.current = ordersHeight;
-      setOrdersHeight(MIN_HEIGHT);
-      setOrdersExpanded(false);
-    } else {
-      setOrdersHeight(lastExpandedHeight.current);
-      setOrdersExpanded(true);
-    }
-  };
+  const { ordersHeight, ordersExpanded, isDragging, handleOrdersToggle, onDragStart } = useOrdersPanelResize();
 
   const handleExitAll = async () => {
     setActing("all");
@@ -136,31 +109,6 @@ function TerminalPageInner() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [load, openCount]);
-
-  const onDragStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    dragStartY.current = e.clientY;
-    dragStartHeight.current = ordersHeight;
-    setIsDragging(true);
-
-    const onMouseMove = (ev: MouseEvent) => {
-      if (dragStartY.current === null) return;
-      const delta = dragStartY.current - ev.clientY;
-      const next = Math.max(MIN_HEIGHT, dragStartHeight.current + delta);
-      setOrdersHeight(next);
-      setOrdersExpanded(next > MIN_HEIGHT);
-    };
-
-    const onMouseUp = () => {
-      dragStartY.current = null;
-      setIsDragging(false);
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
-    };
-
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
-  }, [ordersHeight]);
 
 
   return (
@@ -228,26 +176,12 @@ function TerminalPageInner() {
         />
       </Suspense>
 
-      {/* Exit All confirmation (triggered by E key or button) */}
-      <AlertDialog open={exitAllConfirmOpen} onOpenChange={setExitAllConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Exit {openCount} open position{openCount !== 1 ? "s" : ""}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Market exit orders will be placed for all {openCount} open position{openCount !== 1 ? "s" : ""}. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => { setExitAllConfirmOpen(false); handleExitAll(); }}
-            >
-              Exit All
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ExitAllDialog
+        open={exitAllConfirmOpen}
+        openCount={openCount}
+        onOpenChange={setExitAllConfirmOpen}
+        onConfirm={handleExitAll}
+      />
     </div>
   );
 }

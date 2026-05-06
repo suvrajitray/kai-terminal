@@ -17,9 +17,9 @@ import {
   type OrderIntent,
 } from "@/components/panels/order-dialog";
 import type { Position } from "@/types";
+import { INR, PnlCell } from "./pnl-cell";
 
-const INR    = new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const INR_INT = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
+export { PnlCell } from "./pnl-cell";
 
 const PRODUCT_LABEL: Record<string, string> = {
   Intraday:   "Intraday",
@@ -27,23 +27,6 @@ const PRODUCT_LABEL: Record<string, string> = {
   Mtf:        "MTF",
   CoverOrder: "Cover Order",
 };
-
-export function PnlCell({ value, pct, noDecimal }: { value: number; pct?: number; noDecimal?: boolean }) {
-  const color = value > 0 ? "text-emerald-500" : value < 0 ? "text-rose-500" : "text-muted-foreground";
-  const fmt = noDecimal ? INR_INT : INR;
-  return (
-    <div className="flex flex-col items-end gap-0">
-      <span className={cn("font-mono tabular-nums", color)}>
-        {value >= 0 ? "+" : ""}₹{fmt.format(value)}
-      </span>
-      {pct !== undefined && (
-        <span className={cn("font-mono text-[10px] tabular-nums opacity-60", color)}>
-          {pct >= 0 ? "+" : ""}{pct.toFixed(1)}%
-        </span>
-      )}
-    </div>
-  );
-}
 
 type DialogType = "exit" | "more" | "convert" | "stoploss" | null;
 

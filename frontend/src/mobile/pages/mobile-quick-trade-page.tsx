@@ -26,16 +26,15 @@ export function MobileQuickTradePage() {
 
   // By Chain: use the option chain hook, sync with form underlying/expiry
   const chain = useOptionChain()
+  const { setUnderlying: setChainUnderlying, setExpiry: setChainExpiry } = chain
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (form.underlying !== chain.underlying) chain.setUnderlying(form.underlying)
-  }, [form.underlying])
+    if (form.underlying !== chain.underlying) setChainUnderlying(form.underlying)
+  }, [chain.underlying, form.underlying, setChainUnderlying])
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (form.expiry && form.expiry !== chain.expiry) chain.setExpiry(form.expiry)
-  }, [form.expiry])
+    if (form.expiry && form.expiry !== chain.expiry) setChainExpiry(form.expiry)
+  }, [chain.expiry, form.expiry, setChainExpiry])
 
   // Order sheet state (for By Chain tab)
   const [orderSheet, setOrderSheet] = useState<{
