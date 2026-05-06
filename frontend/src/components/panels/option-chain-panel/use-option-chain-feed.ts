@@ -38,7 +38,12 @@ export function useOptionChainFeed({ onLtpBatch }: UseOptionChainFeedOptions) {
     });
 
     connectionRef.current = conn;
-    conn.start().catch(() => {});
+    conn.start()
+      .then(() => {
+        const tokens = liveTokensRef.current;
+        if (tokens.length > 0) conn.invoke("SubscribeToInstruments", tokens).catch(() => {});
+      })
+      .catch(() => {});
 
     return () => {
       conn.invoke("ClearSubscriptions").catch(() => {});
