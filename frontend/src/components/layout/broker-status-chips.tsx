@@ -1,10 +1,11 @@
-import { ShieldCheck, Wallet } from "lucide-react";
+import { ShieldCheck, Unplug, Wallet } from "lucide-react";
 import { useBrokerStore } from "@/stores/broker-store";
 import { useFunds } from "@/hooks/use-funds";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
 import { BROKERS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import type { FundsData } from "@/services/trading-api";
@@ -88,30 +89,44 @@ export function BrokerStatusChips() {
 
                 <Separator />
 
-                <div className="space-y-1.5">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className={cn(
-                      "w-full h-7 text-xs",
-                      ppConfigs[broker.id]?.enabled
-                        ? "border-green-500/30 text-green-500 hover:bg-green-500/10 hover:text-green-500"
-                        : "border-border/50 text-muted-foreground hover:text-foreground",
-                    )}
-                    onClick={() => useProfitProtectionStore.getState().requestOpen(broker.id)}
-                  >
-                    <ShieldCheck className="mr-1.5 size-3" />
-                    Profit Protection
-                  </Button>
+                <div className="flex items-center gap-1.5">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className={cn(
+                          "flex-1 h-7 text-xs",
+                          ppConfigs[broker.id]?.enabled
+                            ? "border-green-500/30 text-green-500 hover:bg-green-500/10 hover:text-green-500"
+                            : "border-border/50 text-muted-foreground hover:text-foreground",
+                        )}
+                        onClick={() => useProfitProtectionStore.getState().requestOpen(broker.id)}
+                      >
+                        <ShieldCheck className="mr-1.5 size-3" />
+                        Profit Protection
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{ppConfigs[broker.id]?.enabled ? "PP enabled — click to configure" : "Click to configure Profit Protection"}</p>
+                    </TooltipContent>
+                  </Tooltip>
 
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-full h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
-                    onClick={() => removeCredentials(broker.id)}
-                  >
-                    Disconnect
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="h-7 w-7 shrink-0 border-border/50 text-muted-foreground/50 hover:border-destructive/40 hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => removeCredentials(broker.id)}
+                      >
+                        <Unplug className="size-3" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Disconnect {broker.name}</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
               </div>
             </PopoverContent>
