@@ -11,6 +11,8 @@ import type { Draft } from "./use-pp-draft";
 interface BrokerPpFormProps {
   draft: Draft;
   onField: <K extends keyof Draft>(key: K, value: Draft[K]) => void;
+  activeTab: string;
+  onTabChange: (tab: string) => void;
   targetWarning: boolean;
   slWarning: boolean;
   activateAtWarning: boolean;
@@ -23,13 +25,13 @@ interface BrokerPpFormProps {
 }
 
 export const BrokerPpForm = memo(function BrokerPpForm({
-  draft, onField,
+  draft, onField, activeTab, onTabChange,
   targetWarning, slWarning, activateAtWarning, lockProfitWarning,
   increaseByVal, trailByVal, slVal, activateAtVal, lockProfitAtVal,
 }: BrokerPpFormProps) {
   return (
     <div className={cn("transition-opacity duration-200", !draft.enabled && "pointer-events-none opacity-40")}>
-      <Tabs defaultValue="limits" className="w-full">
+      <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
         <div className="px-6 pt-4">
           <TabsList variant="line" className="w-full border-b border-border/50 pb-0">
             <TabsTrigger value="limits">Stop Loss &amp; Targets</TabsTrigger>

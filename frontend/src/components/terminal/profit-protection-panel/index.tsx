@@ -1,5 +1,5 @@
 // frontend/src/components/terminal/profit-protection-panel/index.tsx
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ShieldCheck, ShieldOff } from "lucide-react";
 import { toast } from "@/lib/toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -27,10 +27,13 @@ export function ProfitProtectionPanel({ open, onClose, brokerId }: ProfitProtect
   const dhanConfig    = useRiskConfig("dhan");
 
   const {
-    draft, setField, toggleEnabled, resetToBroker, resetToDefaults,
+    draft, setField, toggleEnabled, resetToBroker,
+    resetSlTargetsToDefaults, resetAutoShiftToDefaults,
     currentMtm, warnings, canSave, toSavePayload,
     increaseByVal, trailByVal, slVal, activateAtVal, lockProfitAtVal,
   } = usePpDraft(activeBroker);
+
+  const [activeTab, setActiveTab] = useState("limits");
 
   // Reset draft whenever the dialog opens or the broker changes.
   // useEffect is required here — Radix never fires onOpenChange(true) for
@@ -126,6 +129,8 @@ export function ProfitProtectionPanel({ open, onClose, brokerId }: ProfitProtect
         <BrokerPpForm
           draft={draft}
           onField={setField}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
           targetWarning={warnings.targetWarning}
           slWarning={warnings.slWarning}
           activateAtWarning={warnings.activateAtWarning}
@@ -141,7 +146,7 @@ export function ProfitProtectionPanel({ open, onClose, brokerId }: ProfitProtect
           <Button
             variant="ghost"
             className="text-muted-foreground hover:text-foreground"
-            onClick={resetToDefaults}
+            onClick={activeTab === "limits" ? resetSlTargetsToDefaults : resetAutoShiftToDefaults}
           >
             Defaults
           </Button>

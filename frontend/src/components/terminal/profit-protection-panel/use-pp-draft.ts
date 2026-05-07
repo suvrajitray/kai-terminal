@@ -79,8 +79,29 @@ export function usePpDraft(broker: string) {
     });
   }, []);
 
-  const resetToDefaults = useCallback(() => {
-    setDraft(PP_DEFAULTS);
+  const resetSlTargetsToDefaults = useCallback(() => {
+    setDraft((d) => ({
+      ...d,
+      enabled:            PP_DEFAULTS.enabled,
+      watchedProducts:    PP_DEFAULTS.watchedProducts,
+      mtmTarget:          PP_DEFAULTS.mtmTarget,
+      mtmSl:              PP_DEFAULTS.mtmSl,
+      trailingEnabled:    PP_DEFAULTS.trailingEnabled,
+      trailingActivateAt: PP_DEFAULTS.trailingActivateAt,
+      lockProfitAt:       PP_DEFAULTS.lockProfitAt,
+      increaseBy:         PP_DEFAULTS.increaseBy,
+      trailBy:            PP_DEFAULTS.trailBy,
+    }));
+  }, []);
+
+  const resetAutoShiftToDefaults = useCallback(() => {
+    setDraft((d) => ({
+      ...d,
+      autoShiftEnabled:      PP_DEFAULTS.autoShiftEnabled,
+      autoShiftThresholdPct: PP_DEFAULTS.autoShiftThresholdPct,
+      autoShiftMaxCount:     PP_DEFAULTS.autoShiftMaxCount,
+      autoShiftStrikeGap:    PP_DEFAULTS.autoShiftStrikeGap,
+    }));
   }, []);
 
   // Derived numeric values
@@ -126,7 +147,8 @@ export function usePpDraft(broker: string) {
   });
 
   return {
-    draft, setField, toggleEnabled, resetToBroker, resetToDefaults,
+    draft, setField, toggleEnabled, resetToBroker,
+    resetSlTargetsToDefaults, resetAutoShiftToDefaults,
     currentMtm, warnings, canSave, toSavePayload,
     increaseByVal, trailByVal, slVal, activateAtVal, lockProfitAtVal,
   };
