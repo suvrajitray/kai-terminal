@@ -1,6 +1,6 @@
 // frontend/src/components/terminal/profit-protection-panel/use-pp-draft.ts
 import { useState, useCallback, useMemo } from "react";
-import { useProfitProtectionStore } from "@/stores/profit-protection-store";
+import { useProfitProtectionStore, defaults as ppStoreDefaults } from "@/stores/profit-protection-store";
 import { usePositionsStore } from "@/stores/positions-store";
 
 export interface Draft {
@@ -18,6 +18,22 @@ export interface Draft {
   autoShiftMaxCount: string;
   autoShiftStrikeGap: string;
 }
+
+export const PP_DEFAULTS: Draft = {
+  enabled:               ppStoreDefaults.enabled,
+  watchedProducts:       ppStoreDefaults.watchedProducts,
+  mtmTarget:             String(ppStoreDefaults.mtmTarget),
+  mtmSl:                 String(ppStoreDefaults.mtmSl),
+  trailingEnabled:       ppStoreDefaults.trailingEnabled,
+  trailingActivateAt:    String(ppStoreDefaults.trailingActivateAt),
+  lockProfitAt:          String(ppStoreDefaults.lockProfitAt),
+  increaseBy:            String(ppStoreDefaults.increaseBy),
+  trailBy:               String(ppStoreDefaults.trailBy),
+  autoShiftEnabled:      ppStoreDefaults.autoShiftEnabled,
+  autoShiftThresholdPct: String(ppStoreDefaults.autoShiftThresholdPct),
+  autoShiftMaxCount:     String(ppStoreDefaults.autoShiftMaxCount),
+  autoShiftStrikeGap:    String(ppStoreDefaults.autoShiftStrikeGap),
+};
 
 function makeDraft(broker: string): Draft {
   const p = useProfitProtectionStore.getState().getConfig(broker);
@@ -63,6 +79,10 @@ export function usePpDraft(broker: string) {
     });
   }, []);
 
+  const resetToDefaults = useCallback(() => {
+    setDraft(PP_DEFAULTS);
+  }, []);
+
   // Derived numeric values
   const targetVal       = Number(draft.mtmTarget);
   const slVal           = Number(draft.mtmSl);
@@ -106,7 +126,7 @@ export function usePpDraft(broker: string) {
   });
 
   return {
-    draft, setField, toggleEnabled, resetToBroker,
+    draft, setField, toggleEnabled, resetToBroker, resetToDefaults,
     currentMtm, warnings, canSave, toSavePayload,
     increaseByVal, trailByVal, slVal, activateAtVal, lockProfitAtVal,
   };

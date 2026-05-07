@@ -17,19 +17,19 @@ export interface ProfitProtectionConfig {
 }
 
 export const defaults: ProfitProtectionConfig = {
-  enabled:               false,
-  mtmTarget:             Number(import.meta.env.VITE_PP_MTM_TARGET)            || 25000,
-  mtmSl:                 Number(import.meta.env.VITE_PP_MTM_SL)                || -25000,
-  trailingEnabled:       import.meta.env.VITE_PP_TRAILING_ENABLED !== "false",
-  trailingActivateAt:    Number(import.meta.env.VITE_PP_TRAILING_ACTIVATE_AT)  || 10000,
-  lockProfitAt:          Number(import.meta.env.VITE_PP_LOCK_PROFIT_AT)        || 3000,
+  enabled:               import.meta.env.VITE_PP_ENABLED              !== "false",
+  watchedProducts:       (import.meta.env.VITE_PP_WATCHED_PRODUCTS    as ProfitProtectionConfig["watchedProducts"]) || "All",
+  mtmTarget:             Number(import.meta.env.VITE_PP_MTM_TARGET)            || 15000,
+  mtmSl:                 Number(import.meta.env.VITE_PP_MTM_SL)                || -20000,
+  trailingEnabled:       import.meta.env.VITE_PP_TRAILING_ENABLED      !== "false",
+  trailingActivateAt:    Number(import.meta.env.VITE_PP_TRAILING_ACTIVATE_AT)  || 5000,
+  lockProfitAt:          Number(import.meta.env.VITE_PP_LOCK_PROFIT_AT)        || 1000,
   increaseBy:            Number(import.meta.env.VITE_PP_INCREASE_BY)           || 100,
   trailBy:               Number(import.meta.env.VITE_PP_TRAIL_BY)              || 50,
-  autoShiftEnabled:      false,
-  autoShiftThresholdPct: 30,
-  autoShiftMaxCount:     2,
-  autoShiftStrikeGap:    1,
-  watchedProducts:       "All",
+  autoShiftEnabled:      import.meta.env.VITE_PP_AUTO_SHIFT_ENABLED    !== "false",
+  autoShiftThresholdPct: Number(import.meta.env.VITE_PP_AUTO_SHIFT_THRESHOLD_PCT) || 35,
+  autoShiftMaxCount:     Number(import.meta.env.VITE_PP_AUTO_SHIFT_MAX_COUNT)      || 1,
+  autoShiftStrikeGap:    Number(import.meta.env.VITE_PP_AUTO_SHIFT_STRIKE_GAP)     || 1,
 };
 
 interface ProfitProtectionState {

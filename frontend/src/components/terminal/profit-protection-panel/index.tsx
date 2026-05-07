@@ -27,7 +27,7 @@ export function ProfitProtectionPanel({ open, onClose, brokerId }: ProfitProtect
   const dhanConfig    = useRiskConfig("dhan");
 
   const {
-    draft, setField, toggleEnabled, resetToBroker,
+    draft, setField, toggleEnabled, resetToBroker, resetToDefaults,
     currentMtm, warnings, canSave, toSavePayload,
     increaseByVal, trailByVal, slVal, activateAtVal, lockProfitAtVal,
   } = usePpDraft(activeBroker);
@@ -137,9 +137,18 @@ export function ProfitProtectionPanel({ open, onClose, brokerId }: ProfitProtect
           lockProfitAtVal={lockProfitAtVal}
         />
 
-        <div className="flex justify-end gap-2 border-t border-border/50 px-6 py-4">
-          <Button variant="outline" onClick={onClose}>Close</Button>
-          <Button onClick={handleSave} disabled={!canSave}>Save</Button>
+        <div className="flex items-center justify-between border-t border-border/50 px-6 py-4">
+          <Button
+            variant="ghost"
+            className="text-muted-foreground hover:text-foreground"
+            onClick={resetToDefaults}
+          >
+            Defaults
+          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onClose}>Close</Button>
+            <Button onClick={handleSave} disabled={!canSave}>Save</Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
