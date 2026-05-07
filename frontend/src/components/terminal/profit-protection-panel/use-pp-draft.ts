@@ -1,7 +1,7 @@
 // frontend/src/components/terminal/profit-protection-panel/use-pp-draft.ts
 import { useState, useCallback, useMemo } from "react";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
-import type { Position } from "@/types";
+import { usePositionsStore } from "@/stores/positions-store";
 
 export interface Draft {
   enabled: boolean;
@@ -38,7 +38,8 @@ function makeDraft(broker: string): Draft {
   };
 }
 
-export function usePpDraft(broker: string, positions: Position[]) {
+export function usePpDraft(broker: string) {
+  const positions = usePositionsStore((s) => s.positions);
   const [draft, setDraft] = useState<Draft>(() => makeDraft(broker));
 
   const resetToBroker = useCallback((b: string) => {

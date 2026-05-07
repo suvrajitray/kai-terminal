@@ -18,7 +18,6 @@ interface StatsActionsProps {
   loading: boolean;
   chainOpen: boolean;
   onOpenProfitProtection: (brokerId?: string) => void;
-  onToggleProfitProtection: () => void;
   onExitAll: () => void;
   onRefresh: () => void;
   onOpenPayoff: () => void;
@@ -33,7 +32,6 @@ export function StatsActions({
   loading,
   chainOpen,
   onOpenProfitProtection,
-  onToggleProfitProtection,
   onExitAll,
   onRefresh,
   onOpenPayoff,
@@ -44,7 +42,6 @@ export function StatsActions({
       <ProfitProtectionControl
         connectedBrokers={connectedBrokers}
         ppEnabled={ppEnabled}
-        onToggleEnabled={onToggleProfitProtection}
         onOpenProfitProtection={onOpenProfitProtection}
       />
 

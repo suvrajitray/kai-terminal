@@ -1,6 +1,7 @@
-import { Wallet } from "lucide-react";
+import { ShieldCheck, Wallet } from "lucide-react";
 import { useBrokerStore } from "@/stores/broker-store";
 import { useFunds } from "@/hooks/use-funds";
+import { useProfitProtectionStore } from "@/stores/profit-protection-store";
 import { BROKERS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -12,6 +13,7 @@ export function BrokerStatusChips() {
   const credentials       = useBrokerStore((s) => s.credentials);
   const removeCredentials = useBrokerStore((s) => s.removeCredentials);
   const { allFunds, loading: fundsLoading, refresh } = useFunds();
+  const ppConfigs         = useProfitProtectionStore((s) => s.configs);
 
   const connectedBrokers = BROKERS.filter((b) => credentials[b.id]);
 
@@ -86,14 +88,31 @@ export function BrokerStatusChips() {
 
                 <Separator />
 
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
-                  onClick={() => removeCredentials(broker.id)}
-                >
-                  Disconnect
-                </Button>
+                <div className="space-y-1.5">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className={cn(
+                      "w-full h-7 text-xs",
+                      ppConfigs[broker.id]?.enabled
+                        ? "border-green-500/30 text-green-500 hover:bg-green-500/10 hover:text-green-500"
+                        : "border-border/50 text-muted-foreground hover:text-foreground",
+                    )}
+                    onClick={() => useProfitProtectionStore.getState().requestOpen(broker.id)}
+                  >
+                    <ShieldCheck className="mr-1.5 size-3" />
+                    Profit Protection
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30"
+                    onClick={() => removeCredentials(broker.id)}
+                  >
+                    Disconnect
+                  </Button>
+                </div>
               </div>
             </PopoverContent>
           </Popover>

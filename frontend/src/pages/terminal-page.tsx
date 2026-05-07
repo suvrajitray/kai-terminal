@@ -1,12 +1,9 @@
-import { useState, useRef, useEffect, lazy, Suspense, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { PositionsPanel } from "@/components/panels/positions-panel";
 import { OrdersPanel } from "@/components/panels/orders-panel";
 import { StatsBar } from "@/components/terminal/stats-bar";
-const ProfitProtectionPanel = lazy(() =>
-  import("@/components/terminal/profit-protection-panel").then((m) => ({ default: m.ProfitProtectionPanel }))
-);
 import { BrokerAuthRequired } from "@/components/terminal/broker-auth-required";
 import { usePositionsFeed } from "@/components/panels/positions-panel/use-positions-feed";
 import { useProfitProtection } from "./use-profit-protection";
@@ -41,8 +38,6 @@ function TerminalPageInner() {
     () => loadOrdersRef.current?.()
   );
   const [acting, setActing] = useState<string | null>(null);
-  const [ppOpen, setPpOpen] = useState(false);
-  const [ppBrokerId, setPpBrokerId] = useState<string | null>(null);
   const [chainOpen, setChainOpen] = useState(true);
   const [chainWidth, setChainWidth] = useState(400);
   const [exitAllConfirmOpen, setExitAllConfirmOpen] = useState(false);
@@ -123,7 +118,7 @@ function TerminalPageInner() {
           acting={acting}
           onRefresh={load}
           onExitAll={() => setExitAllConfirmOpen(true)}
-          onOpenProfitProtection={(brokerId?: string) => { setPpBrokerId(brokerId || null); setPpOpen(true); }}
+          onOpenProfitProtection={(brokerId?: string) => useProfitProtectionStore.getState().requestOpen(brokerId ?? "upstox")}
           onToggleChain={() => setChainOpen((v) => !v)}
           chainOpen={chainOpen}
           productFilter={productFilter}
@@ -165,16 +160,6 @@ function TerminalPageInner() {
 
       {/* Right column — option chain panel */}
       {chainOpen && <OptionChainPanel width={chainWidth} onResize={setChainWidth} onClose={() => setChainOpen(false)} netDelta={netDelta} />}
-
-      {/* Profit Protection config dialog */}
-      <Suspense fallback={<div className="flex items-center justify-center p-8 text-muted-foreground text-sm">Loading…</div>}>
-        <ProfitProtectionPanel
-          open={ppOpen}
-          onClose={() => { setPpOpen(false); setPpBrokerId(null); }}
-          positions={positions}
-          brokerId={ppBrokerId}
-        />
-      </Suspense>
 
       <ExitAllDialog
         open={exitAllConfirmOpen}

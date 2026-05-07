@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { apiClient } from "@/lib/api-client";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
+import { useRiskStateStore } from "@/stores/risk-state-store";
 import { useBrokerStore } from "@/stores/broker-store";
 import type { ProfitProtectionConfig } from "@/stores/profit-protection-store";
 
@@ -58,8 +59,14 @@ export function useRiskConfig(brokerType: string = "upstox") {
   }, [brokerType, isAuthenticated]);
 
   async function save(config: ProfitProtectionConfig) {
+    const current = useProfitProtectionStore.getState().getConfig(brokerType);
     await apiClient.put(`/api/risk-config?broker=${brokerType}`, toDto(config));
     useProfitProtectionStore.getState().setConfig(brokerType, config);
+    // Any field change causes the Worker to restart the session and reset trailing state.
+    // Clear the frontend TSL now so it doesn't show a stale floor until SessionStarted arrives.
+    const anyChanged = (Object.keys(config) as (keyof ProfitProtectionConfig)[])
+      .some((k) => config[k] !== current[k]);
+    if (anyChanged) useRiskStateStore.getState().resetTsl(brokerType);
   }
 
   function setEnabled(enabled: boolean) {

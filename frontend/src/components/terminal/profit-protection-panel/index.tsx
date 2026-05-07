@@ -11,16 +11,14 @@ import { BROKERS } from "@/lib/constants";
 import { useShallow } from "zustand/react/shallow";
 import { usePpDraft } from "./use-pp-draft";
 import { BrokerPpForm } from "./broker-pp-form";
-import type { Position } from "@/types";
 
 interface ProfitProtectionPanelProps {
   open: boolean;
   onClose: () => void;
-  positions: Position[];
   brokerId?: string | null;
 }
 
-export function ProfitProtectionPanel({ open, onClose, positions, brokerId }: ProfitProtectionPanelProps) {
+export function ProfitProtectionPanel({ open, onClose, brokerId }: ProfitProtectionPanelProps) {
   const connectedBrokers = useBrokerStore(useShallow((s) => BROKERS.filter((b) => s.isAuthenticated(b.id))));
   const activeBroker = brokerId ?? connectedBrokers[0]?.id ?? "";
 
@@ -32,7 +30,7 @@ export function ProfitProtectionPanel({ open, onClose, positions, brokerId }: Pr
     draft, setField, toggleEnabled, resetToBroker,
     currentMtm, warnings, canSave, toSavePayload,
     increaseByVal, trailByVal, slVal, activateAtVal, lockProfitAtVal,
-  } = usePpDraft(activeBroker, positions);
+  } = usePpDraft(activeBroker);
 
   // Reset draft whenever the dialog opens or the broker changes.
   // useEffect is required here — Radix never fires onOpenChange(true) for

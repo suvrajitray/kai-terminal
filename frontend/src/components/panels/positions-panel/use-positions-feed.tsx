@@ -1,6 +1,7 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { usePositionsRestFallback } from "./use-positions-rest-fallback";
 import { useSignalrPositions } from "./use-signalr-positions";
+import { usePositionsStore } from "@/stores/positions-store";
 import type { Position } from "@/types";
 
 export function usePositionsFeed(onOrderUpdate?: () => void) {
@@ -48,6 +49,10 @@ export function usePositionsFeed(onOrderUpdate?: () => void) {
     onFallbackLoad: load,
     setLoading,
   });
+
+  useEffect(() => {
+    usePositionsStore.getState().setPositions(positions);
+  }, [positions]);
 
   return { positions, setPositions, loading, isLive, load };
 }

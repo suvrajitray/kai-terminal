@@ -17,7 +17,7 @@ import { AutoShiftSection } from "./mobile-pp-form/auto-shift-section";
 
 function BrokerPPForm({ broker }: { broker: "upstox" | "zerodha" }) {
   const { save } = useRiskConfig(broker);
-  const ppDraft = usePpDraft(broker, []);
+  const ppDraft = usePpDraft(broker);
   const isLoaded = useProfitProtectionStore((s) => s.loadedBrokers.includes(broker));
   const [saving, setSaving] = useState(false);
 

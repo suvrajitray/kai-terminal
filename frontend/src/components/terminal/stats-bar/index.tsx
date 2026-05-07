@@ -46,7 +46,7 @@ export function StatsBar({
     BROKERS.filter((broker) => state.isAuthenticated(broker.id)),
   ));
   const singleBroker = connectedBrokers[0]?.id ?? "upstox";
-  const { setEnabled } = useRiskConfig(singleBroker);
+  useRiskConfig(singleBroker);
   const ppEnabled = ppBrokers.length > 0;
   const [payoffOpen, setPayoffOpen] = useState(false);
   const {
@@ -80,7 +80,6 @@ export function StatsBar({
         loading={loading}
         chainOpen={chainOpen}
         onOpenProfitProtection={onOpenProfitProtection}
-        onToggleProfitProtection={() => setEnabled(!ppEnabled)}
         onExitAll={onExitAll}
         onRefresh={onRefresh}
         onOpenPayoff={() => setPayoffOpen(true)}

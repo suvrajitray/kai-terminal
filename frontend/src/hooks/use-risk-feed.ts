@@ -70,7 +70,7 @@ export function useRiskFeed(): void {
         store.setTslActivated(event.broker, event.tslFloor);
       else if (event.type === "TslRaised" && event.tslFloor != null)
         store.setTslRaised(event.broker, event.tslFloor);
-      else if (event.type === "TslHit" || event.type === "HardSlHit" || event.type === "TargetHit" || event.type === "SquareOffComplete")
+      else if (event.type === "TslHit" || event.type === "HardSlHit" || event.type === "TargetHit" || event.type === "SquareOffComplete" || event.type === "SessionStarted")
         store.resetTsl(event.broker);
 
       // Append to risk log store

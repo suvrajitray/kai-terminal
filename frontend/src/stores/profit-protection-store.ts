@@ -35,16 +35,20 @@ export const defaults: ProfitProtectionConfig = {
 interface ProfitProtectionState {
   configs: Record<string, ProfitProtectionConfig>;  // keyed by brokerType ("upstox" | "zerodha")
   loadedBrokers: string[];                          // replaces single isLoaded boolean
+  pendingOpenBrokerId: string | null;               // signals terminal page to open PP dialog
   getConfig: (broker: string) => ProfitProtectionConfig;
   setEnabled: (broker: string, enabled: boolean) => void;
   setConfig: (broker: string, config: Partial<ProfitProtectionConfig>) => void;
   markLoaded: (broker: string) => void;
+  requestOpen: (brokerId: string) => void;
+  clearPendingOpen: () => void;
   reset: () => void;
 }
 
 export const useProfitProtectionStore = create<ProfitProtectionState>()((set, get) => ({
   configs: {},
   loadedBrokers: [],
+  pendingOpenBrokerId: null,
 
   getConfig: (broker) => get().configs[broker] ?? defaults,
 
@@ -63,5 +67,8 @@ export const useProfitProtectionStore = create<ProfitProtectionState>()((set, ge
       loadedBrokers: s.loadedBrokers.includes(broker) ? s.loadedBrokers : [...s.loadedBrokers, broker],
     })),
 
-  reset: () => set({ configs: {}, loadedBrokers: [] }),
+  requestOpen: (brokerId) => set({ pendingOpenBrokerId: brokerId }),
+  clearPendingOpen: () => set({ pendingOpenBrokerId: null }),
+
+  reset: () => set({ configs: {}, loadedBrokers: [], pendingOpenBrokerId: null }),
 }));
