@@ -32,7 +32,8 @@ export function TerminalPage() {
 }
 
 function TerminalPageInner() {
-  const credentials = useBrokerStore((s) => s.credentials);
+  const credentials     = useBrokerStore((s) => s.credentials);
+  const isAuthenticated = useBrokerStore((s) => s.isAuthenticated);
   const loadOrdersRef = useRef<(() => void) | null>(null);
   const { positions, loading, isLive, load } = usePositionsFeed(
     () => loadOrdersRef.current?.()
@@ -82,10 +83,11 @@ function TerminalPageInner() {
   const openCount = positions.filter((p) => p.quantity !== 0).length;
 
   const ppBrokers = useMemo(() => [
-    upstoxPp.enabled ? { broker: "upstox",  target: upstoxPp.mtmTarget, currentSl: upstoxSl,  trailing: upstoxPp.trailingEnabled } : null,
-    zerodhaP.enabled ? { broker: "zerodha", target: zerodhaP.mtmTarget, currentSl: zerodhasl, trailing: zerodhaP.trailingEnabled } : null,
-    dhanPp.enabled   ? { broker: "dhan",    target: dhanPp.mtmTarget,   currentSl: dhanSl,    trailing: dhanPp.trailingEnabled }   : null,
+    upstoxPp.enabled && isAuthenticated("upstox")  ? { broker: "upstox",  target: upstoxPp.mtmTarget, currentSl: upstoxSl,  trailing: upstoxPp.trailingEnabled } : null,
+    zerodhaP.enabled && isAuthenticated("zerodha") ? { broker: "zerodha", target: zerodhaP.mtmTarget, currentSl: zerodhasl, trailing: zerodhaP.trailingEnabled } : null,
+    dhanPp.enabled   && isAuthenticated("dhan")    ? { broker: "dhan",    target: dhanPp.mtmTarget,   currentSl: dhanSl,    trailing: dhanPp.trailingEnabled }   : null,
   ].filter((x): x is NonNullable<typeof x> => x !== null), [
+    isAuthenticated,
     upstoxPp.enabled, upstoxPp.mtmTarget, upstoxPp.trailingEnabled, upstoxSl,
     zerodhaP.enabled, zerodhaP.mtmTarget, zerodhaP.trailingEnabled, zerodhasl,
     dhanPp.enabled,   dhanPp.mtmTarget,   dhanPp.trailingEnabled,   dhanSl,
