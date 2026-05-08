@@ -43,6 +43,10 @@ export function BasketDialog({ open, onClose }: BasketDialogProps) {
     }
   }, [credentials]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (!open) setShowStrip(false);
+  }, [open]);
+
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const allSelected = items.length > 0 && items.every((i) => selectedIds.has(i.id));
@@ -156,9 +160,11 @@ export function BasketDialog({ open, onClose }: BasketDialogProps) {
           </div>
           <div className="flex items-center gap-3">
             <button
+              type="button"
+              aria-pressed={showStrip}
               onClick={() => setShowStrip((s) => !s)}
               className={cn(
-                "flex items-center gap-1.5 rounded border px-2.5 py-1 text-xs font-semibold transition-colors",
+                "flex items-center gap-1.5 rounded border px-2.5 py-1 text-xs transition-colors",
                 showStrip
                   ? "border-emerald-700/50 bg-emerald-950/40 text-emerald-400"
                   : "border-border/40 text-muted-foreground hover:text-foreground hover:bg-muted/30",
