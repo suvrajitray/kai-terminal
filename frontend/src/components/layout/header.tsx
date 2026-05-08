@@ -68,7 +68,7 @@ export function Header() {
           </nav>
         </div>
         <div className="flex items-center gap-4">
-          <MarketStatus />
+          {import.meta.env.VITE_SHOW_MARKET_STATUS !== "false" && <MarketStatus />}
           <IndexTicker />
           <BrokerStatusChips />
           {brokerAuthenticated && <QuickTradeButton />}
