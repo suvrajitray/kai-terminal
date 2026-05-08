@@ -1,7 +1,6 @@
 // frontend/src/components/layout/basket-dialog/index.tsx
 import { ShoppingCart, CircleX } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useBasketStore } from "@/stores/basket-store";
 import { BasketItemRow } from "./basket-item-row";
 
@@ -49,11 +48,11 @@ export function BasketDialog({ open, onClose }: BasketDialogProps) {
             <p className="text-xs opacity-60">Add instruments from the option chain or positions panel</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
             <table className="w-full border-collapse">
               <thead>
                 <tr className="border-b border-border/40 bg-muted/20">
-                  <th className="pl-3 py-2 w-7"><Checkbox /></th>
+                  <th className="pl-3 py-2 w-7">{/* select-all placeholder */}</th>
                   <th className="px-2 py-2 w-8"></th>
                   <th className="px-3 py-2 text-left text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                     Instrument

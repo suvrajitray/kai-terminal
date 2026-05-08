@@ -15,7 +15,7 @@ export interface BasketItem {
   transactionType: "Buy" | "Sell";
   orderType: "Market" | "Limit";
   product: "Intraday" | "Delivery";
-  qty: number;
+  qty: number;       // in lots — multiply by lotSize to get contract quantity for order placement
   limitPrice: string;
 }
 

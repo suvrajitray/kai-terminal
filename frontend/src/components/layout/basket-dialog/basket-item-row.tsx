@@ -17,9 +17,9 @@ export function BasketItemRow({ item, onUpdate, onRemove }: BasketItemRowProps) 
 
   return (
     <tr className="border-b border-border/30 hover:bg-muted/20 [&>td]:align-middle">
-      {/* Checkbox */}
+      {/* Checkbox — placeholder for future batch-selection */}
       <td className="pl-3 py-2 w-7">
-        <Checkbox />
+        <Checkbox disabled />
       </td>
 
       {/* B/S toggle */}
