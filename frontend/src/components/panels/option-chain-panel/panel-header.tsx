@@ -1,4 +1,4 @@
-import { RefreshCw, X } from "lucide-react";
+import { RefreshCw, ShoppingCart, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +12,8 @@ interface PanelHeaderProps {
   onExpiryChange: (expiry: string) => void;
   onRefresh: () => void;
   onClose?: () => void;
+  basketMode: boolean;
+  onBasketModeToggle: () => void;
 }
 
 export function PanelHeader({
@@ -24,6 +26,8 @@ export function PanelHeader({
   onExpiryChange,
   onRefresh,
   onClose,
+  basketMode,
+  onBasketModeToggle,
 }: PanelHeaderProps) {
   return (
     <div className="flex flex-col 2xl:flex-row shrink-0 border-b border-border bg-muted/40">
@@ -59,6 +63,15 @@ export function PanelHeader({
           title="Refresh chain"
         >
           <RefreshCw className={cn("size-3", loading && "animate-spin")} />
+        </Button>
+        <Button
+          size="icon"
+          variant={basketMode ? "default" : "ghost"}
+          className={cn("size-6 shrink-0", basketMode && "bg-primary text-primary-foreground hover:bg-primary/90")}
+          onClick={onBasketModeToggle}
+          title={basketMode ? "Exit basket mode" : "Add to basket mode"}
+        >
+          <ShoppingCart className="size-3" />
         </Button>
         {onClose && (
           <Button

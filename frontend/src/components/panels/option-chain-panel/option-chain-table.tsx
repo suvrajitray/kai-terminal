@@ -12,9 +12,10 @@ interface Props {
   underlying: string;
   liveStrikeSet: Set<number>;
   onOrder: (intent: OrderIntent) => void;
+  basketMode: boolean;
 }
 
-export const OptionChainTable = memo(function OptionChainTable({ rows, atmStrike, spotPrice, underlying, liveStrikeSet, onOrder }: Props) {
+export const OptionChainTable = memo(function OptionChainTable({ rows, atmStrike, spotPrice, underlying, liveStrikeSet, onOrder, basketMode }: Props) {
   const positions        = usePositionsStore((s) => s.positions);
   const getByInstrumentKey = useOptionContractsStore((s) => s.getByInstrumentKey);
 
@@ -62,6 +63,7 @@ export const OptionChainTable = memo(function OptionChainTable({ rows, atmStrike
             onOrder={onOrder}
             hasCallPos={!!entry.callOptions?.instrumentKey && openPositionKeys.has(entry.callOptions.instrumentKey)}
             hasPutPos={!!entry.putOptions?.instrumentKey && openPositionKeys.has(entry.putOptions.instrumentKey)}
+            basketMode={basketMode}
           />
         ))}
       </tbody>

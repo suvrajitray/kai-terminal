@@ -15,6 +15,7 @@ interface ChainScrollBodyProps {
   onLoadMoreLow: () => void;
   onLoadMoreHigh: () => void;
   onOrder: (intent: OrderIntent) => void;
+  basketMode: boolean;
 }
 
 export const ChainScrollBody = forwardRef<HTMLDivElement, ChainScrollBodyProps>(function ChainScrollBody({
@@ -29,6 +30,7 @@ export const ChainScrollBody = forwardRef<HTMLDivElement, ChainScrollBodyProps>(
   onLoadMoreLow,
   onLoadMoreHigh,
   onOrder,
+  basketMode,
 }, scrollRef) {
   return (
     <div ref={scrollRef} className="flex-1 overflow-y-auto">
@@ -51,6 +53,7 @@ export const ChainScrollBody = forwardRef<HTMLDivElement, ChainScrollBodyProps>(
             underlying={underlying}
             liveStrikeSet={liveStrikeSet}
             onOrder={onOrder}
+            basketMode={basketMode}
           />
 
           <LoadMoreBlock

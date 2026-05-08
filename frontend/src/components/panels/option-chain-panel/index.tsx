@@ -46,6 +46,7 @@ export function OptionChainPanel({ width, onResize, onClose, netDelta }: Props) 
   } = useOptionChain();
 
   const [orderIntent, setOrderIntent] = useState<OrderIntent | null>(null);
+  const [basketMode, setBasketMode] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const underlyings = Object.keys(UNDERLYING_KEYS);
 
@@ -92,6 +93,8 @@ export function OptionChainPanel({ width, onResize, onClose, netDelta }: Props) 
           onExpiryChange={setExpiry}
           onRefresh={refresh}
           onClose={onClose}
+          basketMode={basketMode}
+          onBasketModeToggle={() => setBasketMode((b) => !b)}
         />
         <ChainScrollBody
           ref={scrollRef}
@@ -106,6 +109,7 @@ export function OptionChainPanel({ width, onResize, onClose, netDelta }: Props) 
           onLoadMoreLow={loadMoreLow}
           onLoadMoreHigh={loadMoreHigh}
           onOrder={setOrderIntent}
+          basketMode={basketMode}
         />
         <OptionChainFooter
           underlying={underlying}

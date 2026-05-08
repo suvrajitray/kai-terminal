@@ -2,6 +2,8 @@ import React, { memo } from "react";
 import { cn } from "@/lib/utils";
 import type { OptionChainEntry } from "@/types";
 import type { OrderIntent } from "@/components/panels/order-dialog";
+import { useBasketStore } from "@/stores/basket-store";
+import { getLotSize } from "@/lib/lot-sizes";
 
 interface Props {
   entry: OptionChainEntry;
@@ -13,6 +15,7 @@ interface Props {
   onOrder: (intent: OrderIntent) => void;
   hasCallPos: boolean;
   hasPutPos: boolean;
+  basketMode: boolean;
 }
 
 function formatLtp(ltp: number | undefined): string {
@@ -42,7 +45,7 @@ function formatOiChange(change: number): string {
 }
 
 
-export const OptionChainRow = memo(function OptionChainRow({ entry, isAtm, isLive, spotPrice, underlying, maxOi, onOrder, hasCallPos, hasPutPos }: Props) {
+export const OptionChainRow = memo(function OptionChainRow({ entry, isAtm, isLive, spotPrice, underlying, maxOi, onOrder, hasCallPos, hasPutPos, basketMode }: Props) {
   const callLtp      = entry.callOptions?.marketData?.ltp;
   const putLtp       = entry.putOptions?.marketData?.ltp;
   const callDelta    = entry.callOptions?.optionGreeks?.delta;
@@ -83,11 +86,34 @@ export const OptionChainRow = memo(function OptionChainRow({ entry, isAtm, isLiv
     rowBgStyle.backgroundPosition = positions.join(',');
   }
 
+  const addToBasket = useBasketStore((s) => s.addItem);
+
   function triggerOrder(side: "CE" | "PE", transactionType: "Buy" | "Sell") {
     const opt = side === "CE" ? entry.callOptions : entry.putOptions;
     const ltp = opt?.marketData?.ltp ?? 0;
     const key = opt?.instrumentKey;
     if (!key) return;
+
+    if (basketMode) {
+      addToBasket({
+        instrumentKey: key,
+        displayName: `${underlying} ${entry.strikePrice} ${side}`,
+        exchange: "NFO",
+        side,
+        underlying,
+        strike: entry.strikePrice,
+        expiry: entry.expiry,
+        ltp,
+        lotSize: getLotSize(underlying),
+        transactionType,
+        orderType: "Market",
+        product: "Intraday",
+        qty: 1,
+        limitPrice: "",
+      });
+      return;
+    }
+
     onOrder({ instrumentKey: key, side, transactionType, ltp, strike: entry.strikePrice, underlying });
   }
 
