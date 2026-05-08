@@ -10,6 +10,7 @@ import { MarketStatus } from "./market-status";
 import { BrokerStatusChips } from "./broker-status-chips";
 import { ThemeToggle } from "./theme-toggle";
 import { useBrokerStore } from "@/stores/broker-store";
+import { BasketButton } from "./basket-button";
 
 const NAV_ICONS: Record<string, LucideIcon> = {
   "/dashboard":  LayoutDashboard,
@@ -72,6 +73,7 @@ export function Header() {
           <IndexTicker />
           <BrokerStatusChips />
           {brokerAuthenticated && <QuickTradeButton />}
+          {brokerAuthenticated && <BasketButton />}
           <ThemeToggle />
           <UserMenu />
         </div>
