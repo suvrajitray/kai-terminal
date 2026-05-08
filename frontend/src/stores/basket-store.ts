@@ -38,12 +38,8 @@ export const useBasketStore = create<BasketStore>()((set, get) => ({
       toast.error("Basket is full (max 20 items)");
       return;
     }
-    if (items.some((i) => i.instrumentKey === item.instrumentKey)) {
-      toast.error("Already in basket");
-      return;
-    }
+    if (items.some((i) => i.instrumentKey === item.instrumentKey)) return;
     set((s) => ({ items: [...s.items, { ...item, id: crypto.randomUUID() }] }));
-    toast.success("Added to basket");
   },
   removeItem: (id) => set((s) => ({ items: s.items.filter((i) => i.id !== id) })),
   updateItem: (id, patch) =>
