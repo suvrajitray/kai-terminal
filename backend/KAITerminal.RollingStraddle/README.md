@@ -103,19 +103,13 @@ nano /opt/kaiterminal/repo/backend/KAITerminal.RollingStraddle/appsettings.json
 
 ### Every trading day
 
-**4. Set today's access token** (changes daily after Upstox login)
-
-```bash
-cd /opt/kaiterminal/repo/backend/KAITerminal.RollingStraddle
-dotnet user-secrets set "Upstox:AccessToken" "<your-token>"
-```
-
-**5. Run in a tmux session**
+**4. Run in a tmux session**
 
 ```bash
 tmux new -s straddle
 cd /opt/kaiterminal/repo/backend/KAITerminal.RollingStraddle
 dotnet run --project .
+# → Prompted: paste today's token and Enter (or just Enter to use appsettings value)
 
 # Detach (session keeps running): Ctrl+B, D
 # Re-attach later:                 tmux attach -t straddle

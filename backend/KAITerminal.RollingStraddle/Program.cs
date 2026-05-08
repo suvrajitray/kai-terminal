@@ -15,7 +15,26 @@ Log.Logger = new LoggerConfiguration()
 
 try
 {
+    var overrides = new List<KeyValuePair<string, string?>>();
+
+    Prompt("Upstox access token (Enter to use appsettings value): ",
+        v => overrides.Add(new("Upstox:AccessToken", v)));
+
+    Prompt("Expiry yyyy-MM-dd (Enter to use appsettings value): ",
+        v => overrides.Add(new("Strategy:Expiry", v)));
+
+    Prompt("Lots (Enter to use appsettings value): ",
+        v => overrides.Add(new("Strategy:Lots", v)));
+
+    Prompt("Daily MTM target ₹ (Enter to use appsettings value): ",
+        v => overrides.Add(new("Strategy:DailyMtmTarget", v)));
+
+    Prompt("Daily MTM stop-loss ₹ (Enter to use appsettings value): ",
+        v => overrides.Add(new("Strategy:DailyMtmStopLoss", v)));
+
     var builder = Host.CreateApplicationBuilder(args);
+    if (overrides.Count > 0)
+        builder.Configuration.AddInMemoryCollection(overrides);
 
     Log.Logger = new LoggerConfiguration()
         .MinimumLevel.Information()
@@ -62,4 +81,12 @@ catch (Exception ex)
 finally
 {
     await Log.CloseAndFlushAsync();
+}
+
+static void Prompt(string label, Action<string> onValue)
+{
+    Console.Write(label);
+    var value = Console.ReadLine()?.Trim() ?? string.Empty;
+    if (!string.IsNullOrEmpty(value))
+        onValue(value);
 }
