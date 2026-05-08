@@ -15,6 +15,7 @@ import { placeOrder, type MarginInstrument } from "@/services/trading-api";
 import { useOptionContractsStore } from "@/stores/option-contracts-store";
 import { toast } from "@/lib/toast";
 import { BasketItemRow } from "./basket-item-row";
+import { StrategyStrip } from "./strategy-strip";
 import type { SupportedBroker } from "@/components/panels/order-dialog-parts/types";
 
 interface BasketDialogProps {
@@ -66,6 +67,7 @@ export function BasketDialog({ open, onClose }: BasketDialogProps) {
 
   const getByInstrumentKey = useOptionContractsStore((s) => s.getByInstrumentKey);
   const [placing, setPlacing] = useState(false);
+  const [showStrip, setShowStrip] = useState(false);
 
   async function handlePlace() {
     const toPlace = someSelected ? items.filter((i) => selectedIds.has(i.id)) : items;
@@ -152,16 +154,32 @@ export function BasketDialog({ open, onClose }: BasketDialogProps) {
               {items.length} / 20 items
             </span>
           </div>
-          {items.length > 0 && (
+          <div className="flex items-center gap-3">
             <button
-              onClick={handleClearBasket}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors"
+              onClick={() => setShowStrip((s) => !s)}
+              className={cn(
+                "flex items-center gap-1.5 rounded border px-2.5 py-1 text-xs font-semibold transition-colors",
+                showStrip
+                  ? "border-emerald-700/50 bg-emerald-950/40 text-emerald-400"
+                  : "border-border/40 text-muted-foreground hover:text-foreground hover:bg-muted/30",
+              )}
             >
-              <CircleX className="size-3.5" />
-              Clear basket
+              Strategies
             </button>
-          )}
+            {items.length > 0 && (
+              <button
+                onClick={handleClearBasket}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors"
+              >
+                <CircleX className="size-3.5" />
+                Clear basket
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* Strategy strip */}
+        {showStrip && <StrategyStrip />}
 
         {/* Table */}
         {items.length === 0 ? (
