@@ -43,6 +43,7 @@ export function BasketDialog({ open, onClose }: BasketDialogProps) {
     }
   }, [credentials]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const [showStrip, setShowStrip] = useState(false);
   useEffect(() => {
     if (!open) setShowStrip(false);
   }, [open]);
@@ -71,7 +72,6 @@ export function BasketDialog({ open, onClose }: BasketDialogProps) {
 
   const getByInstrumentKey = useOptionContractsStore((s) => s.getByInstrumentKey);
   const [placing, setPlacing] = useState(false);
-  const [showStrip, setShowStrip] = useState(false);
 
   async function handlePlace() {
     const toPlace = someSelected ? items.filter((i) => selectedIds.has(i.id)) : items;

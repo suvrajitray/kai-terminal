@@ -6,6 +6,7 @@ import { useIndicesFeed } from "@/hooks/use-indices-feed";
 import { useOptionContractsStore, formatExpiryLabel } from "@/stores/option-contracts-store";
 import { useBasketStore } from "@/stores/basket-store";
 import { getLotSize, INSTRUMENTS } from "@/lib/lot-sizes";
+import { toast } from "@/lib/toast";
 import type { ContractEntry } from "@/types";
 
 type Strategy = "Straddle" | "Strangle" | "IronCondor";
@@ -137,10 +138,17 @@ export function StrategyStrip() {
     [contracts, expiry, spot, strategy, sellWidth, hedgeWidth],
   );
 
+  const hasUpstoxContracts = contracts.some((c) => c.upstoxToken !== "");
+
   const canAdd = legs !== null && legs.length > 0;
 
   function handleAdd() {
     if (!legs) return;
+    const currentCount = useBasketStore.getState().items.length;
+    if (currentCount + legs.length > 20) {
+      toast.error(`Not enough room — need ${legs.length} slots, only ${20 - currentCount} available`);
+      return;
+    }
     for (const leg of legs) {
       addItem({
         instrumentKey: leg.upstoxToken,
@@ -162,9 +170,10 @@ export function StrategyStrip() {
   }
 
   const disabledReason =
-    !expiry           ? "No expiry available for this underlying" :
-    spot <= 0         ? "Open the option chain for this underlying to get a live spot price" :
-    legs === null     ? "Width exceeds available strikes — reduce OTM width" :
+    !expiry              ? "No expiry available for this underlying" :
+    spot <= 0            ? "No live spot price available" :
+    !hasUpstoxContracts  ? "Strategy quick-entry requires an Upstox session" :
+    legs === null        ? "Width exceeds available strikes — reduce OTM width" :
     null;
 
   return (
@@ -206,6 +215,7 @@ export function StrategyStrip() {
       <div className="flex gap-1">
         {STRATEGY_BUTTONS.map(({ id, label }) => (
           <button
+            type="button"
             key={id}
             onClick={() => setStrategy(id)}
             className={cn(
