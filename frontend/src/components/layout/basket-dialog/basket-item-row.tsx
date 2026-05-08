@@ -1,7 +1,9 @@
 // frontend/src/components/layout/basket-dialog/basket-item-row.tsx
+import { useState } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
+import { QtyInput, type QtyMode } from "@/components/ui/qty-input";
 import { formatExpiryLabel } from "@/stores/option-contracts-store";
 import type { BasketItem } from "@/stores/basket-store";
 
@@ -16,6 +18,31 @@ interface BasketItemRowProps {
 export function BasketItemRow({ item, selected, onToggleSelect, onUpdate, onRemove }: BasketItemRowProps) {
   const isSell = item.transactionType === "Sell";
   const isLimit = item.orderType === "Limit";
+
+  const [qtyMode, setQtyMode] = useState<QtyMode>("lot");
+  const [qtyValue, setQtyValue] = useState(String(item.qty));
+
+  function handleQtyChange(v: string) {
+    setQtyValue(v);
+    const n = parseInt(v, 10);
+    if (!isNaN(n) && n > 0) {
+      const lots = qtyMode === "lot" ? n : Math.max(1, Math.round(n / item.lotSize));
+      onUpdate({ qty: lots });
+    }
+  }
+
+  function handleToggleMode() {
+    setQtyMode((prev) => {
+      const n = parseInt(qtyValue, 10);
+      if (prev === "lot") {
+        setQtyValue(isNaN(n) ? "" : String(n * item.lotSize));
+        return "qty";
+      } else {
+        setQtyValue(isNaN(n) ? "" : String(Math.max(1, Math.round(n / item.lotSize))));
+        return "lot";
+      }
+    });
+  }
 
   return (
     <tr className={cn("border-b border-border/30 hover:bg-muted/20 [&>td]:align-middle", selected && "bg-primary/5")}>
@@ -107,17 +134,15 @@ export function BasketItemRow({ item, selected, onToggleSelect, onUpdate, onRemo
         </div>
       </td>
 
-      {/* Qty (lots) */}
-      <td className="px-3 py-2 text-right">
-        <input
-          type="number"
-          min="1"
-          value={item.qty}
-          onChange={(e) => {
-            const v = parseInt(e.target.value, 10);
-            onUpdate({ qty: isNaN(v) || v < 1 ? 1 : v });
-          }}
-          className="w-12 rounded border border-border/50 bg-muted/20 px-2 py-1 text-right text-sm tabular-nums font-mono focus:outline-none focus:ring-1 focus:ring-primary/50"
+      {/* Qty */}
+      <td className="px-3 py-2">
+        <QtyInput
+          value={qtyValue}
+          mode={qtyMode}
+          lotSize={item.lotSize}
+          onChange={handleQtyChange}
+          onToggleMode={handleToggleMode}
+          hintPosition="left"
         />
       </td>
 
