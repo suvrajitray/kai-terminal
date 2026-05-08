@@ -1,10 +1,15 @@
 // frontend/src/components/layout/basket-dialog/index.tsx
-import { useState, useCallback, useMemo } from "react";
-import { ShoppingCart, CircleX, Trash2 } from "lucide-react";
+import { useState, useCallback, useMemo, useEffect } from "react";
+import { ShoppingCart, CircleX, Trash2, ArrowRightLeft } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
 import { useBasketStore } from "@/stores/basket-store";
+import { useBrokerStore } from "@/stores/broker-store";
+import { BROKERS } from "@/lib/constants";
+import { isBrokerTokenExpired } from "@/lib/token-utils";
 import { BasketItemRow } from "./basket-item-row";
+import type { SupportedBroker } from "@/components/panels/order-dialog-parts/types";
 
 interface BasketDialogProps {
   open: boolean;
@@ -16,6 +21,20 @@ export function BasketDialog({ open, onClose }: BasketDialogProps) {
   const removeItem = useBasketStore((s) => s.removeItem);
   const updateItem = useBasketStore((s) => s.updateItem);
   const clearBasket = useBasketStore((s) => s.clearBasket);
+
+  const credentials = useBrokerStore((s) => s.credentials);
+  const activeBrokers = BROKERS.filter(
+    (b) => (b.id === "upstox" || b.id === "zerodha") && !isBrokerTokenExpired(b.id, credentials[b.id]?.accessToken),
+  );
+
+  const [broker, setBroker] = useState<SupportedBroker | undefined>(activeBrokers[0]?.id as SupportedBroker);
+
+  // Sync default broker if credentials change while dialog is open
+  useEffect(() => {
+    if (!broker || !activeBrokers.some((b) => b.id === broker)) {
+      setBroker(activeBrokers[0]?.id as SupportedBroker | undefined);
+    }
+  }, [credentials]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -45,6 +64,8 @@ export function BasketDialog({ open, onClose }: BasketDialogProps) {
     clearBasket();
     setSelectedIds(new Set());
   }, [clearBasket]);
+
+  const brokerLabel = broker === "zerodha" ? "Zerodha" : "Upstox";
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -129,7 +150,8 @@ export function BasketDialog({ open, onClose }: BasketDialogProps) {
 
         {/* Footer */}
         <div className="flex items-center justify-between gap-2 px-4 py-3 border-t border-border/40 bg-muted/10">
-          <div>
+          {/* Left: remove selected / broker routing */}
+          <div className="flex items-center gap-4">
             {someSelected && (
               <button
                 onClick={removeSelected}
@@ -139,7 +161,35 @@ export function BasketDialog({ open, onClose }: BasketDialogProps) {
                 Remove {selectedCount} selected
               </button>
             )}
+            {activeBrokers.length > 1 ? (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <ArrowRightLeft className="size-3.5" />
+                  <span>Route via</span>
+                </div>
+                <div className="flex items-center gap-1 rounded-md border border-border/40 bg-background p-0.5">
+                  {activeBrokers.map((b) => (
+                    <button
+                      key={b.id}
+                      onClick={() => setBroker(b.id as SupportedBroker)}
+                      className={cn(
+                        "cursor-pointer rounded px-3 py-1 text-xs font-semibold transition-all",
+                        broker === b.id
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {b.id === "upstox" ? "Upstox" : "Zerodha"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <span className="text-xs text-muted-foreground/60">via {brokerLabel}</span>
+            )}
           </div>
+
+          {/* Right: close + place */}
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
