@@ -8,6 +8,10 @@ import { useBasketStore } from "@/stores/basket-store";
 import { useBrokerStore } from "@/stores/broker-store";
 import { BROKERS } from "@/lib/constants";
 import { isBrokerTokenExpired } from "@/lib/token-utils";
+import { useDirectMarginEstimate } from "@/components/layout/use-margin-estimate";
+import { useAvailableMargin } from "@/components/panels/use-order-dialog-state";
+import { getMarginColor } from "@/components/panels/order-dialog-parts/order-dialog-utils";
+import { type MarginInstrument } from "@/services/trading-api";
 import { BasketItemRow } from "./basket-item-row";
 import type { SupportedBroker } from "@/components/panels/order-dialog-parts/types";
 
@@ -41,6 +45,22 @@ export function BasketDialog({ open, onClose }: BasketDialogProps) {
   const allSelected = items.length > 0 && items.every((i) => selectedIds.has(i.id));
   const someSelected = items.some((i) => selectedIds.has(i.id));
   const selectedCount = useMemo(() => items.filter((i) => selectedIds.has(i.id)).length, [items, selectedIds]);
+
+  const activeBroker = (broker ?? "upstox") as "upstox" | "zerodha";
+
+  const marginInstruments = useMemo<MarginInstrument[] | null>(() => {
+    if (items.length === 0) return null;
+    return items.map((item) => ({
+      instrumentToken: item.instrumentKey,
+      quantity: item.qty * item.lotSize,
+      product: item.product,
+      transactionType: item.transactionType,
+    }));
+  }, [items]);
+
+  const { margin, loading: marginLoading } = useDirectMarginEstimate(marginInstruments, activeBroker);
+  const availableMargin = useAvailableMargin(activeBroker, open);
+  const marginColor = getMarginColor({ margin, availableMargin });
 
   const toggleSelectAll = useCallback(() => {
     setSelectedIds(allSelected ? new Set() : new Set(items.map((i) => i.id)));
@@ -186,6 +206,35 @@ export function BasketDialog({ open, onClose }: BasketDialogProps) {
               </div>
             ) : (
               <span className="text-xs text-muted-foreground/60">via {brokerLabel}</span>
+            )}
+
+            {/* Margin info */}
+            {items.length > 0 && (
+              <>
+                <div className="h-6 w-px bg-border/40" />
+                <div className="space-y-0.5">
+                  <p className="text-[11px] text-muted-foreground">
+                    Required{" "}
+                    {marginLoading ? (
+                      <span className="font-mono animate-pulse">—</span>
+                    ) : margin != null ? (
+                      <span className={cn("font-mono font-semibold tabular-nums", marginColor)}>
+                        ₹{margin.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                      </span>
+                    ) : (
+                      <span className="font-mono text-muted-foreground/40">—</span>
+                    )}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Available{" "}
+                    <span className="font-mono font-semibold tabular-nums text-foreground">
+                      {availableMargin != null
+                        ? `₹${availableMargin.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`
+                        : "—"}
+                    </span>
+                  </p>
+                </div>
+              </>
             )}
           </div>
 
