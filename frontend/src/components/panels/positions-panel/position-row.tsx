@@ -111,7 +111,7 @@ export const PositionRow = memo(function PositionRow({
   function handleAddToBasket() {
     const contractSide = contract?.instrumentType ?? parseTradingSymbol(p.tradingSymbol)?.type ?? "CE";
     const displayName = contract
-      ? `${index ?? p.tradingSymbol} ${contract.strikePrice} ${contract.instrumentType}`
+      ? `${index ?? parseTradingSymbol(p.tradingSymbol)?.index ?? p.tradingSymbol} ${contract.strikePrice} ${contract.instrumentType}`
       : p.tradingSymbol;
     addToBasket({
       instrumentKey: p.instrumentToken,
