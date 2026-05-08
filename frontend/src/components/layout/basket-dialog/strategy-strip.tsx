@@ -1,5 +1,6 @@
 // src/components/layout/basket-dialog/strategy-strip.tsx
 import { useState, useMemo, useEffect } from "react";
+import { Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIndicesFeed } from "@/hooks/use-indices-feed";
 import { useOptionContractsStore, formatExpiryLabel } from "@/stores/option-contracts-store";
@@ -18,6 +19,18 @@ const UNDERLYING_TO_INDEX: Record<string, "nifty" | "bankNifty" | "sensex" | "fi
 };
 
 const BSE_UNDERLYINGS = new Set(["SENSEX", "BANKEX"]);
+
+const STRATEGY_BUTTONS: { id: Strategy; label: string }[] = [
+  { id: "Straddle",   label: "Straddle"    },
+  { id: "Strangle",   label: "Strangle"    },
+  { id: "IronCondor", label: "Iron Condor" },
+];
+
+const STRATEGY_ACTIVE_CLASS: Record<Strategy, string> = {
+  Straddle:   "bg-blue-900/50 text-blue-300 border-blue-700/50",
+  Strangle:   "bg-violet-900/50 text-violet-300 border-violet-700/50",
+  IronCondor: "bg-rose-900/50 text-rose-300 border-rose-700/50",
+};
 
 interface Leg {
   upstoxToken: string;
@@ -46,10 +59,10 @@ function computeLegs(
   hedgeWidth: number,
 ): Leg[] | null {
   const ces = contracts
-    .filter((c) => c.expiry === expiry && c.instrumentType === "CE")
+    .filter((c) => c.expiry === expiry && c.instrumentType === "CE" && c.upstoxToken !== "")
     .sort((a, b) => a.strikePrice - b.strikePrice);
   const pes = contracts
-    .filter((c) => c.expiry === expiry && c.instrumentType === "PE")
+    .filter((c) => c.expiry === expiry && c.instrumentType === "PE" && c.upstoxToken !== "")
     .sort((a, b) => a.strikePrice - b.strikePrice);
 
   if (ces.length === 0 || pes.length === 0) return null;
@@ -148,18 +161,6 @@ export function StrategyStrip() {
     }
   }
 
-  const strategyButtons: { id: Strategy; label: string }[] = [
-    { id: "Straddle",   label: "Straddle"    },
-    { id: "Strangle",   label: "Strangle"    },
-    { id: "IronCondor", label: "Iron Condor" },
-  ];
-
-  const strategyActiveClass: Record<Strategy, string> = {
-    Straddle:   "bg-blue-900/50 text-blue-300 border-blue-700/50",
-    Strangle:   "bg-violet-900/50 text-violet-300 border-violet-700/50",
-    IronCondor: "bg-rose-900/50 text-rose-300 border-rose-700/50",
-  };
-
   const disabledReason =
     !expiry           ? "No expiry available for this underlying" :
     spot <= 0         ? "Open the option chain for this underlying to get a live spot price" :
@@ -169,9 +170,10 @@ export function StrategyStrip() {
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-emerald-900/40 bg-emerald-950/20 px-4 py-2.5">
       {/* Label */}
-      <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-500 shrink-0">
-        ⚡ Strategy
-      </span>
+      <div className="flex items-center gap-1 text-emerald-500 shrink-0">
+        <Zap className="size-3" />
+        <span className="text-[10px] font-bold uppercase tracking-wider">Strategy</span>
+      </div>
 
       <div className="w-px h-4 bg-emerald-900/40 shrink-0" />
 
@@ -202,14 +204,14 @@ export function StrategyStrip() {
 
       {/* Strategy pills */}
       <div className="flex gap-1">
-        {strategyButtons.map(({ id, label }) => (
+        {STRATEGY_BUTTONS.map(({ id, label }) => (
           <button
             key={id}
             onClick={() => setStrategy(id)}
             className={cn(
               "h-7 rounded border px-3 text-[10px] font-bold transition-colors",
               strategy === id
-                ? strategyActiveClass[id]
+                ? STRATEGY_ACTIVE_CLASS[id]
                 : "border-border/40 text-muted-foreground hover:text-foreground hover:bg-muted/30",
             )}
           >
@@ -222,21 +224,19 @@ export function StrategyStrip() {
 
       {/* Width controls — shown for Strangle and Iron Condor */}
       {(strategy === "Strangle" || strategy === "IronCondor") && (
-        <>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] text-muted-foreground shrink-0">
-              {strategy === "IronCondor" ? "Sell" : "OTM width"}
-            </span>
-            <input
-              type="number"
-              min={1}
-              value={sellWidth}
-              onChange={(e) => setSellWidth(Math.max(1, parseInt(e.target.value, 10) || 1))}
-              className="h-7 w-10 rounded border border-border/50 bg-background text-center text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
-            />
-            <span className="text-[10px] text-muted-foreground/60 shrink-0">strikes</span>
-          </div>
-        </>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] text-muted-foreground shrink-0">
+            {strategy === "IronCondor" ? "Sell" : "OTM width"}
+          </span>
+          <input
+            type="number"
+            min={1}
+            value={sellWidth}
+            onChange={(e) => setSellWidth(Math.max(1, parseInt(e.target.value, 10) || 1))}
+            className="h-7 w-10 rounded border border-border/50 bg-background text-center text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
+          />
+          <span className="text-[10px] text-muted-foreground/60 shrink-0">strikes</span>
+        </div>
       )}
 
       {strategy === "IronCondor" && (
@@ -263,13 +263,14 @@ export function StrategyStrip() {
         <input
           type="number"
           min={1}
+          max={99}
           value={lots}
-          onChange={(e) => setLots(Math.max(1, parseInt(e.target.value, 10) || 1))}
+          onChange={(e) => setLots(Math.max(1, Math.min(99, parseInt(e.target.value, 10) || 1)))}
           className="h-7 w-10 rounded border border-border/50 bg-background text-center text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
         />
       </div>
 
-      <div className="w-px h-4 bg-border/40 shrink-0" />
+      {canAdd && legs && <div className="w-px h-4 bg-border/40 shrink-0" />}
 
       {/* Leg preview tags */}
       {canAdd && legs && (
