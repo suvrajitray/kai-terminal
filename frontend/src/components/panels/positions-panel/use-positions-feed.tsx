@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { usePositionsRestFallback } from "./use-positions-rest-fallback";
 import { useSignalrPositions } from "./use-signalr-positions";
 import { usePositionsStore } from "@/stores/positions-store";
+import { useBasketStore } from "@/stores/basket-store";
 import type { Position } from "@/types";
 
 export function usePositionsFeed(onOrderUpdate?: () => void) {
@@ -40,6 +41,7 @@ export function usePositionsFeed(onOrderUpdate?: () => void) {
         return { ...p, ltp, pnl };
       });
     });
+    useBasketStore.getState().updateLtpBatch(updates);
   }, []);
 
   const { isLive } = useSignalrPositions({

@@ -6,6 +6,7 @@ import { useIvHistory } from "./use-iv-history";
 import { useOptionChainFeed } from "./use-option-chain-feed";
 import { useIndicesFeed, type IndexPrices } from "@/hooks/use-indices-feed";
 import { calculateMaxPain, calculatePcr, calculateAtmIv, calculateExpectedMove, calculateIvRankMetrics } from "./chain-analytics";
+import { useBasketStore } from "@/stores/basket-store";
 import type { OptionChainEntry } from "@/types";
 
 const UNDERLYING_TO_INDEX: Record<string, keyof IndexPrices> = {
@@ -69,6 +70,7 @@ export function useOptionChain() {
       });
       return changed ? next : prev;
     });
+    useBasketStore.getState().updateLtpBatch(updates);
   }, []);
 
   const { setLiveTokens, invokeSubscribe } = useOptionChainFeed({ onLtpBatch: handleLtpBatch });

@@ -39,8 +39,8 @@ export function BasketItemRow({ item, onUpdate, onRemove }: BasketItemRowProps) 
 
       {/* Instrument */}
       <td className="px-3 py-2">
-        <div className="text-sm font-medium">{item.displayName}</div>
-        <div className="text-[11px] text-muted-foreground">
+        <div className="text-sm font-medium whitespace-nowrap">{item.displayName}</div>
+        <div className="text-[11px] text-muted-foreground whitespace-nowrap">
           {item.exchange} · {item.expiry ? formatExpiryLabel(item.expiry) : "—"}
         </div>
       </td>

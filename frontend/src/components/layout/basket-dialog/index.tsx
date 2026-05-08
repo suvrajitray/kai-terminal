@@ -17,7 +17,7 @@ export function BasketDialog({ open, onClose }: BasketDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-[800px] p-0 gap-0 overflow-hidden" showCloseButton={false}>
+      <DialogContent className="sm:max-w-[960px] p-0 gap-0 overflow-hidden" showCloseButton={false}>
         <DialogTitle className="sr-only">Basket</DialogTitle>
 
         {/* Header */}
