@@ -2,6 +2,8 @@ import { memo, useMemo } from "react";
 import type { OptionChainEntry } from "@/types";
 import { OptionChainRow } from "./option-chain-row";
 import type { OrderIntent } from "@/components/panels/order-dialog";
+import { usePositionsStore } from "@/stores/positions-store";
+import { useOptionContractsStore } from "@/stores/option-contracts-store";
 
 interface Props {
   rows: OptionChainEntry[];
@@ -13,10 +15,26 @@ interface Props {
 }
 
 export const OptionChainTable = memo(function OptionChainTable({ rows, atmStrike, spotPrice, underlying, liveStrikeSet, onOrder }: Props) {
+  const positions        = usePositionsStore((s) => s.positions);
+  const getByInstrumentKey = useOptionContractsStore((s) => s.getByInstrumentKey);
+
   const maxOi = useMemo(
     () => rows.reduce((max, row) => Math.max(max, row.callOptions?.marketData?.oi ?? 0, row.putOptions?.marketData?.oi ?? 0), 0),
     [rows],
   );
+
+  // Build a Set of upstoxTokens (= OptionSide.instrumentKey format) for open positions.
+  // Upstox: instrumentToken is already in NSE_FO|... format — matches directly.
+  // Zerodha: instrumentToken is the trading symbol — resolve to upstoxToken via contracts store.
+  const openPositionKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const p of positions) {
+      if (p.quantity === 0) continue;
+      const lookup = getByInstrumentKey(p.instrumentToken, p.tradingSymbol);
+      keys.add(lookup ? lookup.contract.upstoxToken : p.instrumentToken);
+    }
+    return keys;
+  }, [positions, getByInstrumentKey]);
 
   return (
     <table className="w-full border-collapse text-[10px]">
@@ -42,6 +60,8 @@ export const OptionChainTable = memo(function OptionChainTable({ rows, atmStrike
             underlying={underlying}
             maxOi={maxOi}
             onOrder={onOrder}
+            hasCallPos={!!entry.callOptions?.instrumentKey && openPositionKeys.has(entry.callOptions.instrumentKey)}
+            hasPutPos={!!entry.putOptions?.instrumentKey && openPositionKeys.has(entry.putOptions.instrumentKey)}
           />
         ))}
       </tbody>

@@ -11,6 +11,8 @@ interface Props {
   underlying: string;
   maxOi: number;
   onOrder: (intent: OrderIntent) => void;
+  hasCallPos: boolean;
+  hasPutPos: boolean;
 }
 
 function formatLtp(ltp: number | undefined): string {
@@ -40,7 +42,7 @@ function formatOiChange(change: number): string {
 }
 
 
-export const OptionChainRow = memo(function OptionChainRow({ entry, isAtm, isLive, spotPrice, underlying, maxOi, onOrder }: Props) {
+export const OptionChainRow = memo(function OptionChainRow({ entry, isAtm, isLive, spotPrice, underlying, maxOi, onOrder, hasCallPos, hasPutPos }: Props) {
   const callLtp      = entry.callOptions?.marketData?.ltp;
   const putLtp       = entry.putOptions?.marketData?.ltp;
   const callDelta    = entry.callOptions?.optionGreeks?.delta;
@@ -154,8 +156,10 @@ export const OptionChainRow = memo(function OptionChainRow({ entry, isAtm, isLiv
       </td>
 
       {/* Strike */}
-      <td className={cn("px-1 py-1 text-center font-mono tabular-nums text-[11px]", isAtm ? "font-bold text-foreground" : "text-muted-foreground")}>
+      <td className={cn("relative px-1 py-1 text-center font-mono tabular-nums text-[11px]", isAtm ? "font-bold text-foreground" : "text-muted-foreground")}>
+        {hasCallPos && <span className="absolute left-0.5 top-1/2 -translate-y-1/2 rounded bg-stone-600 px-[3px] py-[1px] text-[9px] font-bold leading-none text-white">P</span>}
         {entry.strikePrice}
+        {hasPutPos && <span className="absolute right-0.5 top-1/2 -translate-y-1/2 rounded bg-stone-600 px-[3px] py-[1px] text-[9px] font-bold leading-none text-white">P</span>}
       </td>
 
       {/* Put LTP */}
