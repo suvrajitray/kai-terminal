@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-KAITerminal.RollingStraddle-3e7a1b5c-2d4f-4e8a-9c6b-1a2b3c4d5e6f</UserSecretsId>
+    <!-- Disable AppHost wrapper — same workaround as Worker for macOS Sequoia / .NET 10 -->
+    <UseAppHost>false</UseAppHost>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.2" />
+    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\KAITerminal.MarketData\KAITerminal.MarketData.csproj" />
+    <ProjectReference Include="..\KAITerminal.Upstox\KAITerminal.Upstox.csproj" />
+  </ItemGroup>
+
+</Project>

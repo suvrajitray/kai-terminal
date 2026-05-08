@@ -6,6 +6,7 @@ using KAITerminal.MarketData.Http;
 using KAITerminal.MarketData.Options;
 using KAITerminal.MarketData.Services;
 using KAITerminal.MarketData.Streaming;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace KAITerminal.MarketData.Extensions;
@@ -88,6 +89,27 @@ public static class MarketDataExtensions
             var logger  = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<UpstoxMarketDataStreamer>>();
             return new UpstoxMarketDataStreamer(http, options, logger, token);
         });
+    }
+
+    /// <summary>
+    /// Registers only the Upstox market data HTTP client and config.
+    /// Use in standalone processes that need option chain or quote data without Redis or hosted services.
+    /// </summary>
+    public static IServiceCollection AddMarketDataCore(
+        this IServiceCollection services, IConfiguration configuration)
+    {
+        services.Configure<MarketDataConfig>(configuration.GetSection(MarketDataConfig.SectionName));
+
+        services.AddHttpClient("UpstoxMarketData", (sp, client) =>
+        {
+            var cfg = ResolveConfig(sp);
+            client.BaseAddress = new Uri(cfg.BaseUrl);
+            client.Timeout     = cfg.HttpTimeout;
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+        });
+
+        services.AddSingleton<UpstoxMarketDataHttpClient>();
+        return services;
     }
 
     private static MarketDataConfig ResolveConfig(IServiceProvider sp)

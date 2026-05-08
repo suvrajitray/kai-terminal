@@ -8,6 +8,7 @@ namespace KAITerminal.Contracts.Domain;
 /// <param name="OrderType">"MARKET" or "LIMIT".</param>
 /// <param name="Price">Limit price; ignored for market orders.</param>
 /// <param name="TriggerPrice">Trigger price; required for SL and SL-M order types.</param>
+/// <param name="Tag">Optional user-defined tag visible in the broker's order book.</param>
 public sealed record BrokerOrderRequest(
     string   InstrumentToken,
     int      Quantity,
@@ -16,4 +17,5 @@ public sealed record BrokerOrderRequest(
     string   OrderType,
     decimal? Price        = null,
     decimal? TriggerPrice = null,
-    string?  Exchange     = null);
+    string?  Exchange     = null,
+    string?  Tag          = null);

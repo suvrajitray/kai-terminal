@@ -58,6 +58,7 @@ internal sealed class UpstoxOrderService : IBrokerOrderService, IUpstoxHftServic
             OrderType       = orderType,
             Product         = product,
             Price           = request.Price ?? 0,
+            Tag             = request.Tag,
             Slice           = true,
         }, ct);
 

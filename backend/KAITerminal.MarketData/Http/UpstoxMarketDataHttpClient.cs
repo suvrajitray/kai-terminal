@@ -11,7 +11,7 @@ namespace KAITerminal.MarketData.Http;
 /// Each method receives an explicit bearer token — no ambient token context.
 /// This makes it safe to use with the analytics token from AppSettings.
 /// </summary>
-internal sealed class UpstoxMarketDataHttpClient
+public sealed class UpstoxMarketDataHttpClient
 {
     private readonly IHttpClientFactory _factory;
 
@@ -69,7 +69,7 @@ internal sealed class UpstoxMarketDataHttpClient
     // Option contracts (metadata, no live prices)
     // ──────────────────────────────────────────────────
 
-    public async Task<IReadOnlyList<RawOptionContract>> GetOptionContractsAsync(
+    internal async Task<IReadOnlyList<RawOptionContract>> GetOptionContractsAsync(
         string token, string underlyingKey, string? expiryDate = null, CancellationToken ct = default)
     {
         var ek   = Uri.EscapeDataString(underlyingKey);
