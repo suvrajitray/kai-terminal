@@ -33,8 +33,13 @@ interface BasketStore {
 export const useBasketStore = create<BasketStore>()((set, get) => ({
   items: [],
   addItem: (item) => {
-    if (get().items.length >= MAX_BASKET_SIZE) {
+    const items = get().items;
+    if (items.length >= MAX_BASKET_SIZE) {
       toast.error("Basket is full (max 20 items)");
+      return;
+    }
+    if (items.some((i) => i.instrumentKey === item.instrumentKey)) {
+      toast.error("Already in basket");
       return;
     }
     set((s) => ({ items: [...s.items, { ...item, id: crypto.randomUUID() }] }));

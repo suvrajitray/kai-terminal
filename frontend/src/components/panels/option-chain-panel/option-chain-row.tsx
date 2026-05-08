@@ -1,4 +1,5 @@
 import React, { memo } from "react";
+import { ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { OptionChainEntry } from "@/types";
 import type { OrderIntent } from "@/components/panels/order-dialog";
@@ -144,11 +145,12 @@ export const OptionChainRow = memo(function OptionChainRow({ entry, isAtm, isLiv
           <button
             onClick={() => triggerOrder("CE", "Buy")}
             className={cn(
-              "h-6 w-full cursor-pointer rounded text-[10px] font-bold text-white",
+              "relative h-6 w-full cursor-pointer rounded text-[10px] font-bold text-white",
               callItm ? "bg-green-900/70 hover:bg-green-900" : "bg-green-600 hover:bg-green-500",
             )}
           >
             B
+            {basketMode && <ShoppingCart className="absolute top-0.5 right-0.5 size-2.5 opacity-90" />}
           </button>
         </span>
       </td>
@@ -163,11 +165,12 @@ export const OptionChainRow = memo(function OptionChainRow({ entry, isAtm, isLiv
           <button
             onClick={() => triggerOrder("CE", "Sell")}
             className={cn(
-              "h-6 w-full cursor-pointer rounded text-[10px] font-bold text-white",
+              "relative h-6 w-full cursor-pointer rounded text-[10px] font-bold text-white",
               callItm ? "bg-red-900/70 hover:bg-red-900" : "bg-red-600 hover:bg-red-500",
             )}
           >
             S
+            {basketMode && <ShoppingCart className="absolute top-0.5 right-0.5 size-2.5 opacity-90" />}
           </button>
         </span>
       </td>
@@ -207,11 +210,12 @@ export const OptionChainRow = memo(function OptionChainRow({ entry, isAtm, isLiv
           <button
             onClick={() => triggerOrder("PE", "Sell")}
             className={cn(
-              "h-6 w-full cursor-pointer rounded text-[10px] font-bold text-white",
+              "relative h-6 w-full cursor-pointer rounded text-[10px] font-bold text-white",
               putItm ? "bg-red-900/70 hover:bg-red-900" : "bg-red-600 hover:bg-red-500",
             )}
           >
             S
+            {basketMode && <ShoppingCart className="absolute top-0.5 right-0.5 size-2.5 opacity-90" />}
           </button>
         </span>
       </td>
@@ -233,11 +237,12 @@ export const OptionChainRow = memo(function OptionChainRow({ entry, isAtm, isLiv
           <button
             onClick={() => triggerOrder("PE", "Buy")}
             className={cn(
-              "h-6 w-full cursor-pointer rounded text-[10px] font-bold text-white",
+              "relative h-6 w-full cursor-pointer rounded text-[10px] font-bold text-white",
               putItm ? "bg-green-900/70 hover:bg-green-900" : "bg-green-600 hover:bg-green-500",
             )}
           >
             B
+            {basketMode && <ShoppingCart className="absolute top-0.5 right-0.5 size-2.5 opacity-90" />}
           </button>
         </span>
       </td>

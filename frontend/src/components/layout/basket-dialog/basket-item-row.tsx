@@ -7,19 +7,20 @@ import type { BasketItem } from "@/stores/basket-store";
 
 interface BasketItemRowProps {
   item: BasketItem;
+  selected: boolean;
+  onToggleSelect: () => void;
   onUpdate: (patch: Partial<BasketItem>) => void;
   onRemove: () => void;
 }
 
-export function BasketItemRow({ item, onUpdate, onRemove }: BasketItemRowProps) {
+export function BasketItemRow({ item, selected, onToggleSelect, onUpdate, onRemove }: BasketItemRowProps) {
   const isSell = item.transactionType === "Sell";
   const isLimit = item.orderType === "Limit";
 
   return (
-    <tr className="border-b border-border/30 hover:bg-muted/20 [&>td]:align-middle">
-      {/* Checkbox — placeholder for future batch-selection */}
-      <td className="pl-3 py-2 w-7">
-        <Checkbox disabled />
+    <tr className={cn("border-b border-border/30 hover:bg-muted/20 [&>td]:align-middle", selected && "bg-primary/5")}>
+      <td className={cn("pl-3 py-2 w-7", selected && "border-l-2 border-l-primary/50")}>
+        <Checkbox checked={selected} onCheckedChange={onToggleSelect} />
       </td>
 
       {/* B/S toggle */}
