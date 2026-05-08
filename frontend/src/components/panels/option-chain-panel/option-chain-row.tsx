@@ -98,7 +98,7 @@ export const OptionChainRow = memo(function OptionChainRow({ entry, isAtm, isLiv
       addToBasket({
         instrumentKey: key,
         displayName: `${underlying} ${entry.strikePrice} ${side}`,
-        exchange: "NFO",
+        exchange: entry.underlyingKey?.startsWith("BSE_") ? "BFO" : "NFO",
         side,
         underlying,
         strike: entry.strikePrice,
