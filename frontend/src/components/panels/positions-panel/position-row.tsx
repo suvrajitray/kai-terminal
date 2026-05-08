@@ -17,6 +17,7 @@ import {
   type OrderIntent,
 } from "@/components/panels/order-dialog";
 import type { Position } from "@/types";
+import { useBasketStore } from "@/stores/basket-store";
 import { INR, PnlCell } from "./pnl-cell";
 
 export { PnlCell } from "./pnl-cell";
@@ -105,6 +106,31 @@ export const PositionRow = memo(function PositionRow({
     : null;
   const activeIntent = moreIntent ?? exitIntent;
 
+  const addToBasket = useBasketStore((s) => s.addItem);
+
+  function handleAddToBasket() {
+    const contractSide = contract?.instrumentType ?? parseTradingSymbol(p.tradingSymbol)?.type ?? "CE";
+    const displayName = contract
+      ? `${index ?? p.tradingSymbol} ${contract.strikePrice} ${contract.instrumentType}`
+      : p.tradingSymbol;
+    addToBasket({
+      instrumentKey: p.instrumentToken,
+      displayName,
+      exchange: p.exchange,
+      side: contractSide,
+      underlying: index ?? parseTradingSymbol(p.tradingSymbol)?.index ?? p.tradingSymbol,
+      strike: contract?.strikePrice ?? Number(parseTradingSymbol(p.tradingSymbol)?.strike ?? 0),
+      expiry: contract?.expiry,
+      ltp: p.ltp,
+      lotSize: getLotSize(p.tradingSymbol),
+      transactionType: p.quantity < 0 ? "Buy" : "Sell",
+      orderType: "Market",
+      product: "Intraday",
+      qty: 1,
+      limitPrice: "",
+    });
+  }
+
   // lockedProduct: only lock when it's a standard product type
   const lockedProduct: "Intraday" | "Delivery" | undefined =
     p.product === "Intraday" || p.product === "Delivery" ? p.product : undefined;
@@ -188,6 +214,7 @@ export const PositionRow = memo(function PositionRow({
             onSellMore={() => setDialog("more")}
             onConvert={() => setDialog("convert")}
             onAddStoploss={() => setDialog("stoploss")}
+            onAddToBasket={handleAddToBasket}
           />
         </td>
       </tr>

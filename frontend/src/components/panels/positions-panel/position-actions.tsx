@@ -1,4 +1,4 @@
-import { Plus, Minus, ArrowUp, ArrowDown, MoreHorizontal, TrendingDown, TrendingUp, RefreshCw, ShieldAlert, LogOut } from "lucide-react";
+import { Plus, Minus, ArrowUp, ArrowDown, MoreHorizontal, TrendingDown, TrendingUp, RefreshCw, ShieldAlert, LogOut, ShoppingCart } from "lucide-react";
 import { QtyInput, type QtyMode } from "./qty-input";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -30,6 +30,7 @@ interface PositionActionsProps {
   onSellMore: () => void;
   onConvert: () => void;
   onAddStoploss: () => void;
+  onAddToBasket?: () => void;
 }
 
 interface ActionBtnProps {
@@ -84,6 +85,7 @@ export function PositionActions({
   onSellMore,
   onConvert,
   onAddStoploss,
+  onAddToBasket,
 }: PositionActionsProps) {
   const disabled    = !!acting;
   const qtyDisabled = disabled || actualQty === 0;
@@ -161,6 +163,15 @@ export function PositionActions({
             <DropdownMenuItem onClick={onAddStoploss} className="gap-2 cursor-pointer text-amber-400 focus:text-amber-400 focus:bg-amber-500/10">
               <ShieldAlert className="size-3.5" />
               <span>Add stoploss</span>
+            </DropdownMenuItem>
+
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={onAddToBasket}
+              className="gap-2 cursor-pointer text-blue-400 focus:text-blue-400 focus:bg-blue-500/10"
+            >
+              <ShoppingCart className="size-3.5" />
+              <span>Add to basket</span>
             </DropdownMenuItem>
 
             {showConvert && (
