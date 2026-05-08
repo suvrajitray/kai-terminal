@@ -13,11 +13,13 @@ interface QtyInputProps {
   fillQty?: number;
   /** Where to show the lot↔qty hint: "bottom" (default) or "left" (position rows) */
   hintPosition?: "bottom" | "left";
+  /** Reduce height from h-9 to h-7 for compact contexts */
+  compact?: boolean;
   className?: string;
 }
 
 export function QtyInput({
-  value, mode, lotSize, onChange, onToggleMode, fillQty, hintPosition = "bottom", className,
+  value, mode, lotSize, onChange, onToggleMode, fillQty, hintPosition = "bottom", compact = false, className,
 }: QtyInputProps) {
   const lot  = Math.max(lotSize, 1);
   const step = mode === "qty" ? lot : 1;
@@ -47,14 +49,16 @@ export function QtyInput({
     : lot > 1 ? `${Math.floor(num / lot)} lot`
     : null;
 
+  const h = compact ? "h-7" : "h-9";
+
   const inputEl = (
-    <div className="flex h-9 items-stretch overflow-hidden rounded border border-border bg-background focus-within:ring-1 focus-within:ring-ring">
+    <div className={cn("flex items-stretch overflow-hidden rounded border border-border bg-background focus-within:ring-1 focus-within:ring-ring", h)}>
         {/* Lot / Qty toggle */}
         <button
           type="button"
           onClick={onToggleMode}
           title={mode === "qty" ? "Switch to lots" : "Switch to qty"}
-          className="flex h-9 w-8 shrink-0 cursor-pointer items-center justify-center border-r border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className={cn("shrink-0 cursor-pointer items-center justify-center border-r border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground flex", h, compact ? "w-7" : "w-8")}
         >
           {mode === "qty" ? <Layers className="size-3.5" /> : <Box className="size-3.5" />}
         </button>
@@ -68,7 +72,7 @@ export function QtyInput({
               onChange(filled);
             }}
             title="Fill all qty"
-            className="flex h-9 w-8 shrink-0 cursor-pointer items-center justify-center border-r border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className={cn("shrink-0 cursor-pointer items-center justify-center border-r border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground flex", h, compact ? "w-7" : "w-8")}
           >
             <ArrowUpAZ className="size-3.5" />
           </button>
@@ -82,7 +86,10 @@ export function QtyInput({
           placeholder={mode === "qty" ? "Qty" : "Lot"}
           onChange={(e) => onChange(e.target.value)}
           onBlur={handleBlur}
-          className="w-16 flex-1 bg-transparent py-1 pl-2 pr-1 text-sm tabular-nums placeholder:text-muted-foreground/40 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none focus:outline-none"
+          className={cn(
+            "bg-transparent py-1 pl-2 pr-1 text-sm tabular-nums placeholder:text-muted-foreground/40 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none focus:outline-none",
+            compact ? "w-10" : "w-16 flex-1",
+          )}
         />
 
         {/* Clear */}
@@ -90,7 +97,7 @@ export function QtyInput({
           type="button"
           onClick={() => onChange("")}
           title="Clear"
-          className="flex h-9 w-7 shrink-0 cursor-pointer items-center justify-center text-muted-foreground/40 transition-colors hover:text-muted-foreground"
+          className={cn("shrink-0 cursor-pointer items-center justify-center text-muted-foreground/40 transition-colors hover:text-muted-foreground flex", h, compact ? "w-6" : "w-7")}
         >
           <X className="size-3" />
         </button>

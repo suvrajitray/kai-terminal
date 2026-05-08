@@ -1,6 +1,6 @@
 // frontend/src/components/layout/basket-dialog/basket-item-row.tsx
 import { useState } from "react";
-import { X } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { QtyInput, type QtyMode } from "@/components/ui/qty-input";
@@ -136,18 +136,21 @@ export function BasketItemRow({ item, selected, onToggleSelect, onUpdate, onRemo
 
       {/* Qty */}
       <td className="px-3 py-2">
-        <QtyInput
-          value={qtyValue}
-          mode={qtyMode}
-          lotSize={item.lotSize}
-          onChange={handleQtyChange}
-          onToggleMode={handleToggleMode}
-          hintPosition="left"
-        />
+        <div className="flex justify-end">
+          <QtyInput
+            value={qtyValue}
+            mode={qtyMode}
+            lotSize={item.lotSize}
+            onChange={handleQtyChange}
+            onToggleMode={handleToggleMode}
+            hintPosition="left"
+            compact
+          />
+        </div>
       </td>
 
       {/* Price */}
-      <td className="px-3 py-2 text-right">
+      <td className="px-3 py-2">
         {isLimit ? (
           <input
             type="number"
@@ -155,7 +158,7 @@ export function BasketItemRow({ item, selected, onToggleSelect, onUpdate, onRemo
             min="0"
             value={item.limitPrice}
             onChange={(e) => onUpdate({ limitPrice: e.target.value })}
-            className="w-16 rounded border border-border/50 bg-muted/20 px-2 py-1 text-right text-sm tabular-nums font-mono focus:outline-none focus:ring-1 focus:ring-primary/50"
+            className="w-24 rounded border border-border/50 bg-muted/20 px-2 py-1 text-left text-sm tabular-nums font-mono focus:outline-none focus:ring-1 focus:ring-primary/50"
           />
         ) : (
           <span className="text-sm tabular-nums font-mono text-muted-foreground/40">—</span>
@@ -163,12 +166,12 @@ export function BasketItemRow({ item, selected, onToggleSelect, onUpdate, onRemo
       </td>
 
       {/* Remove */}
-      <td className="pr-3 py-2 w-8">
+      <td className="px-3 py-2 w-10 border-l border-border/30">
         <button
           onClick={onRemove}
           className="flex items-center justify-center p-1 text-muted-foreground/40 hover:text-destructive transition-colors"
         >
-          <X className="size-3.5" />
+          <Trash2 className="size-3.5" />
         </button>
       </td>
     </tr>

@@ -126,10 +126,10 @@ export function BasketDialog({ open, onClose }: BasketDialogProps) {
                   <th className="px-3 py-2 text-right text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                     Qty
                   </th>
-                  <th className="px-3 py-2 text-right text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                  <th className="px-3 py-2 text-left text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
                     Price
                   </th>
-                  <th className="w-8 pr-3"></th>
+                  <th className="w-10 px-3 border-l border-border/30"></th>
                 </tr>
               </thead>
               <tbody>
