@@ -80,11 +80,11 @@ export function BasketItemRow({ item, selected, onToggleSelect, onUpdate, onRemo
 
       {/* Market / Limit pill */}
       <td className="px-3 py-2">
-        <div className="flex overflow-hidden rounded border border-border/50 w-fit">
+        <div className="flex h-7 overflow-hidden rounded border border-border/50 w-fit">
           <button
             onClick={() => onUpdate({ orderType: "Market", limitPrice: "" })}
             className={cn(
-              "px-2 py-1 text-[10px] font-medium transition-colors",
+              "flex items-center px-2 text-[10px] font-medium transition-colors",
               !isLimit
                 ? "bg-blue-900/50 text-blue-300"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/40",
@@ -95,7 +95,7 @@ export function BasketItemRow({ item, selected, onToggleSelect, onUpdate, onRemo
           <button
             onClick={() => onUpdate({ orderType: "Limit", limitPrice: String(item.ltp.toFixed(2)) })}
             className={cn(
-              "px-2 py-1 text-[10px] font-medium transition-colors border-l border-border/50",
+              "flex items-center px-2 text-[10px] font-medium transition-colors border-l border-border/50",
               isLimit
                 ? "bg-violet-900/50 text-violet-300"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/40",
@@ -108,11 +108,11 @@ export function BasketItemRow({ item, selected, onToggleSelect, onUpdate, onRemo
 
       {/* Intraday / Delivery pill */}
       <td className="px-3 py-2">
-        <div className="flex overflow-hidden rounded border border-border/50 w-fit">
+        <div className="flex h-7 overflow-hidden rounded border border-border/50 w-fit">
           <button
             onClick={() => onUpdate({ product: "Intraday" })}
             className={cn(
-              "px-2 py-1 text-[10px] font-medium transition-colors",
+              "flex items-center px-2 text-[10px] font-medium transition-colors",
               item.product === "Intraday"
                 ? "bg-emerald-900/50 text-emerald-300"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/40",
@@ -123,7 +123,7 @@ export function BasketItemRow({ item, selected, onToggleSelect, onUpdate, onRemo
           <button
             onClick={() => onUpdate({ product: "Delivery" })}
             className={cn(
-              "px-2 py-1 text-[10px] font-medium transition-colors border-l border-border/50",
+              "flex items-center px-2 text-[10px] font-medium transition-colors border-l border-border/50",
               item.product === "Delivery"
                 ? "bg-amber-900/50 text-amber-300"
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/40",
@@ -158,7 +158,7 @@ export function BasketItemRow({ item, selected, onToggleSelect, onUpdate, onRemo
             min="0"
             value={item.limitPrice}
             onChange={(e) => onUpdate({ limitPrice: e.target.value })}
-            className="w-24 rounded border border-border/50 bg-muted/20 px-2 py-1 text-left text-sm tabular-nums font-mono focus:outline-none focus:ring-1 focus:ring-primary/50"
+            className="h-7 w-24 rounded border border-border/50 bg-muted/20 px-2 text-left text-sm tabular-nums font-mono focus:outline-none focus:ring-1 focus:ring-primary/50"
           />
         ) : (
           <span className="text-sm tabular-nums font-mono text-muted-foreground/40">—</span>
