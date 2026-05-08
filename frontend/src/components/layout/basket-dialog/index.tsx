@@ -11,7 +11,9 @@ import { isBrokerTokenExpired } from "@/lib/token-utils";
 import { useDirectMarginEstimate } from "@/components/layout/use-margin-estimate";
 import { useAvailableMargin } from "@/components/panels/use-order-dialog-state";
 import { getMarginColor } from "@/components/panels/order-dialog-parts/order-dialog-utils";
-import { type MarginInstrument } from "@/services/trading-api";
+import { placeOrder, type MarginInstrument } from "@/services/trading-api";
+import { useOptionContractsStore } from "@/stores/option-contracts-store";
+import { toast } from "@/lib/toast";
 import { BasketItemRow } from "./basket-item-row";
 import type { SupportedBroker } from "@/components/panels/order-dialog-parts/types";
 
@@ -61,6 +63,55 @@ export function BasketDialog({ open, onClose }: BasketDialogProps) {
   const { margin, loading: marginLoading } = useDirectMarginEstimate(marginInstruments, activeBroker);
   const availableMargin = useAvailableMargin(activeBroker, open);
   const marginColor = getMarginColor({ margin, availableMargin });
+
+  const getByInstrumentKey = useOptionContractsStore((s) => s.getByInstrumentKey);
+  const [placing, setPlacing] = useState(false);
+
+  async function handlePlace() {
+    const toPlace = someSelected ? items.filter((i) => selectedIds.has(i.id)) : items;
+    if (toPlace.length === 0) return;
+
+    setPlacing(true);
+
+    const results = await Promise.allSettled(
+      toPlace.map((item) => {
+        if (item.orderType === "Limit") {
+          const price = parseFloat(item.limitPrice);
+          if (isNaN(price) || price <= 0) {
+            return Promise.reject(new Error(`${item.displayName}: invalid limit price`));
+          }
+        }
+
+        let token = item.instrumentKey;
+        if (activeBroker === "zerodha") {
+          const lookup = getByInstrumentKey(item.instrumentKey);
+          if (lookup?.contract.zerodhaToken) token = lookup.contract.zerodhaToken;
+        }
+
+        const qty = item.qty * item.lotSize;
+        const orderType = item.orderType === "Limit" ? "limit" : "market";
+        const limitPrice = item.orderType === "Limit" ? parseFloat(item.limitPrice) : undefined;
+
+        return placeOrder(token, qty, item.transactionType, item.product, orderType, limitPrice, activeBroker, item.exchange);
+      }),
+    );
+
+    setPlacing(false);
+    setSelectedIds(new Set());
+
+    const successCount = results.filter((r) => r.status === "fulfilled").length;
+    const failedNames = results
+      .map((r, i) => (r.status === "rejected" ? toPlace[i].displayName : null))
+      .filter(Boolean) as string[];
+
+    if (failedNames.length === 0) {
+      toast.success(`${successCount} order${successCount !== 1 ? "s" : ""} placed`);
+    } else if (successCount > 0) {
+      toast.warning(`${successCount} placed · ${failedNames.length} failed: ${failedNames.join(", ")}`);
+    } else {
+      toast.error(`Orders failed: ${failedNames.join(", ")}`);
+    }
+  }
 
   const toggleSelectAll = useCallback(() => {
     setSelectedIds(allSelected ? new Set() : new Set(items.map((i) => i.id)));
@@ -242,15 +293,21 @@ export function BasketDialog({ open, onClose }: BasketDialogProps) {
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
-              className="px-4 py-1.5 rounded border border-border/50 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+              disabled={placing}
+              className="px-4 py-1.5 rounded border border-border/50 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Close
             </button>
             <button
-              disabled={items.length === 0}
+              onClick={handlePlace}
+              disabled={items.length === 0 || placing}
               className="px-5 py-1.5 rounded bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-primary/90 transition-colors"
             >
-              {someSelected ? `Place ${selectedCount}` : "Place all"}
+              {placing
+                ? "Placing…"
+                : someSelected
+                  ? `Place ${selectedCount}`
+                  : "Place all"}
             </button>
           </div>
         </div>
