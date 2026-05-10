@@ -24,7 +24,7 @@ internal static class FillPoller
         var deadline = DateTimeOffset.UtcNow.AddSeconds(timeoutSeconds);
 
         logger.LogInformation(
-            "AutoShift waiting for fill — orderIds={OrderIds} timeout={Timeout}s chain={ChainKey} [{UserId}]",
+            "[FILL ] Waiting — orderIds={OrderIds} timeout={Timeout}s  |  chain={ChainKey}  [{UserId}]",
             orderIds, timeoutSeconds, chainKey, userId);
 
         while (DateTimeOffset.UtcNow < deadline)
@@ -44,7 +44,7 @@ internal static class FillPoller
                     matched.All(o => o.Status.Equals("complete", StringComparison.OrdinalIgnoreCase)))
                 {
                     logger.LogInformation(
-                        "AutoShift close order filled — orderIds={OrderIds} chain={ChainKey} [{UserId}]",
+                        "[FILL ] Filled — orderIds={OrderIds}  |  chain={ChainKey}  [{UserId}]",
                         orderIds, chainKey, userId);
                     return;
                 }
@@ -53,7 +53,7 @@ internal static class FillPoller
             catch (Exception ex)
             {
                 logger.LogWarning(ex,
-                    "AutoShift WaitForFillAsync: transient error polling orders — will retry | chain={ChainKey} orderIds={OrderIds} [{UserId}]",
+                    "[FILL ] Transient error polling — retrying  |  chain={ChainKey}  |  orderIds={OrderIds}  [{UserId}]",
                     chainKey, orderIds, userId);
             }
 
@@ -61,7 +61,7 @@ internal static class FillPoller
         }
 
         logger.LogWarning(
-            "AutoShift WaitForFillAsync: timed out after {Timeout}s for orderIds={OrderIds} chain={ChainKey} — proceeding with open order anyway [{UserId}]",
+            "[FILL ] Timeout after {Timeout}s — orderIds={OrderIds}  |  chain={ChainKey}  |  proceeding with open order  [{UserId}]",
             timeoutSeconds, orderIds, chainKey, userId);
     }
 }

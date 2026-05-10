@@ -144,6 +144,56 @@ Use `dotnet user-secrets` for all real tokens. `Api:InternalKey` must match in b
 
 ---
 
+## Logging Convention
+
+All operational backend logging (Worker, RiskEngine, RollingStraddle) uses a structured tag format matching the Rolling Straddle style:
+
+```
+[TAG ] Message — detail  |  field=value  |  field=value
+```
+
+**Rules:**
+- Every log line starts with a 7-char tag: `[` + 5-char padded content + `]` (e.g. `[RISK ]`, `[EXIT ]`, `[SHIFT]`)
+- Use `|` to separate distinct data sections within a line
+- Use `—` to separate the action summary from detail
+- Financial values use `₹` with `+#,##0;-#,##0` sign formatting
+- Startup banners use the `━━━` separator line (`const string Sep = "━━━...━━━"`)
+
+**Tag reference:**
+
+| Tag | Used in | Meaning |
+|-----|---------|---------|
+| `[RISK ]` | StreamingRiskWorker | Worker lifecycle |
+| `[SESS ]` | StreamingRiskWorker | Per-user session events |
+| `[POS  ]` | StreamingRiskWorker | Positions loaded at startup |
+| `[POLL ]` | StreamingRiskWorker | Periodic position polls |
+| `[FEED ]` | StreamingRiskWorker | Feed subscription / stream live |
+| `[MKT  ]` | StreamingRiskWorker | Trading window open/closed |
+| `[EVAL ]` | RiskEvaluator | Evaluation ticks |
+| `[STAT ]` | RiskEvaluator | Status updates / 15-min push |
+| `[TSL  ]` | RiskEvaluator | Trailing SL activate / raise / hit |
+| `[SL   ]` | RiskEvaluator | Hard SL hit |
+| `[TGT  ]` | RiskEvaluator | Target hit |
+| `[ASO  ]` | RiskEvaluator | Auto square-off |
+| `[EXIT ]` | RiskEvaluator | Square-off execution |
+| `[CONF ]` | RiskEvaluator | MTM confirmation |
+| `[SHIFT]` | AutoShiftEvaluator / AutoShiftOrderExecutor | All auto-shift events |
+| `[FILL ]` | FillPoller | Order fill polling |
+| `[ENTRY]` | AutoEntryJob | Entry actions |
+| `[SKIP ]` | AutoEntryJob | Entry guard skips (day/time/already-entered) |
+| `[IV   ]` | IvSnapshotJob | IV snapshot events |
+| `[NOTIF]` | HttpRiskEventNotifier | Risk event POST results |
+| `[ERROR]` | All | Unhandled exceptions |
+| `[IDLE ]` | RollingStraddle | Waiting for entry window |
+| `[ROLL ]` | RollingStraddle | Roll triggered |
+| `[CLOSE]` | RollingStraddle | Leg close orders |
+| `[LIVE ]` | RollingStraddle | Live hold tick |
+| `[VIX  ]` | RollingStraddle | VIX filter check |
+
+API-layer logs (endpoints, hubs, webhooks) do not use this format — they are HTTP-level and use plain prose.
+
+---
+
 ## Git Workflow
 
 **Never run any git operation without explicit user instruction.**

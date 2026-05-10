@@ -108,7 +108,7 @@ internal sealed class AutoEntryJob : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "AutoEntry — failed to fetch contract data, skipping tick");
+            _logger.LogError(ex, "[ENTRY] Contract fetch failed — skipping tick");
             return;
         }
 
@@ -121,7 +121,7 @@ internal sealed class AutoEntryJob : BackgroundService
             catch (Exception ex)
             {
                 _logger.LogError(ex,
-                    "AutoEntry — unhandled error for {User} ({Broker}), skipping",
+                    "[ERROR] AutoEntry unhandled error — {User} ({Broker}) — skipping",
                     config.Username, config.BrokerType);
             }
         }
@@ -137,7 +137,7 @@ internal sealed class AutoEntryJob : BackgroundService
         // 1. Day check — skipped when OnlyExpiryDay is set (expiry check happens later)
         if (!config.OnlyExpiryDay && !IsTradingDay(config.TradingDays, nowIst.DayOfWeek))
         {
-            _logger.LogDebug("AutoEntry skipped — {Day} not in trading days [{User} / {Broker} / {Strategy}]",
+            _logger.LogDebug("[SKIP ] {Day} not in trading days  [{User} / {Broker} / {Strategy}]",
                 nowIst.DayOfWeek, config.Username, config.BrokerType, config.Name);
             return;
         }
@@ -146,7 +146,7 @@ internal sealed class AutoEntryJob : BackgroundService
         if (!TimeOnly.TryParse(config.EntryAfterTime,   out var entryAfter)   ||
             !TimeOnly.TryParse(config.NoEntryAfterTime, out var noEntryAfter))
         {
-            _logger.LogWarning("AutoEntry — invalid time config for {User} ({Broker}), skipping",
+            _logger.LogWarning("[ENTRY] Invalid time config — {User} ({Broker}) — skipping",
                 config.Username, config.BrokerType);
             return;
         }
@@ -154,7 +154,7 @@ internal sealed class AutoEntryJob : BackgroundService
         var nowTime = TimeOnly.FromTimeSpan(nowIst.TimeOfDay);
         if (nowTime < entryAfter || nowTime >= noEntryAfter)
         {
-            _logger.LogDebug("AutoEntry skipped — time {Now} outside window {After}–{Before} [{User} / {Broker} / {Strategy}]",
+            _logger.LogDebug("[SKIP ] Time {Now} outside {After}–{Before}  [{User} / {Broker} / {Strategy}]",
                 nowTime, entryAfter, noEntryAfter, config.Username, config.BrokerType, config.Name);
             return;
         }
@@ -166,7 +166,7 @@ internal sealed class AutoEntryJob : BackgroundService
         var alreadyEntered = await svc.HasEnteredTodayAsync(config.Id, todayIstStr, ct);
         if (alreadyEntered)
         {
-            _logger.LogDebug("AutoEntry skipped — already entered today [{User} / {Broker} / {Strategy}]",
+            _logger.LogDebug("[SKIP ] Already entered today  [{User} / {Broker} / {Strategy}]",
                 config.Username, config.BrokerType, config.Name);
             return;
         }
@@ -177,14 +177,14 @@ internal sealed class AutoEntryJob : BackgroundService
             c => c.Username == config.Username && c.BrokerName.ToLower() == brokerType, ct);
         if (cred is null)
         {
-            _logger.LogWarning("AutoEntry — token {Reason} for {User} ({Broker}), skipping",
+            _logger.LogWarning("[ENTRY] Token {Reason} — {User} ({Broker}) — skipping",
                 TokenValidationResult.Missing, config.Username, config.BrokerType);
             return;
         }
         var tokenResult = BrokerTokenHelper.Validate(cred.AccessToken, cred.UpdatedAt, cred.BrokerName);
         if (tokenResult != TokenValidationResult.Valid)
         {
-            _logger.LogWarning("AutoEntry — token {Reason} for {User} ({Broker}), skipping",
+            _logger.LogWarning("[ENTRY] Token {Reason} — {User} ({Broker}) — skipping",
                 tokenResult, config.Username, config.BrokerType);
             return;
         }
@@ -194,7 +194,7 @@ internal sealed class AutoEntryJob : BackgroundService
             ic.Index.Equals(config.Instrument, StringComparison.OrdinalIgnoreCase));
         if (indexContracts is null)
         {
-            _logger.LogWarning("AutoEntry — no contracts found for instrument {Instrument}", config.Instrument);
+            _logger.LogWarning("[ENTRY] No contracts for {Instrument}", config.Instrument);
             return;
         }
 
@@ -207,7 +207,7 @@ internal sealed class AutoEntryJob : BackgroundService
 
         if (upcomingExpiries.Count <= config.ExpiryOffset)
         {
-            _logger.LogWarning("AutoEntry — not enough expiries for {Instrument} at offset {Offset}",
+            _logger.LogWarning("[ENTRY] Not enough expiries — {Instrument} offset={Offset}",
                 config.Instrument, config.ExpiryOffset);
             return;
         }
@@ -218,13 +218,13 @@ internal sealed class AutoEntryJob : BackgroundService
         // 6. Expiry day gate
         if (config.OnlyExpiryDay && expiryDate != todayIst)
         {
-            _logger.LogDebug("AutoEntry — OnlyExpiryDay set but today is not expiry, skipping [{User} / {Broker}]",
+            _logger.LogDebug("[SKIP ] OnlyExpiryDay — not expiry today  [{User} / {Broker}]",
                 config.Username, config.BrokerType);
             return;
         }
         if (!config.OnlyExpiryDay && config.ExcludeExpiryDay && expiryDate == todayIst)
         {
-            _logger.LogDebug("AutoEntry — {Instrument} expiry today, skipping [{User} / {Broker}]",
+            _logger.LogDebug("[SKIP ] ExcludeExpiryDay — expiry today  |  {Instrument}  [{User} / {Broker}]",
                 config.Instrument, config.Username, config.BrokerType);
             return;
         }
@@ -234,7 +234,7 @@ internal sealed class AutoEntryJob : BackgroundService
             config.Instrument.ToUpperInvariant());
         if (underlyingKey is null)
         {
-            _logger.LogWarning("AutoEntry — unknown instrument {Instrument}", config.Instrument);
+            _logger.LogWarning("[ENTRY] Unknown instrument {Instrument}", config.Instrument);
             return;
         }
 
@@ -245,23 +245,23 @@ internal sealed class AutoEntryJob : BackgroundService
             // Upstox REST market-quote API returns ':' in keys (e.g. "NSE_INDEX:Nifty 50")
             // while UnderlyingFeedKeys uses '|' — convert for lookup only
             var quoteKey = underlyingKey.Replace('|', ':');
-            _logger.LogDebug("AutoEntry — quote keys returned: [{Keys}]; looking up {Key}",
+            _logger.LogDebug("[ENTRY] Quote keys: [{Keys}]  |  looking up {Key}",
                 string.Join(", ", quotes.Keys), quoteKey);
             if (!quotes.TryGetValue(quoteKey, out var quote))
             {
-                _logger.LogWarning("AutoEntry — key {Key} not found in quote response for {Instrument}", quoteKey, config.Instrument);
+                _logger.LogWarning("[ENTRY] Quote key {Key} not found  |  {Instrument}", quoteKey, config.Instrument);
                 return;
             }
             if (quote.LastPrice <= 0)
             {
-                _logger.LogWarning("AutoEntry — spot price is {Price} (≤ 0) for {Instrument}", quote.LastPrice, config.Instrument);
+                _logger.LogWarning("[ENTRY] Spot price {Price} invalid (≤ 0)  |  {Instrument}", quote.LastPrice, config.Instrument);
                 return;
             }
             spot = quote.LastPrice;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "AutoEntry — spot price fetch failed for {Instrument}", config.Instrument);
+            _logger.LogError(ex, "[ERROR] Spot price fetch failed — {Instrument}", config.Instrument);
             return;
         }
 
@@ -281,7 +281,7 @@ internal sealed class AutoEntryJob : BackgroundService
             if (token is null)
             {
                 _logger.LogWarning(
-                    "AutoEntry — could not resolve {OptionType} strike for {Instrument} [{User} / {Broker}]",
+                    "[ENTRY] Cannot resolve {OptionType} strike  |  {Instrument}  [{User} / {Broker}]",
                     optionType, config.Instrument, config.Username, config.BrokerType);
                 continue;
             }
@@ -294,7 +294,7 @@ internal sealed class AutoEntryJob : BackgroundService
             var order = new BrokerOrderRequest(token, qty, "SELL", "I", "MARKET", Exchange: exchange);
 
             _logger.LogInformation(
-                "AutoEntry placing SELL {OptionType} {Instrument} expiry={Expiry} token={Token} qty={Qty} lots={Lots} lotSize={LotSize} mode={Mode} [{User} / {Broker}]",
+                "[ENTRY] Placing SELL {OptionType} {Instrument}  |  expiry={Expiry}  |  token={Token}  |  qty={Qty} ({Lots}L × {LotSize})  |  mode={Mode}  [{User} / {Broker}]",
                 optionType, config.Instrument, expiry, token, qty, config.Lots, lotSize, config.StrikeMode, config.Username, config.BrokerType);
 
             try
@@ -302,13 +302,13 @@ internal sealed class AutoEntryJob : BackgroundService
                 await broker.PlaceOrderAsync(order, ct);
                 anyPlaced = true;
                 _logger.LogInformation(
-                    "AutoEntry order placed — {OptionType} {Instrument} qty={Qty} [{User} / {Broker}]",
+                    "[ENTRY] Order placed — {OptionType} {Instrument}  qty={Qty}  [{User} / {Broker}]",
                     optionType, config.Instrument, qty, config.Username, config.BrokerType);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex,
-                    "AutoEntry — order placement failed for {OptionType} {Instrument} [{User} / {Broker}]",
+                    "[ERROR] Order failed — {OptionType} {Instrument}  [{User} / {Broker}]",
                     optionType, config.Instrument, config.Username, config.BrokerType);
             }
         }
@@ -318,7 +318,7 @@ internal sealed class AutoEntryJob : BackgroundService
         {
             await svc.LogEntryAsync(config.Id, config.Instrument, todayIstStr, DateTime.UtcNow, ct);
             _logger.LogInformation(
-                "AutoEntry logged for {User} ({Broker}) on {Date}",
+                "[ENTRY] Logged — {User} ({Broker})  |  {Date}",
                 config.Username, config.BrokerType, todayIstStr);
         }
     }
@@ -383,7 +383,7 @@ internal sealed class AutoEntryJob : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "AutoEntry Delta — chain fetch failed for {Instrument}", config.Instrument);
+            _logger.LogError(ex, "[ERROR] Delta chain fetch failed — {Instrument}", config.Instrument);
             return (null, null);
         }
 
@@ -395,7 +395,7 @@ internal sealed class AutoEntryJob : BackgroundService
 
         if (best == default) return (null, null);
         _logger.LogInformation(
-            "AutoEntry Delta — selected {OptionType} strike={Strike} delta={Delta:F3} (target={Target}) [{User} / {Broker}]",
+            "[ENTRY] Delta — {OptionType} strike={Strike}  |  delta={Delta:F3} (target={Target})  [{User} / {Broker}]",
             optionType, best.entry.StrikePrice, best.side!.OptionGreeks!.Delta, targetDelta, config.Username, config.BrokerType);
         return ResolveUpstoxKeyToToken(best.side!.InstrumentKey, config.BrokerType, contracts, config.Instrument);
     }
@@ -412,7 +412,7 @@ internal sealed class AutoEntryJob : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "AutoEntry Premium — chain fetch failed for {Instrument}", config.Instrument);
+            _logger.LogError(ex, "[ERROR] Premium chain fetch failed — {Instrument}", config.Instrument);
             return (null, null);
         }
 
@@ -424,7 +424,7 @@ internal sealed class AutoEntryJob : BackgroundService
 
         if (best == default) return (null, null);
         _logger.LogInformation(
-            "AutoEntry Premium — selected {OptionType} strike={Strike} ltp=₹{Ltp} (target=₹{Target}) [{User} / {Broker}]",
+            "[ENTRY] Premium — {OptionType} strike={Strike}  |  ltp=₹{Ltp} (target=₹{Target})  [{User} / {Broker}]",
             optionType, best.entry.StrikePrice, best.side!.MarketData!.Ltp, targetPremium, config.Username, config.BrokerType);
         return ResolveUpstoxKeyToToken(best.side!.InstrumentKey, config.BrokerType, contracts, config.Instrument);
     }

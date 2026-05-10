@@ -3,14 +3,9 @@ using KAITerminal.RollingStraddle.Configuration;
 using KAITerminal.RollingStraddle.Services;
 using KAITerminal.Upstox.Extensions;
 using Serilog;
-using Serilog.Events;
-using Serilog.Sinks.SystemConsole.Themes;
-
-const string OutputTemplate =
-    "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}";
 
 Log.Logger = new LoggerConfiguration()
-    .WriteTo.Console(theme: AnsiConsoleTheme.Code, outputTemplate: OutputTemplate)
+    .WriteTo.Console()
     .CreateBootstrapLogger();
 
 try
@@ -37,10 +32,7 @@ try
         builder.Configuration.AddInMemoryCollection(overrides);
 
     Log.Logger = new LoggerConfiguration()
-        .MinimumLevel.Information()
-        .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
-        .MinimumLevel.Override("System", LogEventLevel.Warning)
-        .WriteTo.Console(theme: AnsiConsoleTheme.Code, outputTemplate: OutputTemplate)
+        .ReadFrom.Configuration(builder.Configuration)
         .Enrich.FromLogContext()
         .CreateLogger();
 

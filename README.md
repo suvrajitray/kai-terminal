@@ -949,27 +949,30 @@ Key operational events logged by the API process at `Information` level:
 
 ### Risk Engine Log Messages
 
-All risk engine logs follow the format `{UserId} ({Broker})` and format monetary values as `₹+#,##0` / `₹-#,##0`.
+All risk engine logs use the `[TAG ]` format — a 7-char bracketed tag followed by the message, with `|` separating data sections. Monetary values use `₹+#,##0` / `₹-#,##0`.
 
 | Event | Level | Sample log message |
 |---|---|---|
-| Worker startup | Info | `RiskWorker started — trading window 09:15–15:30 Asia/Kolkata, LTP eval every 15000ms` |
-| Session starting | Info | `Starting session — user@email (upstox)` |
-| New trading day reset | Info | `New trading day — resetting risk state for user@email (upstox)` |
-| Streams live | Info | `Streams live — user@email (upstox)  watching 5 open instrument(s)` |
-| Config changed | Info | `Stopping session (config changed) — user@email (upstox)` |
-| Heartbeat (TSL off) | Info | `user@email (upstox)  PnL ₹+11,353  \|  SL ₹-5,000  \|  Target ₹+25,000  \|  TSL off — activates at ₹+15,000` |
-| Heartbeat (TSL on) | Info | `user@email (upstox)  PnL ₹+11,353  \|  Target ₹+25,000  \|  TSL ₹+3,025` |
-| TSL activated | Info | `TSL ACTIVATED — user@email (upstox)  floor locked at ₹+3,025` |
-| TSL raised | Info | `TSL RAISED — user@email (upstox)  floor → ₹+5,025` |
-| Target hit | Info | `TARGET HIT — user@email (upstox)  PnL ₹+25,000  ≥  Target ₹+25,000 — exiting all` |
-| Hard SL hit | Warn | `HARD SL HIT — user@email (upstox)  PnL ₹-5,000  ≤  SL ₹-5,000 — exiting all` |
-| TSL hit | Warn | `TSL HIT — user@email (upstox)  PnL ₹+3,000  ≤  floor ₹+3,025 — exiting all` |
-| Square-off complete | Warn | `Square-off complete — user@email (upstox) — all positions exited` |
-| Square-off failed | Error | `Square-off FAILED — user@email (upstox) — marked as squared-off; manual verification required` |
-| Auto-shift triggered | Info | `AutoShift NIFTY_2026-04-17_PE: shift 1+1 — closing NFO\|NIFTY..., opening NFO\|NIFTY...` |
-| Auto-shift exhausted | Warn | `AutoShift exhausted for user@email (upstox) — exiting NFO\|NIFTY... after 2 shifts` |
-| Session crash + restart | Warn | `Restarting session — user@email (upstox) in 30s` |
+| Worker startup banner | Info | `━━━━━━  KAI Terminal — Risk Worker  ━━━━━━` |
+| New trading day reset | Info | `[SESS ] New trading day — resetting state  \|  user@email (upstox)` |
+| Positions loaded | Info | `[POS  ] Loaded — user@email (upstox)  \|  5 position(s)  [all products]` |
+| Feed live | Info | `[FEED ] Live — user@email (upstox)  \|  5 open instrument(s)  [Intraday + Delivery]` |
+| Market open | Info | `[MKT  ] Open — risk engine active  \|  09:15–15:30 Asia/Kolkata` |
+| Market closed | Info | `[MKT  ] Closed — paused until 09:15 Asia/Kolkata` |
+| Status heartbeat (TSL off) | Debug | `[STAT ] user@email (upstox)  P&L ₹+11,353  \|  SL ₹-5,000  \|  Target ₹+25,000  \|  TSL activates at ₹+15,000  [Intraday + Delivery]` |
+| Status heartbeat (TSL on) | Debug | `[STAT ] user@email (upstox)  P&L ₹+11,353  \|  Target ₹+25,000  \|  TSL ₹+3,025  [Intraday + Delivery]` |
+| TSL activated | Info | `[TSL  ] Activated — user@email (upstox)  \|  floor locked at ₹+3,025` |
+| TSL raised | Info | `[TSL  ] Raised — user@email (upstox)  \|  floor → ₹+5,025` |
+| Target hit | Info | `[TGT  ] Target hit — user@email (upstox)  \|  P&L ₹+25,000  ≥  Target ₹+25,000 — exiting all` |
+| Hard SL hit | Warn | `[SL   ] Hard SL hit — user@email (upstox)  \|  P&L ₹-5,000  ≤  SL ₹-5,000 — exiting all` |
+| TSL hit | Warn | `[TSL  ] Hit — user@email (upstox)  \|  P&L ₹+3,000  ≤  floor ₹+3,025 — exiting all` |
+| Auto square-off | Warn | `[ASO  ] Auto square-off — user@email (upstox)  \|  15:30 ≥ 15:30 — exiting all` |
+| Square-off complete | Warn | `[EXIT ] Complete — user@email (upstox)  \|  5 exited  [All]` |
+| Square-off failed | Error | `[EXIT ] FAILED — user@email (upstox) — marked squared-off; manual verification required` |
+| Auto-shift triggered | Warn | `[SHIFT] Shifting — chain=NIFTY_2026-04-17_PE_22000  \|  shift 1/2  \|  strike=22000 +1 OTM  [{Broker} / {UserId}]` |
+| Auto-shift complete | Info | `[SHIFT] Complete — chain=NIFTY_2026-04-17_PE_22000  \|  shift 1/2  \|  22000→22100  \|  remaining=1  [{Broker} / {UserId}]` |
+| Auto-shift exhausted | Warn | `[SHIFT] Exhausted — user@email (upstox)  \|  NIFTY... used all 2 shift(s) — exiting` |
+| Session crash + restart | Warn | `[SESS ] Restarting — user@email (upstox) in 30s` |
 
 ---
 
@@ -1191,9 +1194,9 @@ Update `Serilog.WriteTo[Seq].serverUrl` in `appsettings.json` for both Api and W
 
 | Alert | Signal |
 |---|---|
-| Risk engine down during market hours | No `"Market open"` event in 20-min window |
-| Square-off failure | Any `"Square-off FAILED"` event |
-| Session crash loop | More than 3 `"Restarting session"` events in 10 min |
+| Risk engine down during market hours | No `"[MKT  ] Open"` event in 20-min window |
+| Square-off failure | Any `"[EXIT ] FAILED"` event |
+| Session crash loop | More than 3 `"[SESS ] Restarting"` events in 10 min |
 | Auth failures | More than 5 `"Google OAuth callback failed"` events in 10 min |
 
 ### Troubleshooting
@@ -1209,12 +1212,12 @@ Update `Serilog.WriteTo[Seq].serverUrl` in `appsettings.json` for both Api and W
 
 **Config change not taking effect:**
 1. Save the new config via **Settings → Profit Protection**.
-2. Within 60s the Worker logs `Stopping session (config changed)` then `Starting session`.
+2. Within 60s the Worker restarts the session with the new config.
 
 **Square-off did not happen / positions still open:**
-1. Find `HARD SL HIT` / `TARGET HIT` / `TSL HIT` — confirms the trigger fired.
-2. Check immediately after for `Square-off complete` or `Square-off FAILED`.
-3. If `Square-off FAILED` — exit API call failed. **Manually close positions via the broker.** Engine will not retry.
+1. Find `[SL   ] Hard SL hit` / `[TGT  ] Target hit` / `[TSL  ] Hit` — confirms the trigger fired.
+2. Check immediately after for `[EXIT ] Complete` or `[EXIT ] FAILED`.
+3. If `[EXIT ] FAILED` — exit API call failed. **Manually close positions via the broker.** Engine will not retry.
 
 ---
 

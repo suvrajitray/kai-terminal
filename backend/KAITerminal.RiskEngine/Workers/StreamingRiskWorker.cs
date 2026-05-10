@@ -36,6 +36,8 @@ public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTri
     private readonly ILogger<StreamingRiskWorker> _logger;
     private readonly TimeZoneInfo                _tradingTz;
 
+    private const string Sep = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+
     // Keyed by "{userId}::{brokerType}"
     private readonly ConcurrentDictionary<string, Channel<LtpUpdate>> _ltpChannels    = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, Channel<bool>>      _refreshChannels = new(StringComparer.Ordinal);
@@ -97,13 +99,15 @@ public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTri
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation(
-            "RiskWorker started — trading window {Start}–{End} {Tz}, poll every {PollMs}ms, user refresh every {RefreshMs}ms",
-            _cfg.TradingWindowStart.ToString(@"hh\:mm"),
-            _cfg.TradingWindowEnd.ToString(@"hh\:mm"),
-            _cfg.TradingTimeZone,
-            _cfg.PositionPollIntervalMs,
-            _cfg.UserRefreshIntervalMs);
+        _logger.LogInformation(Sep);
+        _logger.LogInformation("  KAI Terminal — Risk Worker");
+        _logger.LogInformation("  Trading window  :  {Start}–{End}  ({Tz})",
+            _cfg.TradingWindowStart.ToString(@"HH\:mm"),
+            _cfg.TradingWindowEnd.ToString(@"HH\:mm"),
+            _cfg.TradingTimeZone);
+        _logger.LogInformation("  Position poll   :  {PollMs}ms", _cfg.PositionPollIntervalMs);
+        _logger.LogInformation("  User refresh    :  {RefreshMs}ms", _cfg.UserRefreshIntervalMs);
+        _logger.LogInformation(Sep);
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -115,7 +119,7 @@ public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTri
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { break; }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Supervisor loop error — will retry in {Ms}ms", _cfg.UserRefreshIntervalMs);
+                _logger.LogError(ex, "[ERROR] Supervisor loop error — retrying in {Ms}ms", _cfg.UserRefreshIntervalMs);
             }
 
             try { await Task.Delay(_cfg.UserRefreshIntervalMs, stoppingToken); }
@@ -126,7 +130,7 @@ public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTri
         foreach (var entry in allEntries) entry.Cts.Cancel();
         await Task.WhenAll(allEntries.Select(e => e.Task));
 
-        _logger.LogInformation("RiskWorker stopped");
+        _logger.LogInformation("[RISK ] Stopped");
     }
 
     // ── Per-user session (with restart) ─────────────────────────────────────
@@ -147,7 +151,7 @@ public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTri
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { return; }
             catch
             {
-                _logger.LogWarning("Restarting session — {UserId} ({Broker}) in {Delay}s",
+                _logger.LogWarning("[SESS ] Restarting — {UserId} ({Broker}) in {Delay}s",
                     user.UserId, user.BrokerType, delaySeconds);
                 try { await Task.Delay(TimeSpan.FromSeconds(delaySeconds), ct); }
                 catch (OperationCanceledException) { return; }
@@ -165,7 +169,7 @@ public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTri
         var existing = await _repo.ReadAsync(stateKey, s => s.ToSnapshot());
         if (existing.LastResetDate < today)
         {
-            _logger.LogInformation("New trading day — resetting risk state for {UserId} ({Broker})",
+            _logger.LogInformation("[SESS ] New trading day — resetting state  |  {UserId} ({Broker})",
                 user.UserId, user.BrokerType);
             await _repo.ResetAsync(stateKey);
             await _repo.MutateAsync(stateKey, s => s.LastResetDate = today);
@@ -274,7 +278,7 @@ public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTri
                     }
                     else
                     {
-                        _logger.LogDebug("No open positions — skipping evaluation for {UserId} ({Broker})",
+                        _logger.LogDebug("[EVAL ] No open positions — skipping  |  {UserId} ({Broker})",
                             user.UserId, user.BrokerType);
                     }
                 }
@@ -284,7 +288,7 @@ public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTri
             {
                 // Transient error (network blip, broker timeout) — log and continue.
                 // The session keeps running; the next poll will retry.
-                _logger.LogError(ex, "Error in eval loop — {UserId} ({Broker})", user.UserId, user.BrokerType);
+                _logger.LogError(ex, "[ERROR] Eval loop error — {UserId} ({Broker})", user.UserId, user.BrokerType);
             }
 
             // ── 4. Sleep until the next LTP tick, refresh signal, or poll time ─
@@ -302,7 +306,7 @@ public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTri
 
     private async Task PollPositionsAsync(UserConfig user, IBrokerClient broker, bool isStartup, CancellationToken ct)
     {
-        _logger.LogDebug("Polling positions — {UserId} ({Broker})", user.UserId, user.BrokerType);
+        _logger.LogDebug("[POLL ] Positions — {UserId} ({Broker})", user.UserId, user.BrokerType);
 
         var rawPositions = await broker.GetAllPositionsAsync(ct);
         var positions = user.WatchedProducts == "All"
@@ -315,17 +319,17 @@ public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTri
         if (isStartup)
         {
             if (user.WatchedProducts == "All")
-                _logger.LogInformation("Positions loaded — {UserId} ({Broker}) | {Count} position(s) [all products]",
+                _logger.LogInformation("[POS  ] Loaded — {UserId} ({Broker})  |  {Count} position(s)  [all products]",
                     user.UserId, user.BrokerType, positions.Count);
             else
                 _logger.LogInformation(
-                    "Positions loaded — {UserId} ({Broker}) | {Watched}/{Total} position(s) [{Filter} only — {Excluded} excluded]",
+                    "[POS  ] Loaded — {UserId} ({Broker})  |  {Watched}/{Total} position(s)  [{Filter} only — {Excluded} excluded]",
                     user.UserId, user.BrokerType, positions.Count, rawPositions.Count,
                     user.WatchedProducts, rawPositions.Count - positions.Count);
         }
         else
         {
-            _logger.LogDebug("Position poll — {UserId} ({Broker}) | {Watched}/{Total} [{Filter}]",
+            _logger.LogDebug("[POLL ] Positions — {UserId} ({Broker})  |  {Watched}/{Total}  [{Filter}]",
                 user.UserId, user.BrokerType, positions.Count, rawPositions.Count, user.WatchedProducts);
         }
 
@@ -339,7 +343,7 @@ public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTri
             var feedTokens = _tokenMapper.ToFeedTokens(user.BrokerType, openTokens);
 
             if (isStartup)
-                _logger.LogInformation("Subscribing {Count} instrument(s) — {UserId} ({Broker})",
+                _logger.LogInformation("[FEED ] Subscribing {Count} instrument(s) — {UserId} ({Broker})",
                     feedTokens.Count, user.UserId, user.BrokerType);
 
             await _sharedMarketData.SubscribeAsync(feedTokens, FeedMode.Ltpc, ct);
@@ -355,11 +359,11 @@ public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTri
             };
             var totalOpen = rawPositions.Count(p => p.IsOpen);
             if (user.WatchedProducts == "All" || totalOpen == openTokens.Count)
-                _logger.LogInformation("Streams live — {UserId} ({Broker})  watching {Count} open instrument(s) [{Watch}]",
+                _logger.LogInformation("[FEED ] Live — {UserId} ({Broker})  |  {Count} open instrument(s)  [{Watch}]",
                     user.UserId, user.BrokerType, openTokens.Count, watchLabel);
             else
                 _logger.LogWarning(
-                    "Streams live — {UserId} ({Broker})  watching {Watched}/{Total} open instrument(s) [{Watch} filter — {Excluded} excluded]",
+                    "[FEED ] Live — {UserId} ({Broker})  |  {Watched}/{Total} open instrument(s)  [{Watch} filter — {Excluded} excluded]",
                     user.UserId, user.BrokerType, openTokens.Count, totalOpen, watchLabel, totalOpen - openTokens.Count);
 
             if (openTokens.Count > 0)
@@ -386,13 +390,13 @@ public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTri
         if (prev != newState)
         {
             if (inWindow)
-                _logger.LogInformation("Market open — risk engine active ({Start}–{End} {Tz})",
-                    _cfg.TradingWindowStart.ToString(@"hh\:mm"),
-                    _cfg.TradingWindowEnd.ToString(@"hh\:mm"),
+                _logger.LogInformation("[MKT  ] Open — risk engine active  |  {Start}–{End} {Tz}",
+                    _cfg.TradingWindowStart.ToString(@"HH\:mm"),
+                    _cfg.TradingWindowEnd.ToString(@"HH\:mm"),
                     _cfg.TradingTimeZone);
             else
-                _logger.LogInformation("Market closed — risk engine paused until {Start} {Tz}",
-                    _cfg.TradingWindowStart.ToString(@"hh\:mm"),
+                _logger.LogInformation("[MKT  ] Closed — paused until {Start} {Tz}",
+                    _cfg.TradingWindowStart.ToString(@"HH\:mm"),
                     _cfg.TradingTimeZone);
         }
 

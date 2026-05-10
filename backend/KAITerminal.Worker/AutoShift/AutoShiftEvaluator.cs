@@ -52,7 +52,7 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
         catch (Exception ex)
         {
             _logger.LogError(ex,
-                "AutoShift evaluation FAILED — {UserId} ({Broker})",
+                "[SHIFT] Evaluation FAILED — {UserId} ({Broker})",
                 userId, broker.BrokerType);
             try
             {
@@ -66,7 +66,7 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
             catch (Exception notifyEx)
             {
                 _logger.LogWarning(notifyEx,
-                    "Failed to notify frontend of AutoShift failure — {UserId} ({Broker}) — check API health",
+                    "[SHIFT] Notify failed — {UserId} ({Broker}) — check API health",
                     userId, broker.BrokerType);
             }
         }
@@ -85,7 +85,7 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
             return;
 
         _logger.LogDebug(
-            "AutoShift tick — {UserId} ({Broker}) evaluating {Count} sell position(s)",
+            "[SHIFT] Tick — {UserId} ({Broker})  |  {Count} sell position(s)",
             userId, broker.BrokerType, sellPositions.Count);
 
         var crossings = AutoShiftDecisionEngine.FilterThresholdCrossings(
@@ -109,7 +109,7 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
             {
                 case AutoShiftDecisionKind.SkipContractNotFound:
                     _logger.LogWarning(
-                        "AutoShift — no contract found for token {Token} [{Broker} / {UserId}] — skipping",
+                        "[SHIFT] No contract for token {Token} — skipping  [{Broker} / {UserId}]",
                         decision.Position.InstrumentToken, broker.BrokerType, userId);
                     await _notifier.NotifyAsync(new RiskNotification(
                         UserId:          userId,
@@ -122,7 +122,7 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
 
                 case AutoShiftDecisionKind.SkipUnknownUnderlying:
                     _logger.LogWarning(
-                        "AutoShift — unknown underlying '{Name}' for chain {ChainKey} — skipping [{Broker} / {UserId}]",
+                        "[SHIFT] Unknown underlying '{Name}'  |  chain={ChainKey} — skipping  [{Broker} / {UserId}]",
                         decision.Contract!.Name, decision.ChainKey, broker.BrokerType, userId);
                     break;
 

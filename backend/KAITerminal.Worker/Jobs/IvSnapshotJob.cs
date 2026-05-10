@@ -69,7 +69,7 @@ internal sealed class IvSnapshotJob : BackgroundService
 
         _lastSnapshotDate = todayIst; // optimistic — prevents duplicate runs this day
 
-        _logger.LogInformation("IV snapshot starting for {Date}", todayIst);
+        _logger.LogInformation("[IV   ] Snapshot starting for {Date}", todayIst);
 
         // Fetch actual contract data to resolve real expiry dates per underlying.
         // UpstoxOptionContractProvider ignores the token params and uses analytics token.
@@ -80,7 +80,7 @@ internal sealed class IvSnapshotJob : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "IV snapshot aborted — could not fetch contract data");
+            _logger.LogError(ex, "[IV   ] Snapshot aborted — could not fetch contract data");
             _lastSnapshotDate = DateOnly.MinValue; // allow retry next cycle
             return;
         }
@@ -101,7 +101,7 @@ internal sealed class IvSnapshotJob : BackgroundService
         {
             if (!expiryByUnderlying.TryGetValue(name, out var expiry) || expiry is null)
             {
-                _logger.LogWarning("IV snapshot skipped for {Underlying} — no upcoming expiry found", name);
+                _logger.LogWarning("[IV   ] Skipped — {Underlying} — no upcoming expiry found", name);
                 continue;
             }
 
@@ -111,7 +111,7 @@ internal sealed class IvSnapshotJob : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "IV snapshot failed for {Underlying}", name);
+                _logger.LogError(ex, "[IV   ] Snapshot failed — {Underlying}", name);
             }
         }
     }
@@ -136,7 +136,7 @@ internal sealed class IvSnapshotJob : BackgroundService
 
         if (atmIv <= 0)
         {
-            _logger.LogWarning("IV snapshot skipped for {Underlying} — ATM IV is 0 (market closed?)", name);
+            _logger.LogWarning("[IV   ] Skipped — {Underlying} — ATM IV is 0 (market closed?)", name);
             return;
         }
 
@@ -161,14 +161,14 @@ internal sealed class IvSnapshotJob : BackgroundService
 
         if (exists)
         {
-            _logger.LogDebug("IV snapshot already stored for {Underlying} {Date}", name, date);
+            _logger.LogDebug("[IV   ] Already stored — {Underlying} {Date}", name, date);
             return;
         }
 
         db.IvSnapshots.Add(snapshot);
         await db.SaveChangesAsync(ct);
         _logger.LogInformation(
-            "IV snapshot saved for {Underlying}: ATM={AtmStrike} IV={AtmIv:F2}% Expiry={Expiry}",
+            "[IV   ] Saved — {Underlying}  |  ATM={AtmStrike}  IV={AtmIv:F2}%  |  expiry={Expiry}",
             name, atm.StrikePrice, atmIv, expiry);
     }
 }

@@ -63,7 +63,7 @@ internal sealed class AutoShiftOrderExecutor
         var chainKey  = decision.ChainKey!;
 
         _logger.LogWarning(
-            "AutoShift SHIFTING — chain={ChainKey} shift {ShiftCount}/{MaxShifts} | strike={Strike} moving {Gap} OTM | isShiftedLeg={IsShifted} [{Broker} / {UserId}]",
+            "[SHIFT] Shifting — chain={ChainKey}  |  shift {ShiftCount}/{MaxShifts}  |  strike={Strike} +{Gap} OTM  |  shifted={IsShifted}  [{Broker} / {UserId}]",
             chainKey, decision.ShiftCount + 1, config.AutoShiftMaxCount, contract.Strike,
             config.AutoShiftStrikeGap, decision.IsShiftedLeg, broker.BrokerType, userId);
 
@@ -74,7 +74,7 @@ internal sealed class AutoShiftOrderExecutor
         if (newUpstoxKey is null)
         {
             _logger.LogWarning(
-                "AutoShift — no target strike found for chain={ChainKey} gap={Gap} — skipping [{Broker} / {UserId}]",
+                "[SHIFT] No target strike — chain={ChainKey} gap={Gap} — skipping  [{Broker} / {UserId}]",
                 chainKey, decision.StrikeGap, broker.BrokerType, userId);
             return;
         }
@@ -84,7 +84,7 @@ internal sealed class AutoShiftOrderExecutor
         if (openSymbol is null)
         {
             _logger.LogWarning(
-                "AutoShift — could not resolve open token for upstoxKey={UpstoxKey} chain={ChainKey} ({Broker}) — skipping [{UserId}]",
+                "[SHIFT] Cannot resolve open token — upstoxKey={UpstoxKey} chain={ChainKey} — skipping  [{Broker} / {UserId}]",
                 newUpstoxKey, chainKey, broker.BrokerType, userId);
             return;
         }
@@ -94,10 +94,10 @@ internal sealed class AutoShiftOrderExecutor
         var openOrder  = new BrokerOrderRequest(openSymbol,               qty, "SELL", position.Product, "MARKET", Exchange: openExchange);
 
         _logger.LogInformation(
-            "AutoShift placing orders — chain={ChainKey} shift {From}→{To} | close={CloseSymbol} qty={Qty} exch={CloseExch} | open={OpenSymbol} qty={Qty} exch={OpenExch} [{Broker} / {UserId}]",
+            "[SHIFT] Orders — chain={ChainKey} shift {From}→{To}  |  close={CloseSymbol} qty={Qty}  |  open={OpenSymbol} qty={Qty}  [{Broker} / {UserId}]",
             chainKey, decision.ShiftCount, decision.ShiftCount + 1,
-            position.InstrumentToken, qty, position.Exchange ?? "N/A",
-            openSymbol, qty, openExchange ?? "N/A",
+            position.InstrumentToken, qty,
+            openSymbol, qty,
             broker.BrokerType, userId);
 
         string closeOrderId;
@@ -108,7 +108,7 @@ internal sealed class AutoShiftOrderExecutor
         catch (Exception ex)
         {
             _logger.LogError(ex,
-                "AutoShift FAILED — could not place close order for {CloseSymbol} qty={Qty} chain={ChainKey} [{Broker} / {UserId}]",
+                "[SHIFT] FAILED — close order rejected for {CloseSymbol} qty={Qty} chain={ChainKey}  [{Broker} / {UserId}]",
                 position.InstrumentToken, qty, chainKey, broker.BrokerType, userId);
             await _notifier.NotifyAsync(new RiskNotification(
                 UserId:          userId,
@@ -121,7 +121,7 @@ internal sealed class AutoShiftOrderExecutor
         }
 
         _logger.LogInformation(
-            "AutoShift close order placed — {CloseSymbol} qty={Qty} orderId={OrderId} [{Broker} / {UserId}]",
+            "[SHIFT] Close placed — {CloseSymbol} qty={Qty}  |  orderId={OrderId}  [{Broker} / {UserId}]",
             position.InstrumentToken, qty, closeOrderId, broker.BrokerType, userId);
 
         // Mark the old token so subsequent LTP ticks don't re-trigger a second shift before the next poll.
@@ -148,7 +148,7 @@ internal sealed class AutoShiftOrderExecutor
             catch (Exception ex)
             {
                 _logger.LogError(ex,
-                    "AutoShift background task CRASHED — chain={ChainKey} close={CloseToken} open={OpenSymbol} [{Broker} / {UserId}]. Manual intervention required.",
+                    "[SHIFT] Background task CRASHED — chain={ChainKey}  |  close={CloseToken}  |  open={OpenSymbol}  [{Broker} / {UserId}]  Manual intervention required.",
                     completion.ChainKey, completion.CloseToken, completion.OpenSymbol,
                     broker.BrokerType, completion.UserId);
             }
@@ -169,7 +169,7 @@ internal sealed class AutoShiftOrderExecutor
 
             await broker.PlaceOrderAsync(ctx.OpenOrder, CancellationToken.None);
             _logger.LogInformation(
-                "AutoShift open order placed — {OpenSymbol} qty={Qty} [{Broker} / {UserId}]",
+                "[SHIFT] Open placed — {OpenSymbol} qty={Qty}  [{Broker} / {UserId}]",
                 ctx.OpenSymbol, ctx.Qty, broker.BrokerType, ctx.UserId);
 
             // MutateAsync serialises Dictionary writes against concurrent session-loop reads.
@@ -181,7 +181,7 @@ internal sealed class AutoShiftOrderExecutor
             });
 
             _logger.LogInformation(
-                "AutoShift COMPLETE — chain={ChainKey} shift {NewCount}/{MaxCount} done | strike {OldStrike}→{OpenSymbol} | remaining={Remaining} [{Broker} / {UserId}]",
+                "[SHIFT] Complete — chain={ChainKey}  |  shift {NewCount}/{MaxCount}  |  {OldStrike}→{OpenSymbol}  |  remaining={Remaining}  [{Broker} / {UserId}]",
                 ctx.ChainKey, newCount, ctx.MaxShiftCount, ctx.OriginalStrike, ctx.OpenSymbol,
                 ctx.MaxShiftCount - newCount, broker.BrokerType, ctx.UserId);
 
@@ -202,7 +202,7 @@ internal sealed class AutoShiftOrderExecutor
         catch (Exception ex)
         {
             _logger.LogError(ex,
-                "AutoShift PARTIAL FAILURE — close={CloseToken} succeeded but open={OpenSymbol} FAILED for chain={ChainKey} [{Broker} / {UserId}]. Manual intervention required.",
+                "[SHIFT] Partial failure — close={CloseToken} OK  |  open={OpenSymbol} FAILED  |  chain={ChainKey}  [{Broker} / {UserId}]  Manual check required.",
                 ctx.CloseToken, ctx.OpenSymbol, ctx.ChainKey, broker.BrokerType, ctx.UserId);
             try
             {
@@ -226,13 +226,13 @@ internal sealed class AutoShiftOrderExecutor
         var chainKey  = decision.ChainKey!;
 
         _logger.LogWarning(
-            "AutoShift EXHAUSTED — {UserId} ({Broker}) | token={Token} has used all {MaxCount} shift(s) — placing exit order now",
+            "[SHIFT] Exhausted — {UserId} ({Broker})  |  {Token} used all {MaxCount} shift(s) — exiting",
             userId, broker.BrokerType, position.InstrumentToken, decision.MaxShiftCount);
 
         await broker.ExitPositionAsync(position.InstrumentToken, position.Product, ct);
 
         _logger.LogInformation(
-            "AutoShift EXHAUSTED exit order placed — {Token} exited after {Count}/{MaxCount} shift(s) [{Broker} / {UserId}]",
+            "[SHIFT] Exhausted exit placed — {Token}  |  {Count}/{MaxCount} shifts  [{Broker} / {UserId}]",
             position.InstrumentToken, decision.ShiftCount, decision.MaxShiftCount, broker.BrokerType, userId);
 
         // Mark this token so subsequent LTP ticks don't re-trigger before the next poll.
@@ -241,7 +241,7 @@ internal sealed class AutoShiftOrderExecutor
         // MutateAsync serialises HashSet write against concurrent session-loop reads.
         await _repo.MutateAsync(stateKey, s => s.MarkChainExited(chainKey));
         _logger.LogDebug(
-            "AutoShift EXHAUSTED chain={ChainKey} marked exited — duplicate exits suppressed [{Broker} / {UserId}]",
+            "[SHIFT] Exhausted chain={ChainKey} marked exited  [{Broker} / {UserId}]",
             chainKey, broker.BrokerType, userId);
 
         // Brief delay for fill propagation, then wake the position poller.
