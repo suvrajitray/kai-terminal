@@ -2,9 +2,12 @@ import { useEffect, useState, useMemo } from "react";
 import { Users, CheckCircle2, XCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getUsers, setUserActive, type AdminUser } from "@/services/admin-api";
+import { RiskConfigDialog } from "@/pages/admin/risk-config-dialog";
+import { PositionsDialog } from "@/pages/admin/positions-dialog";
 import { toast } from "@/lib/toast";
 
 export function AdminUsersPage() {
@@ -27,6 +30,8 @@ function UserManagementCard() {
   const [toggling, setToggling] = useState<number | null>(null);
   const [activeFilter, setActiveFilter] = useState("all");
   const [onlineFilter, setOnlineFilter] = useState("all");
+  const [riskConfigUser, setRiskConfigUser] = useState<AdminUser | null>(null);
+  const [positionsUser, setPositionsUser] = useState<AdminUser | null>(null);
 
   const filteredUsers = useMemo(() => {
     return users.filter((u) => {
@@ -61,6 +66,7 @@ function UserManagementCard() {
   }
 
   return (
+    <>
     <Card className="border-border/40 bg-muted/10">
       <CardHeader className="pb-4">
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
@@ -130,6 +136,26 @@ function UserManagementCard() {
                   <span className="text-xs text-muted-foreground">{user.email}</span>
                 </div>
                 <div className="ml-4 flex shrink-0 items-center gap-3">
+                  {user.isOnline && (
+                    <>
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => setPositionsUser(user)}
+                      >
+                        Positions
+                      </Button>
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
+                        onClick={() => setRiskConfigUser(user)}
+                      >
+                        Risk Config
+                      </Button>
+                    </>
+                  )}
                   {user.isActive ? (
                     <span className="flex items-center gap-1 text-xs text-emerald-500">
                       <CheckCircle2 className="size-3" /> Active
@@ -152,5 +178,21 @@ function UserManagementCard() {
         )}
       </CardContent>
     </Card>
+
+    {riskConfigUser && (
+      <RiskConfigDialog
+        user={riskConfigUser}
+        open={!!riskConfigUser}
+        onClose={() => setRiskConfigUser(null)}
+      />
+    )}
+    {positionsUser && (
+      <PositionsDialog
+        user={positionsUser}
+        open={!!positionsUser}
+        onClose={() => setPositionsUser(null)}
+      />
+    )}
+    </>
   );
 }

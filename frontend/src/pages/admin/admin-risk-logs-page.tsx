@@ -1,8 +1,11 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { RefreshCw, ShieldAlert, Loader2, AlertCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { getAdminRiskLogs, type RiskLogEntry } from "@/services/admin-api";
+import { RiskConfigDialog } from "@/pages/admin/risk-config-dialog";
+import { PositionsDialog } from "@/pages/admin/positions-dialog";
 import { cn } from "@/lib/utils";
 
 function formatTime(ts: string) {
@@ -39,6 +42,8 @@ export function AdminRiskLogsPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState("All Users");
   const [days, setDays] = useState("1");
+  const [riskConfigEmail, setRiskConfigEmail] = useState<string | null>(null);
+  const [positionsEmail, setPositionsEmail] = useState<string | null>(null);
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
@@ -69,6 +74,7 @@ export function AdminRiskLogsPage() {
   }, [logs, selectedUser]);
 
   return (
+    <>
     <div className="flex flex-col gap-6 p-6 h-full overflow-auto">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">User Risk Engine Logs</h1>
@@ -150,7 +156,31 @@ export function AdminRiskLogsPage() {
                         {formatTime(log.timestamp)}
                       </div>
                     </td>
-                    <td className="px-4 py-2.5 font-medium">{log.user || "Unknown"}</td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{log.user || "Unknown"}</span>
+                        {log.user && (
+                          <>
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
+                              onClick={() => setPositionsEmail(log.user)}
+                            >
+                              Positions
+                            </Button>
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
+                              onClick={() => setRiskConfigEmail(log.user)}
+                            >
+                              Risk Config
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-2.5">{log.type}</td>
                     <td className="px-4 py-2.5 text-right font-mono text-xs text-muted-foreground whitespace-nowrap">{fmt(log.sl)}</td>
                     <td className="px-4 py-2.5 text-right font-mono text-xs text-muted-foreground whitespace-nowrap">{fmt(log.target)}</td>
@@ -175,5 +205,21 @@ export function AdminRiskLogsPage() {
         </CardContent>
       </Card>
     </div>
+
+    {riskConfigEmail && (
+      <RiskConfigDialog
+        user={{ email: riskConfigEmail, name: riskConfigEmail }}
+        open={!!riskConfigEmail}
+        onClose={() => setRiskConfigEmail(null)}
+      />
+    )}
+    {positionsEmail && (
+      <PositionsDialog
+        user={{ email: positionsEmail, name: positionsEmail }}
+        open={!!positionsEmail}
+        onClose={() => setPositionsEmail(null)}
+      />
+    )}
+    </>
   );
 }
