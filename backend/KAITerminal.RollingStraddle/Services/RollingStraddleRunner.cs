@@ -80,10 +80,7 @@ internal sealed class RollingStraddleRunner : BackgroundService
                         break;
 
                     case StrategyDecision.Roll r:
-                        _log.LogWarning(
-                            "[ROLL ] #{N} triggered — Spot {Spot:F2} moved {Move:+0.00;-0.00}% from {Entry:F2}",
-                            r.RollNumber, spot, r.MovePct, state.EntrySpot);
-                        state = await HandleRollAsync(spot, state, snapshot, ct);
+                        state = await HandleRollAsync(r, spot, state, snapshot, ct);
                         break;
 
                     case StrategyDecision.HoldMaxRolls m:
@@ -105,7 +102,9 @@ internal sealed class RollingStraddleRunner : BackgroundService
             catch (OperationCanceledException)
             {
                 if (state.HasOpenLegs)
-                    _log.LogWarning("[EXIT ] Shutdown received with open positions — close manually in broker terminal");
+                    await GracefulShutdownAsync(state);
+                else
+                    _log.LogInformation("[EXIT ] Shutdown — no open positions");
                 break;
             }
             catch (Exception ex)
@@ -189,18 +188,27 @@ internal sealed class RollingStraddleRunner : BackgroundService
     // ── Roll ──────────────────────────────────────────────────────────────────
 
     private async Task<StraddleState> HandleRollAsync(
-        decimal spot, StraddleState state, MarketSnapshot snapshot, CancellationToken ct)
+        StrategyDecision.Roll r, decimal spot, StraddleState state, MarketSnapshot snapshot, CancellationToken ct)
     {
-        _log.LogInformation(
-            "[ROLL ] CE {Ce:F2}  PE {Pe:F2}  P&L at roll {Sign}₹{Pnl:N0}",
+        _log.LogWarning(Sep);
+        _log.LogWarning(
+            "  ROLL #{N}  |  Spot {Spot:F2}  Move {Move:+0.00;-0.00}%  from {Entry:F2}",
+            r.RollNumber, spot, r.MovePct, state.EntrySpot);
+        _log.LogWarning(
+            "  CE ₹{Ce:F2}  PE ₹{Pe:F2}  |  P&L at roll {Sign}₹{Pnl:N0}",
             snapshot.CeLtp, snapshot.PeLtp,
             snapshot.Pnl >= 0 ? "+" : "-", Math.Abs(snapshot.Pnl));
+        _log.LogWarning(Sep);
 
         _log.LogInformation("[ROLL ] Closing current legs...");
         var closed = await CloseLegsAsync(state, ct);
 
         _log.LogInformation("[ROLL ] Opening new straddle at Spot {Spot:F2}", spot);
-        return await EnterStraddleAsync(spot, closed with { RollCount = closed.RollCount + 1 }, ct);
+        var result = await EnterStraddleAsync(spot, closed with { RollCount = closed.RollCount + 1 }, ct);
+
+        _log.LogInformation(Sep);
+
+        return result;
     }
 
     // ── Close / Exit ──────────────────────────────────────────────────────────
@@ -244,6 +252,50 @@ internal sealed class RollingStraddleRunner : BackgroundService
         _log.LogInformation(Sep);
 
         _lifetime.StopApplication();
+    }
+
+    // ── Graceful shutdown ─────────────────────────────────────────────────────
+
+    private async Task GracefulShutdownAsync(StraddleState state)
+    {
+        _log.LogWarning("[EXIT ] Ctrl+C — checking broker positions before shutdown...");
+        try
+        {
+            var (ceOpen, peOpen) = await _ledger.CheckLegsOpenAsync(state, CancellationToken.None);
+
+            if (!ceOpen && !peOpen)
+            {
+                _log.LogInformation("[EXIT ] Positions already closed — shutdown clean");
+                return;
+            }
+
+            _log.LogWarning(Sep);
+            _log.LogWarning("  GRACEFUL SHUTDOWN — closing open position(s)");
+            _log.LogWarning(Sep);
+
+            await _executor.CancelAllPendingAsync(CancellationToken.None);
+
+            if (ceOpen && state.CeLeg is { } ce)
+            {
+                _log.LogInformation("[CLOSE] BUY CE {Token}  Qty {Qty}", ce.Token, ce.Qty);
+                var id = await _executor.BuyMarketAsync(ce.Token, ce.Qty, CancellationToken.None);
+                await _executor.WaitForFillAsync("CE shutdown", id, CancellationToken.None);
+            }
+            if (peOpen && state.PeLeg is { } pe)
+            {
+                _log.LogInformation("[CLOSE] BUY PE {Token}  Qty {Qty}", pe.Token, pe.Qty);
+                var id = await _executor.BuyMarketAsync(pe.Token, pe.Qty, CancellationToken.None);
+                await _executor.WaitForFillAsync("PE shutdown", id, CancellationToken.None);
+            }
+
+            _log.LogInformation(Sep);
+            _log.LogInformation("  SHUTDOWN COMPLETE — positions closed");
+            _log.LogInformation(Sep);
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "[ERROR] Graceful shutdown failed — close positions manually in broker terminal");
+        }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
