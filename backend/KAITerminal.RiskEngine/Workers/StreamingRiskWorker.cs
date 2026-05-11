@@ -391,12 +391,12 @@ public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTri
         {
             if (inWindow)
                 _logger.LogInformation("[MKT  ] Open — risk engine active  |  {Start}–{End} {Tz}",
-                    _cfg.TradingWindowStart.ToString(@"HH\:mm"),
-                    _cfg.TradingWindowEnd.ToString(@"HH\:mm"),
+                    _cfg.TradingWindowStart.ToString(@"hh\:mm"),
+                    _cfg.TradingWindowEnd.ToString(@"hh\:mm"),
                     _cfg.TradingTimeZone);
             else
                 _logger.LogInformation("[MKT  ] Closed — paused until {Start} {Tz}",
-                    _cfg.TradingWindowStart.ToString(@"HH\:mm"),
+                    _cfg.TradingWindowStart.ToString(@"hh\:mm"),
                     _cfg.TradingTimeZone);
         }
 

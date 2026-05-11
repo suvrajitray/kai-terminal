@@ -189,7 +189,7 @@ public sealed class RiskEvaluator
                 _logger.LogWarning(
                     "[ASO  ] Auto square-off — {UserId} ({Broker})  |  {Now} ≥ {Cfg} — exiting all",
                     userId, config.BrokerType,
-                    nowIst.ToString(@"HH\:mm"), config.AutoSquareOffTime.ToString(@"HH\:mm"));
+                    nowIst.ToString(@"hh\:mm"), config.AutoSquareOffTime.ToString(@"hh\:mm"));
                 await _notifier.NotifyAsync(new RiskNotification(
                     userId, config.BrokerType, RiskNotificationType.AutoSquareOff,
                     exitMtm, Timestamp: DateTimeOffset.UtcNow), ct);
