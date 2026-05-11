@@ -1,5 +1,5 @@
-using KAITerminal.Infrastructure;
 using KAITerminal.Infrastructure.Data;
+using KAITerminal.Util;
 using KAITerminal.RiskEngine.Abstractions;
 using KAITerminal.RiskEngine.Models;
 using Microsoft.EntityFrameworkCore;

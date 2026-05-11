@@ -25,6 +25,7 @@
     <ProjectReference Include="..\KAITerminal.RiskEngine\KAITerminal.RiskEngine.csproj" />
     <ProjectReference Include="..\KAITerminal.Upstox\KAITerminal.Upstox.csproj" />
     <ProjectReference Include="..\KAITerminal.Zerodha\KAITerminal.Zerodha.csproj" />
+    <ProjectReference Include="..\KAITerminal.Util\KAITerminal.Util.csproj" />
   </ItemGroup>
 
 </Project>

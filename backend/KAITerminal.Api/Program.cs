@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using KAITerminal.Util;
 using KAITerminal.Api.Endpoints;
 using StackExchange.Redis;
 using KAITerminal.Api.Extensions;
@@ -15,8 +16,9 @@ using Scalar.AspNetCore;
 using Serilog;
 
 Log.Logger = new LoggerConfiguration()
+    .Enrich.With(new IstTimestampEnricher())
     .WriteTo.Console(
-        outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}",
+        outputTemplate: "[{TimestampIst:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}",
         theme: Serilog.Sinks.SystemConsole.Themes.AnsiConsoleTheme.Code)
     .CreateBootstrapLogger();
 
@@ -29,7 +31,8 @@ builder.Host.UseSerilog((ctx, services, cfg) => cfg
     .ReadFrom.Configuration(ctx.Configuration)
     .ReadFrom.Services(services)
     .Enrich.FromLogContext()
-    .Enrich.WithMachineName());
+    .Enrich.WithMachineName()
+    .Enrich.With(new IstTimestampEnricher()));
 
 builder.Services.ConfigureHttpJsonOptions(o =>
     o.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));

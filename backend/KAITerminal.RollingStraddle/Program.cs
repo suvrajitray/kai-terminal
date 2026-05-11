@@ -1,11 +1,15 @@
 using KAITerminal.MarketData.Extensions;
+using KAITerminal.Util;
 using KAITerminal.RollingStraddle.Configuration;
 using KAITerminal.RollingStraddle.Services;
 using KAITerminal.Upstox.Extensions;
 using Serilog;
 
 Log.Logger = new LoggerConfiguration()
-    .WriteTo.Console()
+    .Enrich.With(new IstTimestampEnricher())
+    .WriteTo.Console(
+        outputTemplate: "[{TimestampIst:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}",
+        theme: Serilog.Sinks.SystemConsole.Themes.AnsiConsoleTheme.Code)
     .CreateBootstrapLogger();
 
 try
@@ -34,6 +38,7 @@ try
     Log.Logger = new LoggerConfiguration()
         .ReadFrom.Configuration(builder.Configuration)
         .Enrich.FromLogContext()
+        .Enrich.With(new IstTimestampEnricher())
         .CreateLogger();
 
     builder.Services.AddSerilog(Log.Logger, dispose: true);

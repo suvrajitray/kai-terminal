@@ -1,7 +1,7 @@
 using System.Text;
 using System.Text.Json;
 
-namespace KAITerminal.Infrastructure;
+namespace KAITerminal.Util;
 
 public enum TokenValidationResult { Valid, Missing, Stale, JwtExpired }
 

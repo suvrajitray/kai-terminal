@@ -17,6 +17,7 @@
   <ItemGroup>
     <ProjectReference Include="..\KAITerminal.MarketData\KAITerminal.MarketData.csproj" />
     <ProjectReference Include="..\KAITerminal.Upstox\KAITerminal.Upstox.csproj" />
+    <ProjectReference Include="..\KAITerminal.Util\KAITerminal.Util.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,6 +1,6 @@
 using KAITerminal.Contracts;
-using KAITerminal.Infrastructure;
 using KAITerminal.Infrastructure.Data;
+using KAITerminal.Util;
 using KAITerminal.Api.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;

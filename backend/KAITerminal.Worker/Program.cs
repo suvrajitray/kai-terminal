@@ -1,4 +1,5 @@
 using KAITerminal.Broker;
+using KAITerminal.Util;
 using KAITerminal.Contracts;
 using Serilog;
 using KAITerminal.Contracts.Notifications;
@@ -18,8 +19,9 @@ using KAITerminal.Zerodha;
 using KAITerminal.Zerodha.Extensions;
 
 Log.Logger = new LoggerConfiguration()
+    .Enrich.With(new IstTimestampEnricher())
     .WriteTo.Console(
-        outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}",
+        outputTemplate: "[{TimestampIst:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}",
         theme: Serilog.Sinks.SystemConsole.Themes.AnsiConsoleTheme.Code)
     .CreateBootstrapLogger();
 
@@ -33,6 +35,7 @@ try
         .ReadFrom.Configuration(builder.Configuration)
         .Enrich.FromLogContext()
         .Enrich.WithMachineName()
+        .Enrich.With(new IstTimestampEnricher())
         .CreateLogger();
     builder.Services.AddSerilog(Log.Logger, dispose: true);
 
