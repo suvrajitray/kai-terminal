@@ -51,14 +51,14 @@ internal sealed class UserSessionRegistry
             {
                 var changedFields = DescribeConfigChanges(entry.Config, fresh);
                 _logger.LogInformation(
-                    "Stopping session (config changed: {Changes}) — {UserId} ({Broker})",
-                    changedFields, entry.Config.UserId, entry.Config.BrokerType);
+                    "[SESS ] Stop — {UserId} ({Broker})  |  config changed: {Changes}",
+                    entry.Config.UserId, entry.Config.BrokerType, changedFields);
                 await _repo.ResetAsync(key);
             }
             else
             {
                 _logger.LogInformation(
-                    "Stopping session (disabled or token expired) — {UserId} ({Broker})",
+                    "[SESS ] Stop — {UserId} ({Broker})  |  disabled or token expired",
                     entry.Config.UserId, entry.Config.BrokerType);
             }
             entry.Cts.Cancel();
@@ -73,7 +73,7 @@ internal sealed class UserSessionRegistry
         {
             if (_sessions.ContainsKey(Key(user))) continue;
 
-            _logger.LogInformation("Starting session — {UserId} ({Broker})", user.UserId, user.BrokerType);
+            _logger.LogInformation("[SESS ] Start — {UserId} ({Broker})", user.UserId, user.BrokerType);
             var cts  = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
             var task = _sessionFactory(user, cts.Token);
             _sessions[Key(user)] = new SessionEntry { Cts = cts, Task = task, Config = user };

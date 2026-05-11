@@ -42,18 +42,17 @@ public sealed class MarketDataService : ISharedMarketDataService, IHostedService
 
     public async Task StartAsync(CancellationToken ct)
     {
-        _logger.LogInformation("MarketDataService starting — fetching analytics token from AppSettings");
+        _logger.LogInformation("[FEED ] Starting — fetching analytics token from AppSettings");
 
         var token = await FetchAnalyticsTokenAsync(ct);
         if (string.IsNullOrWhiteSpace(token))
         {
             _logger.LogWarning(
-                "MarketDataService: no analytics token configured — market data feed is inactive. " +
-                "Go to Admin page → set the Upstox Analytics Token → restart Worker.");
+                "[FEED ] No analytics token configured — feed inactive  |  Admin → set Upstox Analytics Token → restart Worker");
             return;
         }
 
-        _logger.LogInformation("MarketDataService: analytics token found — connecting Upstox market data WebSocket");
+        _logger.LogInformation("[FEED ] Analytics token found — connecting Upstox market data WebSocket");
 
         _streamer = _streamerFactory(token);
         _streamer.FeedReceived += OnFeedReceived!;
@@ -65,12 +64,12 @@ public sealed class MarketDataService : ISharedMarketDataService, IHostedService
             RedisChannel.Literal("ltp:sub-req"), OnSubRequest);
 
         _logger.LogInformation(
-            "MarketDataService ready — WebSocket connected, listening on ltp:sub-req for instrument subscriptions");
+            "[FEED ] Ready — WebSocket connected  |  listening on ltp:sub-req");
     }
 
     public async Task StopAsync(CancellationToken ct)
     {
-        _logger.LogInformation("MarketDataService stopping");
+        _logger.LogInformation("[FEED ] Stopping");
         _redis.GetSubscriber().Unsubscribe(RedisChannel.Literal("ltp:sub-req"));
         if (_streamer is not null)
             await _streamer.DisposeAsync();
@@ -87,13 +86,13 @@ public sealed class MarketDataService : ISharedMarketDataService, IHostedService
             if (newTokens.Count == 0)
             {
                 _logger.LogDebug(
-                    "MarketDataService: subscription request for {Count} token(s) — all already subscribed, skipping",
+                    "[FEED ] {Count} token(s) already subscribed — skipping",
                     tokens.Count);
                 return;
             }
 
             _logger.LogDebug(
-                "MarketDataService: subscribing {New} new instrument(s) to WebSocket (total subscribed: {Total}) — {Tokens}",
+                "[FEED ] Subscribing {New} new instrument(s) to WebSocket  |  total={Total}  |  {Tokens}",
                 newTokens.Count, _subscribed.Count, string.Join(", ", newTokens));
 
             await _streamer.SubscribeAsync(newTokens, mode);
@@ -113,7 +112,7 @@ public sealed class MarketDataService : ISharedMarketDataService, IHostedService
             // Intentionally not unsubscribing from the WebSocket —
             // other users may still need those ticks; consumers filter locally.
             _logger.LogDebug(
-                "MarketDataService: removed {Count} token(s) from local tracking (WebSocket sub retained)",
+                "[FEED ] Removed {Count} token(s) from local tracking  |  WebSocket sub retained",
                 tokens.Count);
         }
         finally { _subLock.Release(); }
@@ -127,16 +126,16 @@ public sealed class MarketDataService : ISharedMarketDataService, IHostedService
             if (tokens is null || tokens.Count == 0) return;
 
             _logger.LogDebug(
-                "MarketDataService: received subscription request from API for {Count} instrument(s) — forwarding to WebSocket",
+                "[FEED ] API sub-req received for {Count} instrument(s) — forwarding to WebSocket",
                 tokens.Count);
 
             var subTask = SubscribeAsync(tokens).ContinueWith(
-                t => _logger.LogWarning(t.Exception, "MarketDataService: failed to subscribe instruments from API request"),
+                t => _logger.LogWarning(t.Exception, "[FEED ] Failed to subscribe instruments from API request"),
                 TaskContinuationOptions.OnlyOnFaulted);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "MarketDataService: failed to deserialize subscription request from Redis");
+            _logger.LogWarning(ex, "[FEED ] Failed to deserialize subscription request from Redis");
         }
     }
 
@@ -161,7 +160,7 @@ public sealed class MarketDataService : ISharedMarketDataService, IHostedService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "MarketDataService: failed to publish LTP tick to Redis ltp:feed");
+            _logger.LogWarning(ex, "[FEED ] Failed to publish LTP tick to Redis ltp:feed");
         }
     }
 

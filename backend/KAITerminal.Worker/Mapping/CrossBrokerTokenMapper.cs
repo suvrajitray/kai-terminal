@@ -71,7 +71,7 @@ public sealed class CrossBrokerTokenMapper : ITokenMapper
                 result.Add(feedToken);
             else
                 _logger.LogDebug(
-                    "CrossBrokerTokenMapper: no feed-token mapping for {Broker} token {Token}",
+                    "[TMAP ] No feed-token mapping  |  {Broker} {Token}",
                     brokerType, token);
         }
         return result;
@@ -103,7 +103,7 @@ public sealed class CrossBrokerTokenMapper : ITokenMapper
             catch (Exception ex)
             {
                 _logger.LogWarning(ex,
-                    "CrossBrokerTokenMapper: failed to fetch native keys from {Broker} — skipping",
+                    "[TMAP ] {Broker} — failed to fetch native keys — skipping",
                     provider.BrokerType);
                 continue;
             }
@@ -114,7 +114,7 @@ public sealed class CrossBrokerTokenMapper : ITokenMapper
                 if (prefix is null)
                 {
                     _logger.LogDebug(
-                        "CrossBrokerTokenMapper: unknown segment {Segment} for symbol {Symbol} — skipping",
+                        "[TMAP ] Unknown segment {Segment} for {Symbol} — skipping",
                         k.Segment, k.TradingSymbol);
                     skipped++;
                     continue;
@@ -127,7 +127,7 @@ public sealed class CrossBrokerTokenMapper : ITokenMapper
             }
 
             _logger.LogInformation(
-                "CrossBrokerTokenMapper: {Broker} — {Mapped} token mappings built ({Skipped} skipped)",
+                "[TMAP ] {Broker} — {Mapped} token mappings built  |  {Skipped} skipped",
                 provider.BrokerType, mapped, skipped);
         }
 

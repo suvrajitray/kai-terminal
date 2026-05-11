@@ -164,10 +164,10 @@ All operational backend logging (Worker, RiskEngine, RollingStraddle) uses a str
 | Tag | Used in | Meaning |
 |-----|---------|---------|
 | `[RISK ]` | StreamingRiskWorker | Worker lifecycle |
-| `[SESS ]` | StreamingRiskWorker | Per-user session events |
+| `[SESS ]` | StreamingRiskWorker / UserSessionRegistry | Per-user session events |
 | `[POS  ]` | StreamingRiskWorker | Positions loaded at startup |
 | `[POLL ]` | StreamingRiskWorker | Periodic position polls |
-| `[FEED ]` | StreamingRiskWorker | Feed subscription / stream live |
+| `[FEED ]` | StreamingRiskWorker / MarketDataService | Feed subscription / stream live |
 | `[MKT  ]` | StreamingRiskWorker | Trading window open/closed |
 | `[EVAL ]` | RiskEvaluator | Evaluation ticks |
 | `[STAT ]` | RiskEvaluator | Status updates / 15-min push |
@@ -189,6 +189,9 @@ All operational backend logging (Worker, RiskEngine, RollingStraddle) uses a str
 | `[CLOSE]` | RollingStraddle | Leg close orders |
 | `[LIVE ]` | RollingStraddle | Live hold tick |
 | `[VIX  ]` | RollingStraddle | VIX filter check |
+| `[TMAP ]` | CrossBrokerTokenMapper | Token map build / lookup miss |
+| `[WS   ]` | UpstoxMarketDataStreamer | WebSocket reconnect / parse errors |
+| `[RELAY]` | RedisLtpRelay | Redis ltp:feed relay lifecycle |
 
 API-layer logs (endpoints, hubs, webhooks) do not use this format — they are HTTP-level and use plain prose.
 

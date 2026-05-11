@@ -53,10 +53,9 @@ public static class UpstoxEndpoints
             ILoggerFactory lf,
             [FromQuery] string? exchange = null) =>
         {
-            var logger = lf.CreateLogger("UpstoxEndpoints");
             var email = user.GetEmail() ?? "unknown";
             var filterDesc = string.IsNullOrWhiteSpace(exchange) ? "all exchanges" : exchange;
-            logger.LogInformation("Exit all positions — {User} — filter: {Filter}", email, filterDesc);
+            lf.CreateLogger("UpstoxEndpoints").LogInformation("Exit all positions — {User} — filter: {Filter}", email, filterDesc);
 
             var exchanges = string.IsNullOrWhiteSpace(exchange)
                 ? null
@@ -65,7 +64,7 @@ public static class UpstoxEndpoints
                           .AsReadOnly();
             var ids = await upstox.Positions.ExitAllPositionsAsync(exchanges);
 
-            logger.LogInformation(
+            lf.CreateLogger("UpstoxEndpoints").LogInformation(
                 "Exit all complete — {User} — {Count} order(s) placed", email, ids.Count);
             return Results.Ok(new { OrderIds = ids });
         });

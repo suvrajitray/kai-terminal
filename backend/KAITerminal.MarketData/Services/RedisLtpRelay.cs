@@ -27,13 +27,13 @@ public sealed class RedisLtpRelay : ISharedMarketDataService, IHostedService
     public Task StartAsync(CancellationToken ct)
     {
         _redis.GetSubscriber().Subscribe(RedisChannel.Literal("ltp:feed"), OnMessage);
-        _logger.LogInformation("RedisLtpRelay: subscribed to Redis ltp:feed — will relay ticks to PositionStreamCoordinator");
+        _logger.LogInformation("[RELAY] Start — subscribed to Redis ltp:feed");
         return Task.CompletedTask;
     }
 
     public Task StopAsync(CancellationToken ct)
     {
-        _logger.LogInformation("RedisLtpRelay: unsubscribing from ltp:feed");
+        _logger.LogInformation("[RELAY] Stop — unsubscribing from ltp:feed");
         _redis.GetSubscriber().Unsubscribe(RedisChannel.Literal("ltp:feed"));
         return Task.CompletedTask;
     }
@@ -61,12 +61,12 @@ public sealed class RedisLtpRelay : ISharedMarketDataService, IHostedService
         {
             var ltps = JsonSerializer.Deserialize<Dictionary<string, decimal>>(value.ToString());
             if (ltps is null || ltps.Count == 0) return;
-            _logger.LogDebug("RedisLtpRelay: received tick from ltp:feed — {Count} instrument(s)", ltps.Count);
+            _logger.LogDebug("[RELAY] Tick from ltp:feed  |  {Count} instrument(s)", ltps.Count);
             FeedReceived?.Invoke(this, new LtpUpdate(ltps));
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "RedisLtpRelay: failed to deserialize LTP tick from Redis ltp:feed");
+            _logger.LogWarning(ex, "[RELAY] Failed to deserialize LTP tick from Redis");
         }
     }
 }

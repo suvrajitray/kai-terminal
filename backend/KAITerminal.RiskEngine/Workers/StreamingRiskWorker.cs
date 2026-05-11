@@ -102,8 +102,8 @@ public sealed class StreamingRiskWorker : BackgroundService, IPositionRefreshTri
         _logger.LogInformation(Sep);
         _logger.LogInformation("  KAI Terminal — Risk Worker");
         _logger.LogInformation("  Trading window  :  {Start}–{End}  ({Tz})",
-            _cfg.TradingWindowStart.ToString(@"HH\:mm"),
-            _cfg.TradingWindowEnd.ToString(@"HH\:mm"),
+            _cfg.TradingWindowStart.ToString(@"hh\:mm"),
+            _cfg.TradingWindowEnd.ToString(@"hh\:mm"),
             _cfg.TradingTimeZone);
         _logger.LogInformation("  Position poll   :  {PollMs}ms", _cfg.PositionPollIntervalMs);
         _logger.LogInformation("  User refresh    :  {RefreshMs}ms", _cfg.UserRefreshIntervalMs);

@@ -149,13 +149,13 @@ internal sealed class UpstoxMarketDataStreamer : IMarketDataStreamer
             catch (Exception ex)
             {
                 _logger.LogWarning(ex,
-                    "Market data stream reconnect attempt {Attempt}/{Max} failed",
+                    "[WS   ] Reconnect attempt {Attempt}/{Max} failed",
                     attempt, _config.MaxReconnectAttempts);
             }
         }
 
         _logger.LogError(
-            "Market data stream failed to reconnect after {Max} attempt(s) — stream permanently disconnected",
+            "[WS   ] Failed to reconnect after {Max} attempt(s) — stream permanently disconnected",
             _config.MaxReconnectAttempts);
         AutoReconnectStopped?.Invoke(this, EventArgs.Empty);
     }
@@ -185,7 +185,7 @@ internal sealed class UpstoxMarketDataStreamer : IMarketDataStreamer
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to parse market data frame ({Length} bytes)", count);
+            _logger.LogWarning(ex, "[WS   ] Failed to parse market data frame  |  {Length} bytes", count);
         }
     }
 
