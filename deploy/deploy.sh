@@ -5,6 +5,7 @@
 #   ./deploy/deploy.sh              # deploy everything
 #   ./deploy/deploy.sh --frontend   # frontend only
 #   ./deploy/deploy.sh --backend    # API + Worker only
+#   ./deploy/deploy.sh --rs         # Rolling Straddle only → /opt/kaiterminal/rs
 #
 # Requirements (Mac):
 #   - SSH key auth configured (no password prompts)
@@ -35,11 +36,16 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 # ── Argument parsing ──────────────────────────────────────────────────────────
 DEPLOY_FRONTEND=true
 DEPLOY_BACKEND=true
+DEPLOY_RS=false
 
 if [[ "${1:-}" == "--frontend" ]]; then
   DEPLOY_BACKEND=false
 elif [[ "${1:-}" == "--backend" ]]; then
   DEPLOY_FRONTEND=false
+elif [[ "${1:-}" == "--rs" ]]; then
+  DEPLOY_FRONTEND=false
+  DEPLOY_BACKEND=false
+  DEPLOY_RS=true
 fi
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -95,6 +101,21 @@ if $DEPLOY_BACKEND; then
 
   step "Checking service health"
   ssh "$SERVER" "sudo systemctl is-active kaiterminal-api kaiterminal-worker"
+fi
+
+# ── Rolling Straddle ──────────────────────────────────────────────────────────
+if $DEPLOY_RS; then
+  step "Publishing Rolling Straddle"
+  cd "$REPO_ROOT/backend"
+  dotnet publish KAITerminal.RollingStraddle -c Release -o /tmp/kai-rs-publish --nologo -v quiet
+  ok "Published → /tmp/kai-rs-publish"
+
+  step "Deploying Rolling Straddle to server"
+  rsync -azO --delete --progress --rsync-path="sudo rsync" \
+    /tmp/kai-rs-publish/ \
+    "$SERVER:$REMOTE_APP_DIR/rs/"
+  ssh "$SERVER" "sudo chown -R kaiterm:kaiterm $REMOTE_APP_DIR/rs"
+  ok "Synced to $REMOTE_APP_DIR/rs"
 fi
 
 echo

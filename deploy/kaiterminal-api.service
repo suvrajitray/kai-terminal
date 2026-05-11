@@ -11,12 +11,13 @@ WorkingDirectory=/opt/kaiterminal/api
 ExecStart=/usr/bin/dotnet /opt/kaiterminal/api/KAITerminal.Api.dll
 Restart=always
 RestartSec=5
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=kaiterminal-api
+LogsDirectory=kaiterminal
+StandardOutput=append:/var/log/kaiterminal/api.log
+StandardError=append:/var/log/kaiterminal/api.log
 
 # ASP.NET Core — listen on HTTP internally; Nginx handles SSL termination
 Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=DOTNET_SYSTEM_CONSOLE_ALLOW_ANSI_COLOR_REDIRECTION=1
 Environment=ASPNETCORE_URLS=http://localhost:5001
 # Tells ASP.NET Core to trust X-Forwarded-Proto / X-Forwarded-For from Nginx
 Environment=ASPNETCORE_FORWARDEDHEADERS_ENABLED=true

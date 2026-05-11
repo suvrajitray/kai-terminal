@@ -11,11 +11,12 @@ WorkingDirectory=/opt/kaiterminal/worker
 ExecStart=/usr/bin/dotnet /opt/kaiterminal/worker/KAITerminal.Worker.dll
 Restart=always
 RestartSec=10
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=kaiterminal-worker
+LogsDirectory=kaiterminal
+StandardOutput=append:/var/log/kaiterminal/worker.log
+StandardError=append:/var/log/kaiterminal/worker.log
 
 Environment=DOTNET_ENVIRONMENT=Production
+Environment=DOTNET_SYSTEM_CONSOLE_ALLOW_ANSI_COLOR_REDIRECTION=1
 
 # Secrets — file created manually on the server, chmod 600, never committed
 EnvironmentFile=/etc/kaiterminal/worker.env
