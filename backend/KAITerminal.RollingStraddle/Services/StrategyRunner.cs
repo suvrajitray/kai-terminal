@@ -7,24 +7,24 @@ using Microsoft.Extensions.Options;
 
 namespace KAITerminal.RollingStraddle.Services;
 
-internal sealed class RollingStraddleRunner : BackgroundService
+internal sealed class StrategyRunner : BackgroundService
 {
     private readonly MarketDataFeed                 _feed;
     private readonly OrderExecutor                  _executor;
     private readonly PositionLedger                 _ledger;
     private readonly StrategyConfig                 _cfg;
-    private readonly ILogger<RollingStraddleRunner> _log;
+    private readonly ILogger<StrategyRunner> _log;
     private readonly IHostApplicationLifetime       _lifetime;
 
     private static readonly TimeZoneInfo Ist = TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
     private const string Sep = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
 
-    public RollingStraddleRunner(
+    public StrategyRunner(
         MarketDataFeed                 feed,
         OrderExecutor                  executor,
         PositionLedger                 ledger,
         IOptions<StrategyConfig>       config,
-        ILogger<RollingStraddleRunner> log,
+        ILogger<StrategyRunner> log,
         IHostApplicationLifetime       lifetime)
     {
         _feed     = feed;
@@ -46,7 +46,7 @@ internal sealed class RollingStraddleRunner : BackgroundService
 
         PrintBanner();
 
-        var state = StraddleState.Empty;
+        var state = StrategyState.Empty;
 
         try
         {
@@ -122,8 +122,8 @@ internal sealed class RollingStraddleRunner : BackgroundService
 
     // ── Entry ─────────────────────────────────────────────────────────────────
 
-    private async Task<StraddleState> HandleEntryAsync(
-        decimal spot, StraddleState current, CancellationToken ct)
+    private async Task<StrategyState> HandleEntryAsync(
+        decimal spot, StrategyState current, CancellationToken ct)
     {
         if (_cfg.VixMaxThreshold > 0)
         {
@@ -142,20 +142,26 @@ internal sealed class RollingStraddleRunner : BackgroundService
         }
 
         _log.LogInformation("[ENTRY] Entry window open  |  Spot {Spot:F2}", spot);
-        return await EnterStraddleAsync(spot, current, ct);
+        return await OpenLegsAsync(spot, current, ct);
     }
 
-    private async Task<StraddleState> EnterStraddleAsync(
-        decimal spot, StraddleState current, CancellationToken ct)
+    private async Task<StrategyState> OpenLegsAsync(
+        decimal spot, StrategyState current, CancellationToken ct)
     {
         var atm = await _feed.FindAtmAsync(spot, ct);
         if (atm is null) return current;
 
-        var (strike, ceKey, peKey) = atm.Value;
+        var (atmStrike, ceStrike, peStrike, ceKey, peKey) = atm.Value;
         var qty = _cfg.Lots * _cfg.LotSize;
 
-        _log.LogInformation("[ENTRY] ATM strike {Strike}  |  Spot {Spot:F2}", strike, spot);
-        _log.LogInformation("[ENTRY] Placing straddle — SELL CE {Ce}  SELL PE {Pe}  Qty {Qty}", ceKey, peKey, qty);
+        if (_cfg.StrikeOffset == 0)
+            _log.LogInformation("[ENTRY] ATM {Strike}  |  Spot {Spot:F2}", atmStrike, spot);
+        else
+            _log.LogInformation("[ENTRY] ATM {Atm}  CE@{Ce}  PE@{Pe}  |  Spot {Spot:F2}",
+                atmStrike, ceStrike, peStrike, spot);
+
+        _log.LogInformation("[ENTRY] Placing {Type} — SELL CE {Ce}  SELL PE {Pe}  Qty {Qty}",
+            _cfg.StrikeOffset == 0 ? "straddle" : "strangle", ceKey, peKey, qty);
 
         var ceOrderId = await _executor.SellMarketAsync(ceKey, qty, ct);
         var peOrderId = await _executor.SellMarketAsync(peKey, qty, ct);
@@ -175,8 +181,8 @@ internal sealed class RollingStraddleRunner : BackgroundService
         }
 
         _log.LogInformation(
-            "[ENTRY] Straddle active — CE ₹{Ce:F2}  PE ₹{Pe:F2}  Combined ₹{Total:F2}  EntrySpot {Spot:F2}",
-            ceFill, peFill, ceFill + peFill, spot);
+            "[ENTRY] {Type} active — CE ₹{Ce:F2}  PE ₹{Pe:F2}  Combined ₹{Total:F2}  EntrySpot {Spot:F2}",
+            _cfg.StrikeOffset == 0 ? "Straddle" : "Strangle", ceFill, peFill, ceFill + peFill, spot);
 
         return current with
         {
@@ -189,8 +195,8 @@ internal sealed class RollingStraddleRunner : BackgroundService
 
     // ── Roll ──────────────────────────────────────────────────────────────────
 
-    private async Task<StraddleState> HandleRollAsync(
-        StrategyDecision.Roll r, decimal spot, StraddleState state, MarketSnapshot snapshot, CancellationToken ct)
+    private async Task<StrategyState> HandleRollAsync(
+        StrategyDecision.Roll r, decimal spot, StrategyState state, MarketSnapshot snapshot, CancellationToken ct)
     {
         _log.LogWarning(Sep);
         _log.LogWarning(
@@ -205,8 +211,9 @@ internal sealed class RollingStraddleRunner : BackgroundService
         _log.LogInformation("[ROLL ] Closing current legs...");
         var closed = await CloseLegsAsync(state, ct);
 
-        _log.LogInformation("[ROLL ] Opening new straddle at Spot {Spot:F2}", spot);
-        var result = await EnterStraddleAsync(spot, closed with { RollCount = closed.RollCount + 1 }, ct);
+        _log.LogInformation("[ROLL ] Opening new {Type} at Spot {Spot:F2}",
+            _cfg.StrikeOffset == 0 ? "straddle" : "strangle", spot);
+        var result = await OpenLegsAsync(spot, closed with { RollCount = closed.RollCount + 1 }, ct);
 
         _log.LogInformation(Sep);
 
@@ -215,7 +222,7 @@ internal sealed class RollingStraddleRunner : BackgroundService
 
     // ── Close / Exit ──────────────────────────────────────────────────────────
 
-    private async Task<StraddleState> CloseLegsAsync(StraddleState state, CancellationToken ct)
+    private async Task<StrategyState> CloseLegsAsync(StrategyState state, CancellationToken ct)
     {
         if (state.CeLeg is { } ce)
         {
@@ -233,7 +240,7 @@ internal sealed class RollingStraddleRunner : BackgroundService
     }
 
     private async Task HandleExitAsync(
-        string reason, StraddleState state, MarketSnapshot snapshot, CancellationToken ct)
+        string reason, StrategyState state, MarketSnapshot snapshot, CancellationToken ct)
     {
         _log.LogInformation("[EXIT ] {Reason}  |  P&L {Sign}₹{Pnl:N0}",
             reason, PnlSign(snapshot.Pnl), Math.Abs(snapshot.Pnl));
@@ -258,7 +265,7 @@ internal sealed class RollingStraddleRunner : BackgroundService
 
     // ── Graceful shutdown ─────────────────────────────────────────────────────
 
-    private async Task GracefulShutdownAsync(StraddleState state)
+    private async Task GracefulShutdownAsync(StrategyState state)
     {
         _log.LogWarning("[EXIT ] Ctrl+C — checking broker positions before shutdown...");
         try
@@ -313,8 +320,12 @@ internal sealed class RollingStraddleRunner : BackgroundService
 
     private void PrintBanner()
     {
+        var strategyName = _cfg.StrikeOffset == 0
+            ? "Rolling Straddle"
+            : $"Rolling Strangle  (±{_cfg.StrikeOffset} strikes OTM)";
+
         _log.LogInformation(Sep);
-        _log.LogInformation("  KAI Terminal — Rolling Straddle");
+        _log.LogInformation("  KAI Terminal — {Strategy}", strategyName);
         _log.LogInformation("  Underlying   :  {U}", _cfg.Underlying);
         _log.LogInformation("  Expiry       :  {E}", _cfg.Expiry);
         _log.LogInformation("  Size         :  {L} lots x {Ls} = {Total} units/leg",

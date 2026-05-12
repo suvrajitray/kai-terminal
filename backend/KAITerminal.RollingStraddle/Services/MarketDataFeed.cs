@@ -44,12 +44,14 @@ internal sealed class MarketDataFeed
         return Normalise(quotes).TryGetValue(VixKey, out var q) ? q.LastPrice : 0m;
     }
 
-    internal async Task<(decimal Strike, string Ce, string Pe)?> FindAtmAsync(decimal spot, CancellationToken ct)
+    internal async Task<(decimal AtmStrike, decimal CeStrike, decimal PeStrike, string Ce, string Pe)?> FindAtmAsync(
+        decimal spot, CancellationToken ct)
     {
         var chain  = await _client.GetOptionChainAsync(_token, _cfg.Underlying, _cfg.Expiry, ct);
-        var result = AtmSelector.Select(chain, spot);
+        var result = StrikeSelector.Select(chain, spot, _cfg.StrikeOffset);
         if (result is null)
-            _log.LogError("[ENTRY] ATM not found in chain ({Count} entries)  |  Spot {Spot:F2}", chain.Count, spot);
+            _log.LogError("[ENTRY] Leg selection failed ({Count} entries, offset {Off})  |  Spot {Spot:F2}",
+                chain.Count, _cfg.StrikeOffset, spot);
         return result;
     }
 

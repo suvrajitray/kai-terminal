@@ -11,7 +11,7 @@ internal static class StrategyEngine
     /// VIX validation is intentionally excluded; the orchestrator handles it before acting on Enter.
     /// </summary>
     internal static StrategyDecision Evaluate(
-        StraddleState  state,
+        StrategyState  state,
         MarketSnapshot snapshot,
         StrategyConfig config)
     {
@@ -36,7 +36,7 @@ internal static class StrategyEngine
     }
 
     private static StrategyDecision EvaluateActive(
-        StraddleState  state,
+        StrategyState  state,
         MarketSnapshot snapshot,
         StrategyConfig config,
         TimeSpan       exitTime)

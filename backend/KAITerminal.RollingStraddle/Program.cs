@@ -31,6 +31,9 @@ try
     Prompt("Daily MTM stop-loss ₹ (Enter to use appsettings value): ",
         v => overrides.Add(new("Strategy:DailyMtmStopLoss", v)));
 
+    Prompt("Strike offset — 0 straddle, N strangle (Enter to use appsettings value): ",
+        v => overrides.Add(new("Strategy:StrikeOffset", v)));
+
     var builder = Host.CreateApplicationBuilder(args);
     if (overrides.Count > 0)
         builder.Configuration.AddInMemoryCollection(overrides);
@@ -51,7 +54,7 @@ try
     builder.Services.AddSingleton<MarketDataFeed>();
     builder.Services.AddSingleton<OrderExecutor>();
     builder.Services.AddSingleton<PositionLedger>();
-    builder.Services.AddHostedService<RollingStraddleRunner>();
+    builder.Services.AddHostedService<StrategyRunner>();
 
     var host = builder.Build();
 

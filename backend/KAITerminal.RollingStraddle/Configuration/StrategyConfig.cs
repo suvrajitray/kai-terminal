@@ -40,6 +40,12 @@ public sealed class StrategyConfig
     /// <summary>Daily MTM target in rupees. Exits all when profit reaches this amount.</summary>
     public decimal DailyMtmTarget   { get; set; } = 10000m;
 
+    /// <summary>
+    /// Number of strikes OTM for each leg. 0 = straddle (ATM CE + ATM PE).
+    /// 1+ = strangle (CE is <value> strikes above ATM, PE is <value> strikes below ATM).
+    /// </summary>
+    public int     StrikeOffset     { get; set; } = 0;
+
     /// <summary>Polling interval in milliseconds.</summary>
     public int     CheckIntervalMs  { get; set; } = 5000;
 }

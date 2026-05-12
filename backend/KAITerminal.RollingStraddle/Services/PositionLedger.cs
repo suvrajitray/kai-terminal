@@ -11,7 +11,7 @@ internal sealed class PositionLedger
     public PositionLedger(IBrokerPositionService positions) => _positions = positions;
 
     internal async Task<(decimal Pnl, decimal CeLtp, decimal PeLtp)> FetchAsync(
-        StraddleState state, CancellationToken ct)
+        StrategyState state, CancellationToken ct)
     {
         var all = await _positions.GetAllPositionsAsync(ct);
         return PnlAggregator.Compute(all, state.TradedTokens, state.CeLeg?.Token, state.PeLeg?.Token);
@@ -22,7 +22,7 @@ internal sealed class PositionLedger
     /// Used during graceful shutdown to avoid placing buy orders on already-closed positions.
     /// </summary>
     internal async Task<(bool CeOpen, bool PeOpen)> CheckLegsOpenAsync(
-        StraddleState state, CancellationToken ct)
+        StrategyState state, CancellationToken ct)
     {
         var all    = await _positions.GetAllPositionsAsync(ct);
         var ceOpen = state.CeLeg is { } ce &&
