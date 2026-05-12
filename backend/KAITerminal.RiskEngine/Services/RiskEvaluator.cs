@@ -299,9 +299,8 @@ public sealed class RiskEvaluator
         // Rate-limited StatusUpdate push to frontend (at most once per 15 min per broker)
         var key = $"{userId}::{config.BrokerType}";
         var now = DateTimeOffset.UtcNow;
-        if ((now - _lastStatusPushed.GetValueOrDefault(key, DateTimeOffset.MinValue)).TotalMinutes >= 15)
+        if (TryClaimStatusPush(key, now))
         {
-            _lastStatusPushed[key] = now;
             _logger.LogInformation(
                 "[STAT ] {UserId} ({Broker})  P&L ₹{Mtm:+#,##0;-#,##0}  |  SL ₹{Sl:+#,##0;-#,##0}  |  Target ₹{Target:+#,##0}  |  TSL {TslState}  [{Watch}]",
                 userId, config.BrokerType, mtm, config.MtmSl, config.MtmTarget,
@@ -313,6 +312,18 @@ public sealed class RiskEvaluator
                 TslFloor: state.TrailingActive ? state.TrailingStop : null,
                 Timestamp: now), ct);
         }
+    }
+
+    /// <summary>
+    /// Returns true and records the push time if 15 minutes have elapsed since the last push
+    /// for this key. Pure rate-gate — the only side effect is updating the timestamp dictionary.
+    /// </summary>
+    private bool TryClaimStatusPush(string key, DateTimeOffset now)
+    {
+        if ((now - _lastStatusPushed.GetValueOrDefault(key, DateTimeOffset.MinValue)).TotalMinutes < 15)
+            return false;
+        _lastStatusPushed[key] = now;
+        return true;
     }
 
     private async Task SquareOffAsync(

@@ -48,71 +48,73 @@ internal sealed class RollingStraddleRunner : BackgroundService
 
         var state = StraddleState.Empty;
 
-        while (!ct.IsCancellationRequested)
+        try
         {
-            try
+            while (!ct.IsCancellationRequested)
             {
-                var spot = await _feed.FetchSpotAsync(ct);
-                if (spot <= 0)
+                try
                 {
-                    _log.LogWarning("[FEED ] Spot unavailable — retrying in {Ms}ms", _cfg.CheckIntervalMs);
-                    await Delay(ct);
-                    continue;
+                    var spot = await _feed.FetchSpotAsync(ct);
+                    if (spot <= 0)
+                    {
+                        _log.LogWarning("[FEED ] Spot unavailable — retrying in {Ms}ms", _cfg.CheckIntervalMs);
+                        await Delay(ct);
+                        continue;
+                    }
+
+                    var (pnl, ceLtp, peLtp) = state.HasOpenLegs
+                        ? await _ledger.FetchAsync(state, ct)
+                        : (0m, 0m, 0m);
+
+                    var snapshot = new MarketSnapshot(spot, pnl, ceLtp, peLtp, NowIst());
+                    var decision = StrategyEngine.Evaluate(state, snapshot, _cfg);
+
+                    switch (decision)
+                    {
+                        case StrategyDecision.WaitForEntry w:
+                            _log.LogInformation(
+                                "[IDLE ] Entry at {Time} — {Min}m {Sec}s remaining  |  Spot {Spot:F2}",
+                                _cfg.EntryTime, (int)w.Remaining.TotalMinutes, w.Remaining.Seconds, spot);
+                            break;
+
+                        case StrategyDecision.Enter:
+                            state = await HandleEntryAsync(spot, state, ct);
+                            break;
+
+                        case StrategyDecision.Roll r:
+                            state = await HandleRollAsync(r, spot, state, snapshot, ct);
+                            break;
+
+                        case StrategyDecision.HoldMaxRolls m:
+                            _log.LogWarning(
+                                "[ROLL ] Max rolls ({Max}) reached — holding  |  Spot {Spot:F2}  Move {Move:+0.00;-0.00}%",
+                                _cfg.MaxRolls, spot, m.MovePct);
+                            LogLive(snapshot, state.EntrySpot);
+                            break;
+
+                        case StrategyDecision.Hold:
+                            LogLive(snapshot, state.EntrySpot);
+                            break;
+
+                        case StrategyDecision.Exit e:
+                            await HandleExitAsync(e.Reason, state, snapshot, ct);
+                            return;
+                    }
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _log.LogError(ex, "[ERROR] Unhandled exception — retrying in {Ms}ms", _cfg.CheckIntervalMs);
                 }
 
-                var (pnl, ceLtp, peLtp) = state.HasOpenLegs
-                    ? await _ledger.FetchAsync(state, ct)
-                    : (0m, 0m, 0m);
-
-                var snapshot = new MarketSnapshot(spot, pnl, ceLtp, peLtp, NowIst());
-                var decision = StrategyEngine.Evaluate(state, snapshot, _cfg);
-
-                switch (decision)
-                {
-                    case StrategyDecision.WaitForEntry w:
-                        _log.LogInformation(
-                            "[IDLE ] Entry at {Time} — {Min}m {Sec}s remaining  |  Spot {Spot:F2}",
-                            _cfg.EntryTime, (int)w.Remaining.TotalMinutes, w.Remaining.Seconds, spot);
-                        break;
-
-                    case StrategyDecision.Enter:
-                        state = await HandleEntryAsync(spot, state, ct);
-                        break;
-
-                    case StrategyDecision.Roll r:
-                        state = await HandleRollAsync(r, spot, state, snapshot, ct);
-                        break;
-
-                    case StrategyDecision.HoldMaxRolls m:
-                        _log.LogWarning(
-                            "[ROLL ] Max rolls ({Max}) reached — holding  |  Spot {Spot:F2}  Move {Move:+0.00;-0.00}%",
-                            _cfg.MaxRolls, spot, m.MovePct);
-                        LogLive(snapshot, state.EntrySpot);
-                        break;
-
-                    case StrategyDecision.Hold:
-                        LogLive(snapshot, state.EntrySpot);
-                        break;
-
-                    case StrategyDecision.Exit e:
-                        await HandleExitAsync(e.Reason, state, snapshot, ct);
-                        return;
-                }
+                await Delay(ct);
             }
-            catch (OperationCanceledException)
-            {
-                if (state.HasOpenLegs)
-                    await GracefulShutdownAsync(state);
-                else
-                    _log.LogInformation("[EXIT ] Shutdown — no open positions");
-                break;
-            }
-            catch (Exception ex)
-            {
-                _log.LogError(ex, "[ERROR] Unhandled exception — retrying in {Ms}ms", _cfg.CheckIntervalMs);
-            }
-
-            await Delay(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            if (state.HasOpenLegs)
+                await GracefulShutdownAsync(state);
+            else
+                _log.LogInformation("[EXIT ] Shutdown — no open positions");
         }
 
         _lifetime.StopApplication();
@@ -197,7 +199,7 @@ internal sealed class RollingStraddleRunner : BackgroundService
         _log.LogWarning(
             "  CE ₹{Ce:F2}  PE ₹{Pe:F2}  |  P&L at roll {Sign}₹{Pnl:N0}",
             snapshot.CeLtp, snapshot.PeLtp,
-            snapshot.Pnl >= 0 ? "+" : "-", Math.Abs(snapshot.Pnl));
+            PnlSign(snapshot.Pnl), Math.Abs(snapshot.Pnl));
         _log.LogWarning(Sep);
 
         _log.LogInformation("[ROLL ] Closing current legs...");
@@ -234,7 +236,7 @@ internal sealed class RollingStraddleRunner : BackgroundService
         string reason, StraddleState state, MarketSnapshot snapshot, CancellationToken ct)
     {
         _log.LogInformation("[EXIT ] {Reason}  |  P&L {Sign}₹{Pnl:N0}",
-            reason, snapshot.Pnl >= 0 ? "+" : "-", Math.Abs(snapshot.Pnl));
+            reason, PnlSign(snapshot.Pnl), Math.Abs(snapshot.Pnl));
 
         _log.LogInformation("[EXIT ] Cancelling pending orders...");
         await _executor.CancelAllPendingAsync(ct);
@@ -248,7 +250,7 @@ internal sealed class RollingStraddleRunner : BackgroundService
         _log.LogInformation("  SESSION COMPLETE");
         _log.LogInformation("  Exit reason  :  {Reason}", reason);
         _log.LogInformation("  Total rolls  :  {Rolls}", state.RollCount);
-        _log.LogInformation("  Final P&L    :  {Sign}₹{Pnl:N0}", finalPnl >= 0 ? "+" : "-", Math.Abs(finalPnl));
+        _log.LogInformation("  Final P&L    :  {Sign}₹{Pnl:N0}", PnlSign(finalPnl), Math.Abs(finalPnl));
         _log.LogInformation(Sep);
 
         _lifetime.StopApplication();
@@ -306,7 +308,7 @@ internal sealed class RollingStraddleRunner : BackgroundService
         _log.LogInformation(
             "[LIVE ] Spot {Spot:F2} ({Move:+0.00;-0.00}%)  |  CE {Ce:F2}  PE {Pe:F2}  |  P&L {Sign}₹{Pnl:N0}",
             snapshot.Spot, move, snapshot.CeLtp, snapshot.PeLtp,
-            snapshot.Pnl >= 0 ? "+" : "-", Math.Abs(snapshot.Pnl));
+            PnlSign(snapshot.Pnl), Math.Abs(snapshot.Pnl));
     }
 
     private void PrintBanner()
@@ -324,6 +326,8 @@ internal sealed class RollingStraddleRunner : BackgroundService
             _cfg.VixMaxThreshold > 0 ? $"skip if VIX > {_cfg.VixMaxThreshold}" : "disabled");
         _log.LogInformation(Sep);
     }
+
+    private static string PnlSign(decimal pnl) => pnl >= 0 ? "+" : "-";
 
     private static TimeSpan NowIst() =>
         TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, Ist).TimeOfDay;

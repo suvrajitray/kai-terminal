@@ -17,6 +17,8 @@ public sealed class MasterDataService(
     IServiceScopeFactory scopeFactory,
     ILogger<MasterDataService> logger)
 {
+    private static readonly TimeZoneInfo Ist = TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
+
     public async Task<IReadOnlyList<IndexContracts>> GetContractsAsync(
         HttpContext httpContext, CancellationToken ct)
     {
@@ -118,13 +120,12 @@ public sealed class MasterDataService(
         };
 
     private static DateOnly IstToday() =>
-        DateOnly.FromDateTime(DateTime.UtcNow.AddHours(5.5));
+        DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, Ist).DateTime);
 
     private static DateTimeOffset NextIst0815()
     {
-        var istOffset = TimeSpan.FromHours(5.5);
-        var istNow    = DateTimeOffset.UtcNow.ToOffset(istOffset);
-        var todayAt0815 = new DateTimeOffset(istNow.Date, istOffset).AddHours(8).AddMinutes(15);
+        var istNow      = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, Ist);
+        var todayAt0815 = new DateTimeOffset(istNow.Date, istNow.Offset).AddHours(8).AddMinutes(15);
         return istNow < todayAt0815 ? todayAt0815 : todayAt0815.AddDays(1);
     }
 }

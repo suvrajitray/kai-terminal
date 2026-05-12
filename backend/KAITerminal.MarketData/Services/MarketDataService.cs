@@ -129,7 +129,7 @@ public sealed class MarketDataService : ISharedMarketDataService, IHostedService
                 "[FEED ] API sub-req received for {Count} instrument(s) — forwarding to WebSocket",
                 tokens.Count);
 
-            var subTask = SubscribeAsync(tokens).ContinueWith(
+            SubscribeAsync(tokens).ContinueWith(
                 t => _logger.LogWarning(t.Exception, "[FEED ] Failed to subscribe instruments from API request"),
                 TaskContinuationOptions.OnlyOnFaulted);
         }
