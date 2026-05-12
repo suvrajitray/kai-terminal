@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
-import { Settings2 } from "lucide-react";
+import { Settings2, Clock } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useUserTradingSettingsStore } from "@/stores/user-trading-settings-store";
 import { saveUserTradingSettings, type UserTradingSettings } from "@/services/user-settings-api";
@@ -162,12 +161,15 @@ export function UserTradingSettingsDialog({ open, onClose }: Props) {
             {draft.autoSquareOffEnabled && (
               <div className="flex items-center gap-3 rounded-lg border border-border/40 bg-muted/20 px-3 py-2">
                 <Label className="text-xs text-muted-foreground shrink-0">Square-off time</Label>
-                <Input
-                  type="time"
-                  value={draft.autoSquareOffTime}
-                  onChange={(e) => setDraft((d) => ({ ...d, autoSquareOffTime: e.target.value }))}
-                  className="h-7 w-28 text-xs"
-                />
+                <div className="flex items-center rounded-md border border-border/50 bg-background px-3 py-2 focus-within:border-indigo-500/40 transition-colors">
+                  <Clock className="size-3.5 shrink-0 text-indigo-400 mr-2" />
+                  <input
+                    type="time"
+                    value={draft.autoSquareOffTime}
+                    onChange={(e) => setDraft((d) => ({ ...d, autoSquareOffTime: e.target.value }))}
+                    className="bg-transparent border-0 outline-none tabular-nums text-sm font-medium text-foreground w-[5.5rem] [&::-webkit-calendar-picker-indicator]:hidden"
+                  />
+                </div>
                 <span className="text-[11px] text-muted-foreground">IST</span>
               </div>
             )}
