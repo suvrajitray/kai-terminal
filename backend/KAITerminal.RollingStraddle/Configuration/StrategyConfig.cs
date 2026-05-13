@@ -10,11 +10,8 @@ public sealed class StrategyConfig
     /// <summary>Broker name — used to look up credentials in the database (e.g. "upstox").</summary>
     public string  BrokerName       { get; set; } = "";
 
-    /// <summary>Upstox instrument key for the index underlying, e.g. "NSE_INDEX|Nifty 50".</summary>
-    public string  Underlying       { get; set; } = "NSE_INDEX|Nifty 50";
-
-    /// <summary>Exchange for option legs: NFO for NSE indices, BFO for BSE.</summary>
-    public string  Exchange         { get; set; } = "NFO";
+    /// <summary>Upstox instrument key for the index underlying — set by instrument selection at startup.</summary>
+    public string  Underlying       { get; set; } = "";
 
     /// <summary>Option expiry in "yyyy-MM-dd" format.</summary>
     public string  Expiry           { get; set; } = "";
@@ -22,8 +19,8 @@ public sealed class StrategyConfig
     /// <summary>Number of lots to trade.</summary>
     public int     Lots             { get; set; } = 5;
 
-    /// <summary>Lot size of the underlying (NIFTY=65, BANKNIFTY=30, FINNIFTY=60, SENSEX=20, BANKEX=30).</summary>
-    public int     LotSize          { get; set; } = 65;
+    /// <summary>Lot size of the underlying — set by instrument selection at startup.</summary>
+    public int     LotSize          { get; set; } = 0;
 
     /// <summary>Time to enter the straddle in "HH:mm" IST format.</summary>
     public string  EntryTime        { get; set; } = "09:35";

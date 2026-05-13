@@ -20,7 +20,11 @@ try
     var builder = Host.CreateApplicationBuilder(args);
     var overrides = new List<KeyValuePair<string, string?>>();
 
-    Prompt("Expiry yyyy-MM-dd (Enter to use appsettings value): ",
+    var inst = PickInstrument(builder.Configuration);
+    overrides.Add(new("Strategy:Underlying", inst.Underlying));
+    overrides.Add(new("Strategy:LotSize",    inst.LotSize.ToString()));
+
+    Prompt("Expiry yyyy-MM-dd (Enter to auto-resolve nearest expiry): ",
         v => overrides.Add(new("Strategy:Expiry", v)));
 
     Prompt("Lots (Enter to use appsettings value): ",
@@ -146,4 +150,17 @@ static void Prompt(string label, Action<string> onValue)
     var value = Console.ReadLine()?.Trim() ?? string.Empty;
     if (!string.IsNullOrEmpty(value))
         onValue(value);
+}
+
+static (string Name, string Underlying, int LotSize) PickInstrument(IConfiguration config)
+{
+    Console.Write("Instrument — 1. NIFTY  2. SENSEX (Enter for NIFTY): ");
+    var input = Console.ReadLine()?.Trim() ?? string.Empty;
+
+    var key        = input == "2" ? "Sensex" : "Nifty";
+    var name       = input == "2" ? "SENSEX" : "NIFTY";
+    var underlying = config[$"Instruments:{key}:Underlying"] ?? "";
+    var lotSize    = int.TryParse(config[$"Instruments:{key}:LotSize"], out var ls) ? ls : 65;
+
+    return (name, underlying, lotSize);
 }
