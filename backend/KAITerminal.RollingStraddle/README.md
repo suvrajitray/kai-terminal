@@ -28,7 +28,7 @@ Persistent defaults live in `appsettings.json`. You can override any value inter
     "DefaultConnection": ""
   },
   "Strategy": {
-    "Username": "suvrajit.ray@gmail.com",
+    "Username": "sudiptamohapatra89@gmail.com",
     "BrokerName": "upstox",
     "Underlying": "NSE_INDEX|Nifty 50",
     "Exchange": "NFO",
