@@ -333,6 +333,77 @@ sudo systemctl restart kaiterminal-api
 
 ---
 
+## Rolling Straddle
+
+The Rolling Straddle (`KAITerminal.RollingStraddle`) is a standalone console app that runs a daily options strategy. It is **not a systemd service** — you launch it manually via `rs.sh` on days you want to trade, and it exits cleanly at the end of the session.
+
+### Why not a systemd service?
+
+A systemd service starts automatically on boot and restarts forever. Rolling Straddle is a once-per-day tool that should only run when you decide to trade — and on a day you don't want it running, a service would silently enter the market anyway. Manual launch keeps you in control.
+
+### One-time server setup
+
+Create `/etc/kaiterminal/rs.env` with **only** the database connection string:
+
+```bash
+# Copy worker.env as a starting point, then strip it down:
+sudo cp /etc/kaiterminal/worker.env /etc/kaiterminal/rs.env
+sudo nano /etc/kaiterminal/rs.env
+```
+
+The file should contain a single line:
+
+```env
+ConnectionStrings__DefaultConnection=Host=localhost;Database=kaiterminal;Username=kaiuser;Password=SuperSecretPassword
+```
+
+Lock it down:
+
+```bash
+sudo chmod 600 /etc/kaiterminal/rs.env
+sudo chown root:kaiterm /etc/kaiterminal/rs.env
+```
+
+Everything else (Upstox access token, strategy parameters) is read from the database and `appsettings.json` respectively. No other secrets are needed.
+
+### Deploy
+
+```bash
+./deploy/deploy.sh --rs
+```
+
+This publishes `KAITerminal.RollingStraddle` locally and rsyncs the output to `/opt/kaiterminal/rs/` on the server. Run it whenever the code changes; you can redeploy while the app is not running.
+
+### Run
+
+```bash
+./scripts/rs.sh
+```
+
+This SSH-es into the server and attaches to (or creates) a tmux session named `rs`. The app:
+
+1. Reads the DB connection string from `rs.env`
+2. Prompts for Expiry, Lots, MTM target/SL per lot, and Strike offset (press Enter to use `appsettings.json` defaults)
+3. Fetches the Upstox access token from the database — no manual token entry needed
+4. Runs until 15:05 IST, then exits cleanly
+
+```
+Ctrl+B  D     ← detach from tmux without stopping the strategy
+Ctrl+C        ← graceful shutdown (closes open positions, then exits)
+```
+
+After detaching you can close your laptop — the strategy keeps running in the tmux session on the server. Reconnect any time by running `rs.sh` again.
+
+### Strategy configuration
+
+Per-session overrides (Expiry, Lots, thresholds) are entered interactively at startup. Persistent defaults live in `appsettings.json`. Sensitive config (connection string) comes from `rs.env`.
+
+If `Expiry` is blank or points to a past date, the app auto-resolves the nearest upcoming expiry from the Upstox API so you don't need to look it up manually.
+
+`DailyMtmTargetPerLot` and `DailyMtmStopLossPerLot` are per-lot figures — the app multiplies by `Lots` automatically and shows the effective values in the startup banner.
+
+---
+
 ## Directory Layout on the Server
 
 ```
@@ -340,6 +411,7 @@ sudo systemctl restart kaiterminal-api
     repo/           ← git clone of your codebase (source)
     api/            ← compiled .NET API  (dotnet publish output)
     worker/         ← compiled .NET Worker (dotnet publish output)
+    rs/             ← compiled Rolling Straddle (dotnet publish output)
 
 /var/www/kaiterminal/
     index.html      ← React app entry point
@@ -348,6 +420,7 @@ sudo systemctl restart kaiterminal-api
 /etc/kaiterminal/
     api.env         ← API secrets  (chmod 600 — never in git)
     worker.env      ← Worker secrets (chmod 600 — never in git)
+    rs.env          ← Rolling Straddle secrets (chmod 600 — never in git)
 
 /etc/nginx/
     sites-available/kaiterminal   ← your nginx.conf (copied here)

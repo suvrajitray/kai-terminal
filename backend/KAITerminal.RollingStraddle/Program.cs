@@ -1,8 +1,10 @@
+using KAITerminal.Infrastructure.Data;
 using KAITerminal.MarketData.Extensions;
 using KAITerminal.Util;
 using KAITerminal.RollingStraddle.Configuration;
 using KAITerminal.RollingStraddle.Services;
 using KAITerminal.Upstox.Extensions;
+using Microsoft.EntityFrameworkCore;
 using Serilog;
 
 Log.Logger = new LoggerConfiguration()
@@ -14,10 +16,9 @@ Log.Logger = new LoggerConfiguration()
 
 try
 {
+    // Builder created first so we can read connection string and strategy config from appsettings.
+    var builder = Host.CreateApplicationBuilder(args);
     var overrides = new List<KeyValuePair<string, string?>>();
-
-    Prompt("Upstox access token (Enter to use appsettings value): ",
-        v => overrides.Add(new("Upstox:AccessToken", v)));
 
     Prompt("Expiry yyyy-MM-dd (Enter to use appsettings value): ",
         v => overrides.Add(new("Strategy:Expiry", v)));
@@ -34,7 +35,63 @@ try
     Prompt("Strike offset — 0 straddle, N strangle (Enter to use appsettings value): ",
         v => overrides.Add(new("Strategy:StrikeOffset", v)));
 
-    var builder = Host.CreateApplicationBuilder(args);
+    // Resolve Upstox access token — manual paste overrides DB fetch.
+    string accessToken;
+    Console.Write("Upstox access token (Enter to fetch from DB): ");
+    var manualToken = Console.ReadLine()?.Trim() ?? string.Empty;
+
+    if (!string.IsNullOrEmpty(manualToken))
+    {
+        accessToken = manualToken;
+        Log.Information("[CONFIG] Using manually entered access token.");
+    }
+    else
+    {
+        var username   = builder.Configuration["Strategy:Username"]   ?? "";
+        var brokerName = builder.Configuration["Strategy:BrokerName"] ?? "";
+        var connStr    = builder.Configuration.GetConnectionString("DefaultConnection") ?? "";
+
+        if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(brokerName))
+        {
+            Log.Fatal("[CONFIG] Strategy:Username and Strategy:BrokerName must be set in appsettings.json.");
+            return 1;
+        }
+
+        if (string.IsNullOrEmpty(connStr))
+        {
+            Log.Fatal("[CONFIG] ConnectionStrings:DefaultConnection is not set — add via rs.env and restart.");
+            return 1;
+        }
+
+        var dbOptions = new DbContextOptionsBuilder<AppDbContext>().UseNpgsql(connStr).Options;
+        await using var db = new AppDbContext(dbOptions);
+
+        var cred = await db.BrokerCredentials
+            .FirstOrDefaultAsync(c => c.Username == username && c.BrokerName == brokerName);
+
+        if (cred is null)
+        {
+            Log.Fatal("[CONFIG] No {Broker} credentials found for {User} — authenticate via the web app first.",
+                brokerName, username);
+            return 1;
+        }
+
+        var tokenStatus = BrokerTokenHelper.Validate(cred.AccessToken, cred.UpdatedAt, cred.BrokerName);
+        if (tokenStatus != TokenValidationResult.Valid)
+        {
+            Log.Fatal("[CONFIG] {Broker} token for {User} is {Status} — re-authenticate via the web app and retry.",
+                brokerName, username, tokenStatus);
+            return 1;
+        }
+
+        Log.Information("[CONFIG] Loaded {Broker} token for {User} (updated {At:HH:mm:ss})",
+            brokerName, username, cred.UpdatedAt.ToLocalTime());
+
+        accessToken = cred.AccessToken;
+    }
+
+    overrides.Add(new("Upstox:AccessToken", accessToken));
+
     if (overrides.Count > 0)
         builder.Configuration.AddInMemoryCollection(overrides);
 

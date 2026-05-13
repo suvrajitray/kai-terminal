@@ -29,7 +29,7 @@ Press `Ctrl+B Q` to flash pane numbers.
 ## Rolling Straddle
 
 ```bash
-./scripts/run-rolling-straddle.sh      # SSH in, start/attach tmux session "rs", run
+./scripts/rs.sh                        # SSH in, start/attach tmux session "rs", run
 ```
 
 On the server directly:

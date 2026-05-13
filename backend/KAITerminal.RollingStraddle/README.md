@@ -1,64 +1,71 @@
 # KAI Terminal — Rolling Straddle
 
-Standalone console app for validating the rolling straddle strategy with real Upstox trades at low quantity before building the full terminal feature.
+Standalone console app for running the rolling straddle/strangle strategy with real Upstox trades.
 
 ---
 
 ## Strategy
 
-Sells an ATM straddle (CE + PE) at entry time and manages it through the day:
+Sells an ATM straddle (or OTM strangle) at entry time and manages it through the day:
 
-- **Entry:** Waits for `EntryTime`, checks India VIX, then sells ATM CE + ATM PE at market
-- **Roll:** If spot moves ≥ `RollThresholdPct`% from the entry spot, buys back both legs and re-enters a fresh straddle at the new ATM. Repeats up to `MaxRolls` times per day
+- **Entry:** Waits for `EntryTime`, checks India VIX, then sells CE + PE at market
+- **Straddle vs strangle:** `StrikeOffset = 0` → ATM straddle. `StrikeOffset = N` → CE is N strikes above ATM, PE is N strikes below ATM
+- **Roll:** If spot moves ≥ `RollThresholdPct`% from the entry spot, buys back both legs and re-enters a fresh position at the new ATM. Repeats up to `MaxRolls` times per day
 - **Exit (first condition met):**
   - Time reaches `ExitTime`
-  - P&L reaches `DailyMtmTarget` (profit target)
-  - P&L falls below `-DailyMtmStopLoss` (stop-loss)
+  - P&L reaches `DailyMtmTargetPerLot × Lots` (profit target)
+  - P&L falls below `-(DailyMtmStopLossPerLot × Lots)` (stop-loss)
 
 ---
 
 ## Configuration
 
-Edit `appsettings.json` before running. **`Strategy:Expiry` must be updated every week.**
+Persistent defaults live in `appsettings.json`. You can override any value interactively at startup (press Enter to accept the default).
 
 ```json
 {
-  "Upstox": {
-    "AccessToken": ""
+  "ConnectionStrings": {
+    "DefaultConnection": ""
   },
   "Strategy": {
+    "Username": "suvrajit.ray@gmail.com",
+    "BrokerName": "upstox",
     "Underlying": "NSE_INDEX|Nifty 50",
     "Exchange": "NFO",
-    "Expiry": "2026-05-12",
+    "Expiry": "",
     "Lots": 5,
     "LotSize": 65,
     "EntryTime": "09:35",
     "ExitTime": "15:05",
     "VixMaxThreshold": 20.0,
-    "RollThresholdPct": 0.3,
+    "RollThresholdPct": 0.35,
     "MaxRolls": 3,
-    "DailyMtmTarget": 10000,
-    "DailyMtmStopLoss": 15000,
-    "CheckIntervalMs": 5000
+    "DailyMtmTargetPerLot": 2000,
+    "DailyMtmStopLossPerLot": 3000,
+    "StrikeOffset": 0,
+    "CheckIntervalMs": 15000
   }
 }
 ```
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
+| `Username` | *(required)* | Email used to look up the Upstox token in the database |
+| `BrokerName` | `upstox` | Broker name for the DB credentials lookup |
 | `Underlying` | `NSE_INDEX\|Nifty 50` | Upstox instrument key for the index |
 | `Exchange` | `NFO` | Options exchange (`NFO` for NSE, `BFO` for BSE) |
-| `Expiry` | *(required)* | Option expiry date — format `yyyy-MM-dd`, e.g. `2026-05-12` |
+| `Expiry` | *(auto)* | Option expiry `yyyy-MM-dd`. Leave blank to auto-resolve the nearest upcoming expiry |
 | `Lots` | `5` | Number of lots to trade |
 | `LotSize` | `65` | Units per lot — see table below |
-| `EntryTime` | `09:35` | IST time to enter the straddle (`HH:mm`) |
+| `EntryTime` | `09:35` | IST time to enter (`HH:mm`) |
 | `ExitTime` | `15:05` | IST hard exit time (`HH:mm`) |
 | `VixMaxThreshold` | `20` | Skip entry if India VIX is above this. Set `0` to disable |
-| `RollThresholdPct` | `0.3` | Spot move % from entry spot that triggers a roll |
+| `RollThresholdPct` | `0.35` | Spot move % from entry spot that triggers a roll |
 | `MaxRolls` | `3` | Maximum rolls per day. Position is held unchanged after this |
-| `DailyMtmTarget` | `10000` | Exit when P&L reaches ₹10,000 |
-| `DailyMtmStopLoss` | `15000` | Exit when loss reaches ₹15,000 |
-| `CheckIntervalMs` | `5000` | Polling interval in milliseconds |
+| `DailyMtmTargetPerLot` | `2000` | Exit when P&L ≥ this × Lots (e.g. ₹2000 × 5 = ₹10,000) |
+| `DailyMtmStopLossPerLot` | `3000` | Exit when loss ≥ this × Lots (e.g. ₹3000 × 5 = ₹15,000) |
+| `StrikeOffset` | `0` | `0` = straddle (ATM). `N` = strangle (N strikes OTM each leg) |
+| `CheckIntervalMs` | `15000` | Polling interval in milliseconds |
 
 ---
 
@@ -66,78 +73,68 @@ Edit `appsettings.json` before running. **`Strategy:Expiry` must be updated ever
 
 The server has a static IP whitelisted with Upstox (required by SEBI). **Do not run locally.**
 
-This app is **not** a systemd service (unlike the API and Worker). It runs manually in a tmux session when needed.
+This app is **not** a systemd service. It runs manually in a tmux session on days you want to trade.
 
-### Server details
+### One-time server setup
 
-| Item | Value |
-|------|-------|
-| SSH | `ssh kaiterminal` |
-| Repo | `/opt/kaiterminal/repo` |
-| Project | `/opt/kaiterminal/repo/backend/KAITerminal.RollingStraddle` |
-
----
-
-### Before the first run of the week
-
-**1. Push your changes from local**
-
-Commit and push any config changes (e.g. updated `Expiry`) from your local machine.
-
-**2. Pull on the server**
+Create `/etc/kaiterminal/rs.env` with just the DB connection string:
 
 ```bash
-ssh kaiterminal
-cd /opt/kaiterminal/repo
-git pull
+sudo cp /etc/kaiterminal/worker.env /etc/kaiterminal/rs.env
+sudo nano /etc/kaiterminal/rs.env
+# Keep only: ConnectionStrings__DefaultConnection=...
+sudo chmod 600 /etc/kaiterminal/rs.env
+sudo chown root:kaiterm /etc/kaiterminal/rs.env
 ```
 
-**3. Update the expiry** (if not done via git)
+The Upstox access token is fetched automatically from the database at startup — no manual token entry needed.
+
+### Deploy a new build
 
 ```bash
-nano /opt/kaiterminal/repo/backend/KAITerminal.RollingStraddle/appsettings.json
-# Set "Expiry": "yyyy-MM-dd"  (Nifty expires on Tuesdays)
+./deploy/deploy.sh --rs
 ```
 
----
+Publishes the project locally and rsyncs the output to `/opt/kaiterminal/rs/` on the server. Run whenever the code changes.
 
 ### Every trading day
 
-**4. Run in a tmux session**
-
 ```bash
-tmux new -s straddle
-cd /opt/kaiterminal/repo/backend/KAITerminal.RollingStraddle
-dotnet run --project .
-# → Prompted: paste today's token and Enter (or just Enter to use appsettings value)
-
-# Detach (session keeps running): Ctrl+B, D
-# Re-attach later:                 tmux attach -t straddle
+./scripts/rs.sh
 ```
 
-**To stop:** press `Ctrl+C` inside the tmux session. If positions are open, close them manually in the Upstox broker terminal — the app logs a reminder on shutdown.
+SSH-es into the server and attaches to (or creates) a tmux session named `rs`. On startup you are prompted for:
+
+- **Expiry** — press Enter to auto-resolve the nearest upcoming expiry
+- **Lots** — press Enter to use the appsettings value
+- **MTM target per lot** — press Enter to use the appsettings value
+- **MTM stop-loss per lot** — press Enter to use the appsettings value
+- **Strike offset** — press Enter to use the appsettings value (0 = straddle)
+
+```
+Ctrl+B  D     ← detach from tmux (strategy keeps running)
+Ctrl+C        ← graceful shutdown (closes open positions, then exits)
+```
+
+After detaching you can close your laptop. Reconnect any time by running `run-rolling-straddle.sh` again.
 
 ---
 
 ## P&L Tracking
 
-P&L is fetched directly from the broker via `GetAllPositionsAsync()` — no manual calculation. The app tracks the exact instrument tokens it traded and filters positions to only those tokens, so other open positions in your account are not affected.
-
-On a day with rolls, closed legs retain their realized P&L in the broker's response (`Quantity=0` but `Realised` is preserved), so the total shown is always accurate.
+P&L is fetched directly from the broker via `GetAllPositionsAsync()`. The app tracks the exact instrument tokens it traded and filters to only those, so other open positions in your account are not affected. On a day with rolls, closed legs retain their realized P&L in the broker response (`Quantity=0` but `Realised` is preserved).
 
 ---
 
 ## Order Execution
 
-Orders are placed via the Upstox HFT endpoint (`api-hft.upstox.com`) for minimum latency. Fill detection polls `GET /v2/order/retrieve-all` every 500ms until the status reaches `complete`. For MARKET orders on NIFTY options this typically resolves on the first or second poll.
-
-If either leg fails to fill (rejection or 60-second timeout), the app immediately closes any leg that did fill to avoid naked exposure, then returns to idle.
+Orders are placed via the Upstox HFT endpoint (`api-hft.upstox.com`). Fill detection polls `GET /v2/order/retrieve-all` every 500ms until status reaches `complete`. If either leg fails to fill (rejection or 60-second timeout), any filled leg is immediately closed to avoid naked exposure, then the app returns to idle.
 
 ---
 
 ## Order Identification
 
-All orders placed by this app carry the tag `KAI_TERMINAL_RS`. You can filter by this tag in the Upstox order book to distinguish strategy orders from manual trades.
+All orders carry the tag `KAI_TERMINAL_RS`. Filter by this tag in the Upstox order book to distinguish strategy orders from manual trades.
 
 ---
 

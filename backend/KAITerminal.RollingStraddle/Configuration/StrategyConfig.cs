@@ -4,6 +4,12 @@ public sealed class StrategyConfig
 {
     public const string SectionName = "Strategy";
 
+    /// <summary>User email — used to look up credentials in the database.</summary>
+    public string  Username         { get; set; } = "";
+
+    /// <summary>Broker name — used to look up credentials in the database (e.g. "upstox").</summary>
+    public string  BrokerName       { get; set; } = "";
+
     /// <summary>Upstox instrument key for the index underlying, e.g. "NSE_INDEX|Nifty 50".</summary>
     public string  Underlying       { get; set; } = "NSE_INDEX|Nifty 50";
 

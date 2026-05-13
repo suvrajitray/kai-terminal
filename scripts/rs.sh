@@ -15,4 +15,4 @@ SERVER="kaiterminal"
 REMOTE_RS_DIR="/opt/kaiterminal/rs"
 
 ssh -t "$SERVER" \
-  "tmux new-session -A -s rs -c '$REMOTE_RS_DIR' 'dotnet KAITerminal.RollingStraddle.dll; exec bash'"
+  "tmux new-session -A -s rs -c '$REMOTE_RS_DIR' 'set -a && source /etc/kaiterminal/rs.env && set +a && dotnet KAITerminal.RollingStraddle.dll; exec bash'"
