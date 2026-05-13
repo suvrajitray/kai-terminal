@@ -44,10 +44,13 @@ internal static class StrategyEngine
         if (snapshot.TimeOfDay >= exitTime)
             return new StrategyDecision.Exit("hard exit time");
 
-        if (snapshot.Pnl >= config.DailyMtmTarget)
+        var effectiveTarget = config.DailyMtmTargetPerLot * config.Lots;
+        var effectiveSl     = config.DailyMtmStopLossPerLot * config.Lots;
+
+        if (snapshot.Pnl >= effectiveTarget)
             return new StrategyDecision.Exit("daily target hit");
 
-        if (snapshot.Pnl <= -config.DailyMtmStopLoss)
+        if (snapshot.Pnl <= -effectiveSl)
             return new StrategyDecision.Exit("MTM stop-loss");
 
         var movePct = MovePct(state.EntrySpot, snapshot.Spot);

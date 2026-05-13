@@ -44,6 +44,12 @@ internal sealed class MarketDataFeed
         return Normalise(quotes).TryGetValue(VixKey, out var q) ? q.LastPrice : 0m;
     }
 
+    internal async Task<DateOnly?> ResolveExpiryAsync(CancellationToken ct)
+    {
+        var expiries = await _client.GetExpiryDatesAsync(_token, _cfg.Underlying, ct);
+        return expiries.Count > 0 ? expiries[0] : null;
+    }
+
     internal async Task<(decimal AtmStrike, decimal CeStrike, decimal PeStrike, string Ce, string Pe)?> FindAtmAsync(
         decimal spot, CancellationToken ct)
     {

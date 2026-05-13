@@ -65,6 +65,25 @@ public sealed class UpstoxMarketDataHttpClient
         return raw.Select(MapChainEntry).ToList().AsReadOnly();
     }
 
+    /// <summary>
+    /// Returns upcoming expiry dates (>= today UTC) for the given underlying, sorted ascending.
+    /// </summary>
+    public async Task<IReadOnlyList<DateOnly>> GetExpiryDatesAsync(
+        string token, string underlyingKey, CancellationToken ct = default)
+    {
+        var contracts = await GetOptionContractsAsync(token, underlyingKey, null, ct);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
+        return contracts
+            .Select(c => c.Expiry)
+            .Where(e => DateOnly.TryParseExact(e, "yyyy-MM-dd", null,
+                System.Globalization.DateTimeStyles.None, out var d) && d >= today)
+            .Select(e => DateOnly.ParseExact(e, "yyyy-MM-dd"))
+            .Distinct()
+            .OrderBy(d => d)
+            .ToList()
+            .AsReadOnly();
+    }
+
     // ──────────────────────────────────────────────────
     // Option contracts (metadata, no live prices)
     // ──────────────────────────────────────────────────

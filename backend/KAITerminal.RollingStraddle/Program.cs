@@ -25,11 +25,11 @@ try
     Prompt("Lots (Enter to use appsettings value): ",
         v => overrides.Add(new("Strategy:Lots", v)));
 
-    Prompt("Daily MTM target ₹ (Enter to use appsettings value): ",
-        v => overrides.Add(new("Strategy:DailyMtmTarget", v)));
+    Prompt("Daily MTM target per lot ₹ (Enter to use appsettings value): ",
+        v => overrides.Add(new("Strategy:DailyMtmTargetPerLot", v)));
 
-    Prompt("Daily MTM stop-loss ₹ (Enter to use appsettings value): ",
-        v => overrides.Add(new("Strategy:DailyMtmStopLoss", v)));
+    Prompt("Daily MTM stop-loss per lot ₹ (Enter to use appsettings value): ",
+        v => overrides.Add(new("Strategy:DailyMtmStopLossPerLot", v)));
 
     Prompt("Strike offset — 0 straddle, N strangle (Enter to use appsettings value): ",
         v => overrides.Add(new("Strategy:StrikeOffset", v)));

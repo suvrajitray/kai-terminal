@@ -34,11 +34,11 @@ public sealed class StrategyConfig
     /// <summary>Maximum number of rolls allowed per day before holding the position regardless.</summary>
     public int     MaxRolls         { get; set; } = 3;
 
-    /// <summary>Daily MTM stop-loss in rupees. Exits all when loss exceeds this amount.</summary>
-    public decimal DailyMtmStopLoss { get; set; } = 15000m;
+    /// <summary>Daily MTM stop-loss per lot in rupees. Effective SL = this × Lots.</summary>
+    public decimal DailyMtmStopLossPerLot { get; set; } = 3000m;
 
-    /// <summary>Daily MTM target in rupees. Exits all when profit reaches this amount.</summary>
-    public decimal DailyMtmTarget   { get; set; } = 10000m;
+    /// <summary>Daily MTM target per lot in rupees. Effective target = this × Lots.</summary>
+    public decimal DailyMtmTargetPerLot   { get; set; } = 2000m;
 
     /// <summary>
     /// Number of strikes OTM for each leg. 0 = straddle (ATM CE + ATM PE).

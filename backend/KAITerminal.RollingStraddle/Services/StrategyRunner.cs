@@ -37,11 +37,26 @@ internal sealed class StrategyRunner : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
-        if (string.IsNullOrEmpty(_cfg.Expiry))
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, Ist).Date);
+        bool expiryMissing = string.IsNullOrEmpty(_cfg.Expiry);
+        bool expiryPast    = !expiryMissing
+            && DateOnly.TryParseExact(_cfg.Expiry, "yyyy-MM-dd", null,
+                System.Globalization.DateTimeStyles.None, out var cfgDate)
+            && cfgDate < today;
+
+        if (expiryMissing || expiryPast)
         {
-            _log.LogError("[CONFIG] Strategy:Expiry is not set. Update appsettings.json and restart.");
-            _lifetime.StopApplication();
-            return;
+            _log.LogInformation("[CONFIG] Expiry {Msg} — resolving nearest upcoming expiry...",
+                expiryMissing ? "not set" : $"{_cfg.Expiry} is in the past");
+            DateOnly? resolved = await _feed.ResolveExpiryAsync(ct);
+            if (resolved is null)
+            {
+                _log.LogError("[CONFIG] Could not resolve expiry from API — set Strategy:Expiry manually and restart.");
+                _lifetime.StopApplication();
+                return;
+            }
+            _cfg.Expiry = resolved.Value.ToString("yyyy-MM-dd");
+            _log.LogInformation("[CONFIG] Resolved expiry: {Expiry}", _cfg.Expiry);
         }
 
         PrintBanner();
@@ -125,6 +140,7 @@ internal sealed class StrategyRunner : BackgroundService
     private async Task<StrategyState> HandleEntryAsync(
         decimal spot, StrategyState current, CancellationToken ct)
     {
+        decimal? vixOk = null;
         if (_cfg.VixMaxThreshold > 0)
         {
             var vix = await _feed.FetchVixAsync(ct);
@@ -138,11 +154,17 @@ internal sealed class StrategyRunner : BackgroundService
                 _log.LogWarning("[VIX  ] {Vix:F1} exceeds threshold {Max} — skipping entry", vix, _cfg.VixMaxThreshold);
                 return current;
             }
-            _log.LogInformation("[VIX  ] {Vix:F1} — OK (threshold {Max})", vix, _cfg.VixMaxThreshold);
+            vixOk = vix;
         }
 
+        _log.LogInformation(Sep);
+        if (vixOk.HasValue)
+            _log.LogInformation("[VIX  ] {Vix:F1} — OK (threshold {Max})", vixOk.Value, _cfg.VixMaxThreshold);
         _log.LogInformation("[ENTRY] Entry window open  |  Spot {Spot:F2}", spot);
-        return await OpenLegsAsync(spot, current, ct);
+        var result = await OpenLegsAsync(spot, current, ct);
+        if (result.HasOpenLegs)
+            _log.LogInformation(Sep);
+        return result;
     }
 
     private async Task<StrategyState> OpenLegsAsync(
@@ -332,7 +354,10 @@ internal sealed class StrategyRunner : BackgroundService
             _cfg.Lots, _cfg.LotSize, _cfg.Lots * _cfg.LotSize);
         _log.LogInformation("  Entry / Exit :  {Entry}  →  {Exit}", _cfg.EntryTime, _cfg.ExitTime);
         _log.LogInformation("  Roll         :  {Roll}%  max {MaxRolls}x", _cfg.RollThresholdPct, _cfg.MaxRolls);
-        _log.LogInformation("  Target / SL  :  +₹{Target:N0}  /  -₹{Sl:N0}", _cfg.DailyMtmTarget, _cfg.DailyMtmStopLoss);
+        _log.LogInformation(
+            "  Target / SL  :  +₹{Tpl:N0}/lot × {Lots} = ₹{Target:N0}  /  -₹{Spl:N0}/lot × {Lots} = ₹{Sl:N0}",
+            _cfg.DailyMtmTargetPerLot,   _cfg.Lots, _cfg.DailyMtmTargetPerLot   * _cfg.Lots,
+            _cfg.DailyMtmStopLossPerLot, _cfg.Lots, _cfg.DailyMtmStopLossPerLot * _cfg.Lots);
         _log.LogInformation("  VIX filter   :  {Vix}",
             _cfg.VixMaxThreshold > 0 ? $"skip if VIX > {_cfg.VixMaxThreshold}" : "disabled");
         _log.LogInformation(Sep);
