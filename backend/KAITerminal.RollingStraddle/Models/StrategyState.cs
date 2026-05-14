@@ -13,4 +13,6 @@ internal sealed record StrategyState(
         new(null, null, 0m, 0, ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase));
 
     public bool HasOpenLegs => CeLeg is not null && PeLeg is not null;
+
+    public DateTimeOffset? ReEntryAfter { get; init; }
 }
