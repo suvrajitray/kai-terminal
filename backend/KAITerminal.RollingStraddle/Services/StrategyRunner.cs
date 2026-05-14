@@ -391,6 +391,8 @@ internal sealed class StrategyRunner : BackgroundService
             _cfg.DailyMtmStopLossPerLot, _cfg.Lots, _cfg.DailyMtmStopLossPerLot * _cfg.Lots);
         _log.LogInformation("  VIX filter   :  {Vix}",
             _cfg.VixMaxThreshold > 0 ? $"skip if VIX > {_cfg.VixMaxThreshold}" : "disabled");
+        _log.LogInformation("  Re-entry delay :  {Delay}",
+            _cfg.ReEntryDelayMinutes > 0 ? $"{_cfg.ReEntryDelayMinutes} min after roll" : "immediate");
         _log.LogInformation(Sep);
     }
 
