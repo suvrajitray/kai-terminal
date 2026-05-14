@@ -232,14 +232,27 @@ internal sealed class StrategyRunner : BackgroundService
 
         _log.LogInformation("[ROLL ] Closing current legs...");
         var closed = await CloseLegsAsync(state, ct);
+        var afterRoll = closed with { RollCount = closed.RollCount + 1 };
 
-        _log.LogInformation("[ROLL ] Opening new {Type} at Spot {Spot:F2}",
-            _cfg.StrikeOffset == 0 ? "straddle" : "strangle", spot);
-        var result = await OpenLegsAsync(spot, closed with { RollCount = closed.RollCount + 1 }, ct);
+        if (_cfg.ReEntryDelayMinutes <= 0)
+        {
+            _log.LogInformation("[ROLL ] Opening new {Type} at Spot {Spot:F2}",
+                _cfg.StrikeOffset == 0 ? "straddle" : "strangle", spot);
+            var result = await OpenLegsAsync(spot, afterRoll, ct);
+            _log.LogInformation(Sep);
+            return result;
+        }
 
+        var reEntryAt = DateTimeOffset.UtcNow.AddMinutes(_cfg.ReEntryDelayMinutes);
+        var reEntryIst = TimeZoneInfo.ConvertTime(reEntryAt, Ist);
+        _log.LogInformation(
+            "[IDLE ] Roll complete — cooling off {N} min, next {Type} entry at {Time:HH:mm} IST",
+            _cfg.ReEntryDelayMinutes,
+            _cfg.StrikeOffset == 0 ? "straddle" : "strangle",
+            reEntryIst);
         _log.LogInformation(Sep);
 
-        return result;
+        return afterRoll with { ReEntryAfter = reEntryAt };
     }
 
     // ── Close / Exit ──────────────────────────────────────────────────────────
