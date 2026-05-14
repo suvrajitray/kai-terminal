@@ -1,9 +1,11 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { BarChart2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 import { usePayoffData, payoffAt } from "./use-payoff-data";
 import type { RenderedCurve } from "./use-payoff-data";
 import { PayoffChart } from "./payoff-chart";
+import { PayoffTable } from "./payoff-table";
 import { StatsBar } from "./stats-bar";
 import type { Position } from "@/types";
 
@@ -73,6 +75,8 @@ export function PayoffChartDialog({ open, onOpenChange, positions }: Props) {
     };
   }, [allLegs, spot, groups]);
 
+  const [activeTab, setActiveTab] = useState<"chart" | "table">("chart");
+
   if (!open) return null;
 
   const hasData = renderedCurves.length > 0 && combinedPts.length > 0;
@@ -100,15 +104,42 @@ export function PayoffChartDialog({ open, onOpenChange, positions }: Props) {
           />
         )}
 
-        <PayoffChart
-          groups={groups}
-          spot={spot}
-          renderedCurves={renderedCurves}
-          xMin={xMin}
-          xMax={xMax}
-          yMin={yMin}
-          yMax={yMax}
-        />
+        {hasData && (
+          <div className="flex gap-0 border-b border-border/40 -mb-1">
+            {(["chart", "table"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={cn(
+                  "px-4 py-2 text-xs font-medium capitalize border-b-2 -mb-px transition-colors",
+                  activeTab === tab
+                    ? "border-primary text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {activeTab === "chart" ? (
+          <PayoffChart
+            groups={groups}
+            spot={spot}
+            renderedCurves={renderedCurves}
+            xMin={xMin}
+            xMax={xMax}
+            yMin={yMin}
+            yMax={yMax}
+          />
+        ) : (
+          <PayoffTable
+            groups={groups}
+            spot={spot}
+            groupColors={renderedCurves.map((c) => c.color)}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );
