@@ -69,6 +69,24 @@ internal sealed class StrategyRunner : BackgroundService
             {
                 try
                 {
+                    if (state.ReEntryAfter.HasValue)
+                    {
+                        if (DateTimeOffset.UtcNow < state.ReEntryAfter.Value)
+                        {
+                            var exitParts = _cfg.ExitTime.Split(':');
+                            var exitTime  = new TimeSpan(int.Parse(exitParts[0]), int.Parse(exitParts[1]), 0);
+                            if (NowIst() >= exitTime)
+                            {
+                                _log.LogInformation("[EXIT ] Past exit time during re-entry cooldown — no new entry today");
+                                _lifetime.StopApplication();
+                                return;
+                            }
+                            await Delay(ct);
+                            continue;
+                        }
+                        state = state with { ReEntryAfter = null };
+                    }
+
                     var spot = await _feed.FetchSpotAsync(ct);
                     if (spot <= 0)
                     {
