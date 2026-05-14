@@ -51,4 +51,7 @@ public sealed class StrategyConfig
 
     /// <summary>Polling interval in milliseconds.</summary>
     public int     CheckIntervalMs  { get; set; } = 5000;
+
+    /// <summary>Minutes to wait after a roll before opening new legs. 0 = immediate re-entry.</summary>
+    public int     ReEntryDelayMinutes { get; set; } = 15;
 }
