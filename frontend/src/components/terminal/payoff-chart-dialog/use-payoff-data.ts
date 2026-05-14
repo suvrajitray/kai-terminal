@@ -17,6 +17,13 @@ export interface ExpiryGroup {
   legs: Leg[];
 }
 
+export interface RenderedCurve {
+  expiry: string;
+  color: string;
+  pts: [number, number][];
+  breakevens: number[];
+}
+
 export const INDEX_TO_FEED: Record<string, keyof ReturnType<typeof useIndicesFeed>> = {
   NIFTY:     "nifty",
   BANKNIFTY: "bankNifty",
