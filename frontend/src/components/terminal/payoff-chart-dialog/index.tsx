@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { usePayoffData, payoffAt } from "./use-payoff-data";
 import type { RenderedCurve } from "./use-payoff-data";
 import { PayoffChart } from "./payoff-chart";
+import { StatsBar } from "./stats-bar";
 import type { Position } from "@/types";
 
 const GROUP_COLORS = ["#38bdf8", "#fbbf24", "#a78bfa", "#34d399"];
@@ -20,9 +21,10 @@ export function PayoffChartDialog({ open, onOpenChange, positions }: Props) {
 
   const allLegs = useMemo(() => groups.flatMap((g) => g.legs), [groups]);
 
-  const { renderedCurves, xMin, xMax, yMin, yMax } = useMemo(() => {
+  const { renderedCurves, combinedPts, xMin, xMax, yMin, yMax } = useMemo(() => {
     const empty = {
       renderedCurves: [] as RenderedCurve[],
+      combinedPts: [] as [number, number][],
       xMin: 0, xMax: 0, yMin: -1, yMax: 1,
     };
     if (allLegs.length === 0 || spot === 0) return empty;
@@ -36,6 +38,8 @@ export function PayoffChartDialog({ open, onOpenChange, positions }: Props) {
 
     const step = (xMax - xMin) / STEPS;
     const xs   = Array.from({ length: STEPS + 1 }, (_, i) => xMin + i * step);
+
+    const combinedPts: [number, number][] = xs.map((x) => [x, payoffAt(allLegs, x)]);
 
     let globalMin = 0, globalMax = 0;
 
@@ -62,6 +66,7 @@ export function PayoffChartDialog({ open, onOpenChange, positions }: Props) {
 
     return {
       renderedCurves,
+      combinedPts,
       xMin, xMax,
       yMin: Math.min(0, globalMin) - yPad,
       yMax: Math.max(0, globalMax) + yPad,
@@ -69,6 +74,9 @@ export function PayoffChartDialog({ open, onOpenChange, positions }: Props) {
   }, [allLegs, spot, groups]);
 
   if (!open) return null;
+
+  const hasData = renderedCurves.length > 0 && combinedPts.length > 0;
+  const atSpot = spot > 0 ? payoffAt(allLegs, spot) : 0;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -82,6 +90,15 @@ export function PayoffChartDialog({ open, onOpenChange, positions }: Props) {
             )}
           </DialogTitle>
         </DialogHeader>
+
+        {hasData && (
+          <StatsBar
+            renderedCurves={renderedCurves}
+            combinedPts={combinedPts}
+            spot={spot}
+            atSpot={atSpot}
+          />
+        )}
 
         <PayoffChart
           groups={groups}
