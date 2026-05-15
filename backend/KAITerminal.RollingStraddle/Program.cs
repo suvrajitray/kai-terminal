@@ -24,6 +24,10 @@ try
     overrides.Add(new("Strategy:Underlying", inst.Underlying));
     overrides.Add(new("Strategy:LotSize",    inst.LotSize.ToString()));
 
+    string? promptedUsername = null;
+    Prompt("Username (Enter to use appsettings value): ",
+        v => { promptedUsername = v; overrides.Add(new("Strategy:Username", v)); });
+
     Prompt("Expiry yyyy-MM-dd (Enter to auto-resolve nearest expiry): ",
         v => overrides.Add(new("Strategy:Expiry", v)));
 
@@ -51,7 +55,7 @@ try
     }
     else
     {
-        var username   = builder.Configuration["Strategy:Username"]   ?? "";
+        var username   = promptedUsername ?? builder.Configuration["Strategy:Username"] ?? "";
         var brokerName = builder.Configuration["Strategy:BrokerName"] ?? "";
         var connStr    = builder.Configuration.GetConnectionString("DefaultConnection") ?? "";
 
