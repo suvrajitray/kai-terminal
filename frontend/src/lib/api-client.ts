@@ -5,6 +5,7 @@ import { useBrokerStore } from "@/stores/broker-store";
 import { isTokenExpired } from "@/lib/token-utils";
 import { performLogout } from "@/lib/logout";
 import { createLogger } from "@/lib/logger";
+import { toast } from "@/lib/toast";
 
 const log = createLogger("ApiClient");
 
@@ -34,9 +35,16 @@ apiClient.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
-      log.warn("401 received — logging out");
-      performLogout();
-      return Promise.reject(new Error("Session expired. Please log in again."));
+      const url: string = err.config?.url ?? "";
+      const isBrokerEndpoint = url.includes("/api/upstox/") || url.includes("/api/zerodha/");
+      if (isBrokerEndpoint) {
+        log.warn("401 from broker endpoint — not logging out", url);
+        toast.error("Broker session expired. Please re-authenticate.");
+      } else {
+        log.warn("401 received — logging out");
+        performLogout();
+        return Promise.reject(new Error("Session expired. Please log in again."));
+      }
     }
     log.error("request failed", err.config?.url, err.response?.status, err.response?.data?.message ?? err.message);
     return Promise.reject(new Error(err.response?.data?.message ?? err.message));
