@@ -20,13 +20,16 @@ try
     var builder = Host.CreateApplicationBuilder(args);
     var overrides = new List<KeyValuePair<string, string?>>();
 
+    string? promptedUsername = null;
+    Prompt("Username (Enter to use appsettings value): ",
+        v => { promptedUsername = v; overrides.Add(new("Strategy:Username", v)); });
+
     var inst = PickInstrument(builder.Configuration);
     overrides.Add(new("Strategy:Underlying", inst.Underlying));
     overrides.Add(new("Strategy:LotSize",    inst.LotSize.ToString()));
 
-    string? promptedUsername = null;
-    Prompt("Username (Enter to use appsettings value): ",
-        v => { promptedUsername = v; overrides.Add(new("Strategy:Username", v)); });
+    Prompt("Strike offset — 0 straddle, N strangle (Enter to use appsettings value): ",
+        v => overrides.Add(new("Strategy:StrikeOffset", v)));
 
     Prompt("Expiry yyyy-MM-dd (Enter to auto-resolve nearest expiry): ",
         v => overrides.Add(new("Strategy:Expiry", v)));
@@ -39,9 +42,6 @@ try
 
     Prompt("Daily MTM stop-loss per lot ₹ (Enter to use appsettings value): ",
         v => overrides.Add(new("Strategy:DailyMtmStopLossPerLot", v)));
-
-    Prompt("Strike offset — 0 straddle, N strangle (Enter to use appsettings value): ",
-        v => overrides.Add(new("Strategy:StrikeOffset", v)));
 
     // Resolve Upstox access token — manual paste overrides DB fetch.
     string accessToken;

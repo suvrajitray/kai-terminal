@@ -1,8 +1,8 @@
-import { ShieldCheck, Unplug, Wallet } from "lucide-react";
+import { KeyRound, ShieldCheck, Wallet } from "lucide-react";
 import { useBrokerStore } from "@/stores/broker-store";
 import { useFunds } from "@/hooks/use-funds";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
-import { BROKERS } from "@/lib/constants";
+import { BROKERS, UPSTOX_OAUTH_URL, ZERODHA_OAUTH_URL } from "@/lib/constants";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -11,8 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import type { FundsData } from "@/services/trading-api";
 
 export function BrokerStatusChips() {
-  const credentials       = useBrokerStore((s) => s.credentials);
-  const removeCredentials = useBrokerStore((s) => s.removeCredentials);
+  const credentials = useBrokerStore((s) => s.credentials);
   const { allFunds, loading: fundsLoading, refresh } = useFunds();
   const ppConfigs         = useProfitProtectionStore((s) => s.configs);
 
@@ -90,43 +89,48 @@ export function BrokerStatusChips() {
                 <Separator />
 
                 <div className="flex items-center gap-1.5">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className={cn(
-                          "flex-1 h-7 text-xs",
-                          ppConfigs[broker.id]?.enabled
-                            ? "border-green-500/30 text-green-500 hover:bg-green-500/10 hover:text-green-500"
-                            : "border-border/50 text-muted-foreground hover:text-foreground",
-                        )}
-                        onClick={() => useProfitProtectionStore.getState().requestOpen(broker.id)}
-                      >
-                        <ShieldCheck className="mr-1.5 size-3" />
-                        Profit Protection
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{ppConfigs[broker.id]?.enabled ? "PP enabled — click to configure" : "Click to configure Profit Protection"}</p>
-                    </TooltipContent>
-                  </Tooltip>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className={cn(
+                      "flex-1 h-7 text-xs",
+                      ppConfigs[broker.id]?.enabled
+                        ? "border-green-500/30 text-green-500 hover:bg-green-500/10 hover:text-green-500"
+                        : "border-border/50 text-muted-foreground hover:text-foreground",
+                    )}
+                    onClick={() => useProfitProtectionStore.getState().requestOpen(broker.id)}
+                  >
+                    <ShieldCheck className="mr-1.5 size-3" />
+                    Profit Protection
+                  </Button>
 
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        size="icon"
-                        variant="outline"
-                        className="h-7 w-7 shrink-0 border-border/50 text-muted-foreground/50 hover:border-destructive/40 hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => removeCredentials(broker.id)}
-                      >
-                        <Unplug className="size-3" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Disconnect {broker.name}</p>
-                    </TooltipContent>
-                  </Tooltip>
+                  {!isAuthed && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          className="h-7 w-7 shrink-0 border-amber-500/30 text-amber-500 hover:bg-amber-500/10 hover:border-amber-500/50"
+                          onClick={() => {
+                            const storedKey = creds?.apiKey;
+                            if (!storedKey) return;
+                            const redirectUrl = `${window.location.origin}${broker.redirectPath}`;
+                            const oauthBase = broker.id === "upstox" ? UPSTOX_OAUTH_URL : ZERODHA_OAUTH_URL;
+                            const sep = oauthBase.includes("?") ? "&" : "?";
+                            const url = broker.id === "upstox"
+                              ? `${oauthBase}${sep}api_key=${storedKey}&redirect_uri=${encodeURIComponent(redirectUrl)}`
+                              : `${oauthBase}${sep}api_key=${storedKey}`;
+                            window.location.href = url;
+                          }}
+                        >
+                          <KeyRound className="size-3" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Authenticate {broker.name}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
                 </div>
               </div>
             </PopoverContent>
