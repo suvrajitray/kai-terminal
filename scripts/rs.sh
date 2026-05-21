@@ -15,7 +15,7 @@ SERVER="kaiterminal"
 REMOTE_RS_DIR="/opt/kaiterminal/rs"
 
 read -rp "Username: " USERNAME
-SESSION="${USERNAME}-rs"
+SESSION="${USERNAME}"
 
 ssh -t "$SERVER" \
   "tmux new-session -A -s '$SESSION' -c '$REMOTE_RS_DIR' 'set -a && source <(sudo cat /etc/kaiterminal/rs.env) && set +a && dotnet KAITerminal.RollingStraddle.dll; exec bash'"

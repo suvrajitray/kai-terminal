@@ -115,11 +115,14 @@ export function BrokerStatusChips() {
                             const storedKey = creds?.apiKey;
                             if (!storedKey) return;
                             const redirectUrl = `${window.location.origin}${broker.redirectPath}`;
-                            const oauthBase = broker.id === "upstox" ? UPSTOX_OAUTH_URL : ZERODHA_OAUTH_URL;
-                            const sep = oauthBase.includes("?") ? "&" : "?";
-                            const url = broker.id === "upstox"
-                              ? `${oauthBase}${sep}api_key=${storedKey}&redirect_uri=${encodeURIComponent(redirectUrl)}`
-                              : `${oauthBase}${sep}api_key=${storedKey}`;
+                            let url: string;
+                            if (broker.id === "upstox") {
+                              const params = new URLSearchParams({ response_type: "code", client_id: storedKey, redirect_uri: redirectUrl });
+                              url = `${UPSTOX_OAUTH_URL}?${params.toString()}`;
+                            } else {
+                              const params = new URLSearchParams({ v: "3", api_key: storedKey });
+                              url = `${ZERODHA_OAUTH_URL}?${params.toString()}`;
+                            }
                             window.location.href = url;
                           }}
                         >
