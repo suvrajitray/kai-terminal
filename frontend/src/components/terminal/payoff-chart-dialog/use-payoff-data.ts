@@ -24,6 +24,27 @@ export interface RenderedCurve {
   breakevens: number[];
 }
 
+export interface DisplayItem {
+  instrumentToken: string;
+  tradingSymbol: string;
+  quantity: number;
+  pnl: number;
+  broker: string;
+  contract?: {
+    strikePrice: number;
+    instrumentType: "CE" | "PE";
+    expiry: string;
+  };
+}
+
+export interface UnderlyingPayoffGroup {
+  underlying: string;
+  feedKey: keyof ReturnType<typeof useIndicesFeed> | undefined;
+  expiryGroups: ExpiryGroup[];
+  items: DisplayItem[];
+  totalPnl: number;
+}
+
 export const INDEX_TO_FEED: Record<string, keyof ReturnType<typeof useIndicesFeed>> = {
   NIFTY:     "nifty",
   BANKNIFTY: "bankNifty",
@@ -44,48 +65,70 @@ export function payoffAt(legs: Leg[], spot: number): number {
 
 export function usePayoffData(positions: Position[], open: boolean) {
   const getByInstrumentKey = useOptionContractsStore((s) => s.getByInstrumentKey);
-  const feed = useIndicesFeed();
 
-  const { groups, indexName } = useMemo(() => {
-    if (!open) return { groups: [], indexName: "" };
-    const allLegs: Leg[] = [];
-    const indexCount: Record<string, number> = {};
+  const underlyingGroups: UnderlyingPayoffGroup[] = useMemo(() => {
+    if (!open) return [];
 
-    for (const p of positions.filter((x) => x.quantity !== 0)) {
+    // Map underlying → { legs per expiry, display items }
+    const underlyingMap = new Map<string, {
+      byExpiry: Map<string, Leg[]>;
+      items: DisplayItem[];
+      feedKey: keyof ReturnType<typeof useIndicesFeed> | undefined;
+    }>();
+
+    for (const p of positions) {
       const lookup = getByInstrumentKey(p.instrumentToken, p.tradingSymbol);
-      if (!lookup) continue;
-      const { contract, index } = lookup;
-      allLegs.push({
-        strike: contract.strikePrice,
-        instrumentType: contract.instrumentType,
-        avgPrice: p.averagePrice,
+      const index = lookup?.index ?? p.tradingSymbol;
+      const contract = lookup?.contract;
+
+      if (!underlyingMap.has(index)) {
+        underlyingMap.set(index, {
+          byExpiry: new Map(),
+          items: [],
+          feedKey: INDEX_TO_FEED[index],
+        });
+      }
+
+      const entry = underlyingMap.get(index)!;
+
+      // Display item for left panel
+      entry.items.push({
+        instrumentToken: p.instrumentToken,
+        tradingSymbol: p.tradingSymbol,
         quantity: p.quantity,
-        index,
-        expiry: contract.expiry,
+        pnl: p.pnl,
+        broker: p.broker ?? "upstox",
+        contract: contract
+          ? { strikePrice: contract.strikePrice, instrumentType: contract.instrumentType, expiry: contract.expiry }
+          : undefined,
       });
-      indexCount[index] = (indexCount[index] ?? 0) + Math.abs(p.quantity);
+
+      // Legs for payoff computation (only open positions with contracts)
+      if (contract && p.quantity !== 0) {
+        const expiry = contract.expiry;
+        const legs = entry.byExpiry.get(expiry) ?? [];
+        legs.push({
+          strike: contract.strikePrice,
+          instrumentType: contract.instrumentType,
+          avgPrice: p.averagePrice,
+          quantity: p.quantity,
+          index,
+          expiry,
+        });
+        entry.byExpiry.set(expiry, legs);
+      }
     }
 
-    const primaryIndex =
-      Object.entries(indexCount).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
+    return [...underlyingMap.entries()].map(([underlying, { byExpiry, items, feedKey }]) => {
+      const expiryGroups: ExpiryGroup[] = [...byExpiry.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([expiry, legs]) => ({ expiry, legs }));
 
-    // Group by expiry, sorted nearest first
-    const byExpiry = new Map<string, Leg[]>();
-    for (const leg of allLegs) {
-      const list = byExpiry.get(leg.expiry) ?? [];
-      list.push(leg);
-      byExpiry.set(leg.expiry, list);
-    }
-    const groups: ExpiryGroup[] = [...byExpiry.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([expiry, legs]) => ({ expiry, legs }));
+      const totalPnl = items.reduce((sum, item) => sum + item.pnl, 0);
 
-    return { groups, indexName: primaryIndex };
+      return { underlying, feedKey, expiryGroups, items, totalPnl };
+    });
   }, [positions, getByInstrumentKey, open]);
 
-  // Spot price for the primary index — live, not memoized
-  const feedKey = open ? INDEX_TO_FEED[indexName] : undefined;
-  const spot = feedKey ? (feed[feedKey].ltp ?? 0) : 0;
-
-  return { groups, indexName, spot };
+  return { underlyingGroups };
 }

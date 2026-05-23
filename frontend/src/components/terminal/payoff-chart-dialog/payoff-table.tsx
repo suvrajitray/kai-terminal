@@ -50,7 +50,7 @@ export function PayoffTable({ groups, spot, groupColors }: PayoffTableProps) {
     );
   }
 
-  const interval = nearestRoundInterval(spot * 0.005);
+  const interval = nearestRoundInterval(spot * 0.001);
   const anchor = Math.floor(spot / interval) * interval;
 
   const belowPrices = Array.from({ length: 9 }, (_, i) => anchor - (9 - i) * interval)
