@@ -1,4 +1,4 @@
-import { KeyRound, ShieldCheck, Wallet } from "lucide-react";
+import { KeyRound, ShieldCheck, Star, Wallet } from "lucide-react";
 import { useBrokerStore } from "@/stores/broker-store";
 import { useFunds } from "@/hooks/use-funds";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
@@ -11,11 +11,17 @@ import { Separator } from "@/components/ui/separator";
 import type { FundsData } from "@/services/trading-api";
 
 export function BrokerStatusChips() {
-  const credentials = useBrokerStore((s) => s.credentials);
+  const credentials      = useBrokerStore((s) => s.credentials);
+  const brokerPriority   = useBrokerStore((s) => s.brokerPriority);
+  const setDefaultBroker = useBrokerStore((s) => s.setDefaultBroker);
   const { allFunds, loading: fundsLoading, refresh } = useFunds();
   const ppConfigs         = useProfitProtectionStore((s) => s.configs);
 
   const connectedBrokers = BROKERS.filter((b) => credentials[b.id]);
+  const defaultBrokerId =
+    connectedBrokers.length > 1
+      ? (brokerPriority.find((id) => connectedBrokers.some((b) => b.id === id)) ?? connectedBrokers[0]?.id)
+      : null;
 
   if (connectedBrokers.length === 0) return null;
 
@@ -44,6 +50,9 @@ export function BrokerStatusChips() {
                     isAuthed ? "bg-green-500" : "bg-muted-foreground/50",
                   )}
                 />
+                {broker.id === defaultBrokerId && (
+                  <Star className="size-2.5 fill-current" />
+                )}
                 {broker.name}
                 {isAuthed && pillBar != null && (
                   <span className="flex h-1.5 w-8 overflow-hidden rounded-full bg-white/10">
@@ -88,6 +97,17 @@ export function BrokerStatusChips() {
 
                 <Separator />
 
+                {connectedBrokers.length > 1 && broker.id !== defaultBrokerId && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full h-7 text-xs border-border/50 text-muted-foreground hover:text-foreground"
+                    onClick={() => setDefaultBroker(broker.id)}
+                  >
+                    <Star className="mr-1.5 size-3" />
+                    Set as default
+                  </Button>
+                )}
                 <div className="flex items-center gap-1.5">
                   <Button
                     size="sm"
