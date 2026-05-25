@@ -20,6 +20,18 @@ import { getMarginColor, getOrderAccent, getOrderQuantity } from "./order-dialog
 import { QuantityPriceSection } from "./order-dialog-parts/quantity-price-section";
 import type { ProductType, SupportedBroker } from "./order-dialog-parts/types";
 
+function sortByPriority<T extends { id: string }>(items: T[], priority: string[]): T[] {
+  if (priority.length === 0) return items;
+  return [...items].sort((a, b) => {
+    const ai = priority.indexOf(a.id);
+    const bi = priority.indexOf(b.id);
+    if (ai === -1 && bi === -1) return 0;
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
+}
+
 export interface OrderIntent {
   instrumentKey: string;
   side: "CE" | "PE";
@@ -55,10 +67,14 @@ export function OrderDialog({
   defaultQtyOverride,
 }: Props) {
   const credentials        = useBrokerStore((s) => s.credentials);
+  const brokerPriority     = useBrokerStore((s) => s.brokerPriority);
   const getByInstrumentKey = useOptionContractsStore((s) => s.getByInstrumentKey);
 
-  const activeBrokers = BROKERS.filter(
-    (b) => (b.id === "upstox" || b.id === "zerodha") && !isBrokerTokenExpired(b.id, credentials[b.id]?.accessToken),
+  const activeBrokers = sortByPriority(
+    BROKERS.filter(
+      (b) => (b.id === "upstox" || b.id === "zerodha") && !isBrokerTokenExpired(b.id, credentials[b.id]?.accessToken),
+    ),
+    brokerPriority,
   );
   const defaultBrokerId = activeBrokers[0]?.id;
 
