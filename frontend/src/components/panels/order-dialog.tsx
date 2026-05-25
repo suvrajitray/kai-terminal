@@ -70,11 +70,15 @@ export function OrderDialog({
   const brokerPriority     = useBrokerStore((s) => s.brokerPriority);
   const getByInstrumentKey = useOptionContractsStore((s) => s.getByInstrumentKey);
 
-  const activeBrokers = sortByPriority(
-    BROKERS.filter(
-      (b) => (b.id === "upstox" || b.id === "zerodha") && !isBrokerTokenExpired(b.id, credentials[b.id]?.accessToken),
-    ),
-    brokerPriority,
+  const activeBrokers = useMemo(
+    () =>
+      sortByPriority(
+        BROKERS.filter(
+          (b) => (b.id === "upstox" || b.id === "zerodha") && !isBrokerTokenExpired(b.id, credentials[b.id]?.accessToken),
+        ),
+        brokerPriority,
+      ),
+    [credentials, brokerPriority],
   );
   const defaultBrokerId = activeBrokers[0]?.id;
 
