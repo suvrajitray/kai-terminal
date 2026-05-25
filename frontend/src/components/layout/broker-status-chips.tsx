@@ -98,16 +98,20 @@ export function BrokerStatusChips() {
                 <Separator />
 
                 {connectedBrokers.length > 1 && broker.id !== defaultBrokerId && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-full h-7 text-xs border-border/50 text-muted-foreground hover:text-foreground"
-                    onClick={() => setDefaultBroker(broker.id)}
-                  >
-                    <Star className="mr-1.5 size-3" />
-                    Set as default
-                  </Button>
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full h-7 text-xs border-border/50 text-muted-foreground hover:text-foreground"
+                      onClick={() => setDefaultBroker(broker.id)}
+                    >
+                      <Star className="mr-1.5 size-3" />
+                      Set as default
+                    </Button>
+                    <Separator />
+                  </>
                 )}
+
                 <div className="flex items-center gap-1.5">
                   <Button
                     size="sm"
