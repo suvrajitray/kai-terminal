@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import type { RenderedCurve } from "./use-payoff-data";
 
-const INR = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
+import { INR_INT as INR } from "@/lib/formatters";
 
 function fmt(v: number): string {
   return (v >= 0 ? "+" : "−") + "₹" + INR.format(Math.abs(v));

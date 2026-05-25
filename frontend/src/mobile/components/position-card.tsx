@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/lib/toast'
+import { formatSignedInr } from '@/lib/formatters'
 import { exitPosition, placeMarketOrder } from '@/services/trading-api'
 import { useOptionContractsStore, formatExpiryLabel } from '@/stores/option-contracts-store'
 import { getLotSize } from '@/lib/lot-sizes'
@@ -15,13 +16,6 @@ interface PositionCardProps {
   onRefresh: () => void
 }
 
-function formatPnl(value: number): string {
-  const abs = Math.abs(value).toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
-  return value >= 0 ? `+₹${abs}` : `-₹${abs}`
-}
 
 export function PositionCard({ position: p, onRefresh }: PositionCardProps) {
   const [expanded, setExpanded] = useState(false)
@@ -136,11 +130,11 @@ export function PositionCard({ position: p, onRefresh }: PositionCardProps) {
         {/* P&L */}
         <div className="flex flex-col items-end shrink-0">
           <span className={cn('text-sm font-semibold font-mono tabular-nums', pnlColor)}>
-            {formatPnl(p.unrealised)}
+            {formatSignedInr(p.unrealised)}
           </span>
           {p.realised !== 0 && (
             <span className="text-[10px] text-muted-foreground font-mono tabular-nums">
-              R {formatPnl(p.realised)}
+              R {formatSignedInr(p.realised)}
             </span>
           )}
         </div>

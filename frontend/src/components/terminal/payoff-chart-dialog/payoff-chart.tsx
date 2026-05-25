@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { payoffAt } from "./use-payoff-data";
 import type { ExpiryGroup, RenderedCurve } from "./use-payoff-data";
 
-const INR = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
+import { INR_INT as INR } from "@/lib/formatters";
 
 const W = 500, H = 240;
 const PAD = { top: 28, right: 20, bottom: 40, left: 68 };

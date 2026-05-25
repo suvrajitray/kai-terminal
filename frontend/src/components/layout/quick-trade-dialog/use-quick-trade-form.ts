@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useReducer } from "react";
 import { getLotSize } from "@/lib/lot-sizes";
+import { resolveDefaultBroker } from "@/lib/broker-utils";
 import { useBrokerStore } from "@/stores/broker-store";
 import { useUserTradingSettingsStore } from "@/stores/user-trading-settings-store";
 import { useOptionContractsStore } from "@/stores/option-contracts-store";
@@ -54,9 +55,11 @@ export function useQuickTradeForm() {
   const bothConnected   = isUpstoxAuthed && isZerodhaAuthed;
 
   const defaultBroker = useMemo((): QuickTradeBroker => {
-    if (savedDefault === "upstox"  && isUpstoxAuthed)  return "upstox";
-    if (savedDefault === "zerodha" && isZerodhaAuthed) return "zerodha";
-    return isUpstoxAuthed ? "upstox" : "zerodha";
+    const connectedIds = [
+      ...(isUpstoxAuthed  ? ["upstox"  as const] : []),
+      ...(isZerodhaAuthed ? ["zerodha" as const] : []),
+    ];
+    return (resolveDefaultBroker(savedDefault, connectedIds) ?? "upstox") as QuickTradeBroker;
   }, [savedDefault, isUpstoxAuthed, isZerodhaAuthed]);
 
   const [form, dispatch] = useReducer(tradeFormReducer, {

@@ -60,3 +60,11 @@ export const BROKERS: BrokerInfo[] = [
     redirectPath: "/redirect/dhan",
   },
 ];
+
+export const UNDERLYING_TO_INDEX: Record<string, "nifty" | "bankNifty" | "sensex" | "finNifty" | "bankex"> = {
+  NIFTY:     "nifty",
+  BANKNIFTY: "bankNifty",
+  SENSEX:    "sensex",
+  FINNIFTY:  "finNifty",
+  BANKEX:    "bankex",
+};

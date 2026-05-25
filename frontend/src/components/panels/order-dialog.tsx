@@ -20,11 +20,7 @@ import { OrderDialogHeader } from "./order-dialog-parts/order-dialog-header";
 import { getMarginColor, getOrderAccent, getOrderQuantity } from "./order-dialog-parts/order-dialog-utils";
 import { QuantityPriceSection } from "./order-dialog-parts/quantity-price-section";
 import type { ProductType, SupportedBroker } from "./order-dialog-parts/types";
-
-function putDefaultFirst<T extends { id: string }>(items: T[], defaultId: string | null): T[] {
-  if (!defaultId) return items;
-  return [...items].sort((a) => (a.id === defaultId ? -1 : 1));
-}
+import { putDefaultFirst } from "@/lib/broker-utils";
 
 export interface OrderIntent {
   instrumentKey: string;

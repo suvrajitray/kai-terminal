@@ -5,7 +5,7 @@ import { getLotSize } from "@/lib/lot-sizes";
 import type { UnderlyingPayoffGroup, DisplayItem } from "./use-payoff-data";
 import type { IndexPrices } from "@/hooks/use-indices-feed";
 
-const INR = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
+import { INR_INT as INR } from "@/lib/formatters";
 
 function fmtPnl(v: number) {
   return (v >= 0 ? "+" : "-") + INR.format(Math.abs(v));

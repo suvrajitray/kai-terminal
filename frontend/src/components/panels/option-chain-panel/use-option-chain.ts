@@ -1,43 +1,118 @@
-import { useState, useEffect, useCallback } from "react";
+import { useReducer, useEffect, useCallback } from "react";
 import { fetchOptionChain } from "@/services/trading-api";
 import { useOptionContractsStore } from "@/stores/option-contracts-store";
 import { UNDERLYING_KEYS } from "@/lib/shift-config";
+import { UNDERLYING_TO_INDEX } from "@/lib/constants";
 import { useIvHistory } from "./use-iv-history";
 import { useOptionChainFeed } from "./use-option-chain-feed";
-import { useIndicesFeed, type IndexPrices } from "@/hooks/use-indices-feed";
+import { useIndicesFeed } from "@/hooks/use-indices-feed";
 import { calculateMaxPain, calculatePcr, calculateAtmIv, calculateExpectedMove, calculateIvRankMetrics } from "./chain-analytics";
 import { useBasketStore } from "@/stores/basket-store";
 import type { OptionChainEntry } from "@/types";
 
-const UNDERLYING_TO_INDEX: Record<string, keyof IndexPrices> = {
-  NIFTY:     "nifty",
-  BANKNIFTY: "bankNifty",
-  SENSEX:    "sensex",
-  FINNIFTY:  "finNifty",
-  BANKEX:    "bankex",
+const LIVE_WINDOW_SIZE = 20;
+const VISIBLE_SIDE = 20;
+const VISIBLE_STEP = 15;
+
+interface ChainState {
+  underlying: string;
+  expiry: string;
+  allChain: OptionChainEntry[];
+  liveStrikeSet: Set<number>;
+  atmStrike: number;
+  spotPrice: number;
+  visibleLow: number;
+  visibleHigh: number;
+  loading: boolean;
+  lastRefreshed: Date | null;
+  scrollSignal: number;
+}
+
+type ChainAction =
+  | { type: "SET_UNDERLYING"; underlying: string }
+  | { type: "SET_EXPIRY"; expiry: string }
+  | { type: "FETCH_START" }
+  | { type: "FETCH_SUCCESS"; chain: OptionChainEntry[]; liveSet: Set<number>; atm: number; spot: number; scrollAtm: boolean }
+  | { type: "FETCH_ERROR" }
+  | { type: "UPDATE_SPOT"; spot: number }
+  | { type: "UPDATE_LTP_BATCH"; map: Map<string, number> }
+  | { type: "LOAD_MORE_LOW" }
+  | { type: "LOAD_MORE_HIGH" };
+
+const initialState: ChainState = {
+  underlying: "NIFTY",
+  expiry: "",
+  allChain: [],
+  liveStrikeSet: new Set(),
+  atmStrike: 0,
+  spotPrice: 0,
+  visibleLow: VISIBLE_SIDE,
+  visibleHigh: VISIBLE_SIDE,
+  loading: false,
+  lastRefreshed: null,
+  scrollSignal: 0,
 };
 
-const LIVE_WINDOW_SIZE = 20; // OTM rows on each side of ATM (for SignalR subscriptions)
-const VISIBLE_SIDE = 20;    // OTM rows shown on each side of ATM initially
-const VISIBLE_STEP = 15;    // extra rows revealed per "load more" (each side)
+function chainReducer(state: ChainState, action: ChainAction): ChainState {
+  switch (action.type) {
+    case "SET_UNDERLYING":
+      return { ...state, underlying: action.underlying };
+    case "SET_EXPIRY":
+      return { ...state, expiry: action.expiry };
+    case "FETCH_START":
+      return { ...state, loading: true };
+    case "FETCH_SUCCESS":
+      return {
+        ...state,
+        loading: false,
+        allChain: action.chain,
+        liveStrikeSet: action.liveSet,
+        atmStrike: action.atm,
+        spotPrice: action.spot,
+        lastRefreshed: new Date(),
+        visibleLow: VISIBLE_SIDE,
+        visibleHigh: VISIBLE_SIDE,
+        scrollSignal: action.scrollAtm ? state.scrollSignal + 1 : state.scrollSignal,
+      };
+    case "FETCH_ERROR":
+      return { ...state, loading: false };
+    case "UPDATE_SPOT":
+      return { ...state, spotPrice: action.spot };
+    case "UPDATE_LTP_BATCH": {
+      if (state.allChain.length === 0 || action.map.size === 0) return state;
+      let changed = false;
+      const next = state.allChain.map((entry) => {
+        let callOpts = entry.callOptions;
+        let putOpts  = entry.putOptions;
+        if (callOpts?.marketData && action.map.has(callOpts.instrumentKey)) {
+          callOpts = { ...callOpts, marketData: { ...callOpts.marketData, ltp: action.map.get(callOpts.instrumentKey)! } };
+          changed = true;
+        }
+        if (putOpts?.marketData && action.map.has(putOpts.instrumentKey)) {
+          putOpts = { ...putOpts, marketData: { ...putOpts.marketData, ltp: action.map.get(putOpts.instrumentKey)! } };
+          changed = true;
+        }
+        if (callOpts === entry.callOptions && putOpts === entry.putOptions) return entry;
+        return { ...entry, callOptions: callOpts, putOptions: putOpts };
+      });
+      return changed ? { ...state, allChain: next } : state;
+    }
+    case "LOAD_MORE_LOW":
+      return { ...state, visibleLow: state.visibleLow + VISIBLE_STEP };
+    case "LOAD_MORE_HIGH":
+      return { ...state, visibleHigh: state.visibleHigh + VISIBLE_STEP };
+    default:
+      return state;
+  }
+}
 
 export function useOptionChain() {
+  const [state, dispatch] = useReducer(chainReducer, initialState);
+  const { underlying, expiry, allChain, liveStrikeSet, atmStrike, spotPrice,
+          visibleLow, visibleHigh, loading, lastRefreshed, scrollSignal } = state;
+
   const getExpiries = useOptionContractsStore((s) => s.getExpiries);
-
-  const [underlying, setUnderlying] = useState("NIFTY");
-  const [expiry, setExpiry] = useState<string>("");
-  const [allChain, setAllChain] = useState<OptionChainEntry[]>([]);
-  const [liveStrikeSet, setLiveStrikeSet] = useState<Set<number>>(new Set());
-  const [atmStrike, setAtmStrike] = useState<number>(0);
-  const [spotPrice, setSpotPrice] = useState<number>(0);
-  const [visibleLow, setVisibleLow]   = useState(VISIBLE_SIDE); // strikes below ATM
-  const [visibleHigh, setVisibleHigh] = useState(VISIBLE_SIDE); // strikes above ATM
-  const [loading, setLoading] = useState(false);
-  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
-  const [scrollSignal, setScrollSignal] = useState(0);
-
   const expiries = getExpiries(underlying);
-
   const ivHistory = useIvHistory(underlying);
 
   // Keep spot price live from the indices SignalR feed
@@ -46,30 +121,12 @@ export function useOptionChain() {
     const key = UNDERLYING_TO_INDEX[underlying];
     if (!key) return;
     const ltp = indexPrices[key]?.ltp;
-    if (ltp != null && ltp > 0) setSpotPrice(ltp);
+    if (ltp != null && ltp > 0) dispatch({ type: "UPDATE_SPOT", spot: ltp });
   }, [indexPrices, underlying]);
 
   const handleLtpBatch = useCallback((updates: Array<{ instrumentToken: string; ltp: number }>) => {
     const map = new Map(updates.map((u) => [u.instrumentToken, u.ltp]));
-    setAllChain((prev) => {
-      if (prev.length === 0 || map.size === 0) return prev;
-      let changed = false;
-      const next = prev.map((entry) => {
-        let callOpts = entry.callOptions;
-        let putOpts = entry.putOptions;
-        if (callOpts?.marketData && map.has(callOpts.instrumentKey)) {
-          callOpts = { ...callOpts, marketData: { ...callOpts.marketData, ltp: map.get(callOpts.instrumentKey)! } };
-          changed = true;
-        }
-        if (putOpts?.marketData && map.has(putOpts.instrumentKey)) {
-          putOpts = { ...putOpts, marketData: { ...putOpts.marketData, ltp: map.get(putOpts.instrumentKey)! } };
-          changed = true;
-        }
-        if (callOpts === entry.callOptions && putOpts === entry.putOptions) return entry;
-        return { ...entry, callOptions: callOpts, putOptions: putOpts };
-      });
-      return changed ? next : prev;
-    });
+    dispatch({ type: "UPDATE_LTP_BATCH", map });
     useBasketStore.getState().updateLtpBatch(updates);
   }, []);
 
@@ -77,11 +134,10 @@ export function useOptionChain() {
 
   // Default expiry to the nearest one when underlying changes
   useEffect(() => {
-    setExpiry((prev) => {
-      if (expiries.length > 0 && !expiries.includes(prev)) return expiries[0];
-      return prev;
-    });
-  }, [underlying, expiries]);
+    if (expiries.length > 0 && !expiries.includes(expiry)) {
+      dispatch({ type: "SET_EXPIRY", expiry: expiries[0] });
+    }
+  }, [underlying, expiries]); // intentionally excludes expiry to avoid loop
 
   const buildLiveWindow = useCallback((chain: OptionChainEntry[]) => {
     if (chain.length === 0) return { liveSet: new Set<number>(), atm: 0, spot: 0 };
@@ -91,7 +147,7 @@ export function useOptionChain() {
     );
     const atmIdx = chain.findIndex((e) => e.strikePrice === atmEntry.strikePrice);
     const start = Math.max(0, atmIdx - LIVE_WINDOW_SIZE);
-    const end = Math.min(chain.length - 1, atmIdx + LIVE_WINDOW_SIZE);
+    const end   = Math.min(chain.length - 1, atmIdx + LIVE_WINDOW_SIZE);
     const liveSet = new Set(chain.slice(start, end + 1).map((e) => e.strikePrice));
     return { liveSet, atm: atmEntry.strikePrice, spot };
   }, []);
@@ -101,7 +157,7 @@ export function useOptionChain() {
     for (const entry of chain) {
       if (!liveSet.has(entry.strikePrice)) continue;
       if (entry.callOptions?.instrumentKey) tokens.push(entry.callOptions.instrumentKey);
-      if (entry.putOptions?.instrumentKey) tokens.push(entry.putOptions.instrumentKey);
+      if (entry.putOptions?.instrumentKey)  tokens.push(entry.putOptions.instrumentKey);
     }
     setLiveTokens(tokens);
     invokeSubscribe(tokens);
@@ -110,22 +166,15 @@ export function useOptionChain() {
   const fetchAndSubscribe = useCallback(async (u: string, exp: string, scrollAtm = false) => {
     const underlyingKey = UNDERLYING_KEYS[u];
     if (!underlyingKey || !exp) return;
-    setLoading(true);
+    dispatch({ type: "FETCH_START" });
     try {
-      const chain = await fetchOptionChain(underlyingKey, exp);
+      const chain  = await fetchOptionChain(underlyingKey, exp);
       const sorted = [...chain].sort((a, b) => a.strikePrice - b.strikePrice);
       const { liveSet, atm, spot } = buildLiveWindow(sorted);
-      setAllChain(sorted);
-      setLiveStrikeSet(liveSet);
-      setAtmStrike(atm);
-      setSpotPrice(spot);
-      setLastRefreshed(new Date());
-      setVisibleLow(VISIBLE_SIDE);
-      setVisibleHigh(VISIBLE_SIDE);
+      dispatch({ type: "FETCH_SUCCESS", chain: sorted, liveSet, atm, spot, scrollAtm });
       subscribeLiveTokens(sorted, liveSet);
-      if (scrollAtm) setScrollSignal((s) => s + 1);
-    } finally {
-      setLoading(false);
+    } catch {
+      dispatch({ type: "FETCH_ERROR" });
     }
   }, [buildLiveWindow, subscribeLiveTokens]);
 
@@ -133,54 +182,43 @@ export function useOptionChain() {
     if (underlying && expiry) fetchAndSubscribe(underlying, expiry, true);
   }, [underlying, expiry, fetchAndSubscribe]);
 
-  // Auto-refresh Greeks (delta, IV) every 60s — LTP streams via SignalR but greeks don't
-  // scrollAtm=false so the user's scroll position is preserved during background refresh
+  // Auto-refresh Greeks every 60s (LTP streams live, but Greeks don't)
   useEffect(() => {
     if (!underlying || !expiry) return;
     const id = setInterval(() => fetchAndSubscribe(underlying, expiry, false), 60_000);
     return () => clearInterval(id);
   }, [underlying, expiry, fetchAndSubscribe]);
 
-  // Fetch chain when underlying/expiry changes — always scroll to ATM on these triggers
+  // Fetch chain when underlying/expiry changes
   useEffect(() => {
     if (underlying && expiry) fetchAndSubscribe(underlying, expiry, true);
   }, [underlying, expiry, fetchAndSubscribe]);
 
-  // ATM IV + Expected Move — computed from ATM straddle price
   const atmIv = calculateAtmIv(allChain, atmStrike);
   const { pct: expectedMovePct, pts: expectedMovePts } = calculateExpectedMove(allChain, atmStrike, spotPrice);
-
-  // Max Pain — strike that minimises total in-the-money payout from option writers
   const maxPain = calculateMaxPain(allChain);
+  const pcr     = calculatePcr(allChain);
+  const { ivRank, ivPercentile } = calculateIvRankMetrics(atmIv, ivHistory);
 
-  // Slice ATM ± visibleLow/High rows independently
-  const atmIdx = allChain.findIndex((e) => e.strikePrice === atmStrike);
-  const sliceStart = atmIdx >= 0 ? Math.max(0, atmIdx - visibleLow)  : 0;
+  const atmIdx   = allChain.findIndex((e) => e.strikePrice === atmStrike);
+  const sliceStart = atmIdx >= 0 ? Math.max(0, atmIdx - visibleLow)              : 0;
   const sliceEnd   = atmIdx >= 0 ? Math.min(allChain.length, atmIdx + visibleHigh + 1) : allChain.length;
-  const visibleRows    = allChain.slice(sliceStart, sliceEnd);
+  const visibleRows = allChain.slice(sliceStart, sliceEnd);
   const hasMoreLow  = sliceStart > 0;
   const hasMoreHigh = sliceEnd < allChain.length;
 
-  const loadMoreLow  = useCallback(() => setVisibleLow((s)  => s + VISIBLE_STEP), []);
-  const loadMoreHigh = useCallback(() => setVisibleHigh((s) => s + VISIBLE_STEP), []);
-
-  // Compute PCR from total OI across all strikes (more reliable than Upstox's per-row pcr field)
-  const pcr = calculatePcr(allChain);
-
-  // IV Rank + IV Percentile from historical snapshots
-  const ivHistoryDays = ivHistory.length;
-  const { ivRank, ivPercentile } = calculateIvRankMetrics(atmIv, ivHistory);
-
   return {
-    underlying, setUnderlying,
-    expiry, setExpiry,
+    underlying,
+    setUnderlying: useCallback((u: string) => dispatch({ type: "SET_UNDERLYING", underlying: u }), []),
+    expiry,
+    setExpiry: useCallback((e: string) => dispatch({ type: "SET_EXPIRY", expiry: e }), []),
     expiries,
     allChain,
     visibleRows,
     hasMoreLow,
     hasMoreHigh,
-    loadMoreLow,
-    loadMoreHigh,
+    loadMoreLow:  useCallback(() => dispatch({ type: "LOAD_MORE_LOW" }),  []),
+    loadMoreHigh: useCallback(() => dispatch({ type: "LOAD_MORE_HIGH" }), []),
     liveStrikeSet,
     atmStrike,
     spotPrice,
@@ -191,7 +229,7 @@ export function useOptionChain() {
     expectedMovePts,
     ivRank,
     ivPercentile,
-    ivHistoryDays,
+    ivHistoryDays: ivHistory.length,
     loading,
     lastRefreshed,
     refresh,

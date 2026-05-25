@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { payoffAt } from "./use-payoff-data";
 import type { ExpiryGroup } from "./use-payoff-data";
 
-const INR = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
+import { INR_INT as INR } from "@/lib/formatters";
 
 function fmtPnl(v: number): string {
   return INR.format(Math.round(v));

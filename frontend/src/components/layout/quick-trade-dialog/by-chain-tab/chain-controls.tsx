@@ -16,7 +16,7 @@ interface ChainControlsProps {
   onDirectionChange: (d: Direction) => void;
 }
 
-const INR = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
+import { INR_INT as INR } from "@/lib/formatters";
 
 export const ChainControls = React.memo(function ChainControls({
   qtyValue,

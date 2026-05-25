@@ -5,6 +5,7 @@ import { saveUserTradingSettings } from "@/services/user-settings-api";
 import { useFunds } from "@/hooks/use-funds";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
 import { BROKERS, UPSTOX_OAUTH_URL, ZERODHA_OAUTH_URL } from "@/lib/constants";
+import { resolveDefaultBroker } from "@/lib/broker-utils";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -19,10 +20,10 @@ export function BrokerStatusChips() {
   const ppConfigs      = useProfitProtectionStore((s) => s.configs);
 
   const connectedBrokers = BROKERS.filter((b) => credentials[b.id]);
-  const defaultBrokerId =
-    connectedBrokers.length > 1
-      ? (savedDefault && connectedBrokers.some((b) => b.id === savedDefault) ? savedDefault : connectedBrokers[0]?.id)
-      : null;
+  const connectedIds = connectedBrokers.map((b) => b.id);
+  const defaultBrokerId = connectedBrokers.length > 1
+    ? resolveDefaultBroker(savedDefault, connectedIds)
+    : null;
 
   function handleSetDefault(brokerId: string) {
     const settings = useUserTradingSettingsStore.getState();

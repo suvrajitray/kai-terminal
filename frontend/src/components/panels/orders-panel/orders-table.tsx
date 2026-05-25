@@ -5,6 +5,7 @@ import { BrokerBadge } from "@/components/ui/broker-badge";
 import { OptionTypeBadge } from "@/components/panels/positions-panel/option-type-badge";
 import type { Order } from "@/types";
 import { INSTRUMENTS } from "@/lib/lot-sizes";
+import { INR } from "@/lib/formatters";
 
 const TERMINAL_STATUSES = new Set(["complete", "rejected", "cancelled"]);
 
@@ -83,7 +84,7 @@ function formatTime(ts: string | null) {
 }
 
 function fmt(n: number) {
-  return new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+  return INR.format(n);
 }
 
 export interface OrdersTableProps {

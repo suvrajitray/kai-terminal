@@ -7,6 +7,7 @@ import { getAdminRiskLogs, type RiskLogEntry } from "@/services/admin-api";
 import { RiskConfigDialog } from "@/pages/admin/risk-config-dialog";
 import { PositionsDialog } from "@/pages/admin/positions-dialog";
 import { cn } from "@/lib/utils";
+import { INR } from "@/lib/formatters";
 
 function formatTime(ts: string) {
   try {
@@ -33,7 +34,7 @@ function StatusNode({ type }: { type: string }) {
 
 function fmt(n: number) {
   if (n == null) return "--";
-  return new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+  return INR.format(n);
 }
 
 export function AdminRiskLogsPage() {

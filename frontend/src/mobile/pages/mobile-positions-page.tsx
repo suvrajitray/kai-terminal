@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
 import { toast } from '@/lib/toast'
+import { formatSignedInr, formatGreek } from '@/lib/formatters'
 import { exitAllPositions, exitAllZerodhaPositions } from '@/services/trading-api'
 import { useSignalrPositions } from '@/components/panels/positions-panel/use-signalr-positions'
 import { usePortfolioGreeks } from '@/hooks/use-portfolio-greeks'
@@ -25,21 +26,6 @@ import type { Position } from '@/types'
 
 type BrokerFilter = 'all' | 'upstox' | 'zerodha'
 
-function formatMtm(value: number): string {
-  const abs = Math.abs(value).toLocaleString('en-IN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
-  return value >= 0 ? `+₹${abs}` : `-₹${abs}`
-}
-
-function formatGreek(value: number, decimals = 2): string {
-  return value.toLocaleString('en-IN', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-    signDisplay: 'always',
-  })
-}
 
 export function MobilePositionsPage() {
   const [positions, setPositions] = useState<Position[]>([])
@@ -133,7 +119,7 @@ export function MobilePositionsPage() {
               Total MTM
             </span>
             <span className={cn('text-xl font-bold font-mono tabular-nums', mtmColor)}>
-              {formatMtm(totalMtm)}
+              {formatSignedInr(totalMtm)}
             </span>
           </div>
 

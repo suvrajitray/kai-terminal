@@ -3,7 +3,7 @@ import { useIndicesFeed, type IndexQuote, type IndexPrices } from "@/hooks/use-i
 import { useUserTradingSettingsStore } from "@/stores/user-trading-settings-store";
 import { cn } from "@/lib/utils";
 
-const FMT = new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+import { INR as FMT } from "@/lib/formatters";
 const fmt = (v: number | null) => (v !== null ? FMT.format(v) : "—");
 
 const ALL_INDICES: { key: keyof IndexPrices; label: string }[] = [

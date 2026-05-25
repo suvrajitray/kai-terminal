@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { getUserBrokers, getUserPositions, type AdminPosition } from "@/services/admin-api";
 
-const INR = new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+import { INR } from "@/lib/formatters";
 
 const PRODUCT_LABEL: Record<string, string> = {
   Intraday: "Intraday",

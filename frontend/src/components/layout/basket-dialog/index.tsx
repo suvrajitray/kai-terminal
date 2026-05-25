@@ -1,21 +1,20 @@
-// frontend/src/components/layout/basket-dialog/index.tsx
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { ShoppingCart, CircleX, Trash2, ArrowRightLeft } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { useBasketStore } from "@/stores/basket-store";
-import { useBrokerStore } from "@/stores/broker-store";
-import { BROKERS } from "@/lib/constants";
-import { isBrokerTokenExpired } from "@/lib/token-utils";
 import { useDirectMarginEstimate } from "@/components/layout/use-margin-estimate";
 import { useAvailableMargin } from "@/components/panels/use-order-dialog-state";
 import { getMarginColor } from "@/components/panels/order-dialog-parts/order-dialog-utils";
 import { placeOrder, type MarginInstrument } from "@/services/trading-api";
 import { useOptionContractsStore } from "@/stores/option-contracts-store";
 import { toast } from "@/lib/toast";
+import { INR_INT } from "@/lib/formatters";
 import { BasketItemRow } from "./basket-item-row";
 import { StrategyStrip } from "./strategy-strip";
+import { useBasketSelection } from "./use-basket-selection";
+import { useBasketBroker } from "./use-basket-broker";
 import type { SupportedBroker } from "@/components/panels/order-dialog-parts/types";
 
 interface BasketDialogProps {
@@ -24,37 +23,20 @@ interface BasketDialogProps {
 }
 
 export function BasketDialog({ open, onClose }: BasketDialogProps) {
-  const items = useBasketStore((s) => s.items);
-  const removeItem = useBasketStore((s) => s.removeItem);
+  const items      = useBasketStore((s) => s.items);
   const updateItem = useBasketStore((s) => s.updateItem);
-  const clearBasket = useBasketStore((s) => s.clearBasket);
 
-  const credentials = useBrokerStore((s) => s.credentials);
-  const activeBrokers = BROKERS.filter(
-    (b) => (b.id === "upstox" || b.id === "zerodha") && !isBrokerTokenExpired(b.id, credentials[b.id]?.accessToken),
-  );
+  const {
+    selectedIds, allSelected, someSelected, selectedCount,
+    toggleSelectAll, toggleSelect, removeSelected, handleClearBasket, clearSelection,
+  } = useBasketSelection();
 
-  const [broker, setBroker] = useState<SupportedBroker | undefined>(activeBrokers[0]?.id as SupportedBroker);
-
-  // Sync default broker if credentials change while dialog is open
-  useEffect(() => {
-    if (!broker || !activeBrokers.some((b) => b.id === broker)) {
-      setBroker(activeBrokers[0]?.id as SupportedBroker | undefined);
-    }
-  }, [credentials]); // eslint-disable-line react-hooks/exhaustive-deps
+  const { broker, setBroker, activeBrokers, activeBroker, brokerLabel } = useBasketBroker();
 
   const [showStrip, setShowStrip] = useState(false);
   useEffect(() => {
     if (!open) setShowStrip(false);
   }, [open]);
-
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-
-  const allSelected = items.length > 0 && items.every((i) => selectedIds.has(i.id));
-  const someSelected = items.some((i) => selectedIds.has(i.id));
-  const selectedCount = useMemo(() => items.filter((i) => selectedIds.has(i.id)).length, [items, selectedIds]);
-
-  const activeBroker = (broker ?? "upstox") as "upstox" | "zerodha";
 
   const marginInstruments = useMemo<MarginInstrument[] | null>(() => {
     if (items.length === 0) return null;
@@ -94,7 +76,7 @@ export function BasketDialog({ open, onClose }: BasketDialogProps) {
           if (lookup?.contract.zerodhaToken) token = lookup.contract.zerodhaToken;
         }
 
-        const qty = item.qty * item.lotSize;
+        const qty       = item.qty * item.lotSize;
         const orderType = item.orderType === "Limit" ? "limit" : "market";
         const limitPrice = item.orderType === "Limit" ? parseFloat(item.limitPrice) : undefined;
 
@@ -103,10 +85,10 @@ export function BasketDialog({ open, onClose }: BasketDialogProps) {
     );
 
     setPlacing(false);
-    setSelectedIds(new Set());
+    clearSelection();
 
     const successCount = results.filter((r) => r.status === "fulfilled").length;
-    const failedNames = results
+    const failedNames  = results
       .map((r, i) => (r.status === "rejected" ? toPlace[i].displayName : null))
       .filter(Boolean) as string[];
 
@@ -118,31 +100,6 @@ export function BasketDialog({ open, onClose }: BasketDialogProps) {
       toast.error(`Orders failed: ${failedNames.join(", ")}`);
     }
   }
-
-  const toggleSelectAll = useCallback(() => {
-    setSelectedIds(allSelected ? new Set() : new Set(items.map((i) => i.id)));
-  }, [allSelected, items]);
-
-  const toggleSelect = useCallback((id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
-  const removeSelected = useCallback(() => {
-    selectedIds.forEach((id) => removeItem(id));
-    setSelectedIds(new Set());
-  }, [selectedIds, removeItem]);
-
-  const handleClearBasket = useCallback(() => {
-    clearBasket();
-    setSelectedIds(new Set());
-  }, [clearBasket]);
-
-  const brokerLabel = broker === "zerodha" ? "Zerodha" : "Upstox";
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -235,7 +192,7 @@ export function BasketDialog({ open, onClose }: BasketDialogProps) {
                     selected={selectedIds.has(item.id)}
                     onToggleSelect={() => toggleSelect(item.id)}
                     onUpdate={(patch) => updateItem(item.id, patch)}
-                    onRemove={() => removeItem(item.id)}
+                    onRemove={() => useBasketStore.getState().removeItem(item.id)}
                   />
                 ))}
               </tbody>
@@ -294,7 +251,7 @@ export function BasketDialog({ open, onClose }: BasketDialogProps) {
                       <span className="font-mono animate-pulse">—</span>
                     ) : margin != null ? (
                       <span className={cn("font-mono font-semibold tabular-nums", marginColor)}>
-                        ₹{margin.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                        ₹{INR_INT.format(margin)}
                       </span>
                     ) : (
                       <span className="font-mono text-muted-foreground/40">—</span>
@@ -303,9 +260,7 @@ export function BasketDialog({ open, onClose }: BasketDialogProps) {
                   <p className="text-[11px] text-muted-foreground">
                     Available{" "}
                     <span className="font-mono font-semibold tabular-nums text-foreground">
-                      {availableMargin != null
-                        ? `₹${availableMargin.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`
-                        : "—"}
+                      {availableMargin != null ? `₹${INR_INT.format(availableMargin)}` : "—"}
                     </span>
                   </p>
                 </div>

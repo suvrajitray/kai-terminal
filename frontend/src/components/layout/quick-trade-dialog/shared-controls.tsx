@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { UNDERLYING_KEYS } from "@/lib/shift-config";
+import { useUserTradingSettingsStore } from "@/stores/user-trading-settings-store";
 
 const UNDERLYINGS = Object.keys(UNDERLYING_KEYS);
 
@@ -46,6 +47,9 @@ export const SharedControls = React.memo(function SharedControls({
   onExpiryChange,
   onProductChange,
 }: SharedControlsProps) {
+  const savedDefault = useUserTradingSettingsStore((s) => s.defaultBroker);
+  const brokerOrder: readonly ("upstox" | "zerodha")[] =
+    savedDefault === "zerodha" ? ["zerodha", "upstox"] : ["upstox", "zerodha"];
   return (
     <div className="space-y-4">
       {/* Broker selector — only shown when both brokers are connected */}
@@ -56,7 +60,7 @@ export const SharedControls = React.memo(function SharedControls({
             <span>Route via</span>
           </div>
           <div className="flex items-center gap-1 rounded-md border border-border/40 bg-background p-0.5">
-            {(["upstox", "zerodha"] as const).map((b) => (
+            {brokerOrder.map((b) => (
               <button
                 key={b}
                 onClick={() => onBrokerChange(b)}
