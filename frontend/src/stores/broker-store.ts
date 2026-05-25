@@ -38,7 +38,7 @@ export const useBrokerStore = create<BrokerState>()(
           delete next[brokerId];
           return { credentials: next, brokerPriority: state.brokerPriority.filter((b) => b !== brokerId) };
         }),
-      clearAll: () => set({ credentials: {} }),
+      clearAll: () => set({ credentials: {}, brokerPriority: [] }),
       isConnected: (brokerId) => brokerId in get().credentials,
       isAuthenticated: (brokerId) => !!get().credentials[brokerId]?.accessToken,
       getCredentials: (brokerId) => get().credentials[brokerId],
