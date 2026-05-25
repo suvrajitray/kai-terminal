@@ -33,6 +33,7 @@ export function UserTradingSettingsDialog({ open, onClose }: Props) {
     indexChangeMode: store.indexChangeMode,
     autoSquareOffEnabled: store.autoSquareOffEnabled,
     autoSquareOffTime: store.autoSquareOffTime,
+    defaultBroker: store.defaultBroker,
   }));
   const [saving, setSaving] = useState(false);
 
@@ -48,6 +49,7 @@ export function UserTradingSettingsDialog({ open, onClose }: Props) {
       indexChangeMode: store.indexChangeMode,
       autoSquareOffEnabled: store.autoSquareOffEnabled,
       autoSquareOffTime: store.autoSquareOffTime,
+      defaultBroker: store.defaultBroker,
     });
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 

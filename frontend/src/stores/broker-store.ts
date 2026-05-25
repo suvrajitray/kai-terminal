@@ -4,7 +4,6 @@ import type { BrokerCredentials } from "@/types";
 
 interface BrokerState {
   credentials: Record<string, BrokerCredentials>;
-  brokerPriority: string[];
   saveCredentials: (brokerId: string, creds: BrokerCredentials) => void;
   setAccessToken: (brokerId: string, accessToken: string) => void;
   removeCredentials: (brokerId: string) => void;
@@ -12,14 +11,12 @@ interface BrokerState {
   isConnected: (brokerId: string) => boolean;
   isAuthenticated: (brokerId: string) => boolean;
   getCredentials: (brokerId: string) => BrokerCredentials | undefined;
-  setDefaultBroker: (id: string) => void;
 }
 
 export const useBrokerStore = create<BrokerState>()(
   persist(
     (set, get) => ({
       credentials: {},
-      brokerPriority: [],
       saveCredentials: (brokerId, creds) =>
         set((state) => ({
           credentials: { ...state.credentials, [brokerId]: creds },
@@ -36,16 +33,12 @@ export const useBrokerStore = create<BrokerState>()(
         set((state) => {
           const next = { ...state.credentials };
           delete next[brokerId];
-          return { credentials: next, brokerPriority: state.brokerPriority.filter((b) => b !== brokerId) };
+          return { credentials: next };
         }),
-      clearAll: () => set({ credentials: {}, brokerPriority: [] }),
+      clearAll: () => set({ credentials: {} }),
       isConnected: (brokerId) => brokerId in get().credentials,
       isAuthenticated: (brokerId) => !!get().credentials[brokerId]?.accessToken,
       getCredentials: (brokerId) => get().credentials[brokerId],
-      setDefaultBroker: (id) =>
-        set((state) => ({
-          brokerPriority: [id, ...state.brokerPriority.filter((b) => b !== id)],
-        })),
     }),
     { name: "kai-terminal-brokers" },
   ),

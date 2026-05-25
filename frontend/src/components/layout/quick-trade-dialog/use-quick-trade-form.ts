@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer } from "react";
 import { getLotSize } from "@/lib/lot-sizes";
 import { useBrokerStore } from "@/stores/broker-store";
+import { useUserTradingSettingsStore } from "@/stores/user-trading-settings-store";
 import { useOptionContractsStore } from "@/stores/option-contracts-store";
 import { type QtyMode } from "@/components/ui/qty-input";
 
@@ -47,12 +48,19 @@ function tradeFormReducer(state: TradeFormState, action: TradeFormAction): Trade
 }
 
 export function useQuickTradeForm() {
-  const isUpstoxAuthed = useBrokerStore((s) => s.isAuthenticated("upstox"));
+  const isUpstoxAuthed  = useBrokerStore((s) => s.isAuthenticated("upstox"));
   const isZerodhaAuthed = useBrokerStore((s) => s.isAuthenticated("zerodha"));
-  const bothConnected = isUpstoxAuthed && isZerodhaAuthed;
+  const savedDefault    = useUserTradingSettingsStore((s) => s.defaultBroker);
+  const bothConnected   = isUpstoxAuthed && isZerodhaAuthed;
+
+  const defaultBroker = useMemo((): QuickTradeBroker => {
+    if (savedDefault === "upstox"  && isUpstoxAuthed)  return "upstox";
+    if (savedDefault === "zerodha" && isZerodhaAuthed) return "zerodha";
+    return isUpstoxAuthed ? "upstox" : "zerodha";
+  }, [savedDefault, isUpstoxAuthed, isZerodhaAuthed]);
 
   const [form, dispatch] = useReducer(tradeFormReducer, {
-    broker: isUpstoxAuthed ? "upstox" : "zerodha",
+    broker: defaultBroker,
     underlying: "NIFTY",
     expiry: "",
     qtyValue: "",
@@ -63,6 +71,10 @@ export function useQuickTradeForm() {
 
   const getExpiries = useOptionContractsStore((s) => s.getExpiries);
   const expiries = getExpiries(form.underlying);
+
+  useEffect(() => {
+    dispatch({ type: "SET_BROKER", broker: defaultBroker });
+  }, [defaultBroker]);
 
   useEffect(() => {
     const nextExpiry = expiries.includes(form.expiry) ? form.expiry : (expiries[0] ?? "");

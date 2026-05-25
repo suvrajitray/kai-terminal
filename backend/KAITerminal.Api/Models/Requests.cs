@@ -16,7 +16,8 @@ public record struct SaveUserTradingSettingsRequest(
     int BankexShiftOffset = 10,
     string IndexChangeMode = "prevClose",
     bool AutoSquareOffEnabled = false,
-    string AutoSquareOffTime = "15:20");
+    string AutoSquareOffTime = "15:20",
+    string? DefaultBroker = null);
 
 public record struct SaveBrokerCredentialRequest(
     string BrokerName,

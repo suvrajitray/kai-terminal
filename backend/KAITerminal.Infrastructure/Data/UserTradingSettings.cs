@@ -12,5 +12,6 @@ public class UserTradingSettings
     public string IndexChangeMode { get; set; } = "prevClose";
     public bool AutoSquareOffEnabled { get; set; } = false;
     public string AutoSquareOffTime { get; set; } = "15:20";
+    public string? DefaultBroker { get; set; }
     public DateTime UpdatedAt { get; set; }
 }

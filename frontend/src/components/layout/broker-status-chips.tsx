@@ -1,5 +1,7 @@
 import { KeyRound, ShieldCheck, Star, Wallet } from "lucide-react";
 import { useBrokerStore } from "@/stores/broker-store";
+import { useUserTradingSettingsStore } from "@/stores/user-trading-settings-store";
+import { saveUserTradingSettings } from "@/services/user-settings-api";
 import { useFunds } from "@/hooks/use-funds";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
 import { BROKERS, UPSTOX_OAUTH_URL, ZERODHA_OAUTH_URL } from "@/lib/constants";
@@ -11,17 +13,23 @@ import { Separator } from "@/components/ui/separator";
 import type { FundsData } from "@/services/trading-api";
 
 export function BrokerStatusChips() {
-  const credentials      = useBrokerStore((s) => s.credentials);
-  const brokerPriority   = useBrokerStore((s) => s.brokerPriority);
-  const setDefaultBroker = useBrokerStore((s) => s.setDefaultBroker);
+  const credentials   = useBrokerStore((s) => s.credentials);
+  const savedDefault  = useUserTradingSettingsStore((s) => s.defaultBroker);
   const { allFunds, loading: fundsLoading, refresh } = useFunds();
-  const ppConfigs         = useProfitProtectionStore((s) => s.configs);
+  const ppConfigs      = useProfitProtectionStore((s) => s.configs);
 
   const connectedBrokers = BROKERS.filter((b) => credentials[b.id]);
   const defaultBrokerId =
     connectedBrokers.length > 1
-      ? (brokerPriority.find((id) => connectedBrokers.some((b) => b.id === id)) ?? connectedBrokers[0]?.id)
+      ? (savedDefault && connectedBrokers.some((b) => b.id === savedDefault) ? savedDefault : connectedBrokers[0]?.id)
       : null;
+
+  function handleSetDefault(brokerId: string) {
+    const settings = useUserTradingSettingsStore.getState();
+    const updated = { ...settings, defaultBroker: brokerId };
+    useUserTradingSettingsStore.getState().setSettings(updated);
+    void saveUserTradingSettings(updated);
+  }
 
   if (connectedBrokers.length === 0) return null;
 
@@ -65,7 +73,7 @@ export function BrokerStatusChips() {
               </button>
             </PopoverTrigger>
 
-            <PopoverContent className="w-52 p-3" align="end">
+            <PopoverContent className="w-72 p-3" align="end">
               <div className="space-y-3">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -97,22 +105,18 @@ export function BrokerStatusChips() {
 
                 <Separator />
 
-                {connectedBrokers.length > 1 && broker.id !== defaultBrokerId && (
-                  <>
+                <div className="flex items-center gap-1.5">
+                  {connectedBrokers.length > 1 && broker.id !== defaultBrokerId && (
                     <Button
                       size="sm"
                       variant="outline"
-                      className="w-full h-7 text-xs border-border/50 text-muted-foreground hover:text-foreground"
-                      onClick={() => setDefaultBroker(broker.id)}
+                      className="flex-1 h-7 text-xs border-border/50 text-muted-foreground hover:text-foreground"
+                      onClick={() => handleSetDefault(broker.id)}
                     >
                       <Star className="mr-1.5 size-3" />
                       Set as default
                     </Button>
-                    <Separator />
-                  </>
-                )}
-
-                <div className="flex items-center gap-1.5">
+                  )}
                   <Button
                     size="sm"
                     variant="outline"

@@ -10,4 +10,5 @@ public record UserTradingSettingsResponse(
     int BankexShiftOffset,
     string IndexChangeMode = "prevClose",
     bool AutoSquareOffEnabled = false,
-    string AutoSquareOffTime = "15:20");
+    string AutoSquareOffTime = "15:20",
+    string? DefaultBroker = null);

@@ -9,6 +9,7 @@ export interface UserTradingSettings {
   indexChangeMode: "open" | "prevClose";
   autoSquareOffEnabled: boolean;
   autoSquareOffTime: string;
+  defaultBroker: string | null;
 }
 
 export const DEFAULT_TRADING_SETTINGS: UserTradingSettings = {
@@ -20,6 +21,7 @@ export const DEFAULT_TRADING_SETTINGS: UserTradingSettings = {
   indexChangeMode: "prevClose",
   autoSquareOffEnabled: false,
   autoSquareOffTime: "15:20",
+  defaultBroker: null,
 };
 
 export async function fetchUserTradingSettings(): Promise<UserTradingSettings> {

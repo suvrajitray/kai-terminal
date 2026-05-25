@@ -31,7 +31,8 @@ public class UserTradingSettingsService(AppDbContext db)
             settings.BankexShiftOffset,
             settings.IndexChangeMode,
             settings.AutoSquareOffEnabled,
-            settings.AutoSquareOffTime);
+            settings.AutoSquareOffTime,
+            settings.DefaultBroker);
     }
 
     public async Task SaveAsync(string username, SaveUserTradingSettingsRequest request)
@@ -65,5 +66,6 @@ public class UserTradingSettingsService(AppDbContext db)
         entity.IndexChangeMode      = req.IndexChangeMode;
         entity.AutoSquareOffEnabled = req.AutoSquareOffEnabled;
         entity.AutoSquareOffTime    = req.AutoSquareOffTime;
+        entity.DefaultBroker        = req.DefaultBroker;
     }
 }
