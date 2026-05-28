@@ -118,20 +118,22 @@ export function BrokerStatusChips() {
                       Set as default
                     </Button>
                   )}
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className={cn(
-                      "flex-1 h-7 text-xs",
-                      ppConfigs[broker.id]?.enabled
-                        ? "border-green-500/30 text-green-500 hover:bg-green-500/10 hover:text-green-500"
-                        : "border-border/50 text-muted-foreground hover:text-foreground",
-                    )}
-                    onClick={() => useProfitProtectionStore.getState().requestOpen(broker.id)}
-                  >
-                    <ShieldCheck className="mr-1.5 size-3" />
-                    Profit Protection
-                  </Button>
+                  {isAuthed && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className={cn(
+                        "flex-1 h-7 text-xs",
+                        ppConfigs[broker.id]?.enabled
+                          ? "border-green-500/30 text-green-500 hover:bg-green-500/10 hover:text-green-500"
+                          : "border-border/50 text-muted-foreground hover:text-foreground",
+                      )}
+                      onClick={() => useProfitProtectionStore.getState().requestOpen(broker.id)}
+                    >
+                      <ShieldCheck className="mr-1.5 size-3" />
+                      Profit Protection
+                    </Button>
+                  )}
 
                   {!isAuthed && (
                     <Tooltip>
