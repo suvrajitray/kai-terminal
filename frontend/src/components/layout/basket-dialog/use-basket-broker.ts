@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useBrokerStore } from "@/stores/broker-store";
 import { useUserTradingSettingsStore } from "@/stores/user-trading-settings-store";
 import { BROKERS } from "@/lib/constants";
@@ -17,16 +17,12 @@ export function useBasketBroker() {
     defaultBroker,
   );
 
-  const [broker, setBroker] = useState<SupportedBroker | undefined>(
-    activeBrokers[0]?.id as SupportedBroker,
-  );
-
-  // Sync selected broker when credentials change while dialog is open
-  useEffect(() => {
-    if (!broker || !activeBrokers.some((b) => b.id === broker)) {
-      setBroker(activeBrokers[0]?.id as SupportedBroker | undefined);
-    }
-  }, [credentials]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Honor the user's last pick if it's still active; otherwise fall back to the
+  // first active broker (which respects the default ordering).
+  const [userBroker, setBroker] = useState<SupportedBroker | undefined>();
+  const broker = (userBroker && activeBrokers.some((b) => b.id === userBroker))
+    ? userBroker
+    : (activeBrokers[0]?.id as SupportedBroker | undefined);
 
   const activeBroker  = (broker ?? "upstox") as "upstox" | "zerodha";
   const brokerLabel   = broker === "zerodha" ? "Zerodha" : "Upstox";

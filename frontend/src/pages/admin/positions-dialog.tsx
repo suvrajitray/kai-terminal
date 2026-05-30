@@ -92,27 +92,35 @@ export function PositionsDialog({
   onClose: () => void;
 }) {
   const [brokers, setBrokers] = useState<string[]>([]);
-  const [broker, setBroker] = useState<"upstox" | "zerodha">("upstox");
-  const [positions, setPositions] = useState<AdminPosition[] | undefined>(undefined);
-  const [loading, setLoading] = useState(false);
+  const [userBroker, setBroker] = useState<"upstox" | "zerodha" | null>(null);
+  const [resp, setResp] = useState<{ broker: string; data: AdminPosition[] } | null>(null);
 
   useEffect(() => {
     if (!open) return;
+    let cancelled = false;
     getUserBrokers(user.email).then((list) => {
+      if (cancelled) return;
       setBrokers(list);
       if (list.length > 0) setBroker(list[0] as "upstox" | "zerodha");
     });
+    return () => { cancelled = true; };
   }, [open, user.email]);
 
+  const broker = userBroker ?? "upstox";
+
   useEffect(() => {
-    if (!open || !broker) return;
-    setLoading(true);
-    setPositions(undefined);
-    getUserPositions(user.email, broker)
-      .then(setPositions)
-      .catch(() => setPositions([]))
-      .finally(() => setLoading(false));
-  }, [open, user.email, broker]);
+    if (!open || !userBroker) return;
+    let cancelled = false;
+    getUserPositions(user.email, userBroker).then(
+      (p) => { if (!cancelled) setResp({ broker: userBroker, data: p }); },
+      ()  => { if (!cancelled) setResp({ broker: userBroker, data: [] }); },
+    );
+    return () => { cancelled = true; };
+  }, [open, user.email, userBroker]);
+
+  // Loading whenever the latest response is for a different broker than the active one.
+  const loading   = userBroker !== null && resp?.broker !== userBroker;
+  const positions = loading ? undefined : resp?.data;
 
   const openPositions   = positions?.filter(p => p.isOpen)  ?? [];
   const closedPositions = positions?.filter(p => !p.isOpen) ?? [];

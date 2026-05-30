@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { ShoppingCart, CircleX, Trash2, ArrowRightLeft } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -33,9 +33,10 @@ export function BasketDialog({ open, onClose }: BasketDialogProps) {
   const { broker, setBroker, activeBrokers, activeBroker, brokerLabel } = useBasketBroker();
 
   const [showStrip, setShowStrip] = useState(false);
-  useEffect(() => {
-    if (!open) setShowStrip(false);
-  }, [open]);
+  const handleClose = () => {
+    setShowStrip(false);
+    onClose();
+  };
 
   const marginInstruments = useMemo<MarginInstrument[] | null>(() => {
     if (items.length === 0) return null;
@@ -101,7 +102,7 @@ export function BasketDialog({ open, onClose }: BasketDialogProps) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
       <DialogContent className="sm:max-w-[960px] p-0 gap-0 overflow-hidden" showCloseButton={false}>
         <DialogTitle className="sr-only">Basket</DialogTitle>
 
@@ -268,7 +269,7 @@ export function BasketDialog({ open, onClose }: BasketDialogProps) {
           {/* Right: close + place */}
           <div className="flex items-center gap-2">
             <button
-              onClick={onClose}
+              onClick={handleClose}
               disabled={placing}
               className="px-4 py-1.5 rounded border border-border/50 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >

@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState } from "react";
 import { BarChart2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
@@ -24,16 +24,11 @@ export function PayoffChartDialog({ open, onOpenChange, positions }: Props) {
   const { underlyingGroups } = usePayoffData(positions, open);
   const feed = useIndicesFeed();
 
-  // Default selected = first group with open positions
-  const [selectedUnderlying, setSelectedUnderlying] = useState<string>("");
-
-  useEffect(() => {
-    if (underlyingGroups.length > 0 && !underlyingGroups.find((g) => g.underlying === selectedUnderlying)) {
-      setSelectedUnderlying(underlyingGroups[0].underlying);
-    }
-  }, [underlyingGroups, selectedUnderlying]);
-
-  const selectedGroup = underlyingGroups.find((g) => g.underlying === selectedUnderlying) ?? underlyingGroups[0];
+  // Honor the user's pick if it's still in the available groups; otherwise fall
+  // back to the first group with open positions.
+  const [userSelected, setSelectedUnderlying] = useState<string>("");
+  const selectedGroup = underlyingGroups.find((g) => g.underlying === userSelected) ?? underlyingGroups[0];
+  const selectedUnderlying = selectedGroup?.underlying ?? "";
 
   // Live spot for the selected underlying
   const spot = useMemo(() => {
@@ -41,7 +36,7 @@ export function PayoffChartDialog({ open, onOpenChange, positions }: Props) {
     return feed[selectedGroup.feedKey].ltp ?? 0;
   }, [selectedGroup, feed]);
 
-  const groups = selectedGroup?.expiryGroups ?? [];
+  const groups = useMemo(() => selectedGroup?.expiryGroups ?? [], [selectedGroup]);
   const allLegs = useMemo(() => groups.flatMap((g) => g.legs), [groups]);
 
   const { renderedCurves, combinedPts, xMin, xMax, yMin, yMax } = useMemo(() => {

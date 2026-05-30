@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useEffect, lazy, Suspense } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { Header } from "./header";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
@@ -19,17 +19,10 @@ export function AppLayout() {
       .catch(() => {});
   }, []);
 
+  // The PP store is the single source of truth: a non-null pendingOpenBrokerId
+  // means "panel open for this broker". onClose clears it.
   const pendingOpenBrokerId = useProfitProtectionStore((s) => s.pendingOpenBrokerId);
-  const [ppOpen, setPpOpen] = useState(false);
-  const [ppBrokerId, setPpBrokerId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (pendingOpenBrokerId) {
-      setPpBrokerId(pendingOpenBrokerId);
-      setPpOpen(true);
-      useProfitProtectionStore.getState().clearPendingOpen();
-    }
-  }, [pendingOpenBrokerId]);
+  const clearPendingOpen    = useProfitProtectionStore((s) => s.clearPendingOpen);
 
   return (
     <div className="min-h-svh bg-background">
@@ -39,9 +32,9 @@ export function AppLayout() {
       </main>
       <Suspense fallback={null}>
         <ProfitProtectionPanel
-          open={ppOpen}
-          onClose={() => { setPpOpen(false); setPpBrokerId(null); }}
-          brokerId={ppBrokerId}
+          open={pendingOpenBrokerId !== null}
+          onClose={clearPendingOpen}
+          brokerId={pendingOpenBrokerId}
         />
       </Suspense>
     </div>

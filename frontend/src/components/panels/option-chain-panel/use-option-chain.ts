@@ -132,12 +132,16 @@ export function useOptionChain() {
 
   const { setLiveTokens, invokeSubscribe } = useOptionChainFeed({ onLtpBatch: handleLtpBatch });
 
-  // Default expiry to the nearest one when underlying changes
+  // Default expiry to the nearest one when underlying changes.
+  // Excludes `expiry` from deps deliberately — it's the state being assigned,
+  // not a trigger, and including it would cause the effect to re-fire on every
+  // SET_EXPIRY dispatch.
   useEffect(() => {
     if (expiries.length > 0 && !expiries.includes(expiry)) {
       dispatch({ type: "SET_EXPIRY", expiry: expiries[0] });
     }
-  }, [underlying, expiries]); // intentionally excludes expiry to avoid loop
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [underlying, expiries]);
 
   const buildLiveWindow = useCallback((chain: OptionChainEntry[]) => {
     if (chain.length === 0) return { liveSet: new Set<number>(), atm: 0, spot: 0 };

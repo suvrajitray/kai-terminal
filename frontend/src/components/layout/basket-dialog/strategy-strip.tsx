@@ -1,5 +1,5 @@
 // src/components/layout/basket-dialog/strategy-strip.tsx
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIndicesFeed } from "@/hooks/use-indices-feed";
@@ -32,17 +32,11 @@ export function StrategyStrip() {
   const addItem      = useBasketStore((s) => s.addItem);
 
   const [underlying, setUnderlying] = useState<string>(INSTRUMENTS[0]);
-  const [expiry, setExpiry]         = useState<string>("");
+  const [userExpiry, setUserExpiry] = useState<string>("");
   const [strategy, setStrategy]     = useState<Strategy>("Straddle");
   const [lots, setLots]             = useState(1);
   const [sellWidth, setSellWidth]   = useState(2);
   const [hedgeWidth, setHedgeWidth] = useState(2);
-
-  // Reset expiry when underlying changes
-  useEffect(() => {
-    const exps = getExpiries(underlying);
-    setExpiry((prev) => (exps.includes(prev) ? prev : (exps[0] ?? "")));
-  }, [underlying, getExpiries]);
 
   const indexKey = UNDERLYING_TO_INDEX[underlying];
   const spot     = indexKey ? (indexPrices[indexKey]?.ltp ?? 0) : 0;
@@ -50,6 +44,12 @@ export function StrategyStrip() {
   const expiries  = getExpiries(underlying);
   const exchange  = BSE_UNDERLYINGS.has(underlying) ? "BFO" : "NFO";
   const lotSize   = getLotSize(underlying);
+
+  // Derive expiry: honor the user's pick if still valid, otherwise the nearest one.
+  const expiry = useMemo(
+    () => (expiries.includes(userExpiry) ? userExpiry : (expiries[0] ?? "")),
+    [expiries, userExpiry],
+  );
 
   const legs = useMemo(
     () => (expiry && spot > 0 ? computeLegs(contracts, expiry, spot, strategy, sellWidth, hedgeWidth) : null),
@@ -118,7 +118,7 @@ export function StrategyStrip() {
       {/* Expiry */}
       <select
         value={expiry}
-        onChange={(e) => setExpiry(e.target.value)}
+        onChange={(e) => setUserExpiry(e.target.value)}
         disabled={expiries.length === 0}
         className="h-7 rounded border border-border/50 bg-background px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 disabled:opacity-40"
       >
