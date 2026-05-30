@@ -33,7 +33,7 @@ export interface OrderIntent {
   expiry?: string;
 }
 
-interface Props {
+export interface OrderDialogProps {
   intent: OrderIntent | null;
   currentLtp?: number;
   onClose: () => void;
@@ -55,7 +55,7 @@ export function OrderDialog({
   lockedProduct,
   hideDirectionToggle,
   defaultQtyOverride,
-}: Props) {
+}: OrderDialogProps) {
   const credentials        = useBrokerStore((s) => s.credentials);
   const defaultBroker      = useUserTradingSettingsStore((s) => s.defaultBroker);
   const getByInstrumentKey = useOptionContractsStore((s) => s.getByInstrumentKey);

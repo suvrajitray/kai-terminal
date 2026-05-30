@@ -13,12 +13,13 @@ import {
 } from "./position-action-dialogs";
 import { parseTradingSymbol } from "./trading-symbol";
 import {
-  OrderDialog,
+  OrderDialogLazy,
   type OrderIntent,
-} from "@/components/panels/order-dialog";
+} from "@/components/panels/order-dialog-lazy";
 import type { Position } from "@/types";
 import { useBasketStore } from "@/stores/basket-store";
-import { INR, PnlCell } from "./pnl-cell";
+import { INR } from "@/lib/formatters";
+import { PnlCell } from "./pnl-cell";
 
 export { PnlCell } from "./pnl-cell";
 
@@ -220,7 +221,7 @@ export const PositionRow = memo(function PositionRow({
       </tr>
 
       {/* Unified order dialog for buy-more / sell-more / exit */}
-      <OrderDialog
+      <OrderDialogLazy
         intent={activeIntent}
         currentLtp={p.ltp}
         onClose={() => setDialog(null)}

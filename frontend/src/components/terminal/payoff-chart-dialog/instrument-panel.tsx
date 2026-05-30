@@ -5,10 +5,10 @@ import { getLotSize } from "@/lib/lot-sizes";
 import type { UnderlyingPayoffGroup, DisplayItem } from "./use-payoff-data";
 import type { IndexPrices } from "@/hooks/use-indices-feed";
 
-import { INR_INT as INR } from "@/lib/formatters";
+import { INR_INT } from "@/lib/formatters";
 
 function fmtPnl(v: number) {
-  return (v >= 0 ? "+" : "-") + INR.format(Math.abs(v));
+  return (v >= 0 ? "+" : "-") + INR_INT.format(Math.abs(v));
 }
 
 function fmtExpiryShort(iso: string): string {
@@ -20,7 +20,7 @@ function fmtExpiryShort(iso: string): string {
 function fmtItemLabel(item: DisplayItem): string {
   const lots = Math.round(Math.abs(item.quantity) / getLotSize(item.tradingSymbol));
   if (item.contract) {
-    return `${lots} x ${fmtExpiryShort(item.contract.expiry)} ${INR.format(item.contract.strikePrice)} ${item.contract.instrumentType}`;
+    return `${lots} x ${fmtExpiryShort(item.contract.expiry)} ${INR_INT.format(item.contract.strikePrice)} ${item.contract.instrumentType}`;
   }
   return `${Math.abs(item.quantity)} x ${item.tradingSymbol}`;
 }
@@ -72,7 +72,7 @@ export function InstrumentPanel({ groups, selectedUnderlying, feed, onSelect }: 
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold">{group.underlying}</span>
                 {spot != null && (
-                  <span className="tabular-nums text-[13px] text-foreground">{INR.format(spot)}</span>
+                  <span className="tabular-nums text-[13px] text-foreground">{INR_INT.format(spot)}</span>
                 )}
                 {pctStr != null && (
                   <span className={cn(

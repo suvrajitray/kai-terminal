@@ -3,8 +3,8 @@ import { useIndicesFeed, type IndexQuote, type IndexPrices } from "@/hooks/use-i
 import { useUserTradingSettingsStore } from "@/stores/user-trading-settings-store";
 import { cn } from "@/lib/utils";
 
-import { INR as FMT } from "@/lib/formatters";
-const fmt = (v: number | null) => (v !== null ? FMT.format(v) : "—");
+import { INR } from "@/lib/formatters";
+const fmt = (v: number | null) => (v !== null ? INR.format(v) : "—");
 
 const ALL_INDICES: { key: keyof IndexPrices; label: string }[] = [
   { key: "nifty",     label: "NIFTY" },
@@ -49,7 +49,7 @@ function IndexCard({ label, quote, delay }: { label: string; quote: IndexQuote; 
         </span>
         {hasData && change !== null && changePct !== null ? (
           <span className={cn("text-[11px] tabular-nums font-medium leading-none", isUp ? "text-emerald-500" : "text-rose-500")}>
-            {isUp ? "+" : ""}{FMT.format(change)}
+            {isUp ? "+" : ""}{INR.format(change)}
             <span className="ml-1 text-[10px] opacity-70">({isUp ? "+" : ""}{changePct.toFixed(2)}%)</span>
           </span>
         ) : (

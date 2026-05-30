@@ -1,10 +1,10 @@
 import { cn } from "@/lib/utils";
 import type { RenderedCurve } from "./use-payoff-data";
 
-import { INR_INT as INR } from "@/lib/formatters";
+import { INR_INT } from "@/lib/formatters";
 
 function fmt(v: number): string {
-  return (v >= 0 ? "+" : "−") + "₹" + INR.format(Math.abs(v));
+  return (v >= 0 ? "+" : "−") + "₹" + INR_INT.format(Math.abs(v));
 }
 
 function pct(price: number, spot: number): string {
@@ -84,7 +84,7 @@ export function StatsBar({ renderedCurves, combinedPts, spot, atSpot }: StatsBar
         {allBEs.length > 0
           ? allBEs.map((be, i) => (
               <span key={i} className="flex items-center gap-1 bg-muted/30 border border-border/40 rounded px-2 py-0.5">
-                <span className="text-xs font-mono font-semibold tabular-nums">₹{INR.format(be)}</span>
+                <span className="text-xs font-mono font-semibold tabular-nums">₹{INR_INT.format(be)}</span>
                 <span className="text-[10px] text-muted-foreground">{pct(be, spot)}</span>
               </span>
             ))

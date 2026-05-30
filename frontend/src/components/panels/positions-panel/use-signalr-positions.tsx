@@ -1,4 +1,5 @@
 import { useEffect, useState, useEffectEvent } from "react";
+import { useShallow } from "zustand/react/shallow";
 import * as signalR from "@microsoft/signalr";
 import { toast as sonner } from "sonner";
 import { toast } from "@/lib/toast";
@@ -82,6 +83,22 @@ export function useSignalrPositions({
 }: UseSignalrPositionsOptions) {
   const [isLive, setIsLive] = useState(false);
 
+  // Subscribe to credentials so the connection rebuilds when a broker is added or replaced.
+  // useShallow keeps the reference stable when the resolved values are unchanged.
+  const conn = useBrokerStore(useShallow((s) => {
+    const upstox = s.credentials.upstox;
+    const zerodha = s.credentials.zerodha;
+    const upstoxToken = upstox?.accessToken && !isBrokerTokenExpired("upstox", upstox.accessToken)
+      ? upstox.accessToken
+      : "";
+    const zerodhaValid = !!zerodha?.accessToken && !isBrokerTokenExpired("zerodha", zerodha.accessToken) && !!zerodha?.apiKey;
+    return {
+      upstoxToken,
+      zerodhaToken: zerodhaValid ? zerodha!.accessToken : "",
+      zerodhaApiKey: zerodhaValid ? zerodha!.apiKey ?? "" : "",
+    };
+  }));
+
   const handlePositions = useEffectEvent((incoming: Position[]) => {
     onPositions(incoming);
     setLoading(false);
@@ -96,13 +113,9 @@ export function useSignalrPositions({
   const setLoadingState = useEffectEvent((loading: boolean) => setLoading(loading));
 
   useEffect(() => {
-    const { getCredentials } = useBrokerStore.getState();
-    const upstoxToken   = getCredentials("upstox")?.accessToken;
-    const zerodhaToken  = getCredentials("zerodha")?.accessToken;
-    const zerodhaApiKey = getCredentials("zerodha")?.apiKey;
-
-    const hasUpstox  = !!upstoxToken  && !isBrokerTokenExpired("upstox",  upstoxToken);
-    const hasZerodha = !!zerodhaToken && !isBrokerTokenExpired("zerodha", zerodhaToken) && !!zerodhaApiKey;
+    const { upstoxToken, zerodhaToken, zerodhaApiKey } = conn;
+    const hasUpstox  = !!upstoxToken;
+    const hasZerodha = !!zerodhaToken && !!zerodhaApiKey;
 
     if (!hasUpstox && !hasZerodha) {
       // No broker available — nothing to connect
@@ -110,27 +123,27 @@ export function useSignalrPositions({
     }
 
     const params = new URLSearchParams();
-    if (hasUpstox)  params.set("upstoxToken",  upstoxToken!);
-    if (hasZerodha) { params.set("zerodhaToken", zerodhaToken!); params.set("zerodhaApiKey", zerodhaApiKey!); }
+    if (hasUpstox)  params.set("upstoxToken",  upstoxToken);
+    if (hasZerodha) { params.set("zerodhaToken", zerodhaToken); params.set("zerodhaApiKey", zerodhaApiKey); }
 
     const wsUrl = `${API_BASE_URL}/hubs/positions?${params.toString()}`;
     const jwt   = useAuthStore.getState().token ?? "";
 
-    const conn = new signalR.HubConnectionBuilder()
+    const hubConn = new signalR.HubConnectionBuilder()
       .withUrl(wsUrl, { accessTokenFactory: () => jwt })
       .withAutomaticReconnect()
       .build();
 
     // Backend sends combined positions for all connected brokers
-    conn.on("ReceivePositions", (incoming: Position[]) => {
+    hubConn.on("ReceivePositions", (incoming: Position[]) => {
       handlePositions(incoming);
     });
 
-    conn.on("ReceiveLtpBatch", (updates: Array<{ instrumentToken: string; ltp: number }>) => {
+    hubConn.on("ReceiveLtpBatch", (updates: Array<{ instrumentToken: string; ltp: number }>) => {
       handleLtpBatch(updates);
     });
 
-    conn.on("ReceiveOrderUpdate", (update: {
+    hubConn.on("ReceiveOrderUpdate", (update: {
       orderId: string;
       status: string;
       statusMessage: string;
@@ -180,12 +193,12 @@ export function useSignalrPositions({
       handleOrderUpdate();
     });
 
-    conn.onreconnecting(() => setIsLive(false));
-    conn.onreconnected(() => setIsLive(true));
-    conn.onclose(() => setIsLive(false));
+    hubConn.onreconnecting(() => setIsLive(false));
+    hubConn.onreconnected(() => setIsLive(true));
+    hubConn.onclose(() => setIsLive(false));
 
     setLoadingState(true);
-    conn.start()
+    hubConn.start()
       .then(() => setIsLive(true))
       .catch(() => {
         setIsLive(false);
@@ -193,9 +206,9 @@ export function useSignalrPositions({
       });
 
     return () => {
-      conn.stop();
+      hubConn.stop();
     };
-  }, []);
+  }, [conn]);
 
   return { isLive };
 }

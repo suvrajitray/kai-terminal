@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { UNDERLYING_KEYS } from "@/lib/shift-config";
-import { OrderDialog, type OrderIntent } from "@/components/panels/order-dialog";
+import { OrderDialogLazy, type OrderIntent } from "@/components/panels/order-dialog-lazy";
 import { useOptionContractsStore } from "@/stores/option-contracts-store";
 import { ChainScrollBody } from "./chain-scroll-body";
 import { calculateHedgeSuggestion } from "./hedge-suggestion";
@@ -128,7 +128,7 @@ export function OptionChainPanel({ width, onResize, onClose, netDelta }: Props) 
         />
       </div>
 
-      <OrderDialog
+      <OrderDialogLazy
         intent={orderIntent}
         currentLtp={currentLtp}
         onClose={() => setOrderIntent(null)}

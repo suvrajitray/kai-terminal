@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast";
 import { PositionsPanel } from "@/components/panels/positions-panel";
@@ -6,10 +6,9 @@ import { OrdersPanel } from "@/components/panels/orders-panel";
 import { StatsBar } from "@/components/terminal/stats-bar";
 import { BrokerAuthRequired } from "@/components/terminal/broker-auth-required";
 import { usePositionsFeed } from "@/components/panels/positions-panel/use-positions-feed";
-import { useProfitProtection } from "./use-profit-protection";
-import { useRiskConfig } from "@/hooks/use-risk-config";
 import { useOptionContractsPrefetch } from "@/hooks/use-option-contracts-prefetch";
 import { usePortfolioGreeks } from "@/hooks/use-portfolio-greeks";
+import { useBrokerPpStatus } from "@/hooks/use-broker-pp-status";
 import { exitAllPositions, exitAllZerodhaPositions } from "@/services/trading-api";
 import { OptionChainPanel } from "@/components/panels/option-chain-panel";
 import { useProfitProtectionStore } from "@/stores/profit-protection-store";
@@ -33,7 +32,6 @@ export function TerminalPage() {
 
 function TerminalPageInner() {
   const credentials     = useBrokerStore((s) => s.credentials);
-  const isAuthenticated = useBrokerStore((s) => s.isAuthenticated);
   const loadOrdersRef = useRef<(() => void) | null>(null);
   const { positions, loading, isLive, load } = usePositionsFeed(
     () => loadOrdersRef.current?.()
@@ -66,32 +64,9 @@ function TerminalPageInner() {
 
   useOptionContractsPrefetch();
   const { netDelta, thetaPerDay } = usePortfolioGreeks(positions);
-
-  // Hooks must be called unconditionally — one set per known broker in BROKERS.
-  // When adding a new broker (e.g. "dhan"), add useRiskConfig, useProfitProtection,
-  // getConfig, and one entry in ppBrokers below.
-  useRiskConfig("upstox");
-  useRiskConfig("zerodha");
-  useRiskConfig("dhan");
-  const { currentSl: upstoxSl }  = useProfitProtection("upstox");
-  const { currentSl: zerodhasl } = useProfitProtection("zerodha");
-  const { currentSl: dhanSl }    = useProfitProtection("dhan");
-  const upstoxPp  = useProfitProtectionStore((s) => s.getConfig("upstox"));
-  const zerodhaP  = useProfitProtectionStore((s) => s.getConfig("zerodha"));
-  const dhanPp    = useProfitProtectionStore((s) => s.getConfig("dhan"));
+  const ppBrokers = useBrokerPpStatus();
 
   const openCount = positions.filter((p) => p.quantity !== 0).length;
-
-  const ppBrokers = useMemo(() => [
-    upstoxPp.enabled && isAuthenticated("upstox")  ? { broker: "upstox",  target: upstoxPp.mtmTarget, currentSl: upstoxSl,  trailing: upstoxPp.trailingEnabled } : null,
-    zerodhaP.enabled && isAuthenticated("zerodha") ? { broker: "zerodha", target: zerodhaP.mtmTarget, currentSl: zerodhasl, trailing: zerodhaP.trailingEnabled } : null,
-    dhanPp.enabled   && isAuthenticated("dhan")    ? { broker: "dhan",    target: dhanPp.mtmTarget,   currentSl: dhanSl,    trailing: dhanPp.trailingEnabled }   : null,
-  ].filter((x): x is NonNullable<typeof x> => x !== null), [
-    isAuthenticated,
-    upstoxPp.enabled, upstoxPp.mtmTarget, upstoxPp.trailingEnabled, upstoxSl,
-    zerodhaP.enabled, zerodhaP.mtmTarget, zerodhaP.trailingEnabled, zerodhasl,
-    dhanPp.enabled,   dhanPp.mtmTarget,   dhanPp.trailingEnabled,   dhanSl,
-  ]);
 
   // Keyboard shortcuts: R = refresh, E = exit all (with confirm)
   useEffect(() => {

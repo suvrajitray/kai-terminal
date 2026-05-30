@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useOptionContractsStore } from "@/stores/option-contracts-store";
 import { fetchOptionChain } from "@/services/trading-api";
 import { UNDERLYING_KEYS } from "@/lib/shift-config";
@@ -52,10 +52,10 @@ export function usePortfolioGreeks(positions: Position[]): PortfolioGreeks {
 
   // When positions change, rebuild group map. Fetch immediately only for new groups.
   useEffect(() => {
-    const openPositions = positions.filter((p) => p.quantity !== 0);
     const nextGroups: GroupMap = new Map();
 
-    for (const p of openPositions) {
+    for (const p of positions) {
+      if (p.quantity === 0) continue;
       const lookup = getByInstrumentKey(p.instrumentToken, p.tradingSymbol);
       if (!lookup) continue;
       const { index, contract } = lookup;
@@ -82,20 +82,21 @@ export function usePortfolioGreeks(positions: Position[]): PortfolioGreeks {
     return () => clearInterval(id);
   }, [fetchGroups]);
 
-  // Aggregate greeks weighted by signed position quantity
-  let netDelta = 0;
-  let thetaPerDay = 0;
-
-  for (const p of positions.filter((pos) => pos.quantity !== 0)) {
-    const lookup = getByInstrumentKey(p.instrumentToken, p.tradingSymbol);
-    if (!lookup) continue;
-    const chainKey = lookup.contract.upstoxToken;
-    if (!chainKey) continue;
-    const g = greeksMap.get(chainKey);
-    if (!g) continue;
-    netDelta    += g.delta * p.quantity;
-    thetaPerDay += g.theta * p.quantity;
-  }
-
-  return { netDelta, thetaPerDay };
+  // Aggregate greeks weighted by signed position quantity (single pass)
+  return useMemo(() => {
+    let netDelta = 0;
+    let thetaPerDay = 0;
+    for (const p of positions) {
+      if (p.quantity === 0) continue;
+      const lookup = getByInstrumentKey(p.instrumentToken, p.tradingSymbol);
+      if (!lookup) continue;
+      const chainKey = lookup.contract.upstoxToken;
+      if (!chainKey) continue;
+      const g = greeksMap.get(chainKey);
+      if (!g) continue;
+      netDelta    += g.delta * p.quantity;
+      thetaPerDay += g.theta * p.quantity;
+    }
+    return { netDelta, thetaPerDay };
+  }, [positions, greeksMap, getByInstrumentKey]);
 }

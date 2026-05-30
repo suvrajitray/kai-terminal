@@ -1,17 +1,23 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { ShoppingCart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useBasketStore } from "@/stores/basket-store";
-import { BasketDialog } from "./basket-dialog";
+
+const BasketDialog = lazy(() =>
+  import("./basket-dialog").then((m) => ({ default: m.BasketDialog })),
+);
 
 export function BasketButton() {
   const [open, setOpen] = useState(false);
+  // Mount the dialog once on first open and keep it mounted so Radix can play
+  // its close transition when `open` flips back to false.
+  const [hasOpened, setHasOpened] = useState(false);
   const count = useBasketStore((s) => s.items.length);
 
   return (
     <>
       <button
-        onClick={() => setOpen(true)}
+        onClick={() => { setHasOpened(true); setOpen(true); }}
         className={cn(
           "relative flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm transition-colors",
           count > 0
@@ -27,7 +33,11 @@ export function BasketButton() {
           </span>
         )}
       </button>
-      <BasketDialog open={open} onClose={() => setOpen(false)} />
+      {hasOpened && (
+        <Suspense fallback={null}>
+          <BasketDialog open={open} onClose={() => setOpen(false)} />
+        </Suspense>
+      )}
     </>
   );
 }

@@ -1,8 +1,6 @@
 import { cn } from "@/lib/utils";
 import { INR, INR_INT } from "@/lib/formatters";
 
-export { INR, INR_INT };
-
 export function PnlCell({ value, pct, noDecimal }: { value: number; pct?: number; noDecimal?: boolean }) {
   const color = value > 0 ? "text-emerald-500" : value < 0 ? "text-rose-500" : "text-muted-foreground";
   const fmt = noDecimal ? INR_INT : INR;

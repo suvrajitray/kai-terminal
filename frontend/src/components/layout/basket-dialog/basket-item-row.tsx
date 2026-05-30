@@ -1,21 +1,22 @@
 // frontend/src/components/layout/basket-dialog/basket-item-row.tsx
-import { useState } from "react";
+import { memo, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { QtyInput, type QtyMode } from "@/components/ui/qty-input";
 import { formatExpiryLabel } from "@/stores/option-contracts-store";
-import type { BasketItem } from "@/stores/basket-store";
+import { useBasketStore, type BasketItem } from "@/stores/basket-store";
 
 interface BasketItemRowProps {
   item: BasketItem;
   selected: boolean;
-  onToggleSelect: () => void;
-  onUpdate: (patch: Partial<BasketItem>) => void;
-  onRemove: () => void;
+  onToggleSelect: (id: string) => void;
 }
 
-export function BasketItemRow({ item, selected, onToggleSelect, onUpdate, onRemove }: BasketItemRowProps) {
+export const BasketItemRow = memo(function BasketItemRow({ item, selected, onToggleSelect }: BasketItemRowProps) {
+  const updateItem = useBasketStore((s) => s.updateItem);
+  const removeItem = useBasketStore((s) => s.removeItem);
+
   const isSell = item.transactionType === "Sell";
   const isLimit = item.orderType === "Limit";
 
@@ -27,7 +28,7 @@ export function BasketItemRow({ item, selected, onToggleSelect, onUpdate, onRemo
     const n = parseInt(v, 10);
     if (!isNaN(n) && n > 0) {
       const lots = qtyMode === "lot" ? n : Math.max(1, Math.round(n / item.lotSize));
-      onUpdate({ qty: lots });
+      updateItem(item.id, { qty: lots });
     }
   }
 
@@ -47,13 +48,13 @@ export function BasketItemRow({ item, selected, onToggleSelect, onUpdate, onRemo
   return (
     <tr className={cn("border-b border-border/30 hover:bg-muted/20 [&>td]:align-middle", selected && "bg-primary/5")}>
       <td className={cn("pl-3 py-2 w-7", selected && "border-l-2 border-l-primary/50")}>
-        <Checkbox checked={selected} onCheckedChange={onToggleSelect} />
+        <Checkbox checked={selected} onCheckedChange={() => onToggleSelect(item.id)} />
       </td>
 
       {/* B/S toggle */}
       <td className="px-2 py-2 w-8">
         <button
-          onClick={() => onUpdate({ transactionType: isSell ? "Buy" : "Sell" })}
+          onClick={() => updateItem(item.id, { transactionType: isSell ? "Buy" : "Sell" })}
           className={cn(
             "flex h-6 w-6 items-center justify-center rounded text-[11px] font-bold transition-colors",
             isSell
@@ -82,7 +83,7 @@ export function BasketItemRow({ item, selected, onToggleSelect, onUpdate, onRemo
       <td className="px-3 py-2">
         <div className="flex h-7 overflow-hidden rounded border border-border/50 w-fit">
           <button
-            onClick={() => onUpdate({ orderType: "Market", limitPrice: "" })}
+            onClick={() => updateItem(item.id, { orderType: "Market", limitPrice: "" })}
             className={cn(
               "flex items-center px-2 text-[10px] font-medium transition-colors",
               !isLimit
@@ -93,7 +94,7 @@ export function BasketItemRow({ item, selected, onToggleSelect, onUpdate, onRemo
             Market
           </button>
           <button
-            onClick={() => onUpdate({ orderType: "Limit", limitPrice: String(item.ltp.toFixed(2)) })}
+            onClick={() => updateItem(item.id, { orderType: "Limit", limitPrice: String(item.ltp.toFixed(2)) })}
             className={cn(
               "flex items-center px-2 text-[10px] font-medium transition-colors border-l border-border/50",
               isLimit
@@ -110,7 +111,7 @@ export function BasketItemRow({ item, selected, onToggleSelect, onUpdate, onRemo
       <td className="px-3 py-2">
         <div className="flex h-7 overflow-hidden rounded border border-border/50 w-fit">
           <button
-            onClick={() => onUpdate({ product: "Intraday" })}
+            onClick={() => updateItem(item.id, { product: "Intraday" })}
             className={cn(
               "flex items-center px-2 text-[10px] font-medium transition-colors",
               item.product === "Intraday"
@@ -121,7 +122,7 @@ export function BasketItemRow({ item, selected, onToggleSelect, onUpdate, onRemo
             Intraday
           </button>
           <button
-            onClick={() => onUpdate({ product: "Delivery" })}
+            onClick={() => updateItem(item.id, { product: "Delivery" })}
             className={cn(
               "flex items-center px-2 text-[10px] font-medium transition-colors border-l border-border/50",
               item.product === "Delivery"
@@ -157,7 +158,7 @@ export function BasketItemRow({ item, selected, onToggleSelect, onUpdate, onRemo
             step="0.05"
             min="0"
             value={item.limitPrice}
-            onChange={(e) => onUpdate({ limitPrice: e.target.value })}
+            onChange={(e) => updateItem(item.id, { limitPrice: e.target.value })}
             className="h-7 w-24 rounded border border-border/50 bg-muted/20 px-2 text-left text-sm tabular-nums font-mono focus:outline-none focus:ring-1 focus:ring-primary/50"
           />
         ) : (
@@ -168,7 +169,7 @@ export function BasketItemRow({ item, selected, onToggleSelect, onUpdate, onRemo
       {/* Remove */}
       <td className="px-3 py-2 w-10 border-l border-border/30">
         <button
-          onClick={onRemove}
+          onClick={() => removeItem(item.id)}
           className="flex items-center justify-center p-1 text-muted-foreground/40 hover:text-destructive transition-colors"
         >
           <Trash2 className="size-3.5" />
@@ -176,4 +177,4 @@ export function BasketItemRow({ item, selected, onToggleSelect, onUpdate, onRemo
       </td>
     </tr>
   );
-}
+});

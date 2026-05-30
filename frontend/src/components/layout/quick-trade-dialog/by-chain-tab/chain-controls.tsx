@@ -16,7 +16,7 @@ interface ChainControlsProps {
   onDirectionChange: (d: Direction) => void;
 }
 
-import { INR_INT as INR } from "@/lib/formatters";
+import { INR_INT } from "@/lib/formatters";
 
 export const ChainControls = React.memo(function ChainControls({
   qtyValue,
@@ -63,7 +63,7 @@ export const ChainControls = React.memo(function ChainControls({
         {marginLoading ? (
           <span className="animate-pulse text-muted-foreground/60 tabular-nums">…</span>
         ) : margin != null ? (
-          <span className="font-semibold tabular-nums">₹{INR.format(margin)}</span>
+          <span className="font-semibold tabular-nums">₹{INR_INT.format(margin)}</span>
         ) : (
           <span className="text-muted-foreground/40">—</span>
         )}

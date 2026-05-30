@@ -24,7 +24,6 @@ interface BasketDialogProps {
 
 export function BasketDialog({ open, onClose }: BasketDialogProps) {
   const items      = useBasketStore((s) => s.items);
-  const updateItem = useBasketStore((s) => s.updateItem);
 
   const {
     selectedIds, allSelected, someSelected, selectedCount,
@@ -190,9 +189,7 @@ export function BasketDialog({ open, onClose }: BasketDialogProps) {
                     key={item.id}
                     item={item}
                     selected={selectedIds.has(item.id)}
-                    onToggleSelect={() => toggleSelect(item.id)}
-                    onUpdate={(patch) => updateItem(item.id, patch)}
-                    onRemove={() => useBasketStore.getState().removeItem(item.id)}
+                    onToggleSelect={toggleSelect}
                   />
                 ))}
               </tbody>

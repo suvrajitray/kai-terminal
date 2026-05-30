@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import { payoffAt } from "./use-payoff-data";
 import type { ExpiryGroup, RenderedCurve } from "./use-payoff-data";
 
-import { INR_INT as INR } from "@/lib/formatters";
+import { INR_INT } from "@/lib/formatters";
 
 const W = 500, H = 240;
 const PAD = { top: 28, right: 20, bottom: 40, left: 68 };
@@ -83,7 +83,7 @@ export const PayoffChart = memo(function PayoffChart({
               <span className="flex items-center gap-1">
                 <span className="text-muted-foreground">at spot</span>
                 <span className={cn("font-mono font-semibold tabular-nums", pnlAtSpot >= 0 ? "text-emerald-500" : "text-rose-500")}>
-                  {pnlAtSpot >= 0 ? "+" : ""}₹{INR.format(pnlAtSpot)}
+                  {pnlAtSpot >= 0 ? "+" : ""}₹{INR_INT.format(pnlAtSpot)}
                 </span>
               </span>
             )}
@@ -91,7 +91,7 @@ export const PayoffChart = memo(function PayoffChart({
               ? gc.breakevens.map((be, i) => (
                   <span key={i} className="flex items-center gap-1">
                     <span className="text-muted-foreground">B/E{gc.breakevens.length > 1 ? ` ${i + 1}` : ""}</span>
-                    <span className="font-mono font-semibold tabular-nums">₹{INR.format(be)}</span>
+                    <span className="font-mono font-semibold tabular-nums">₹{INR_INT.format(be)}</span>
                   </span>
                 ))
               : (
@@ -157,7 +157,7 @@ export const PayoffChart = memo(function PayoffChart({
                     stroke={gc.color} strokeWidth={0.8} strokeDasharray="4 3" opacity={0.6}
                   />
                   <text x={toX(be)} y={PAD.top - 8} textAnchor="middle" fontSize={8} fill={gc.color} opacity={0.8}>
-                    ₹{INR.format(be)}
+                    ₹{INR_INT.format(be)}
                   </text>
                 </g>
               ))}
@@ -185,7 +185,7 @@ export const PayoffChart = memo(function PayoffChart({
                 ) : null;
               })}
               <text x={spotX} y={PAD.top + DH + 28} textAnchor="middle" fontSize={8.5} fill="#fbbf24">
-                ₹{INR.format(spot)}
+                ₹{INR_INT.format(spot)}
               </text>
             </g>
           )}
@@ -198,7 +198,7 @@ export const PayoffChart = memo(function PayoffChart({
               textAnchor="middle" fontSize={8.5}
               fill="hsl(var(--muted-foreground))"
             >
-              ₹{INR.format(v)}
+              ₹{INR_INT.format(v)}
             </text>
           ))}
 
@@ -222,7 +222,7 @@ export const PayoffChart = memo(function PayoffChart({
               <div key={i} className="flex items-center justify-between px-3 py-1.5 text-xs pl-7">
                 <span className="flex items-center gap-2">
                   <span className="text-muted-foreground">{leg.index}</span>
-                  <span className="font-mono font-medium">₹{INR.format(leg.strike)}</span>
+                  <span className="font-mono font-medium">₹{INR_INT.format(leg.strike)}</span>
                   <span className={cn("rounded px-1 py-0.5 text-[10px] font-bold",
                     leg.instrumentType === "CE" ? "bg-rose-500/15 text-rose-400" : "bg-emerald-500/15 text-emerald-400")}>
                     {leg.instrumentType}

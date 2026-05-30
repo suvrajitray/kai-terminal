@@ -3,10 +3,10 @@ import { cn } from "@/lib/utils";
 import { payoffAt } from "./use-payoff-data";
 import type { ExpiryGroup } from "./use-payoff-data";
 
-import { INR_INT as INR } from "@/lib/formatters";
+import { INR_INT } from "@/lib/formatters";
 
 function fmtPnl(v: number): string {
-  return INR.format(Math.round(v));
+  return INR_INT.format(Math.round(v));
 }
 
 function fmtPct(price: number, spot: number): string {
@@ -84,7 +84,7 @@ export function PayoffTable({ groups, spot, groupColors }: PayoffTableProps) {
               return (
                 <tr key={price} className="border-b border-border/20 transition-colors hover:bg-muted/10">
                   <td className="px-4 py-[7px]">
-                    <span className="tabular-nums text-foreground">{INR.format(price)}</span>
+                    <span className="tabular-nums text-foreground">{INR_INT.format(price)}</span>
                     <span className={cn("ml-1.5 text-[11px]", down ? "text-rose-500/70" : "text-emerald-500/70")}>
                       ({pct})
                     </span>
@@ -107,7 +107,7 @@ export function PayoffTable({ groups, spot, groupColors }: PayoffTableProps) {
             {/* Spot row */}
             <tr ref={spotRowRef} className="border-y border-amber-800/30 bg-amber-950/50">
               <td className="px-4 py-[7px]">
-                <span className="tabular-nums font-medium text-foreground">{INR.format(Math.round(spot))}</span>
+                <span className="tabular-nums font-medium text-foreground">{INR_INT.format(Math.round(spot))}</span>
                 <span className="ml-1.5 text-[11px] text-amber-500/80">(0.00%)</span>
               </td>
               {groups.map((g) => {
@@ -129,7 +129,7 @@ export function PayoffTable({ groups, spot, groupColors }: PayoffTableProps) {
               return (
                 <tr key={price} className="border-b border-border/20 transition-colors hover:bg-muted/10">
                   <td className="px-4 py-[7px]">
-                    <span className="tabular-nums text-foreground">{INR.format(price)}</span>
+                    <span className="tabular-nums text-foreground">{INR_INT.format(price)}</span>
                     <span className={cn("ml-1.5 text-[11px]", up ? "text-emerald-500/70" : "text-rose-500/70")}>
                       ({pct})
                     </span>

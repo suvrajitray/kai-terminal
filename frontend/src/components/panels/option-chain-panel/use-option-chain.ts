@@ -1,4 +1,4 @@
-import { useReducer, useEffect, useCallback } from "react";
+import { useReducer, useEffect, useCallback, useMemo } from "react";
 import { fetchOptionChain } from "@/services/trading-api";
 import { useOptionContractsStore } from "@/stores/option-contracts-store";
 import { UNDERLYING_KEYS } from "@/lib/shift-config";
@@ -194,18 +194,28 @@ export function useOptionChain() {
     if (underlying && expiry) fetchAndSubscribe(underlying, expiry, true);
   }, [underlying, expiry, fetchAndSubscribe]);
 
-  const atmIv = calculateAtmIv(allChain, atmStrike);
-  const { pct: expectedMovePct, pts: expectedMovePts } = calculateExpectedMove(allChain, atmStrike, spotPrice);
-  const maxPain = calculateMaxPain(allChain);
-  const pcr     = calculatePcr(allChain);
-  const { ivRank, ivPercentile } = calculateIvRankMetrics(atmIv, ivHistory);
+  const atmIv = useMemo(() => calculateAtmIv(allChain, atmStrike), [allChain, atmStrike]);
+  const { pct: expectedMovePct, pts: expectedMovePts } = useMemo(
+    () => calculateExpectedMove(allChain, atmStrike, spotPrice),
+    [allChain, atmStrike, spotPrice],
+  );
+  const maxPain = useMemo(() => calculateMaxPain(allChain), [allChain]);
+  const pcr     = useMemo(() => calculatePcr(allChain), [allChain]);
+  const { ivRank, ivPercentile } = useMemo(
+    () => calculateIvRankMetrics(atmIv, ivHistory),
+    [atmIv, ivHistory],
+  );
 
-  const atmIdx   = allChain.findIndex((e) => e.strikePrice === atmStrike);
-  const sliceStart = atmIdx >= 0 ? Math.max(0, atmIdx - visibleLow)              : 0;
-  const sliceEnd   = atmIdx >= 0 ? Math.min(allChain.length, atmIdx + visibleHigh + 1) : allChain.length;
-  const visibleRows = allChain.slice(sliceStart, sliceEnd);
-  const hasMoreLow  = sliceStart > 0;
-  const hasMoreHigh = sliceEnd < allChain.length;
+  const { visibleRows, hasMoreLow, hasMoreHigh } = useMemo(() => {
+    const atmIdx   = allChain.findIndex((e) => e.strikePrice === atmStrike);
+    const sliceStart = atmIdx >= 0 ? Math.max(0, atmIdx - visibleLow)              : 0;
+    const sliceEnd   = atmIdx >= 0 ? Math.min(allChain.length, atmIdx + visibleHigh + 1) : allChain.length;
+    return {
+      visibleRows: allChain.slice(sliceStart, sliceEnd),
+      hasMoreLow:  sliceStart > 0,
+      hasMoreHigh: sliceEnd < allChain.length,
+    };
+  }, [allChain, atmStrike, visibleLow, visibleHigh]);
 
   return {
     underlying,
