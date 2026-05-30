@@ -21,6 +21,10 @@
     <ProjectReference Include="../KAITerminal.Contracts/KAITerminal.Contracts.csproj" />
     <ProjectReference Include="../KAITerminal.RiskEngine/KAITerminal.RiskEngine.csproj" />
     <ProjectReference Include="../KAITerminal.Api/KAITerminal.Api.csproj" />
+    <ProjectReference Include="../KAITerminal.Worker/KAITerminal.Worker.csproj" />
+    <ProjectReference Include="../KAITerminal.Upstox/KAITerminal.Upstox.csproj" />
+    <ProjectReference Include="../KAITerminal.MarketData/KAITerminal.MarketData.csproj" />
+    <ProjectReference Include="../KAITerminal.Infrastructure/KAITerminal.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

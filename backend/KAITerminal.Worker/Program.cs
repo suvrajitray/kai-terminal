@@ -58,21 +58,23 @@ try
     });
     builder.Services.AddSingleton<IRiskEventNotifier, HttpRiskEventNotifier>();
 
-    // Register IBrokerClientFactory — same pattern as KAITerminal.Api
+    // Register IBrokerClientFactory — OrderRoutingBrokerClientFactory wraps broker with
+    // per-user OrderAgent when registered, falls back to direct broker otherwise.
+    builder.Services.AddHttpClient("OrderAgent");
+    builder.Services.AddSingleton<KAITerminal.OrderRouting.IOrderAgentRegistry,
+                                   KAITerminal.OrderRouting.OrderAgentRegistry>();
+    builder.Services.AddSingleton<KAITerminal.OrderRouting.IOrderAgentClient,
+                                   KAITerminal.OrderRouting.HttpOrderAgentClient>();
+    builder.Services.AddSingleton<KAITerminal.OrderRouting.IOrderRouter,
+                                   KAITerminal.OrderRouting.OrderRouter>();
     builder.Services.AddSingleton<IBrokerClientFactory>(sp =>
     {
-        var creators = new Dictionary<string, Func<string, string?, IBrokerClient>>(
-            StringComparer.OrdinalIgnoreCase);
-
-        var upstox = sp.GetRequiredService<UpstoxClient>();
-        creators[BrokerNames.Upstox] = (token, _) => new UpstoxBrokerClient(upstox, token);
-
+        var upstox  = sp.GetRequiredService<UpstoxClient>();
         var zerodha = sp.GetService<ZerodhaClient>();
-        if (zerodha is not null)
-            creators[BrokerNames.Zerodha] = (token, apiKey) =>
-                new ZerodhaBrokerClient(zerodha, apiKey!, token);
-
-        return new BrokerClientFactory(creators);
+        var registry = sp.GetRequiredService<KAITerminal.OrderRouting.IOrderAgentRegistry>();
+        var router   = sp.GetRequiredService<KAITerminal.OrderRouting.IOrderRouter>();
+        return new KAITerminal.Worker.OrderRouting.OrderRoutingBrokerClientFactory(
+            upstox, zerodha, registry, router);
     });
 
     // Register cross-broker token mapper before AddRiskEngine so it overrides the default IdentityTokenMapper.
@@ -93,9 +95,24 @@ try
     builder.Services.AddRiskEngine<DbUserTokenSource>(builder.Configuration);
 
     builder.Services.AddHostedService<IvSnapshotJob>();
+
+    builder.Services.AddSingleton<KAITerminal.Worker.Jobs.AutoEntry.IStrikeSelector,
+                                  KAITerminal.Worker.Jobs.AutoEntry.AtmStrikeSelector>();
+    builder.Services.AddSingleton<KAITerminal.Worker.Jobs.AutoEntry.IStrikeSelector,
+                                  KAITerminal.Worker.Jobs.AutoEntry.OtmStrikeSelector>();
+    builder.Services.AddSingleton<KAITerminal.Worker.Jobs.AutoEntry.IStrikeSelector,
+                                  KAITerminal.Worker.Jobs.AutoEntry.DeltaStrikeSelector>();
+    builder.Services.AddSingleton<KAITerminal.Worker.Jobs.AutoEntry.IStrikeSelector,
+                                  KAITerminal.Worker.Jobs.AutoEntry.PremiumStrikeSelector>();
+    builder.Services.AddSingleton<KAITerminal.Worker.Jobs.AutoEntry.StrikeSelectorRegistry>();
+    builder.Services.AddSingleton<KAITerminal.Worker.Jobs.AutoEntry.AutoEntryOrderPlacer>();
     builder.Services.AddHostedService<KAITerminal.Worker.Jobs.AutoEntryJob>();
 
     var host = builder.Build();
+
+    await host.Services
+        .GetRequiredService<KAITerminal.OrderRouting.IOrderAgentRegistry>()
+        .LoadAsync();
 
     // 60-second startup timeout — if any IHostedService.StartAsync hangs, fail fast and loud.
     using var startupCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));

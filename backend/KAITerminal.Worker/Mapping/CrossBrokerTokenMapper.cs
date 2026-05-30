@@ -139,7 +139,7 @@ public sealed class CrossBrokerTokenMapper : ITokenMapper
     /// Maps a Zerodha segment string to the corresponding Upstox exchange prefix.
     /// Returns null for unrecognised segments so they can be silently skipped.
     /// </summary>
-    private static string? SegmentToPrefix(string segment) => segment switch
+    internal static string? SegmentToPrefix(string segment) => segment switch
     {
         "NFO-OPT" or "NFO-FUT" => "NSE_FO",
         "BFO-OPT" or "BFO-FUT" => "BSE_FO",
@@ -149,6 +149,6 @@ public sealed class CrossBrokerTokenMapper : ITokenMapper
     private static DateOnly IstToday()
         => DateOnly.FromDateTime(DateTime.UtcNow.AddHours(5.5));
 
-    private static bool IsUpstox(string brokerType)
+    internal static bool IsUpstox(string brokerType)
         => string.Equals(brokerType, BrokerNames.Upstox, StringComparison.OrdinalIgnoreCase);
 }

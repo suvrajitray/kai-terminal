@@ -13,7 +13,7 @@ internal sealed class MarketDataFeed
     private readonly UpstoxMarketDataHttpClient _client;
     private readonly StrategyConfig             _cfg;
     private readonly string                     _token;
-    private readonly ILogger<MarketDataFeed>    _log;
+    private readonly ILogger<MarketDataFeed>    _logger;
 
     public MarketDataFeed(
         UpstoxMarketDataHttpClient client,
@@ -28,7 +28,7 @@ internal sealed class MarketDataFeed
             : throw new InvalidOperationException(
                 "Upstox:AccessToken is required. Set it via: " +
                 "dotnet user-secrets set \"Upstox:AccessToken\" \"<token>\"");
-        _log    = log;
+        _logger    = log;
     }
 
     internal async Task<decimal> FetchSpotAsync(CancellationToken ct)
@@ -56,7 +56,7 @@ internal sealed class MarketDataFeed
         var chain  = await _client.GetOptionChainAsync(_token, _cfg.Underlying, _cfg.Expiry, ct);
         var result = StrikeSelector.Select(chain, spot, _cfg.StrikeOffset);
         if (result is null)
-            _log.LogError("[ENTRY] Leg selection failed ({Count} entries, offset {Off})  |  Spot {Spot:F2}",
+            _logger.LogError("[ENTRY] Leg selection failed ({Count} entries, offset {Off})  |  Spot {Spot:F2}",
                 chain.Count, _cfg.StrikeOffset, spot);
         return result;
     }

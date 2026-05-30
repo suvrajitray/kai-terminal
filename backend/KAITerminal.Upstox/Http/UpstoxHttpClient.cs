@@ -3,18 +3,19 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using KAITerminal.Upstox.Exceptions;
 using KAITerminal.Upstox.Models;
-using KAITerminal.Upstox.Models.Enums;
-using KAITerminal.Upstox.Models.Requests;
-using KAITerminal.Upstox.Models.Responses;
-using KAITerminal.Upstox.Models.WebSocket;
 
 namespace KAITerminal.Upstox.Http;
 
 /// <summary>
 /// Internal HTTP client that wraps the Upstox REST API.
-/// Uses two named HttpClients: "UpstoxApi" (read) and "UpstoxHft" (order writes).
+/// Uses three named HttpClients: "UpstoxApi" (read), "UpstoxHft" (order writes),
+/// and "UpstoxAuth" (login flow).
+///
+/// Partial-class split by domain — see <c>UpstoxHttpClient.Orders.cs</c>,
+/// <c>UpstoxHttpClient.Portfolio.cs</c>, <c>UpstoxHttpClient.Auth.cs</c>,
+/// <c>UpstoxHttpClient.OptionChain.cs</c>, <c>UpstoxHttpClient.Feed.cs</c>.
 /// </summary>
-internal sealed class UpstoxHttpClient
+internal sealed partial class UpstoxHttpClient
 {
     private readonly IHttpClientFactory _factory;
 
@@ -30,185 +31,7 @@ internal sealed class UpstoxHttpClient
         _factory = factory;
     }
 
-    // ──────────────────────────────────────────────────
-    // Portfolio
-    // ──────────────────────────────────────────────────
-
-    public Task<IReadOnlyList<Position>> GetPositionsAsync(CancellationToken ct = default)
-        => GetListAsync<Position>("UpstoxApi", "/v2/portfolio/short-term-positions", ct);
-
-    public async Task ConvertPositionAsync(
-        string instrumentToken, string oldProduct, string newProduct,
-        string transactionType, int quantity, CancellationToken ct = default)
-    {
-        var dto = new ConvertPositionDto
-        {
-            InstrumentToken = instrumentToken,
-            OldProduct = oldProduct,
-            NewProduct = newProduct,
-            TransactionType = transactionType,
-            Quantity = quantity
-        };
-        var client = _factory.CreateClient("UpstoxApi");
-        var response = await client.PutAsJsonAsync("/v2/portfolio/convert-position", dto, JsonOptions, ct);
-        await HandleResponseAsync<object>(response, ct);
-    }
-
-    // ──────────────────────────────────────────────────
-    // Orders
-    // ──────────────────────────────────────────────────
-
-    public Task<IReadOnlyList<Order>> GetAllOrdersAsync(CancellationToken ct = default)
-        => GetListAsync<Order>("UpstoxApi", "/v2/order/retrieve-all", ct);
-
-    public async Task<PlaceOrderV3Result> PlaceOrderV3Async(PlaceOrderRequest req, CancellationToken ct = default)
-    {
-        var dto = new PlaceOrderDtoV3
-        {
-            Quantity = req.Quantity,
-            Product = UpstoxProductMap.FromEnum(req.Product),
-            Validity = ToValidityString(req.Validity),
-            Price = req.Price,
-            Tag = req.Tag,
-            InstrumentToken = req.InstrumentToken,
-            OrderType = ToOrderTypeString(req.OrderType),
-            TransactionType = ToTransactionTypeString(req.TransactionType),
-            DisclosedQuantity = req.DisclosedQuantity,
-            TriggerPrice = req.TriggerPrice,
-            IsAmo = req.IsAmo,
-            Slice = req.Slice
-        };
-        var (raw, latency) = await PostWithMetaAsync<PlaceOrderRawV3>("UpstoxHft", "/v3/order/place", dto, ct);
-        return new PlaceOrderV3Result
-        {
-            OrderIds = raw.OrderIds ?? [],
-            Latency = latency
-        };
-    }
-
-    public async Task<(string OrderId, int Latency)> CancelOrderV3Async(string orderId, CancellationToken ct = default)
-    {
-        var client = _factory.CreateClient("UpstoxHft");
-        var response = await client.DeleteAsync($"/v3/order/cancel?order_id={Uri.EscapeDataString(orderId)}", ct);
-        var (raw, latency) = await HandleResponseWithMetaAsync<OrderIdRaw>(response, ct);
-        return (raw.OrderId ?? orderId, latency);
-    }
-
-    // ──────────────────────────────────────────────────
-    // WebSocket feed authorization (portfolio stream only)
-    // ──────────────────────────────────────────────────
-
-    public async Task<string> GetPortfolioStreamFeedUriAsync(
-        IEnumerable<UpdateType>? updateTypes, CancellationToken ct = default)
-    {
-        var path = "/v2/feed/portfolio-stream-feed/authorize";
-
-        if (updateTypes is not null)
-        {
-            var parts = updateTypes.Select(t => $"update_types={ToUpdateTypeString(t)}").ToList();
-            if (parts.Count > 0)
-                path += "?" + string.Join("&", parts);
-        }
-
-        var client = _factory.CreateClient("UpstoxApi");
-        var response = await client.GetAsync(path, ct);
-        var data = await HandleResponseAsync<AuthorizeResponse>(response, ct);
-        return data.AuthorizedRedirectUri
-            ?? throw new UpstoxException("Missing authorizedRedirectUri in portfolio stream feed authorize response");
-    }
-
-    // ──────────────────────────────────────────────────
-    // Auth — token generation (no Bearer; raw JSON response)
-    // ──────────────────────────────────────────────────
-
-    public async Task<TokenResponse> GenerateTokenAsync(
-        string clientId, string clientSecret, string redirectUri, string authorizationCode,
-        CancellationToken ct = default)
-    {
-        var form = new FormUrlEncodedContent(new Dictionary<string, string>
-        {
-            ["code"]          = authorizationCode,
-            ["client_id"]     = clientId,
-            ["client_secret"] = clientSecret,
-            ["redirect_uri"]  = redirectUri,
-            ["grant_type"]    = "authorization_code"
-        });
-
-        var client = _factory.CreateClient("UpstoxAuth");
-        var response = await client.PostAsync("/v2/login/authorization/token", form, ct);
-        var json = await response.Content.ReadAsStringAsync(ct);
-
-        if (!response.IsSuccessStatusCode)
-            throw new UpstoxException(
-                $"Token generation failed: {json}",
-                (int)response.StatusCode);
-
-        return JsonSerializer.Deserialize<TokenResponse>(json, JsonOptions)
-            ?? throw new UpstoxException("Empty or invalid token response from Upstox");
-    }
-
-    // ──────────────────────────────────────────────────
-    // Option chain
-    // ──────────────────────────────────────────────────
-
-    public Task<IReadOnlyList<OptionChainEntry>> GetOptionChainAsync(
-        string underlyingKey, string expiryDate, CancellationToken ct = default)
-    {
-        var ek = Uri.EscapeDataString(underlyingKey);
-        var path = $"/v2/option/chain?instrument_key={ek}&expiry_date={Uri.EscapeDataString(expiryDate)}";
-        return GetListAsync<OptionChainEntry>("UpstoxApi", path, ct);
-    }
-
-    public Task<IReadOnlyList<OptionContract>> GetOptionContractsAsync(
-        string underlyingKey, string? expiryDate = null, CancellationToken ct = default)
-    {
-        var ek = Uri.EscapeDataString(underlyingKey);
-        var path = $"/v2/option/contract?instrument_key={ek}";
-        if (!string.IsNullOrEmpty(expiryDate))
-            path += $"&expiry_date={Uri.EscapeDataString(expiryDate)}";
-        return GetListAsync<OptionContract>("UpstoxApi", path, ct);
-    }
-
-    // ──────────────────────────────────────────────────
-    // Margin
-    // ──────────────────────────────────────────────────
-
-    public Task<MarginResponse> GetRequiredMarginAsync(
-        IEnumerable<MarginOrderItem> items, CancellationToken ct = default)
-    {
-        var dto = new MarginRequestDto
-        {
-            Instruments = items.Select(i => new MarginInstrumentDto
-            {
-                InstrumentToken = i.InstrumentToken,
-                Quantity        = i.Quantity,
-                Product         = i.Product,
-                TransactionType = i.TransactionType,
-                Price           = 0
-            }).ToList()
-        };
-        return PostAsync<MarginResponse>("UpstoxApi", "/v2/charges/margin", dto, ct);
-    }
-
-    // ──────────────────────────────────────────────────
-    // Funds
-    // ──────────────────────────────────────────────────
-
-    public async Task<FundsResponse> GetFundsAsync(CancellationToken ct = default)
-    {
-        var data = await GetObjectAsync<FundsDataDto>("UpstoxApi", "/v2/user/get-funds-and-margin?segment=SEC", ct);
-        var eq   = data.Equity ?? new FundsEquityDto();
-        return new FundsResponse
-        {
-            AvailableMargin = eq.AvailableMargin,
-            UsedMargin      = eq.UsedMargin,
-            PayinAmount     = eq.PayinAmount,
-        };
-    }
-
-    // ──────────────────────────────────────────────────
-    // Helpers
-    // ──────────────────────────────────────────────────
+    // ── Generic transport helpers ────────────────────────────────────────────
 
     private async Task<IReadOnlyList<T>> GetListAsync<T>(
         string clientName, string path, CancellationToken ct)
@@ -283,99 +106,7 @@ internal sealed class UpstoxHttpClient
         return (envelope.Data, latency);
     }
 
-    // ──────────────────────────────────────────────────
-    // Enum → API string conversions
-    // ──────────────────────────────────────────────────
-
-    internal static string ToOrderTypeString(OrderType t) => t switch
-    {
-        OrderType.Market => "MARKET",
-        OrderType.Limit => "LIMIT",
-        OrderType.SL => "SL",
-        OrderType.SLM => "SL-M",
-        _ => throw new ArgumentOutOfRangeException(nameof(t), t, null)
-    };
-
-    internal static string ToTransactionTypeString(TransactionType t) => t switch
-    {
-        TransactionType.Buy => "BUY",
-        TransactionType.Sell => "SELL",
-        _ => throw new ArgumentOutOfRangeException(nameof(t), t, null)
-    };
-
-internal static string ToValidityString(Validity v) => v switch
-    {
-        Validity.Day => "DAY",
-        Validity.IOC => "IOC",
-        _ => throw new ArgumentOutOfRangeException(nameof(v), v, null)
-    };
-
-    internal static string ToUpdateTypeString(UpdateType t) => t switch
-    {
-        UpdateType.Order    => "order",
-        UpdateType.Position => "position",
-        UpdateType.Holding  => "holding",
-        UpdateType.GttOrder => "gtt_order",
-        _ => throw new ArgumentOutOfRangeException(nameof(t), t, null)
-    };
-
-    internal PlaceOrderRequest BuildOrderRequest(
-        string instrumentToken, int quantity, TransactionType transactionType,
-        OrderType orderType, Product product, Validity validity,
-        decimal price, decimal triggerPrice, bool isAmo, string? tag, bool slice)
-        => new()
-        {
-            InstrumentToken = instrumentToken,
-            Quantity = quantity,
-            TransactionType = transactionType,
-            OrderType = orderType,
-            Product = product,
-            Validity = validity,
-            Price = price,
-            TriggerPrice = triggerPrice,
-            IsAmo = isAmo,
-            Tag = tag,
-            Slice = slice
-        };
-
-    // ──────────────────────────────────────────────────
-    // Internal DTOs (serialisation only)
-    // ──────────────────────────────────────────────────
-
-    private sealed class PlaceOrderDtoV3
-    {
-        [JsonPropertyName("quantity")] public int Quantity { get; init; }
-        [JsonPropertyName("product")] public string Product { get; init; } = "";
-        [JsonPropertyName("validity")] public string Validity { get; init; } = "";
-        [JsonPropertyName("price")] public decimal Price { get; init; }
-        [JsonPropertyName("tag")] public string? Tag { get; init; }
-        [JsonPropertyName("instrument_token")] public string InstrumentToken { get; init; } = "";
-        [JsonPropertyName("order_type")] public string OrderType { get; init; } = "";
-        [JsonPropertyName("transaction_type")] public string TransactionType { get; init; } = "";
-        [JsonPropertyName("disclosed_quantity")] public int DisclosedQuantity { get; init; }
-        [JsonPropertyName("trigger_price")] public decimal TriggerPrice { get; init; }
-        [JsonPropertyName("is_amo")] public bool IsAmo { get; init; }
-        [JsonPropertyName("slice")] public bool Slice { get; init; }
-    }
-
-    private sealed class ConvertPositionDto
-    {
-        [JsonPropertyName("instrument_token")] public string InstrumentToken { get; init; } = "";
-        [JsonPropertyName("new_product")]      public string NewProduct      { get; init; } = "";
-        [JsonPropertyName("old_product")]      public string OldProduct      { get; init; } = "";
-        [JsonPropertyName("transaction_type")] public string TransactionType { get; init; } = "";
-        [JsonPropertyName("quantity")]         public int    Quantity        { get; init; }
-    }
-
-    private sealed class PlaceOrderRawV3
-    {
-        [JsonPropertyName("order_ids")] public List<string>? OrderIds { get; init; }
-    }
-
-    private sealed class OrderIdRaw
-    {
-        [JsonPropertyName("order_id")] public string? OrderId { get; init; }
-    }
+    // ── Internal envelope DTOs ───────────────────────────────────────────────
 
     private sealed class UpstoxEnvelope<T>
     {
@@ -394,36 +125,5 @@ internal static string ToValidityString(Validity v) => v switch
     private sealed class MetadataDto
     {
         [JsonPropertyName("latency")] public int Latency { get; init; }
-    }
-
-    private sealed class AuthorizeResponse
-    {
-        [JsonPropertyName("authorizedRedirectUri")] public string? AuthorizedRedirectUri { get; init; }
-    }
-
-    private sealed class MarginRequestDto
-    {
-        [JsonPropertyName("instruments")] public List<MarginInstrumentDto> Instruments { get; init; } = [];
-    }
-
-    private sealed class MarginInstrumentDto
-    {
-        [JsonPropertyName("instrument_key")]   public string  InstrumentToken { get; init; } = "";
-        [JsonPropertyName("quantity")]         public int     Quantity        { get; init; }
-        [JsonPropertyName("product")]          public string  Product         { get; init; } = "";
-        [JsonPropertyName("transaction_type")] public string  TransactionType { get; init; } = "";
-        [JsonPropertyName("price")]            public decimal Price           { get; init; }
-    }
-
-    private sealed class FundsDataDto
-    {
-        [JsonPropertyName("equity")] public FundsEquityDto? Equity { get; init; }
-    }
-
-    private sealed class FundsEquityDto
-    {
-        [JsonPropertyName("available_margin")] public decimal AvailableMargin { get; init; }
-        [JsonPropertyName("used_margin")]      public decimal UsedMargin      { get; init; }
-        [JsonPropertyName("payin_amount")]     public decimal PayinAmount     { get; init; }
     }
 }

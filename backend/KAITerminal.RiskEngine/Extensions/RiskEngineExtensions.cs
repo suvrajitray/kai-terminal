@@ -34,7 +34,11 @@ public static class RiskEngineExtensions
         services.AddSingleton<IPositionCache, PositionCache>();
         services.AddSingleton<IUserTokenSource, TTokenSource>();
 
+        services.AddSingleton<RateLimitedStatusNotifier>();
+        services.AddSingleton<PortfolioSquareOff>();
         services.AddSingleton<RiskEvaluator>();
+        services.AddSingleton<TradingWindow>();
+        services.AddSingleton<PositionPoller>();
 
         // Register StreamingRiskWorker as a singleton so the same instance is resolvable
         // as both IHostedService and IPositionRefreshTrigger (used by AutoShiftEvaluator).

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using KAITerminal.Contracts.Domain;
 using KAITerminal.RiskEngine.Abstractions;
+using KAITerminal.RiskEngine.Services;
 
 namespace KAITerminal.RiskEngine.State;
 
@@ -69,22 +70,8 @@ public sealed class PositionCache : IPositionCache
     public decimal GetMtm(string userId)
     {
         if (!_data.TryGetValue(userId, out var e)) return 0m;
-
-        decimal total = 0m;
-        foreach (var p in e.Positions)
-        {
-            // Closed positions always use the broker's P&L — never LTP.
-            // Open positions with a live LTP tick: start from the broker's own verified
-            // p.Pnl and apply only the incremental price delta since the last REST poll.
-            // This avoids issues with blended average-price in NET positions where the
-            // same instrument was traded multiple times intraday (e.g. exit + re-entry).
-            // Fall back to p.Pnl when no LTP tick has arrived yet.
-            if (p.IsOpen && e.Ltp.TryGetValue(p.InstrumentToken, out var ltp))
-                total += p.Pnl + p.Quantity * (ltp - p.Ltp);
-            else
-                total += p.Pnl;
-        }
-        return total;
+        return MtmCalculator.Compute(e.Positions, token =>
+            e.Ltp.TryGetValue(token, out var ltp) ? ltp : null);
     }
 
     public void ResetLtp(string userId)

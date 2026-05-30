@@ -12,7 +12,7 @@ namespace KAITerminal.Worker;
 /// Call <see cref="FilterThresholdCrossings"/> first (no contracts needed),
 /// then load contracts, then call <see cref="Evaluate"/> for actionable decisions.
 /// </summary>
-internal static class AutoShiftDecisionEngine
+internal static class AutoShiftDecisionCalculator
 {
     // Underlying name (from Kite CSV) → Upstox index key (for option chain lookup)
     private static IReadOnlyDictionary<string, string> UnderlyingKeys => WorkerIndexKeys.UnderlyingFeedKeys;

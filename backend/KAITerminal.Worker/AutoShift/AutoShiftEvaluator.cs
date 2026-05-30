@@ -88,7 +88,7 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
             "[SHIFT] Tick — {UserId} ({Broker})  |  {Count} sell position(s)",
             userId, broker.BrokerType, sellPositions.Count);
 
-        var crossings = AutoShiftDecisionEngine.FilterThresholdCrossings(
+        var crossings = AutoShiftDecisionCalculator.FilterThresholdCrossings(
             sellPositions,
             token => _cache.TryGetLiveLtp(stateKey, token),
             token => _cache.IsShifted(stateKey, token),
@@ -100,7 +100,7 @@ internal sealed class AutoShiftEvaluator : IAutoShiftEvaluator
         // Lazy-load contracts — only when at least one position crossed threshold
         var allContracts = await _zerodhaInstruments.GetAllCurrentYearContractsAsync(ct);
 
-        var decisions = AutoShiftDecisionEngine.Evaluate(
+        var decisions = AutoShiftDecisionCalculator.Evaluate(
             crossings, state, config, allContracts, broker.BrokerType);
 
         foreach (var decision in decisions)

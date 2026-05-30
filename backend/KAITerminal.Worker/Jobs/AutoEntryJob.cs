@@ -1,12 +1,12 @@
 using KAITerminal.Broker;
 using KAITerminal.Contracts;
 using KAITerminal.Contracts.Broker;
-using KAITerminal.Contracts.Domain;
 using KAITerminal.Contracts.Options;
 using KAITerminal.Infrastructure.Data;
-using KAITerminal.Util;
 using KAITerminal.Infrastructure.Services;
 using KAITerminal.MarketData.Services;
+using KAITerminal.Util;
+using KAITerminal.Worker.Jobs.AutoEntry;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -15,41 +15,42 @@ using Microsoft.Extensions.Logging;
 namespace KAITerminal.Worker.Jobs;
 
 /// <summary>
-/// Scheduled option-selling automation. Runs every 30 seconds during trading hours.
-/// Reads AutoEntryConfigs from DB, checks eligibility (day, time window, expiry exclusion,
-/// already-entered-today guard), then selects a strike and places a SELL MIS order.
-/// The already-entered-today state is persisted in AutoEntryLogs so a server restart
-/// does not re-enter on the same day.
+/// Scheduled option-selling automation. Runs every 30 seconds during trading hours,
+/// loads enabled auto-entry configs, and delegates eligibility / strike selection /
+/// order placement to focused collaborators.
 /// </summary>
 internal sealed class AutoEntryJob : BackgroundService
 {
-    private static readonly TimeZoneInfo Ist         = TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
-    private static readonly TimeSpan     TradingStart = new(9,  15, 0);
-    private static readonly TimeSpan     TradingEnd   = new(15, 30, 0);
+    private static readonly TimeZoneInfo Ist           = TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
+    private static readonly TimeSpan     TradingStart  = new(9,  15, 0);
+    private static readonly TimeSpan     TradingEnd    = new(15, 30, 0);
     private static readonly TimeSpan     CheckInterval = TimeSpan.FromSeconds(30);
 
-    private readonly IOptionContractProvider  _contractProvider;
-    private readonly IOptionContractProvider? _zerodhaContractProvider;
-    private readonly IOptionChainProvider     _chainProvider;
+    private readonly IOptionContractProvider  _upstoxContracts;
+    private readonly IOptionContractProvider? _zerodhaContracts;
     private readonly IMarketQuoteService      _quoteService;
     private readonly IBrokerClientFactory     _brokerFactory;
+    private readonly StrikeSelectorRegistry   _selectors;
+    private readonly AutoEntryOrderPlacer     _orderPlacer;
     private readonly IServiceScopeFactory     _scopeFactory;
     private readonly ILogger<AutoEntryJob>    _logger;
 
     public AutoEntryJob(
         IEnumerable<IOptionContractProvider> contractProviders,
-        IOptionChainProvider                 chainProvider,
         IMarketQuoteService                  quoteService,
         IBrokerClientFactory                 brokerFactory,
+        StrikeSelectorRegistry               selectors,
+        AutoEntryOrderPlacer                 orderPlacer,
         IServiceScopeFactory                 scopeFactory,
         ILogger<AutoEntryJob>                logger)
     {
         var providers = contractProviders.ToList();
-        _contractProvider        = providers.First(p => p.BrokerType == BrokerNames.Upstox);
-        _zerodhaContractProvider = providers.FirstOrDefault(p => p.BrokerType == BrokerNames.Zerodha);
-        _chainProvider    = chainProvider;
+        _upstoxContracts  = providers.First(p => p.BrokerType == BrokerNames.Upstox);
+        _zerodhaContracts = providers.FirstOrDefault(p => p.BrokerType == BrokerNames.Zerodha);
         _quoteService     = quoteService;
         _brokerFactory    = brokerFactory;
+        _selectors        = selectors;
+        _orderPlacer      = orderPlacer;
         _scopeFactory     = scopeFactory;
         _logger           = logger;
     }
@@ -69,48 +70,11 @@ internal sealed class AutoEntryJob : BackgroundService
 
     private async Task RunCheckAsync(DateTimeOffset nowIst, CancellationToken ct)
     {
-        List<AutoEntryConfig> configs;
-        using (var scope = _scopeFactory.CreateScope())
-        {
-            var svc = scope.ServiceProvider.GetRequiredService<IAutoEntryConfigService>();
-            configs = (await svc.GetAllEnabledAsync(ct)).ToList();
-        }
-
+        var configs = await LoadEnabledConfigsAsync(ct);
         if (configs.Count == 0) return;
 
-        // Fetch contracts once — shared across all configs for efficiency.
-        // Merge Upstox + Zerodha contracts by ExchangeToken so each entry has both tokens.
-        IReadOnlyList<IndexContracts> allContracts;
-        try
-        {
-            var upstoxContracts = await _contractProvider.GetContractsAsync("", null, ct);
-
-            if (_zerodhaContractProvider is not null)
-            {
-                var zerodhaContracts = await _zerodhaContractProvider.GetContractsAsync("", null, ct);
-                var zerodhaByExchangeToken = zerodhaContracts
-                    .SelectMany(ic => ic.Contracts)
-                    .Where(c => !string.IsNullOrEmpty(c.ZerodhaToken) && !string.IsNullOrEmpty(c.ExchangeToken))
-                    .ToDictionary(c => c.ExchangeToken, c => c.ZerodhaToken, StringComparer.OrdinalIgnoreCase);
-
-                allContracts = upstoxContracts
-                    .Select(ic => new IndexContracts(
-                        ic.Index,
-                        ic.Contracts
-                            .Select(c => c with { ZerodhaToken = zerodhaByExchangeToken.GetValueOrDefault(c.ExchangeToken, "") })
-                            .ToList()))
-                    .ToList();
-            }
-            else
-            {
-                allContracts = upstoxContracts;
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "[ENTRY] Contract fetch failed — skipping tick");
-            return;
-        }
+        var allContracts = await FetchMergedContractsAsync(ct);
+        if (allContracts is null) return;
 
         foreach (var config in configs)
         {
@@ -127,69 +91,73 @@ internal sealed class AutoEntryJob : BackgroundService
         }
     }
 
+    private async Task<List<AutoEntryConfig>> LoadEnabledConfigsAsync(CancellationToken ct)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var svc = scope.ServiceProvider.GetRequiredService<IAutoEntryConfigService>();
+        return (await svc.GetAllEnabledAsync(ct)).ToList();
+    }
+
+    /// <summary>
+    /// Merges Upstox + Zerodha contracts by exchange_token so each entry has both broker tokens.
+    /// Returns null on fetch failure so the tick is skipped.
+    /// </summary>
+    private async Task<IReadOnlyList<IndexContracts>?> FetchMergedContractsAsync(CancellationToken ct)
+    {
+        try
+        {
+            var upstox = await _upstoxContracts.GetContractsAsync("", null, ct);
+            if (_zerodhaContracts is null) return upstox;
+
+            var zerodha = await _zerodhaContracts.GetContractsAsync("", null, ct);
+            var zerodhaByExchangeToken = zerodha
+                .SelectMany(ic => ic.Contracts)
+                .Where(c => !string.IsNullOrEmpty(c.ZerodhaToken) && !string.IsNullOrEmpty(c.ExchangeToken))
+                .ToDictionary(c => c.ExchangeToken, c => c.ZerodhaToken, StringComparer.OrdinalIgnoreCase);
+
+            return upstox
+                .Select(ic => new IndexContracts(
+                    ic.Index,
+                    ic.Contracts
+                        .Select(c => c with { ZerodhaToken = zerodhaByExchangeToken.GetValueOrDefault(c.ExchangeToken, "") })
+                        .ToList()))
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[ENTRY] Contract fetch failed — skipping tick");
+            return null;
+        }
+    }
+
     private async Task EvaluateConfigAsync(
-        AutoEntryConfig config, DateTimeOffset nowIst,
-        IReadOnlyList<IndexContracts> allContracts, CancellationToken ct)
+        AutoEntryConfig                config,
+        DateTimeOffset                 nowIst,
+        IReadOnlyList<IndexContracts>  allContracts,
+        CancellationToken              ct)
     {
         var todayIst    = DateOnly.FromDateTime(nowIst.DateTime);
         var todayIstStr = todayIst.ToString("yyyy-MM-dd");
+        var ctx         = $"[{config.Username} / {config.BrokerType} / {config.Name}]";
 
-        // 1. Day check — skipped when OnlyExpiryDay is set (expiry check happens later)
-        if (!config.OnlyExpiryDay && !IsTradingDay(config.TradingDays, nowIst.DayOfWeek))
+        var scheduleSkip = AutoEntryEligibility.CheckSchedule(config, nowIst);
+        if (scheduleSkip is not null)
         {
-            _logger.LogDebug("[SKIP ] {Day} not in trading days  [{User} / {Broker} / {Strategy}]",
-                nowIst.DayOfWeek, config.Username, config.BrokerType, config.Name);
+            LogEligibilitySkip(scheduleSkip, ctx);
             return;
         }
 
-        // 2. Time window check
-        if (!TimeOnly.TryParse(config.EntryAfterTime,   out var entryAfter)   ||
-            !TimeOnly.TryParse(config.NoEntryAfterTime, out var noEntryAfter))
-        {
-            _logger.LogWarning("[ENTRY] Invalid time config — {User} ({Broker}) — skipping",
-                config.Username, config.BrokerType);
-            return;
-        }
-
-        var nowTime = TimeOnly.FromTimeSpan(nowIst.TimeOfDay);
-        if (nowTime < entryAfter || nowTime >= noEntryAfter)
-        {
-            _logger.LogDebug("[SKIP ] Time {Now} outside {After}–{Before}  [{User} / {Broker} / {Strategy}]",
-                nowTime, entryAfter, noEntryAfter, config.Username, config.BrokerType, config.Name);
-            return;
-        }
-
-        // 3. Already entered today (safe-restart guard)
         using var scope = _scopeFactory.CreateScope();
-        var db  = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var svc = scope.ServiceProvider.GetRequiredService<IAutoEntryConfigService>();
-        var alreadyEntered = await svc.HasEnteredTodayAsync(config.Id, todayIstStr, ct);
-        if (alreadyEntered)
+        if (await svc.HasEnteredTodayAsync(config.Id, todayIstStr, ct))
         {
-            _logger.LogDebug("[SKIP ] Already entered today  [{User} / {Broker} / {Strategy}]",
-                config.Username, config.BrokerType, config.Name);
+            _logger.LogDebug("[SKIP ] Already entered today  {Ctx}", ctx);
             return;
         }
 
-        // 4. Broker credentials
-        var brokerType = config.BrokerType.ToLower();
-        var cred = await db.BrokerCredentials.FirstOrDefaultAsync(
-            c => c.Username == config.Username && c.BrokerName.ToLower() == brokerType, ct);
-        if (cred is null)
-        {
-            _logger.LogWarning("[ENTRY] Token {Reason} — {User} ({Broker}) — skipping",
-                TokenValidationResult.Missing, config.Username, config.BrokerType);
-            return;
-        }
-        var tokenResult = BrokerTokenHelper.Validate(cred.AccessToken, cred.UpdatedAt, cred.BrokerName);
-        if (tokenResult != TokenValidationResult.Valid)
-        {
-            _logger.LogWarning("[ENTRY] Token {Reason} — {User} ({Broker}) — skipping",
-                tokenResult, config.Username, config.BrokerType);
-            return;
-        }
+        var cred = await ResolveCredentialAsync(scope, config, ct);
+        if (cred is null) return;
 
-        // 5. Resolve expiry
         var indexContracts = allContracts.FirstOrDefault(ic =>
             ic.Index.Equals(config.Instrument, StringComparison.OrdinalIgnoreCase));
         if (indexContracts is null)
@@ -198,122 +166,25 @@ internal sealed class AutoEntryJob : BackgroundService
             return;
         }
 
-        var upcomingExpiries = indexContracts.Contracts
-            .Select(c => c.Expiry)
-            .Distinct()
-            .Where(e => DateOnly.TryParse(e, out var d) && d >= todayIst)
-            .OrderBy(e => e)
-            .ToList();
+        var expiry = ResolveExpiry(indexContracts, config, todayIst);
+        if (expiry is null) return;
 
-        if (upcomingExpiries.Count <= config.ExpiryOffset)
+        var expiryDate     = DateOnly.Parse(expiry);
+        var expiryDaySkip  = AutoEntryEligibility.CheckExpiryDay(
+            config.ExpiryDayPolicy(), expiryDate, todayIst, config.Instrument);
+        if (expiryDaySkip is not null)
         {
-            _logger.LogWarning("[ENTRY] Not enough expiries — {Instrument} offset={Offset}",
-                config.Instrument, config.ExpiryOffset);
+            LogEligibilitySkip(expiryDaySkip, ctx);
             return;
         }
 
-        var expiry      = upcomingExpiries[config.ExpiryOffset];
-        var expiryDate  = DateOnly.Parse(expiry);
+        var spot = await ResolveSpotAsync(config, ct);
+        if (spot is null) return;
 
-        // 6. Expiry day gate
-        if (config.OnlyExpiryDay && expiryDate != todayIst)
-        {
-            _logger.LogDebug("[SKIP ] OnlyExpiryDay — not expiry today  [{User} / {Broker}]",
-                config.Username, config.BrokerType);
-            return;
-        }
-        if (!config.OnlyExpiryDay && config.ExcludeExpiryDay && expiryDate == todayIst)
-        {
-            _logger.LogDebug("[SKIP ] ExcludeExpiryDay — expiry today  |  {Instrument}  [{User} / {Broker}]",
-                config.Instrument, config.Username, config.BrokerType);
-            return;
-        }
+        var broker = _brokerFactory.Create(config.BrokerType, cred.AccessToken, cred.ApiKey, config.Username);
+        var anyPlaced = await PlaceAllOptionLegsAsync(
+            broker, config, expiry, spot.Value, indexContracts.Contracts, ct);
 
-        // 7. Spot price
-        var underlyingKey = WorkerIndexKeys.UnderlyingFeedKeys.GetValueOrDefault(
-            config.Instrument.ToUpperInvariant());
-        if (underlyingKey is null)
-        {
-            _logger.LogWarning("[ENTRY] Unknown instrument {Instrument}", config.Instrument);
-            return;
-        }
-
-        decimal spot;
-        try
-        {
-            var quotes = await _quoteService.GetMarketQuotesAsync([underlyingKey], ct);
-            // Upstox REST market-quote API returns ':' in keys (e.g. "NSE_INDEX:Nifty 50")
-            // while UnderlyingFeedKeys uses '|' — convert for lookup only
-            var quoteKey = underlyingKey.Replace('|', ':');
-            _logger.LogDebug("[ENTRY] Quote keys: [{Keys}]  |  looking up {Key}",
-                string.Join(", ", quotes.Keys), quoteKey);
-            if (!quotes.TryGetValue(quoteKey, out var quote))
-            {
-                _logger.LogWarning("[ENTRY] Quote key {Key} not found  |  {Instrument}", quoteKey, config.Instrument);
-                return;
-            }
-            if (quote.LastPrice <= 0)
-            {
-                _logger.LogWarning("[ENTRY] Spot price {Price} invalid (≤ 0)  |  {Instrument}", quote.LastPrice, config.Instrument);
-                return;
-            }
-            spot = quote.LastPrice;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "[ERROR] Spot price fetch failed — {Instrument}", config.Instrument);
-            return;
-        }
-
-        // 8. Strike selection and order placement
-        var broker = _brokerFactory.Create(config.BrokerType, cred.AccessToken, cred.ApiKey);
-
-        var optionTypes = config.OptionType == "CE+PE"
-            ? new[] { "CE", "PE" }
-            : new[] { config.OptionType };
-
-        bool anyPlaced = false;
-        foreach (var optionType in optionTypes)
-        {
-            var (token, exchange) = await ResolveStrikeTokenAsync(
-                config, optionType, expiry, spot, indexContracts.Contracts, ct);
-
-            if (token is null)
-            {
-                _logger.LogWarning(
-                    "[ENTRY] Cannot resolve {OptionType} strike  |  {Instrument}  [{User} / {Broker}]",
-                    optionType, config.Instrument, config.Username, config.BrokerType);
-                continue;
-            }
-
-            var lotSize = indexContracts.Contracts
-                .FirstOrDefault(c => c.InstrumentType.Equals(optionType, StringComparison.OrdinalIgnoreCase)
-                    && c.Expiry == expiry)?.LotSize ?? 1;
-
-            var qty = config.Lots * (int)lotSize;
-            var order = new BrokerOrderRequest(token, qty, "SELL", "I", "MARKET", Exchange: exchange);
-
-            _logger.LogInformation(
-                "[ENTRY] Placing SELL {OptionType} {Instrument}  |  expiry={Expiry}  |  token={Token}  |  qty={Qty} ({Lots}L × {LotSize})  |  mode={Mode}  [{User} / {Broker}]",
-                optionType, config.Instrument, expiry, token, qty, config.Lots, lotSize, config.StrikeMode, config.Username, config.BrokerType);
-
-            try
-            {
-                await broker.PlaceOrderAsync(order, ct);
-                anyPlaced = true;
-                _logger.LogInformation(
-                    "[ENTRY] Order placed — {OptionType} {Instrument}  qty={Qty}  [{User} / {Broker}]",
-                    optionType, config.Instrument, qty, config.Username, config.BrokerType);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex,
-                    "[ERROR] Order failed — {OptionType} {Instrument}  [{User} / {Broker}]",
-                    optionType, config.Instrument, config.Username, config.BrokerType);
-            }
-        }
-
-        // 9. Log entry to DB (once per day, regardless of CE/PE split)
         if (anyPlaced)
         {
             await svc.LogEntryAsync(config.Id, config.Instrument, todayIstStr, DateTime.UtcNow, ct);
@@ -323,159 +194,127 @@ internal sealed class AutoEntryJob : BackgroundService
         }
     }
 
-    private async Task<(string? token, string? exchange)> ResolveStrikeTokenAsync(
-        AutoEntryConfig config, string optionType, string expiry, decimal spot,
-        IReadOnlyList<ContractEntry> contracts, CancellationToken ct)
+    private async Task<BrokerCredential?> ResolveCredentialAsync(
+        IServiceScope scope, AutoEntryConfig config, CancellationToken ct)
     {
-        var filtered = contracts
-            .Where(c => c.Expiry == expiry
-                && c.InstrumentType.Equals(optionType, StringComparison.OrdinalIgnoreCase))
-            .OrderBy(c => c.StrikePrice)
+        var db         = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var brokerType = config.BrokerType.ToLower();
+        var cred = await db.BrokerCredentials.FirstOrDefaultAsync(
+            c => c.Username == config.Username && c.BrokerName.ToLower() == brokerType, ct);
+
+        if (cred is null)
+        {
+            _logger.LogWarning("[ENTRY] Token {Reason} — {User} ({Broker}) — skipping",
+                TokenValidationResult.Missing, config.Username, config.BrokerType);
+            return null;
+        }
+
+        var tokenResult = BrokerTokenHelper.Validate(cred.AccessToken, cred.UpdatedAt, cred.BrokerName);
+        if (tokenResult != TokenValidationResult.Valid)
+        {
+            _logger.LogWarning("[ENTRY] Token {Reason} — {User} ({Broker}) — skipping",
+                tokenResult, config.Username, config.BrokerType);
+            return null;
+        }
+
+        return cred;
+    }
+
+    private string? ResolveExpiry(IndexContracts indexContracts, AutoEntryConfig config, DateOnly today)
+    {
+        var upcoming = indexContracts.Contracts
+            .Select(c => c.Expiry)
+            .Distinct()
+            .Where(e => DateOnly.TryParse(e, out var d) && d >= today)
+            .OrderBy(e => e)
             .ToList();
 
-        if (filtered.Count == 0) return (null, null);
-
-        return config.StrikeMode switch
+        if (upcoming.Count <= config.ExpiryOffset)
         {
-            "ATM"     => SelectAtm(filtered, spot, config.BrokerType, config.Instrument),
-            "OTM"     => SelectOtm(filtered, spot, optionType, config.StrikeParam, config.BrokerType, config.Instrument),
-            "Delta"   => await SelectByDeltaAsync(config, optionType, expiry, spot, contracts, (double)config.StrikeParam, ct),
-            "Premium" => await SelectByPremiumAsync(config, optionType, expiry, contracts, config.StrikeParam, ct),
-            _         => SelectAtm(filtered, spot, config.BrokerType, config.Instrument),
-        };
+            _logger.LogWarning("[ENTRY] Not enough expiries — {Instrument} offset={Offset}",
+                config.Instrument, config.ExpiryOffset);
+            return null;
+        }
+
+        return upcoming[config.ExpiryOffset];
     }
 
-    private static (string? token, string? exchange) SelectAtm(
-        List<ContractEntry> filtered, decimal spot,
-        string brokerType, string instrument)
+    private async Task<decimal?> ResolveSpotAsync(AutoEntryConfig config, CancellationToken ct)
     {
-        var entry = filtered.MinBy(c => Math.Abs(c.StrikePrice - spot));
-        if (entry is null) return (null, null);
-        return ExtractToken(entry, brokerType, instrument);
-    }
+        var underlyingKey = WorkerIndexKeys.UnderlyingFeedKeys.GetValueOrDefault(
+            config.Instrument.ToUpperInvariant());
+        if (underlyingKey is null)
+        {
+            _logger.LogWarning("[ENTRY] Unknown instrument {Instrument}", config.Instrument);
+            return null;
+        }
 
-    private static (string? token, string? exchange) SelectOtm(
-        List<ContractEntry> filtered, decimal spot, string optionType,
-        decimal strikeParam, string brokerType, string instrument)
-    {
-        // ATM index
-        var atmIdx = filtered
-            .Select((c, i) => (i, diff: Math.Abs(c.StrikePrice - spot)))
-            .MinBy(t => t.diff).i;
-
-        // OTM direction: CE sellers want higher strikes (+), PE sellers want lower strikes (-)
-        int steps  = (int)strikeParam;
-        var offset = optionType.Equals("CE", StringComparison.OrdinalIgnoreCase) ? steps : -steps;
-        var idx    = Math.Clamp(atmIdx + offset, 0, filtered.Count - 1);
-
-        return ExtractToken(filtered[idx], brokerType, instrument);
-    }
-
-    private async Task<(string? token, string? exchange)> SelectByDeltaAsync(
-        AutoEntryConfig config, string optionType, string expiry, decimal spot,
-        IReadOnlyList<ContractEntry> contracts, double targetDelta, CancellationToken ct)
-    {
-        var underlyingKey = WorkerIndexKeys.UnderlyingFeedKeys[config.Instrument.ToUpperInvariant()];
-        IReadOnlyList<OptionChainEntry> chain;
         try
         {
-            chain = await _chainProvider.GetChainAsync(underlyingKey, expiry, ct);
+            var quotes   = await _quoteService.GetMarketQuotesAsync([underlyingKey], ct);
+            // Upstox REST market-quote API returns ':' in keys (e.g. "NSE_INDEX:Nifty 50")
+            // while UnderlyingFeedKeys uses '|' — convert for lookup only.
+            var quoteKey = underlyingKey.Replace('|', ':');
+            if (!quotes.TryGetValue(quoteKey, out var quote))
+            {
+                _logger.LogWarning("[ENTRY] Quote key {Key} not found  |  {Instrument}", quoteKey, config.Instrument);
+                return null;
+            }
+            if (quote.LastPrice <= 0)
+            {
+                _logger.LogWarning("[ENTRY] Spot price {Price} invalid (≤ 0)  |  {Instrument}",
+                    quote.LastPrice, config.Instrument);
+                return null;
+            }
+            return quote.LastPrice;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "[ERROR] Delta chain fetch failed — {Instrument}", config.Instrument);
-            return (null, null);
+            _logger.LogError(ex, "[ERROR] Spot price fetch failed — {Instrument}", config.Instrument);
+            return null;
+        }
+    }
+
+    private async Task<bool> PlaceAllOptionLegsAsync(
+        IBrokerClient                 broker,
+        AutoEntryConfig               config,
+        string                        expiry,
+        decimal                       spot,
+        IReadOnlyList<ContractEntry>  contracts,
+        CancellationToken             ct)
+    {
+        var optionTypes = config.OptionType == "CE+PE"
+            ? new[] { "CE", "PE" }
+            : new[] { config.OptionType };
+
+        var selector = _selectors.For(config.StrikeMode);
+        bool anyPlaced = false;
+
+        foreach (var optionType in optionTypes)
+        {
+            var resolution = await selector.SelectAsync(
+                new StrikeSelectionContext(config, optionType, expiry, spot, contracts), ct);
+
+            if (resolution is null)
+            {
+                _logger.LogWarning(
+                    "[ENTRY] Cannot resolve {OptionType} strike  |  {Instrument}  [{User} / {Broker}]",
+                    optionType, config.Instrument, config.Username, config.BrokerType);
+                continue;
+            }
+
+            if (await _orderPlacer.PlaceAsync(broker, config, optionType, expiry, resolution, contracts, ct))
+                anyPlaced = true;
         }
 
-        var isCe   = optionType.Equals("CE", StringComparison.OrdinalIgnoreCase);
-        var best   = chain
-            .Select(e => (entry: e, side: isCe ? e.CallOptions : e.PutOptions))
-            .Where(x => x.side?.OptionGreeks is not null && !string.IsNullOrEmpty(x.side.InstrumentKey))
-            .MinBy(x => Math.Abs(Math.Abs((double)x.side!.OptionGreeks!.Delta) - targetDelta));
-
-        if (best == default) return (null, null);
-        _logger.LogInformation(
-            "[ENTRY] Delta — {OptionType} strike={Strike}  |  delta={Delta:F3} (target={Target})  [{User} / {Broker}]",
-            optionType, best.entry.StrikePrice, best.side!.OptionGreeks!.Delta, targetDelta, config.Username, config.BrokerType);
-        return ResolveUpstoxKeyToToken(best.side!.InstrumentKey, config.BrokerType, contracts, config.Instrument);
+        return anyPlaced;
     }
 
-    private async Task<(string? token, string? exchange)> SelectByPremiumAsync(
-        AutoEntryConfig config, string optionType, string expiry,
-        IReadOnlyList<ContractEntry> contracts, decimal targetPremium, CancellationToken ct)
+    private void LogEligibilitySkip(EligibilityResult result, string ctx)
     {
-        var underlyingKey = WorkerIndexKeys.UnderlyingFeedKeys[config.Instrument.ToUpperInvariant()];
-        IReadOnlyList<OptionChainEntry> chain;
-        try
-        {
-            chain = await _chainProvider.GetChainAsync(underlyingKey, expiry, ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "[ERROR] Premium chain fetch failed — {Instrument}", config.Instrument);
-            return (null, null);
-        }
-
-        var isCe = optionType.Equals("CE", StringComparison.OrdinalIgnoreCase);
-        var best = chain
-            .Select(e => (entry: e, side: isCe ? e.CallOptions : e.PutOptions))
-            .Where(x => x.side?.MarketData is not null && !string.IsNullOrEmpty(x.side.InstrumentKey))
-            .MinBy(x => Math.Abs(x.side!.MarketData!.Ltp - targetPremium));
-
-        if (best == default) return (null, null);
-        _logger.LogInformation(
-            "[ENTRY] Premium — {OptionType} strike={Strike}  |  ltp=₹{Ltp} (target=₹{Target})  [{User} / {Broker}]",
-            optionType, best.entry.StrikePrice, best.side!.MarketData!.Ltp, targetPremium, config.Username, config.BrokerType);
-        return ResolveUpstoxKeyToToken(best.side!.InstrumentKey, config.BrokerType, contracts, config.Instrument);
-    }
-
-    private static (string? token, string? exchange) ExtractToken(
-        ContractEntry entry, string brokerType, string instrument)
-    {
-        if (brokerType.Equals(BrokerNames.Upstox, StringComparison.OrdinalIgnoreCase))
-            return (entry.UpstoxToken, null);
-
-        // Zerodha: exchange is inferred by ZerodhaOrderService from the trading symbol,
-        // but we pass it explicitly to be safe.
-        var exchange = instrument is "SENSEX" or "BANKEX" ? "BFO" : "NFO";
-        return (string.IsNullOrEmpty(entry.ZerodhaToken) ? null : entry.ZerodhaToken, exchange);
-    }
-
-    private static (string? token, string? exchange) ResolveUpstoxKeyToToken(
-        string upstoxKey, string brokerType,
-        IReadOnlyList<ContractEntry> contracts, string instrument)
-    {
-        // Option chain InstrumentKey uses ':' (e.g. "NSE_FO:57520"); ContractEntry.UpstoxToken uses '|'
-        var normalizedKey = upstoxKey.Replace(':', '|');
-
-        if (brokerType.Equals(BrokerNames.Upstox, StringComparison.OrdinalIgnoreCase))
-            return (normalizedKey, null);
-
-        var exchangeToken = normalizedKey.Contains('|') ? normalizedKey.Split('|')[1] : normalizedKey;
-        var match = contracts.FirstOrDefault(c =>
-            c.UpstoxToken.Contains('|') &&
-            c.UpstoxToken.Split('|')[1].Equals(exchangeToken, StringComparison.OrdinalIgnoreCase));
-
-        if (match is null || string.IsNullOrEmpty(match.ZerodhaToken))
-            return (null, null);
-
-        var exchange = instrument is "SENSEX" or "BANKEX" ? "BFO" : "NFO";
-        return (match.ZerodhaToken, exchange);
-    }
-
-    private static bool IsTradingDay(string tradingDays, DayOfWeek dayOfWeek)
-    {
-        var dayAbbr = dayOfWeek switch
-        {
-            DayOfWeek.Monday    => "Mon",
-            DayOfWeek.Tuesday   => "Tue",
-            DayOfWeek.Wednesday => "Wed",
-            DayOfWeek.Thursday  => "Thu",
-            DayOfWeek.Friday    => "Fri",
-            _                   => "",
-        };
-        if (string.IsNullOrEmpty(dayAbbr)) return false;
-        return tradingDays.Split(',', StringSplitOptions.RemoveEmptyEntries)
-            .Any(d => d.Trim().Equals(dayAbbr, StringComparison.OrdinalIgnoreCase));
+        if (result.Severity == EligibilitySeverity.InvalidConfigWarning)
+            _logger.LogWarning("[ENTRY] {Reason}  {Ctx}", result.Reason, ctx);
+        else
+            _logger.LogDebug("[SKIP ] {Reason}  {Ctx}", result.Reason, ctx);
     }
 }

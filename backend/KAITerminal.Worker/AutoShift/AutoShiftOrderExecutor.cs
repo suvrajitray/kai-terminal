@@ -16,6 +16,9 @@ namespace KAITerminal.Worker;
 /// </summary>
 internal sealed class AutoShiftOrderExecutor
 {
+    private const int FillPollTimeoutSeconds = 15;
+    private static readonly TimeSpan FillPropagationDelay = TimeSpan.FromMilliseconds(500);
+
     private readonly OptionStrikeService              _strikeSvc;
     private readonly IRiskRepository                  _repo;
     private readonly IRiskEventNotifier               _notifier;
@@ -142,17 +145,12 @@ internal sealed class AutoShiftOrderExecutor
             UserId:         userId,
             Qty:            qty);
 
-        _ = Task.Run(async () =>
-        {
-            try   { await CompleteShiftAsync(completion, broker); }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex,
-                    "[SHIFT] Background task CRASHED — chain={ChainKey}  |  close={CloseToken}  |  open={OpenSymbol}  [{Broker} / {UserId}]  Manual intervention required.",
-                    completion.ChainKey, completion.CloseToken, completion.OpenSymbol,
-                    broker.BrokerType, completion.UserId);
-            }
-        });
+        BackgroundTask.RunDetached(
+            logger:          _logger,
+            tag:             "SHIFT",
+            messageTemplate: "chain={ChainKey}  |  close={CloseToken}  |  open={OpenSymbol}  [{Broker} / {UserId}]",
+            args:            [completion.ChainKey, completion.CloseToken, completion.OpenSymbol, broker.BrokerType, completion.UserId],
+            action:          () => CompleteShiftAsync(completion, broker));
     }
 
     /// <summary>
@@ -164,7 +162,7 @@ internal sealed class AutoShiftOrderExecutor
     {
         try
         {
-            await FillPoller.WaitForFillAsync(broker, ctx.CloseOrderId, timeoutSeconds: 15,
+            await FillPoller.WaitForFillAsync(broker, ctx.CloseOrderId, FillPollTimeoutSeconds,
                 ctx.UserId, ctx.ChainKey, _logger, CancellationToken.None);
 
             await broker.PlaceOrderAsync(ctx.OpenOrder, CancellationToken.None);
@@ -185,8 +183,8 @@ internal sealed class AutoShiftOrderExecutor
                 ctx.ChainKey, newCount, ctx.MaxShiftCount, ctx.OriginalStrike, ctx.OpenSymbol,
                 ctx.MaxShiftCount - newCount, broker.BrokerType, ctx.UserId);
 
-            // Brief delay for fill propagation, then wake the position poller.
-            await Task.Delay(500);
+            // Wake the position poller after the broker has propagated the fill.
+            await Task.Delay(FillPropagationDelay);
             _refreshTriggerFactory().RequestRefresh(ctx.StateKey);
 
             await _notifier.NotifyAsync(new RiskNotification(
@@ -244,8 +242,8 @@ internal sealed class AutoShiftOrderExecutor
             "[SHIFT] Exhausted chain={ChainKey} marked exited  [{Broker} / {UserId}]",
             chainKey, broker.BrokerType, userId);
 
-        // Brief delay for fill propagation, then wake the position poller.
-        await Task.Delay(500, ct);
+        // Wake the position poller after the broker has propagated the fill.
+        await Task.Delay(FillPropagationDelay, ct);
         _refreshTriggerFactory().RequestRefresh(stateKey);
 
         await _notifier.NotifyAsync(new RiskNotification(
