@@ -4,6 +4,7 @@ using KAITerminal.Api.Mapping;
 using KAITerminal.Api.Models;
 using KAITerminal.Api.Services;
 using KAITerminal.MarketData.Services;
+using KAITerminal.OrderRouting;
 using KAITerminal.Zerodha;
 using KAITerminal.Zerodha.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -68,13 +69,14 @@ internal static class ZerodhaPositionEndpoints
         group.MapPost("/positions/shift", async (
             [FromBody] ShiftPositionRequest request,
             PositionShiftService shiftSvc,
+            IOrderRouter orderRouter,
             ZerodhaClient zerodha,
             IZerodhaInstrumentService zerodhaInstruments,
             ClaimsPrincipal user,
             CancellationToken ct) =>
             await shiftSvc.ShiftZerodhaAsync(
                 request, zerodha, zerodhaInstruments,
-                user.GetEmail() ?? "unknown", logger, ct));
+                orderRouter, user.GetEmail() ?? "unknown", logger, ct));
 
         group.MapPost("/positions/{instrumentToken}/exit", async (
             string instrumentToken,

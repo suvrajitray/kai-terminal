@@ -13,6 +13,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<RiskEngineLog>   RiskEngineLogs   => Set<RiskEngineLog>();
     public DbSet<AutoEntryConfig> AutoEntryConfigs  => Set<AutoEntryConfig>();
     public DbSet<AutoEntryLog>    AutoEntryLogs     => Set<AutoEntryLog>();
+    public DbSet<UserOrderAgent>  UserOrderAgents   => Set<UserOrderAgent>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<BrokerCredential>()
@@ -49,5 +50,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         modelBuilder.Entity<AutoEntryLog>()
             .HasIndex(x => x.StrategyId);
+
+        modelBuilder.Entity<UserOrderAgent>()
+            .HasKey(x => x.Username);
     }
 }

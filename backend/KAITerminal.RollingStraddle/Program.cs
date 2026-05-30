@@ -1,4 +1,5 @@
 using KAITerminal.Infrastructure.Data;
+using KAITerminal.Infrastructure.Extensions;
 using KAITerminal.MarketData.Extensions;
 using KAITerminal.Util;
 using KAITerminal.RollingStraddle.Configuration;
@@ -110,8 +111,20 @@ try
         .CreateLogger();
 
     builder.Services.AddSerilog(Log.Logger, dispose: true);
+    builder.Services.AddDatabase(builder.Configuration);
     builder.Services.AddUpstoxSdk(builder.Configuration);
     builder.Services.AddMarketDataCore(builder.Configuration);
+
+    builder.Services.AddHttpClient("OrderAgent");
+    builder.Services.AddSingleton<KAITerminal.OrderRouting.IOrderAgentRegistry,
+                                   KAITerminal.OrderRouting.OrderAgentRegistry>();
+    builder.Services.AddSingleton<KAITerminal.OrderRouting.IOrderAgentClient,
+                                   KAITerminal.OrderRouting.HttpOrderAgentClient>();
+    builder.Services.AddSingleton<KAITerminal.OrderRouting.IOrderRouter>(sp =>
+        new KAITerminal.OrderRouting.OrderRouter(
+            sp.GetRequiredService<KAITerminal.OrderRouting.IOrderAgentRegistry>(),
+            sp.GetRequiredService<KAITerminal.OrderRouting.IOrderAgentClient>(),
+            sp.GetRequiredService<KAITerminal.Upstox.UpstoxClient>()));
 
     builder.Services.Configure<StrategyConfig>(
         builder.Configuration.GetSection(StrategyConfig.SectionName));
@@ -122,6 +135,10 @@ try
     builder.Services.AddHostedService<StrategyRunner>();
 
     var host = builder.Build();
+
+    await host.Services
+        .GetRequiredService<KAITerminal.OrderRouting.IOrderAgentRegistry>()
+        .LoadAsync();
 
     using var startupCts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
     try

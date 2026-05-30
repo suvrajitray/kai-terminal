@@ -14,7 +14,7 @@ public sealed class BrokerClientFactory : IBrokerClientFactory
     public BrokerClientFactory(IReadOnlyDictionary<string, Func<string, string?, IBrokerClient>> creators)
         => _creators = creators;
 
-    public IBrokerClient Create(string brokerType, string accessToken, string? apiKey = null)
+    public IBrokerClient Create(string brokerType, string accessToken, string? apiKey = null, string? username = null)
     {
         var key = brokerType.ToLowerInvariant();
         if (!_creators.TryGetValue(key, out var creator))

@@ -18,13 +18,15 @@ A full-stack options trading terminal built for **options sellers** in Indian eq
 10. [API Reference](#api-reference)
 11. [Live Positions WebSocket](#live-positions-websocket)
 12. [Profit Protection](#profit-protection)
-13. [Upstox SDK](#upstox-sdk)
-14. [AI Signals](#ai-signals)
-15. [Database](#database)
-16. [Logging & Observability](#logging--observability)
-17. [Production Deployment — Azure VM](#production-deployment--azure-vm)
-18. [Configuration Reference](#configuration-reference)
-19. [Development Commands](#development-commands)
+13. [SEBI Static IP Order Routing](#sebi-static-ip-order-routing)
+14. [Rolling Straddle Strategy Runner](#rolling-straddle-strategy-runner)
+15. [Upstox SDK](#upstox-sdk)
+16. [AI Signals](#ai-signals)
+17. [Database](#database)
+18. [Logging & Observability](#logging--observability)
+19. [Production Deployment — Azure VM](#production-deployment--azure-vm)
+20. [Configuration Reference](#configuration-reference)
+21. [Development Commands](#development-commands)
 
 ---
 
@@ -33,10 +35,11 @@ A full-stack options trading terminal built for **options sellers** in Indian eq
 | Layer | Technology |
 |---|---|
 | Backend | .NET 10, ASP.NET Core minimal API, SignalR, EF Core |
-| Database | PostgreSQL (Neon) |
+| Database | PostgreSQL |
 | Cache / Pub-Sub | Redis (StackExchange.Redis) |
 | Auth | Google OAuth 2.0, JWT (HS256) |
 | Brokers | Upstox (execution + market data), Zerodha (REST; streaming stub) |
+| Order Routing | Per-user Docker containers with dedicated static IPs (SEBI compliance) |
 | Frontend | React 19, TypeScript, Vite |
 | UI | Tailwind CSS, shadcn/ui |
 | State | Zustand (persisted to localStorage) |
@@ -49,6 +52,8 @@ A full-stack options trading terminal built for **options sellers** in Indian eq
 - **Profit Protection** — backend Worker monitors MTM per user and fires exits on hard SL, target, auto square-off, or trailing SL; `WatchedProducts` filter scopes evaluation to "All", "MIS only", or "NRML only" positions while terminal display remains complete
 - **Auto square-off** — configurable time-based exit (IST, 24h); set in Settings → Trading Settings; evaluated as check #3 in the risk engine
 - **Auto Shift** — risk engine automatically shifts sell positions further OTM when premium rises by a configured %; exits the position after a configurable max number of shifts; each original position leg has its own independent shift counter
+- **SEBI static IP order routing** — each user's broker API order calls (place, cancel, exit) are routed through a dedicated per-user Docker container bound to a pre-registered static IP, satisfying SEBI's IP whitelist requirement; existing users without a registered agent route directly as before
+- **Rolling Straddle strategy runner** — automated short straddle/strangle with configurable underlying, expiry, strike offset, roll threshold, VIX filter, MTM targets/SLs, and fill polling; runs as an interactive CLI process alongside the live terminal
 - **Risk event alerts** — every risk trigger (SL hit, target hit, auto square-off, TSL activated/raised/fired, square-off, auto-shift) delivered as a browser toast in real time via a dedicated SignalR hub
 - **Position shift** — manually shift any sell position up or down by a configurable strike gap; ↓ always means lower premium (safer/further OTM) for both CE and PE
 - **Quick Trade** — place options orders by premium or by chain (straddle/strangle), for both Upstox and Zerodha, with live margin preview
@@ -66,7 +71,7 @@ A full-stack options trading terminal built for **options sellers** in Indian eq
 ## Repository Layout
 
 ```
-kai-terminal/
+kaiterminal/
 ├── backend/
 │   ├── KAITerminal.Api/           REST API + SignalR hubs
 │   │   ├── Endpoints/             Minimal API route groups
@@ -74,8 +79,14 @@ kai-terminal/
 │   │   ├── Services/              MasterDataService, …
 │   │   └── Notifications/         SignalRRiskEventNotifier
 │   ├── KAITerminal.Worker/        Multi-user risk engine host
+│   │   ├── OrderRouting/          OrderRoutingBrokerClient + Factory (SEBI)
 │   │   └── Notifications/         HttpRiskEventNotifier
 │   ├── KAITerminal.Console/       Single-user risk engine host
+│   ├── KAITerminal.RollingStraddle/  Automated straddle/strangle strategy runner
+│   │   └── Services/              StrategyRunner, OrderExecutor, PositionLedger, …
+│   ├── KAITerminal.OrderAgent/    Per-user HTTP proxy — binds outbound TCP to BIND_IP
+│   │   └── Endpoints/             UpstoxAgentEndpoints, ZerodhaAgentEndpoints
+│   ├── KAITerminal.OrderRouting/  Routing layer — IOrderRouter, IOrderAgentRegistry, HttpOrderAgentClient
 │   ├── KAITerminal.RiskEngine/    Risk logic library
 │   │   ├── Services/              RiskEvaluator
 │   │   ├── State/                 PositionCache, RedisRiskRepository
@@ -92,16 +103,22 @@ kai-terminal/
 │   ├── KAITerminal.Zerodha/       Zerodha SDK — execution only + margin; streaming stubbed
 │   ├── KAITerminal.MarketData/    Market data — quotes, candles, option chain/contracts, WebSocket feed, Kite CSV, RedisLtpRelay
 │   ├── KAITerminal.Infrastructure/ EF Core + PostgreSQL
-│   └── KAITerminal.Auth/          OAuth + JWT helpers
-└── frontend/
-    └── src/
-        ├── components/            UI components (shadcn/ui based)
-        ├── hooks/                 useRiskFeed, useIndicesFeed, useRiskConfig, …
-        ├── pages/                 Route-level page components
-        ├── stores/                Zustand stores (auth, broker, profit-protection)
-        ├── services/              API client helpers
-        ├── types/                 TypeScript interfaces matching backend DTOs
-        └── lib/                   Utilities, constants, logger, logout
+│   ├── KAITerminal.Auth/          OAuth + JWT helpers
+│   ├── KAITerminal.Types/         Shared types
+│   ├── KAITerminal.Util/          BrokerTokenHelper, IstTimestampEnricher
+│   └── docker-compose.yml         Order agent containers (one per user)
+├── frontend/
+│   └── src/
+│       ├── components/            UI components (shadcn/ui based)
+│       ├── hooks/                 useRiskFeed, useIndicesFeed, useRiskConfig, …
+│       ├── pages/                 Route-level page components
+│       ├── stores/                Zustand stores (auth, broker, profit-protection)
+│       ├── services/              API client helpers
+│       ├── types/                 TypeScript interfaces matching backend DTOs
+│       └── lib/                   Utilities, constants, logger, logout
+└── docs/
+    ├── order-agent-deployment.md  Order agent setup and operations guide
+    └── superpowers/               Design specs and implementation plans
 ```
 
 ---
@@ -112,7 +129,7 @@ kai-terminal/
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
 - [Node.js 20+](https://nodejs.org/)
-- PostgreSQL 18 database ([Neon](https://neon.tech) free tier works, or local)
+- PostgreSQL 18 database (local or [Neon](https://neon.tech) free tier)
 - Redis (`redis-server` locally, or any managed Redis)
 - Upstox developer account with an app (API key + secret)
 - Google Cloud OAuth 2.0 app (Client ID + secret)
@@ -165,7 +182,7 @@ Local connection string (use this in user-secrets):
 Host=localhost;Database=kaiterminal;Username=kaiuser;Password=kaipassword
 ```
 
-**Docker** (needed for Seq):
+**Docker** (needed for Seq and Order Agent containers):
 ```bash
 brew install --cask docker
 ```
@@ -246,11 +263,6 @@ dotnet user-secrets set "ConnectionStrings:Redis"    "localhost:6379"
 # Risk event notifications — same UUID in both Api and Worker
 dotnet user-secrets set "Api:InternalKey"  "<uuid>"
 
-# AI Signals (optional — omit to disable)
-dotnet user-secrets set "AiSentiment:OpenAiApiKey"   "sk-..."
-dotnet user-secrets set "AiSentiment:GrokApiKey"     "xai-..."
-dotnet user-secrets set "AiSentiment:GeminiApiKey"   "AIza..."
-dotnet user-secrets set "AiSentiment:ClaudeApiKey"   "sk-ant-..."
 ```
 
 ```bash
@@ -264,9 +276,10 @@ dotnet user-secrets set "Api:BaseUrl"      "https://localhost:5001"
 ```
 
 ```bash
-# Console (single-user alternative to Worker — optional)
-cd ../KAITerminal.Console
-dotnet user-secrets set "Upstox:AccessToken" "<your-daily-upstox-token>"
+# Rolling Straddle (optional)
+cd ../KAITerminal.RollingStraddle
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" \
+  "Host=localhost;Database=kaiterminal;Username=kaiuser;Password=kaipassword"
 ```
 
 > [!NOTE] Analytics Token
@@ -382,7 +395,7 @@ In your Upstox app settings, set the **Postback URL** to:
 https://<your-host>/api/webhooks/upstox/order
 ```
 
-Upstox sends a single postback URL for all users on the same app. KAI routes to the correct user via the `user_id` field in the postback payload, matched against the `BrokerUserId` stored in the DB. **Users must re-authenticate once after the DB migration** (`ALTER TABLE "BrokerCredentials" ADD COLUMN "BrokerUserId" VARCHAR;`) to populate this field.
+Upstox sends a single postback URL for all users on the same app. KAI routes to the correct user via the `user_id` field in the postback payload, matched against the `BrokerUserId` stored in the DB. **Users must re-authenticate once** after the `BrokerUserId` DB migration to populate this field.
 
 Both endpoints verify the broker's cryptographic signature before processing — unauthenticated requests are rejected with `401`.
 
@@ -391,18 +404,21 @@ Both endpoints verify the broker's cryptographic signature before processing —
 ## Architecture
 
 ```
-KAITerminal.Contracts   ← leaf node — all shared domain + notification types
+KAITerminal.Contracts       ← leaf node — all shared domain + notification types
         ↑
-KAITerminal.Broker      ← IBrokerClient, IBrokerClientFactory
+KAITerminal.Broker          ← IBrokerClient, IBrokerClientFactory
         ↑
-KAITerminal.Upstox      ← execution only (auth, orders, positions, funds, margin)
-KAITerminal.Zerodha     ← execution only + margin; streaming stubbed
-KAITerminal.MarketData  ← market data only; zero Upstox/Zerodha SDK deps
+KAITerminal.Upstox          ← execution only (auth, orders, positions, funds, margin)
+KAITerminal.Zerodha         ← execution only + margin; streaming stubbed
+KAITerminal.MarketData      ← market data only; zero Upstox/Zerodha SDK deps
+KAITerminal.OrderRouting    ← IOrderRouter, IOrderAgentRegistry, HttpOrderAgentClient
         ↑
-KAITerminal.RiskEngine  ← risk logic; zero broker/market-data deps
-KAITerminal.Api         ← REST API + SignalR hubs (PositionsHub, IndexHub, RiskHub)
-KAITerminal.Worker      ── RiskEngine + Upstox + Zerodha + MarketData + Infrastructure
-KAITerminal.Console     ── RiskEngine (single-user host)
+KAITerminal.RiskEngine      ← risk logic; zero broker/market-data deps
+KAITerminal.Api             ← REST API + SignalR hubs + AdminOrderAgentEndpoints
+KAITerminal.Worker          ── RiskEngine + OrderRouting + Upstox + Zerodha + MarketData + Infrastructure
+KAITerminal.Console         ── RiskEngine (single-user host)
+KAITerminal.RollingStraddle ── standalone strategy runner (Upstox only, uses OrderRouting)
+KAITerminal.OrderAgent      ── per-user HTTP proxy — runs in Docker, binds sockets to BIND_IP
 ```
 
 **Adding a new broker** (e.g. Dhan): create `KAITerminal.Dhan`, implement `IBrokerClient`, register in `BrokerExtensions`. Add an `IOptionContractProvider` implementation to `KAITerminal.MarketData` and register it in `AddMarketDataConsumer()`/`AddMarketDataProducer()`. Zero changes to RiskEngine, Contracts, or Infrastructure.
@@ -425,9 +441,7 @@ Worker process
                                        └── StreamingRiskWorker
 ```
 
-The `ISharedMarketDataService` interface (defined in `KAITerminal.Contracts`) decouples all consumers from the underlying transport. In the Worker it is backed by `MarketDataService` (live WebSocket); in the Api by `RedisLtpRelay` (Redis subscriber). Swapping to TrueData or an NSE direct feed requires only a new `ISharedMarketDataService` implementation — zero changes to the risk engine, hubs, or any consumer.
-
-Market data services (`IMarketQuoteService`, `IChartDataService`, `IZerodhaInstrumentService`) and option contract/chain providers all live in `KAITerminal.MarketData` — the only project with market data HTTP calls. They use the admin analytics token stored via `AppSettingService`, resolved per-call via `IServiceScopeFactory`.
+The `ISharedMarketDataService` interface decouples all consumers from the underlying transport. In the Worker it is backed by `MarketDataService` (live WebSocket); in the Api by `RedisLtpRelay` (Redis subscriber). Swapping to TrueData or an NSE direct feed requires only a new `ISharedMarketDataService` implementation — zero changes to the risk engine, hubs, or any consumer.
 
 ---
 
@@ -514,6 +528,18 @@ _sessions: ConcurrentDictionary<"{userId}::{brokerType}", SessionEntry>  // in U
 
 A session key includes `brokerType` — one session per user per broker (e.g. `user@email.com::upstox`).
 
+#### `OrderAgentRegistry` — `ConcurrentDictionary` (singleton)
+
+**Project:** `KAITerminal.OrderRouting`
+
+| Field | Value |
+|---|---|
+| **Key** | `username` (user email) |
+| **Value** | `AgentRegistration(string Url)` |
+| **Expiry** | Process lifetime — reloaded from DB on host startup |
+
+Loaded from `UserOrderAgents` DB table at startup via `LoadAsync()`. Updated immediately on `POST /api/admin/order-agents` (upsert) and `DELETE /api/admin/order-agents/{username}`. No restart required to apply changes.
+
 ### Redis
 
 #### `RedisRiskRepository` — Redis string (persistent across restarts)
@@ -573,6 +599,7 @@ Read-through: check Redis → fall back to PostgreSQL → populate Redis on miss
 | `PositionCache` | `ConcurrentDictionary` | `userId` | Process lifetime |
 | `PositionStreamCoordinator` | per-connection | — | On SignalR disconnect |
 | `StreamingRiskWorker` | `ConcurrentDictionary` | `userId::broker` | Dynamic (60s DB refresh) |
+| `OrderAgentRegistry` | `ConcurrentDictionary` | `username` | Process lifetime |
 | `RedisRiskRepository` | Redis string | `risk-state:{userId}` | Indefinite |
 | `RedisLtpRelay` | Redis pub/sub | `ltp:feed`, `ltp:sub-req` | — (fire-and-forget) |
 | `AppSettingService` | Redis L1 + PostgreSQL L2 | `appsetting:{key}` | Indefinite |
@@ -657,10 +684,6 @@ Place order request body:
 | `POST` | `/api/upstox/orders/by-strike/v3` | Same, HFT v3 |
 | `POST` | `/api/upstox/margin` | Get required margin for a list of positions |
 
-Place-by-price request: `{ UnderlyingKey, ExpiryDate, OptionType (CE/PE), TargetPremium, PriceSearchMode (Nearest/GreaterThan/LessThan), Quantity, TransactionType, ... }`
-
-Place-by-strike request: `{ UnderlyingKey, ExpiryDate, OptionType, StrikeType (ATM/OTM1–5/ITM1–5), Quantity, TransactionType, ... }`
-
 Strike resolution rules:
 
 | StrikeType | CE | PE |
@@ -696,6 +719,16 @@ Returns unified `ContractEntry` list with `UpstoxToken` and `ZerodhaToken` field
 |---|---|---|
 | `GET` | `/api/risk-config` | Load Profit Protection config for current user |
 | `PUT` | `/api/risk-config` | Save Profit Protection config for current user |
+
+### Admin — Order Agents
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/admin/order-agents` | Admin JWT | List all registered order agents |
+| `POST` | `/api/admin/order-agents` | Admin JWT | Register or update a user's order agent |
+| `DELETE` | `/api/admin/order-agents/{username}` | Admin JWT | Remove a user's order agent |
+
+POST body: `{ "username": "alice@gmail.com", "agentUrl": "http://127.0.0.1:5101", "staticIp": "10.0.0.5" }`
 
 ### AI Signals
 
@@ -789,19 +822,6 @@ const pnl = unrealised + position.realised;
 ```
 
 `quantity` is negative for short positions — the formula correctly yields a gain for shorts when price falls.
-
-### Exchange Filter
-
-All position and MTM APIs (REST + SignalR) support server-side exchange filtering:
-
-```
-GET /api/upstox/positions?exchange=NFO,BFO     ← NFO + BFO positions only
-GET /api/upstox/positions                       ← all exchanges
-
-WSS /hubs/positions?upstoxToken=<token>&exchange=NFO,BFO
-```
-
-Supported exchanges: `NSE`, `BSE`, `NFO`, `BFO`, `MCX`, `CDS`.
 
 ---
 
@@ -924,29 +944,6 @@ The `RiskEngine` section in `KAITerminal.Worker/appsettings.json` controls worke
 | `UserRefreshIntervalMs` | 60,000 | How often the supervisor re-queries DB for user/config changes |
 | `Exchanges` | `["NFO","BFO"]` | Only positions from these exchanges are included in MTM |
 
-The analytics token used by the shared market data connection is stored in the DB (`AppSettings` key `UpstoxAnalyticsToken`) — set it via the admin UI or `PUT /api/admin/analytics-token`.
-
-### API Log Messages
-
-Key operational events logged by the API process at `Information` level:
-
-| Event | Level | Sample log message |
-|---|---|---|
-| OAuth login success | Info | `OAuth login — user@email.com (Full Name) authenticated — admin=False` |
-| OAuth login — inactive user | Warn | `OAuth login — user@email.com is inactive, redirecting to /auth/inactive` |
-| Upstox token generated | Info | `Upstox access token generated — user@email.com` |
-| Zerodha token exchanged | Info | `Zerodha access token exchanged and persisted — user@email.com` |
-| Broker credentials saved | Info | `Broker credentials saved — user@email.com (upstox)` |
-| Order placed | Info | `Order placed — user@email.com — qty=50 NSE_FO|57352 Sell @ 120 — ids=[abc123] latency=4ms` |
-| Order cancelled | Info | `Order cancelled — user@email.com — abc123 — latency=3ms` |
-| Exit all positions | Info | `Exit all positions — user@email.com — filter: NFO,BFO` then `Exit all complete — 4 order(s) placed` |
-| Exit single position | Info | `Exit position — user@email.com — NSE_FO|57352 (I) — order abc123` |
-| Order COMPLETE/REJECTED | Info | `PositionStreamCoordinator [connId]: order COMPLETE — upstox abc123 NIFTY24...` |
-| RiskHub connected | Info | `RiskHub: user@email.com connected — connId` |
-| RiskHub rejected (no JWT user) | Warn | `RiskHub: connection connId rejected — no user identifier in JWT` |
-| IndexHub snapshot sent | Info | `IndexHub [connId]: initial snapshot sent — 5 index/indices` |
-| IndexHub no analytics token | Debug | `IndexHub [connId]: analytics token not configured — skipping initial snapshot` |
-
 ### Risk Engine Log Messages
 
 All risk engine logs use the `[TAG ]` format — a 7-char bracketed tag followed by the message, with `|` separating data sections. Monetary values use `₹+#,##0` / `₹-#,##0`.
@@ -959,8 +956,6 @@ All risk engine logs use the `[TAG ]` format — a 7-char bracketed tag followed
 | Feed live | Info | `[FEED ] Live — user@email (upstox)  \|  5 open instrument(s)  [Intraday + Delivery]` |
 | Market open | Info | `[MKT  ] Open — risk engine active  \|  09:15–15:30 Asia/Kolkata` |
 | Market closed | Info | `[MKT  ] Closed — paused until 09:15 Asia/Kolkata` |
-| Status heartbeat (TSL off) | Debug | `[STAT ] user@email (upstox)  P&L ₹+11,353  \|  SL ₹-5,000  \|  Target ₹+25,000  \|  TSL activates at ₹+15,000  [Intraday + Delivery]` |
-| Status heartbeat (TSL on) | Debug | `[STAT ] user@email (upstox)  P&L ₹+11,353  \|  Target ₹+25,000  \|  TSL ₹+3,025  [Intraday + Delivery]` |
 | TSL activated | Info | `[TSL  ] Activated — user@email (upstox)  \|  floor locked at ₹+3,025` |
 | TSL raised | Info | `[TSL  ] Raised — user@email (upstox)  \|  floor → ₹+5,025` |
 | Target hit | Info | `[TGT  ] Target hit — user@email (upstox)  \|  P&L ₹+25,000  ≥  Target ₹+25,000 — exiting all` |
@@ -969,10 +964,89 @@ All risk engine logs use the `[TAG ]` format — a 7-char bracketed tag followed
 | Auto square-off | Warn | `[ASO  ] Auto square-off — user@email (upstox)  \|  15:30 ≥ 15:30 — exiting all` |
 | Square-off complete | Warn | `[EXIT ] Complete — user@email (upstox)  \|  5 exited  [All]` |
 | Square-off failed | Error | `[EXIT ] FAILED — user@email (upstox) — marked squared-off; manual verification required` |
-| Auto-shift triggered | Warn | `[SHIFT] Shifting — chain=NIFTY_2026-04-17_PE_22000  \|  shift 1/2  \|  strike=22000 +1 OTM  [{Broker} / {UserId}]` |
-| Auto-shift complete | Info | `[SHIFT] Complete — chain=NIFTY_2026-04-17_PE_22000  \|  shift 1/2  \|  22000→22100  \|  remaining=1  [{Broker} / {UserId}]` |
+| Auto-shift triggered | Warn | `[SHIFT] Shifting — chain=NIFTY_2026-04-17_PE_22000  \|  shift 1/2  \|  22000→22100` |
 | Auto-shift exhausted | Warn | `[SHIFT] Exhausted — user@email (upstox)  \|  NIFTY... used all 2 shift(s) — exiting` |
 | Session crash + restart | Warn | `[SESS ] Restarting — user@email (upstox) in 30s` |
+
+---
+
+## SEBI Static IP Order Routing
+
+SEBI requires that all broker API calls (order placement, cancellation, exits) originate from the IP address pre-registered with the broker app. When running on a shared server or cloud VM, this means each user's orders must leave the server from their own dedicated static IP — not the VM's primary IP.
+
+### How It Works
+
+Every order-mutating call in KAI Terminal passes through `IOrderRouter`. When a user has an agent registered:
+
+```
+API / Worker / Rolling Straddle
+  └── IOrderRouter
+        └── HttpOrderAgentClient
+              HTTP → KAITerminal.OrderAgent (Docker container)
+                       └── SocketsHttpHandler.ConnectCallback
+                             binds TCP source IP to BIND_IP before connecting
+                             → Upstox / Zerodha API
+```
+
+When **no agent is registered** for a user, orders route directly from the calling process (same behavior as before this feature was introduced — existing users unaffected).
+
+> [!IMPORTANT] Hard fail design
+> If an agent is registered but the HTTP call to it fails, the order is **not retried** via the direct path. The exception propagates. Bypassing the static IP would be a SEBI violation.
+
+### All Order Paths Covered
+
+| Caller | Method | Routed via |
+|---|---|---|
+| Api — manual orders | `ByPriceOrderService`, `PositionShiftService` | `IOrderRouter` |
+| Api — position exits | `ExitPositionAsync`, `ExitAllPositionsAsync` | `IOrderRouter` (via `OrderRoutingBrokerClient`) |
+| Worker — risk engine exits | `SquareOffAsync` (MTM SL, trailing SL, auto square-off) | `OrderRoutingBrokerClient` decorator |
+| Worker — auto-shift | `AutoShiftOrderExecutor` | `OrderRoutingBrokerClient` decorator |
+| Worker — auto-entry | `AutoEntryJob` | `IBrokerClientFactory.Create(username=...)` → decorator |
+| Rolling Straddle | `OrderExecutor` | `IOrderRouter` |
+
+### Deployment
+
+See `docs/order-agent-deployment.md` for the full step-by-step guide covering:
+- Assigning permanent static IPs via netplan
+- Building the Docker image
+- Adding users to `backend/docker-compose.yml`
+- Running the DB migration
+- Registering agents via the Admin API
+- Verifying outbound IP and viewing logs
+
+---
+
+## Rolling Straddle Strategy Runner
+
+`KAITerminal.RollingStraddle` is a standalone interactive CLI that automates a short straddle or strangle on a single underlying. It runs as a separate process alongside the main terminal and uses the same DB for broker credentials and order agent registration.
+
+### Starting the runner
+
+```bash
+cd backend
+dotnet run --project KAITerminal.RollingStraddle
+```
+
+The CLI prompts for:
+- **Username** — must match the user's login email; credentials loaded from DB
+- **Instrument** — NIFTY or SENSEX (lots and underlying resolved automatically)
+- **Strike offset** — `0` = straddle, `N` = strangle (N strikes OTM on each side)
+- **Expiry** — `yyyy-MM-dd` or Enter for nearest expiry
+- **Lots**
+- **Daily MTM target per lot** — exit all when MTM/lot ≥ this value
+- **Daily MTM stop-loss per lot** — exit all when MTM/lot ≤ this value
+- **Upstox access token** — paste to override; Enter to fetch from DB
+
+### Strategy logic
+
+1. **Entry guard** — waits until the entry window; skips if VIX > configured filter
+2. **ATM sell** — sells CE + PE at the nearest ATM strike
+3. **Roll check** — every tick, if spot moves by `RollThresholdPct` from last roll price, closes the losing leg and resells at the new ATM
+4. **Roll cap** — stops rolling after `MaxRolls` per day; holds remaining position
+5. **MTM exit** — exits all when daily MTM target or stop-loss is hit
+6. **Auto close** — exits all at `AutoCloseTime` IST
+
+Orders are routed via `IOrderRouter` — if the user has an agent registered, all orders use the SEBI static IP path automatically.
 
 ---
 
@@ -1070,7 +1144,7 @@ Requires `X-Upstox-Access-Token` header and AI API keys set via `dotnet user-sec
 
 ## Database
 
-PostgreSQL via [Neon](https://neon.tech). Tables are created automatically on first startup via `EnsureCreatedAsync()` — no migrations needed. New tables/columns require manual SQL.
+PostgreSQL. Tables are created automatically on first startup via `EnsureCreatedAsync()` — no migrations needed. New tables/columns require manual SQL.
 
 | Table | Purpose |
 |---|---|
@@ -1079,13 +1153,22 @@ PostgreSQL via [Neon](https://neon.tech). Tables are created automatically on fi
 | `UserTradingSettings` | Per-user trading preferences (underlying, expiry, auto square-off time) |
 | `UserRiskConfigs` | Per-user profit protection config + `Enabled` flag (unique on `Username, BrokerType`) |
 | `AppSettings` | Key-value store for admin settings (e.g. `UpstoxAnalyticsToken`) |
+| `UserOrderAgents` | Per-user order agent registration — `Username` (PK), `AgentUrl`, `StaticIp`, `IsEnabled` |
 
 ### Manual DB Steps
 
-Fresh databases created by `EnsureCreatedAsync` get all tables automatically. If you are upgrading an existing database, run these manually:
+Fresh databases created by `EnsureCreatedAsync` get all tables except `UserOrderAgents` automatically. Run these on new or existing databases as needed:
 
 ```sql
--- AppSettings table
+-- UserOrderAgents (SEBI order routing)
+CREATE TABLE IF NOT EXISTS "UserOrderAgents" (
+    "Username"  VARCHAR NOT NULL PRIMARY KEY,
+    "AgentUrl"  VARCHAR NOT NULL,
+    "StaticIp"  VARCHAR NOT NULL,
+    "IsEnabled" BOOLEAN NOT NULL DEFAULT true
+);
+
+-- AppSettings table (if upgrading from older schema)
 CREATE TABLE IF NOT EXISTS "AppSettings" (
   "Key"       text                     PRIMARY KEY,
   "Value"     text                     NOT NULL,
@@ -1134,7 +1217,6 @@ Enter filter expressions in the Seq UI search bar (Events tab):
 | `Source = 'Worker'` | All Worker process logs |
 | `FrontendNamespace = 'BrokerAuth'` | Frontend logs from the broker auth flow |
 | `FrontendNamespace = 'ApiClient'` | API request failures and 401s from the browser |
-| `FrontendNamespace = 'AutoEntry'` | Auto-entry hook logs from the frontend |
 | `@Level = 'Error'` | All errors across all sources |
 | `Source = 'Frontend' and @Level = 'Error'` | Frontend errors only |
 | `FrontendUser = 'user@email.com'` | All frontend logs for a specific user |
@@ -1152,7 +1234,7 @@ log.warn("token missing on load");     // console + relayed to Seq
 log.error("OAuth callback failed", e); // console + relayed to Seq
 ```
 
-`warn` and `error` calls are relayed to `POST /api/client-log` as fire-and-forget fetch — never blocks the UI. They appear in Seq with `Source = 'Frontend'`, `FrontendNamespace`, and `FrontendUser` properties. `debug` and `info` are console-only and suppressed entirely in production builds.
+`warn` and `error` calls are relayed to `POST /api/client-log` as fire-and-forget fetch — never blocks the UI.
 
 ### Log Sinks
 
@@ -1160,35 +1242,6 @@ Both Api and Worker use two sinks:
 
 - **Console** — structured text, always active
 - **Seq** — structured log server at `http://localhost:5341` (local dev) or your hosted Seq instance. Serilog buffers and retries if Seq is unavailable — no logs are lost.
-
-### Log Levels
-
-**Worker** (`appsettings.json`):
-
-| Namespace | Level |
-|---|---|
-| Default | `Information` |
-| `Microsoft`, `System` | `Warning` |
-| `KAITerminal.Upstox`, `KAITerminal.Zerodha` | `Warning` |
-
-**API** (`appsettings.json`):
-
-| Namespace | Level |
-|---|---|
-| Default | `Information` |
-| `Microsoft`, `Microsoft.AspNetCore`, `Microsoft.EntityFrameworkCore`, `System` | `Warning` |
-
-### Configuring Seq
-
-Update `Serilog.WriteTo[Seq].serverUrl` in `appsettings.json` for both Api and Worker:
-
-```json
-"Serilog": {
-  "WriteTo": [
-    { "Name": "Seq", "Args": { "serverUrl": "http://your-seq-host:5341" } }
-  ]
-}
-```
 
 ### Suggested Seq Alerts
 
@@ -1210,20 +1263,16 @@ Update `Serilog.WriteTo[Seq].serverUrl` in `appsettings.json` for both Api and W
 1. Confirm `UserRiskConfigs.Enabled = true` and the broker credential was updated after 7:30 AM IST today.
 2. Sessions start within `UserRefreshIntervalMs` (default 60s) — wait and check logs.
 
-**Config change not taking effect:**
-1. Save the new config via **Settings → Profit Protection**.
-2. Within 60s the Worker restarts the session with the new config.
-
-**Square-off did not happen / positions still open:**
-1. Find `[SL   ] Hard SL hit` / `[TGT  ] Target hit` / `[TSL  ] Hit` — confirms the trigger fired.
-2. Check immediately after for `[EXIT ] Complete` or `[EXIT ] FAILED`.
-3. If `[EXIT ] FAILED` — exit API call failed. **Manually close positions via the broker.** Engine will not retry.
+**Order routed via wrong IP (SEBI compliance):**
+1. Check `GET /api/admin/order-agents` — confirm the user's agent is registered and `IsEnabled = true`.
+2. Check `docker compose ps` on the server — agent container must be running.
+3. Check `docker compose logs order-agent-<username>` — look for bind errors or startup failures.
 
 ---
 
 ## Production Deployment — Azure VM
 
-This guide deploys KAI Terminal on a single Azure VM running Ubuntu 24.04 LTS. Follow the steps **in order** — the sequence matters (NSG before Certbot, DNS before Certbot, temp Nginx before Certbot).
+This guide deploys KAI Terminal on a single Azure VM running Ubuntu 24.04 LTS.
 
 ### VM — D2as_v6
 
@@ -1248,6 +1297,7 @@ Internet → Azure NSG → Nginx (443/80)
                          └── /hubs/*           → http://localhost:5001 (SignalR WebSocket)
 
 localhost:5001  KAITerminal.Api    (systemd: kaiterminal-api)
+localhost:5002+ KAITerminal.OrderAgent per-user  (Docker, network_mode: host)
 localhost:5341  KAITerminal.Worker (systemd: kaiterminal-worker)
 localhost:6379  Redis              (systemd: redis)
 localhost:5432  PostgreSQL         (systemd: postgresql)
@@ -1291,7 +1341,7 @@ In Azure Portal → VM → Networking → Inbound port rules:
 
 ### Step 3 — Configure DNS
 
-In Hostinger (or your DNS provider), add A records pointing to your VM IP for `@` and `www` on each domain. Verify before proceeding to Certbot:
+In Hostinger (or your DNS provider), add A records pointing to your VM IP. Verify before proceeding to Certbot:
 
 ```bash
 dig kaiterminal.com +short
@@ -1327,7 +1377,7 @@ sudo systemctl enable postgresql && sudo systemctl start postgresql
 sudo apt install -y nginx certbot python3-certbot-nginx
 sudo systemctl enable nginx
 
-# Docker (for Seq — optional)
+# Docker (for Seq + Order Agent containers)
 curl -fsSL https://get.docker.com | sudo sh
 sudo usermod -aG docker $USER
 ```
@@ -1454,6 +1504,10 @@ sudo chown -R kaiterm:kaiterm /opt/kaiterminal/api
 # Worker
 dotnet publish KAITerminal.Worker -c Release -o /opt/kaiterminal/worker
 sudo chown -R kaiterm:kaiterm /opt/kaiterminal/worker
+
+# Order Agent image
+cd /opt/kaiterminal/repo/backend
+docker build -f KAITerminal.OrderAgent/Dockerfile -t kaiterminal/order-agent:latest .
 ```
 
 ### Step 11 — Systemd Services
@@ -1474,7 +1528,17 @@ sudo systemctl status kaiterminal-api kaiterminal-worker
 journalctl -u kaiterminal-api -f
 ```
 
-### Step 12 — Daily Worker Reset Timer
+### Step 12 — Order Agent Containers (SEBI)
+
+See `docs/order-agent-deployment.md` for the complete guide. Summary:
+
+1. Assign static IPs permanently via netplan
+2. Run the `UserOrderAgents` DB migration (see Database section above)
+3. Add users to `backend/docker-compose.yml`
+4. Start containers: `cd /opt/kaiterminal/repo/backend && docker compose up -d`
+5. Register agents via `POST /api/admin/order-agents`
+
+### Step 13 — Daily Worker Reset Timer
 
 The timer flushes all `risk-state:*` keys and restarts the Worker every morning at **8:30 AM IST (03:00 UTC)** — before market open.
 
@@ -1489,7 +1553,7 @@ sudo systemctl enable --now kaiterminal-worker-daily-reset.timer
 
 The timer has `Persistent=true` — if the server was off at 03:00 UTC, the reset runs automatically on the next boot.
 
-### Step 13 — UFW Firewall
+### Step 14 — UFW Firewall
 
 ```bash
 sudo ufw default deny incoming
@@ -1498,7 +1562,7 @@ sudo ufw allow 22/tcp && sudo ufw allow 80/tcp && sudo ufw allow 443/tcp
 sudo ufw enable
 ```
 
-### Step 14 — Google OAuth Redirect URIs
+### Step 15 — Google OAuth Redirect URIs
 
 In Google Cloud Console → OAuth 2.0 credentials, add to **Authorized redirect URIs**:
 
@@ -1507,7 +1571,7 @@ https://kaiterminal.com/auth/callback
 https://kaiterminal.in/auth/callback
 ```
 
-### Step 15 — Seq (Optional)
+### Step 16 — Seq (Optional)
 
 ```bash
 docker run -d --name seq --restart unless-stopped \
@@ -1525,24 +1589,27 @@ ssh -L 9080:localhost:8080 kaiterminal
 # then open http://localhost:9080
 ```
 
-After first login: **Settings → Retention → Add policy** → delete events older than 7 days. Monitor disk: `du -sh /opt/seq-data`.
+After first login: **Settings → Retention → Add policy** → delete events older than 7 days.
 
 ### Deployment Checklist
 
 - [ ] VM created (D2as_v6, Ubuntu 24.04 LTS); SSH key set up
 - [ ] Azure NSG — SSH (your IP), HTTP/HTTPS (any), DenyAll configured
 - [ ] DNS A records pointing to VM IP; propagation verified
-- [ ] All dependencies installed
+- [ ] All dependencies installed (including Docker)
 - [ ] PostgreSQL `kaiuser` + `kaiterminal` database created
 - [ ] GitHub SSH key on VM and added to GitHub
-- [ ] Certbot certificates issued for both domains
+- [ ] Certbot certificates issued for all domains
 - [ ] `/etc/kaiterminal/api.env` and `worker.env` created with all secrets; `Api__InternalKey` identical
+- [ ] `UserOrderAgents` DB table created
 - [ ] Frontend + API + Worker built and deployed
+- [ ] Order Agent Docker image built
 - [ ] Systemd services enabled and started
 - [ ] Daily reset timer installed
 - [ ] UFW enabled
 - [ ] Google OAuth redirect URIs updated
 - [ ] Log in, set Upstox analytics token, restart Worker
+- [ ] Order agent containers started (if applicable)
 
 ### Deploying Updates
 
@@ -1550,6 +1617,13 @@ After first login: **Settings → Retention → Add policy** → delete events o
 ./deploy/deploy.sh             # full deploy (frontend + API + Worker)
 ./deploy/deploy.sh --frontend  # frontend only
 ./deploy/deploy.sh --backend   # API + Worker only
+```
+
+To update the Order Agent image after code changes:
+```bash
+cd /opt/kaiterminal/repo/backend
+docker build -f KAITerminal.OrderAgent/Dockerfile -t kaiterminal/order-agent:latest .
+docker compose up -d --no-deps order-agent-<username>
 ```
 
 > [!WARNING]
@@ -1569,6 +1643,9 @@ sudo systemctl restart kaiterminal-worker
 journalctl -u kaiterminal-api -f
 journalctl -u kaiterminal-worker -f
 
+# Order agent logs
+docker compose -f /opt/kaiterminal/repo/backend/docker-compose.yml logs -f order-agent-<username>
+
 # Redis memory
 redis-cli info memory | grep used_memory_human
 
@@ -1578,153 +1655,7 @@ df -h /
 
 ### Weekend Shutdown
 
-Shutting down the VM over the weekend is safe. On Monday restart, all systemd services auto-start and the daily reset timer fires immediately (`Persistent=true`) — Redis state from Friday is flushed and the Worker restarts clean.
-
----
-
-## AssetLens Deployment — assetlens.in (Same VM, Docker)
-
-AssetLens is a FastAPI + SQLite portfolio tracker. It runs in a Docker container on the same VM as KAI Terminal — isolated from the main app, and trivial to tear down when no longer needed.
-
-Docker is already on the VM (used for Seq).
-
-### Architecture on the VM
-
-```
-Internet → Nginx (443/80)
-             └── assetlens.in → http://127.0.0.1:8002 (Docker container)
-
-Docker container: assetlens  (port 8002 on host)
-/app/data/ inside container  SQLite databases (data lives in the container — fine for temp use)
-```
-
-### Step 1 — DNS (Hostinger)
-
-In **Hostinger DNS** for `assetlens.in`, add A records pointing to the same VM IP:
-
-| Type | Name | Value |
-|------|------|-------|
-| A | `@` | `<vm-public-ip>` |
-| A | `www` | `<vm-public-ip>` |
-
-Verify before running Certbot:
-```bash
-dig assetlens.in +short
-```
-
-### Step 2 — Copy Code to VM
-
-```bash
-# On your Mac
-scp -r assetlens/ kaiterminal:/opt/assetlens
-```
-
-### Step 3 — Configure Environment
-
-`.env.production` is already created in the repo with all production values filled in and is copied to the VM as part of Step 2 (`scp`). No manual setup needed.
-
-```bash
-chmod 600 /opt/assetlens/.env.production
-```
-
-### Step 4 — Build and Run the Container
-
-```bash
-cd /opt/assetlens
-
-# Build the image
-docker build -t assetlens .
-
-# Run the container
-docker run -d \
-  --name assetlens \
-  --restart unless-stopped \
-  -p 127.0.0.1:8002:8000 \
-  --env-file .env.production \
-  assetlens
-```
-
-Verify it's running:
-```bash
-docker ps
-docker logs assetlens
-```
-
-### Step 5 — Nginx Server Block
-
-```bash
-sudo nano /etc/nginx/sites-available/assetlens
-```
-
-```nginx
-server {
-    listen 80;
-    server_name assetlens.in www.assetlens.in;
-
-    location / {
-        proxy_pass http://127.0.0.1:8002;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-```bash
-sudo ln -s /etc/nginx/sites-available/assetlens /etc/nginx/sites-enabled/
-sudo nginx -t && sudo systemctl reload nginx
-```
-
-### Step 6 — SSL Certificate
-
-```bash
-sudo certbot --nginx -d assetlens.in -d www.assetlens.in
-```
-
-### Step 7 — Google OAuth Redirect URI
-
-In Google Cloud Console → OAuth 2.0 credentials, add to **Authorized redirect URIs**:
-
-```
-https://assetlens.in/auth/callback
-```
-
-### Deploying Updates
-
-```bash
-ssh kaiterminal
-cd /opt/assetlens
-
-# Pull or copy new code, then rebuild
-docker build -t assetlens .
-docker stop assetlens && docker rm assetlens
-docker run -d \
-  --name assetlens \
-  --restart unless-stopped \
-  -p 127.0.0.1:8002:8000 \
-  --env-file .env.production \
-  assetlens
-```
-
-### Tearing Down (when done)
-
-```bash
-docker stop assetlens && docker rm assetlens
-docker rmi assetlens
-sudo rm /etc/nginx/sites-enabled/assetlens /etc/nginx/sites-available/assetlens
-sudo nginx -t && sudo systemctl reload nginx
-sudo rm -rf /opt/assetlens
-```
-
-### Container Management
-
-```bash
-docker ps                        # check running
-docker logs assetlens -f         # live logs
-docker restart assetlens         # restart
-docker exec -it assetlens bash   # shell into container
-```
+Shutting down the VM over the weekend is safe. On Monday restart, all systemd services auto-start, the daily reset timer fires immediately (`Persistent=true`) — Redis state from Friday is flushed and the Worker restarts clean. Order agent containers restart automatically via `restart: unless-stopped`.
 
 ---
 
@@ -1735,7 +1666,9 @@ docker exec -it assetlens bash   # shell into container
 | `backend/KAITerminal.Api/appsettings.json` | `Jwt:*`, `GoogleAuth:*`, `Frontend:Url`, `Upstox:ApiBaseUrl/HftBaseUrl`, `Api:InternalKey`, `AiSentiment:*`, `Serilog:*` |
 | `backend/KAITerminal.Worker/appsettings.json` | `RiskEngine:*`, `Api:BaseUrl`, `Api:InternalKey`, `ConnectionStrings:DefaultConnection`, `Serilog:*` |
 | `backend/KAITerminal.Console/appsettings.json` | `Upstox:AccessToken`, `RiskEngine:*` |
-| `frontend/.env` | `VITE_API_URL`, `VITE_PP_MTM_TARGET`, `VITE_PP_MTM_SL`, other PP defaults |
+| `backend/KAITerminal.RollingStraddle/appsettings.json` | `Strategy:*` (Username, Underlying, Lots, etc.), `Instruments:*`, `ConnectionStrings:*` |
+| `backend/docker-compose.yml` | Order agent containers — `ASPNETCORE_URLS`, `BIND_IP` per user |
+| `frontend/.env` | `VITE_API_URL`, PP defaults |
 
 `Frontend:Url` in the API config must match the frontend origin for CORS and OAuth redirects to work (default `http://localhost:3000`).
 
@@ -1752,12 +1685,18 @@ dotnet build                              # Build entire solution
 dotnet watch --project KAITerminal.Api    # Hot-reload API
 dotnet run --project KAITerminal.Api
 dotnet run --project KAITerminal.Worker
+dotnet run --project KAITerminal.RollingStraddle
 
 # Frontend
 cd frontend
 npm run dev      # Dev server :3000
 npm run build    # TypeScript check + production build
 npm run lint     # ESLint
+
+# Order Agent (local build)
+cd backend
+docker build -f KAITerminal.OrderAgent/Dockerfile -t kaiterminal/order-agent:latest .
+docker compose up -d   # start all configured agents
 
 # Redis inspection
 redis-cli keys "appsetting:*"

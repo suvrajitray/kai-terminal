@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../KAITerminal.Infrastructure/KAITerminal.Infrastructure.csproj" />
+    <ProjectReference Include="../KAITerminal.Contracts/KAITerminal.Contracts.csproj" />
+    <ProjectReference Include="../KAITerminal.Upstox/KAITerminal.Upstox.csproj" />
+    <ProjectReference Include="../KAITerminal.Zerodha/KAITerminal.Zerodha.csproj" />
+  </ItemGroup>
+</Project>

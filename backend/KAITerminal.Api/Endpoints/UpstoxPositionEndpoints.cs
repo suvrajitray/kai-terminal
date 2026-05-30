@@ -4,6 +4,7 @@ using KAITerminal.Api.Mapping;
 using KAITerminal.Api.Models;
 using KAITerminal.Api.Services;
 using KAITerminal.Contracts.Domain;
+using KAITerminal.OrderRouting;
 using KAITerminal.Upstox;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -73,11 +74,12 @@ internal static class UpstoxPositionEndpoints
         group.MapPost("/positions/shift", async (
             [FromBody] ShiftPositionRequest request,
             PositionShiftService shiftSvc,
+            IOrderRouter orderRouter,
             UpstoxClient upstox,
             ClaimsPrincipal user,
             CancellationToken ct) =>
             await shiftSvc.ShiftUpstoxAsync(
-                request, upstox, user.GetEmail() ?? "unknown", logger, ct));
+                request, upstox, orderRouter, user.GetEmail() ?? "unknown", logger, ct));
     }
 
     private static IReadOnlyList<BrokerPosition> FilterByExchange(

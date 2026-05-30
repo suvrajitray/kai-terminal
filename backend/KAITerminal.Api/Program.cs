@@ -39,7 +39,9 @@ builder.Services.ConfigureHttpJsonOptions(o =>
 
 builder.Services
     .AddAuthServices(builder.Configuration)
-    .AddAuthorization()
+    .AddAuthorization(options =>
+        options.AddPolicy("AdminOnly", policy =>
+            policy.RequireAuthenticatedUser().RequireClaim("isAdmin", "true")))
     .AddOpenApi(options =>
     {
         options.AddDocumentTransformer((doc, _, _) =>
@@ -66,10 +68,20 @@ builder.Services.AddSingleton<OptionChainStreamManager>();
 builder.Services.AddScoped<UserTradingSettingsService>();
 builder.Services.AddScoped<AdminService>();
 builder.Services.AddSingleton<MasterDataService>();
+builder.Services.AddHttpClient("OrderAgent");
+builder.Services.AddSingleton<KAITerminal.OrderRouting.IOrderAgentRegistry,
+                               KAITerminal.OrderRouting.OrderAgentRegistry>();
+builder.Services.AddSingleton<KAITerminal.OrderRouting.IOrderAgentClient,
+                               KAITerminal.OrderRouting.HttpOrderAgentClient>();
+builder.Services.AddSingleton<KAITerminal.OrderRouting.IOrderRouter,
+                               KAITerminal.OrderRouting.OrderRouter>();
 
 var app = builder.Build();
 
 await app.InitializeDatabaseAsync();
+await app.Services
+    .GetRequiredService<KAITerminal.OrderRouting.IOrderAgentRegistry>()
+    .LoadAsync();
 
 app.UseExceptionHandler(errApp => errApp.Run(async ctx =>
 {
@@ -152,6 +164,7 @@ app.MapMasterDataEndpoints();
 app.MapRiskNotificationEndpoints();
 app.MapWebhookEndpoints();
 app.MapAdminEndpoints();
+app.MapAdminOrderAgentEndpoints();
 app.MapHub<PositionsHub>("/hubs/positions");
 app.MapHub<IndexHub>("/hubs/indices");
 app.MapHub<RiskHub>("/hubs/risk");

@@ -119,7 +119,7 @@ Option contracts: not in DB. `MasterDataService` caches in `IMemoryCache`, expir
 
 | File | Key settings |
 |------|-------------|
-| `KAITerminal.Api/appsettings.json` | `Jwt:*`, `GoogleAuth:*`, `Frontend:Url`, `Upstox:ApiBaseUrl/HftBaseUrl`, `ConnectionStrings:*`, `AiSentiment:*` |
+| `KAITerminal.Api/appsettings.json` | `Jwt:*`, `GoogleAuth:*`, `Frontend:Url`, `Upstox:ApiBaseUrl/HftBaseUrl`, `ConnectionStrings:*` |
 | `KAITerminal.Worker/appsettings.json` | `Upstox:*`, `RiskEngine:*`, `Api:BaseUrl`, `Api:InternalKey`, `ConnectionStrings:*` |
 | `KAITerminal.Console/appsettings.json` | `Upstox:AccessToken`, `RiskEngine:*` |
 | `frontend/.env` | `VITE_API_URL`, PP defaults |

@@ -11,5 +11,6 @@ public interface IBrokerClientFactory
     /// <param name="brokerType">E.g. "upstox", "zerodha".</param>
     /// <param name="accessToken">The user's daily access token.</param>
     /// <param name="apiKey">API key — required for Zerodha (used in auth header + checksum).</param>
-    IBrokerClient Create(string brokerType, string accessToken, string? apiKey = null);
+    /// <param name="username">Optional username — used by decorating factories (e.g. order routing) to resolve per-user behaviour.</param>
+    IBrokerClient Create(string brokerType, string accessToken, string? apiKey = null, string? username = null);
 }

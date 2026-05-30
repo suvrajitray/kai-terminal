@@ -25,6 +25,7 @@
     <ProjectReference Include="../KAITerminal.Infrastructure/KAITerminal.Infrastructure.csproj" />
     <ProjectReference Include="../KAITerminal.Upstox/KAITerminal.Upstox.csproj" />
     <ProjectReference Include="../KAITerminal.Zerodha/KAITerminal.Zerodha.csproj" />
+    <ProjectReference Include="../KAITerminal.OrderRouting/KAITerminal.OrderRouting.csproj" />
   </ItemGroup>
 
 

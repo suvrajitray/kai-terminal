@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../KAITerminal.OrderRouting/KAITerminal.OrderRouting.csproj" />
+    <ProjectReference Include="../KAITerminal.Upstox/KAITerminal.Upstox.csproj" />
+    <ProjectReference Include="../KAITerminal.Zerodha/KAITerminal.Zerodha.csproj" />
+  </ItemGroup>
+</Project>
