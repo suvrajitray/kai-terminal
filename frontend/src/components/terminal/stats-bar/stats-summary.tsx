@@ -9,6 +9,7 @@ import type { PpBrokerEntry } from "./types";
 
 interface StatsSummaryProps {
   isLive: boolean;
+  hasValidBroker: boolean;
   hasPositions: boolean;
   totalPnl: number;
   openCount: number;
@@ -21,6 +22,7 @@ interface StatsSummaryProps {
 
 export function StatsSummary({
   isLive,
+  hasValidBroker,
   hasPositions,
   totalPnl,
   openCount,
@@ -32,7 +34,7 @@ export function StatsSummary({
 }: StatsSummaryProps) {
   return (
     <div className="flex h-9 items-center gap-2 flex-1 min-w-0 overflow-hidden">
-      <LiveStatus isLive={isLive} />
+      {hasValidBroker && <LiveStatus isLive={isLive} />}
       <SessionTimer />
 
       {hasPositions && (

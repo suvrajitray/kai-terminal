@@ -4,7 +4,6 @@ import { toast } from "@/lib/toast";
 import { PositionsPanel } from "@/components/panels/positions-panel";
 import { OrdersPanel } from "@/components/panels/orders-panel";
 import { StatsBar } from "@/components/terminal/stats-bar";
-import { BrokerAuthRequired } from "@/components/terminal/broker-auth-required";
 import { usePositionsFeed } from "@/components/panels/positions-panel/use-positions-feed";
 import { useOptionContractsPrefetch } from "@/hooks/use-option-contracts-prefetch";
 import { usePortfolioGreeks } from "@/hooks/use-portfolio-greeks";
@@ -18,20 +17,10 @@ import { useOrdersPanelResize } from "./use-orders-panel-resize";
 import { ExitAllDialog } from "./exit-all-dialog";
 
 export function TerminalPage() {
-  const credentials = useBrokerStore((s) => s.credentials);
-  const brokerEntries = Object.entries(credentials);
-  const hasValid = brokerEntries.some(([id, c]) => !isBrokerTokenExpired(id, c?.accessToken));
-  const hasExpired = brokerEntries.length > 0 && brokerEntries.every(([id, c]) => isBrokerTokenExpired(id, c?.accessToken));
-
-  if (!hasValid) {
-    return <BrokerAuthRequired expired={hasExpired} />;
-  }
-
-  return <TerminalPageInner />;
-}
-
-function TerminalPageInner() {
   const credentials     = useBrokerStore((s) => s.credentials);
+  const hasValidBroker = Object.entries(credentials).some(
+    ([id, c]) => !isBrokerTokenExpired(id, c?.accessToken),
+  );
   const loadOrdersRef = useRef<(() => void) | null>(null);
   const { positions, loading, isLive, load } = usePositionsFeed(
     () => loadOrdersRef.current?.()
@@ -100,14 +89,16 @@ function TerminalPageInner() {
           chainOpen={chainOpen}
           productFilter={productFilter}
           ppBrokers={ppBrokers}
+          hasValidBroker={hasValidBroker}
         />
 
         {/* Positions — flex-1, scrollable */}
-        <div className={cn("flex-1 overflow-hidden", !isDragging && "transition-[padding-bottom] duration-200 ease-in-out")} style={{ paddingBottom: ordersHeight }}>
+        <div className={cn("flex-1 overflow-hidden", !isDragging && "transition-[padding-bottom] duration-200 ease-in-out")} style={{ paddingBottom: hasValidBroker ? ordersHeight : 0 }}>
           <PositionsPanel
             positions={positions}
             loading={loading}
             load={load}
+            hasValidBroker={hasValidBroker}
             productFilter={productFilter}
             onProductFilterChange={setProductFilter}
             netDelta={netDelta}
@@ -116,23 +107,25 @@ function TerminalPageInner() {
         </div>
 
         {/* Orders — pinned bottom, resizable */}
-        <div
-          className={cn("absolute bottom-0 left-0 right-0 border-t border-border bg-background", !isDragging && "transition-[height] duration-200 ease-in-out")}
-          style={{ height: ordersHeight }}
-        >
+        {hasValidBroker && (
           <div
-            className="group absolute -top-2 left-0 right-0 h-4 cursor-row-resize z-10 flex items-center justify-center"
-            onMouseDown={onDragStart}
-            title="Drag to resize"
+            className={cn("absolute bottom-0 left-0 right-0 border-t border-border bg-background", !isDragging && "transition-[height] duration-200 ease-in-out")}
+            style={{ height: ordersHeight }}
           >
-            <div className="h-1 w-12 rounded-full bg-border/60 transition-colors group-hover:bg-primary/60 group-active:bg-primary" />
+            <div
+              className="group absolute -top-2 left-0 right-0 h-4 cursor-row-resize z-10 flex items-center justify-center"
+              onMouseDown={onDragStart}
+              title="Drag to resize"
+            >
+              <div className="h-1 w-12 rounded-full bg-border/60 transition-colors group-hover:bg-primary/60 group-active:bg-primary" />
+            </div>
+            <OrdersPanel
+              expanded={ordersExpanded}
+              onToggle={handleOrdersToggle}
+              onRegisterRefresh={(fn) => { loadOrdersRef.current = fn; }}
+            />
           </div>
-          <OrdersPanel
-            expanded={ordersExpanded}
-            onToggle={handleOrdersToggle}
-            onRegisterRefresh={(fn) => { loadOrdersRef.current = fn; }}
-          />
-        </div>
+        )}
       </div>
 
       {/* Right column — option chain panel */}

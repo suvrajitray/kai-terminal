@@ -10,6 +10,7 @@ import { getMarginColor } from "@/components/panels/order-dialog-parts/order-dia
 import { placeOrder, type MarginInstrument } from "@/services/trading-api";
 import { useOptionContractsStore } from "@/stores/option-contracts-store";
 import { toast } from "@/lib/toast";
+import { ensureBrokerOrPrompt } from "@/lib/broker-guard";
 import { INR_INT } from "@/lib/formatters";
 import { BasketItemRow } from "./basket-item-row";
 import { StrategyStrip } from "./strategy-strip";
@@ -56,6 +57,7 @@ export function BasketDialog({ open, onClose }: BasketDialogProps) {
   const [placing, setPlacing] = useState(false);
 
   async function handlePlace() {
+    if (!ensureBrokerOrPrompt()) return;
     const toPlace = someSelected ? items.filter((i) => selectedIds.has(i.id)) : items;
     if (toPlace.length === 0) return;
 

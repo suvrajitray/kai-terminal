@@ -27,6 +27,7 @@ interface StatsBarProps {
   onToggleChain: () => void;
   chainOpen: boolean;
   productFilter: "Intraday" | "Delivery" | null;
+  hasValidBroker: boolean;
 }
 
 export function StatsBar({
@@ -41,6 +42,7 @@ export function StatsBar({
   onToggleChain,
   chainOpen,
   productFilter,
+  hasValidBroker,
 }: StatsBarProps) {
   const connectedBrokers = useBrokerStore(useShallow((state) =>
     BROKERS.filter((broker) => state.isAuthenticated(broker.id)),
@@ -62,6 +64,7 @@ export function StatsBar({
     <div className="flex flex-col lg:flex-row shrink-0 border-b border-border bg-muted/40 px-3">
       <StatsSummary
         isLive={isLive}
+        hasValidBroker={hasValidBroker}
         hasPositions={displayPositions.length > 0}
         totalPnl={totalPnl}
         openCount={openCount}
@@ -79,6 +82,7 @@ export function StatsBar({
         acting={acting}
         loading={loading}
         chainOpen={chainOpen}
+        hasValidBroker={hasValidBroker}
         onOpenProfitProtection={onOpenProfitProtection}
         onExitAll={onExitAll}
         onRefresh={onRefresh}

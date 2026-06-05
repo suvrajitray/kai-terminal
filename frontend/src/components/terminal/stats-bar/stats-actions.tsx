@@ -17,6 +17,7 @@ interface StatsActionsProps {
   acting: string | null;
   loading: boolean;
   chainOpen: boolean;
+  hasValidBroker: boolean;
   onOpenProfitProtection: (brokerId?: string) => void;
   onExitAll: () => void;
   onRefresh: () => void;
@@ -31,6 +32,7 @@ export function StatsActions({
   acting,
   loading,
   chainOpen,
+  hasValidBroker,
   onOpenProfitProtection,
   onExitAll,
   onRefresh,
@@ -39,15 +41,18 @@ export function StatsActions({
 }: StatsActionsProps) {
   return (
     <div className="flex h-9 items-center gap-2 shrink-0 lg:ml-auto border-t border-border/40 lg:border-t-0">
-      <ProfitProtectionControl
-        connectedBrokers={connectedBrokers}
-        ppEnabled={ppEnabled}
-        onOpenProfitProtection={onOpenProfitProtection}
-      />
+      {hasValidBroker && (
+        <>
+          <ProfitProtectionControl
+            connectedBrokers={connectedBrokers}
+            ppEnabled={ppEnabled}
+            onOpenProfitProtection={onOpenProfitProtection}
+          />
+          <div className="h-4 w-px bg-border" />
+        </>
+      )}
 
-      <div className="h-4 w-px bg-border" />
-
-      {openCount > 0 && (
+      {hasValidBroker && openCount > 0 && (
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -84,7 +89,7 @@ export function StatsActions({
         </TooltipContent>
       </Tooltip>
 
-      {openCount > 0 && (
+      {hasValidBroker && openCount > 0 && (
         <Tooltip>
           <TooltipTrigger asChild>
             <Button

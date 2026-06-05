@@ -8,11 +8,13 @@ import { usePositionGreeksSummary } from "./use-position-greeks-summary";
 import { usePositionQuantities } from "./use-position-quantities";
 import { usePositionSelection } from "./use-position-selection";
 import type { Position } from "@/types";
+import { ConnectBrokerPrompt } from "./connect-broker-prompt";
 
 interface PositionsPanelProps {
   positions: Position[];
   loading: boolean;
   load: () => void;
+  hasValidBroker: boolean;
   netDelta?: number;
   thetaPerDay?: number;
   productFilter: "Intraday" | "Delivery" | null;
@@ -23,6 +25,7 @@ export function PositionsPanel({
   positions,
   loading,
   load,
+  hasValidBroker,
   netDelta,
   thetaPerDay = 0,
   productFilter,
@@ -77,6 +80,14 @@ export function PositionsPanel({
     thetaPerDay,
     openPositions,
   });
+
+  if (!hasValidBroker) {
+    return (
+      <div className="flex h-full flex-col">
+        <ConnectBrokerPrompt />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full flex-col">

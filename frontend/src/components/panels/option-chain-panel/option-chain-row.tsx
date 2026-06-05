@@ -5,6 +5,7 @@ import type { OptionChainEntry } from "@/types";
 import type { OrderIntent } from "@/components/panels/order-dialog";
 import { useBasketStore } from "@/stores/basket-store";
 import { getLotSize } from "@/lib/lot-sizes";
+import { ensureBrokerOrPrompt } from "@/lib/broker-guard";
 
 interface Props {
   entry: OptionChainEntry;
@@ -90,6 +91,7 @@ export const OptionChainRow = memo(function OptionChainRow({ entry, isAtm, isLiv
   const addToBasket = useBasketStore((s) => s.addItem);
 
   function triggerOrder(side: "CE" | "PE", transactionType: "Buy" | "Sell") {
+    if (!ensureBrokerOrPrompt()) return;
     const opt = side === "CE" ? entry.callOptions : entry.putOptions;
     const ltp = opt?.marketData?.ltp ?? 0;
     const key = opt?.instrumentKey;
