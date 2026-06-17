@@ -1,8 +1,10 @@
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "motion/react";
-import { Activity, Bot, LayoutDashboard, MonitorDot, type LucideIcon } from "lucide-react";
+import { Activity, Bot, LayoutDashboard, Menu, MonitorDot, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { APP_NAME, NAV_ITEMS } from "@/lib/constants";
+import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
 import { UserMenu } from "./user-menu";
 import { IndexTicker } from "./index-ticker";
 import { QuickTradeButton } from "./quick-trade-button";
@@ -32,14 +34,55 @@ export function Header() {
       className="relative sticky top-0 z-50 bg-background/80 backdrop-blur-sm"
     >
       <div className="flex h-14 items-center justify-between px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3 sm:gap-6">
+          {/* Mobile hamburger — collapses the inline nav below md */}
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="-ml-2 md:hidden" aria-label="Open navigation menu">
+                <Menu className="size-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-64 p-0">
+              <SheetHeader className="border-b border-border/40 px-4 py-4">
+                <SheetTitle className="flex items-center gap-2">
+                  <div className="flex size-7 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
+                    <Activity className="size-4 text-primary" />
+                  </div>
+                  {APP_NAME}
+                </SheetTitle>
+              </SheetHeader>
+              <nav className="flex flex-col gap-1 p-3">
+                {NAV_ITEMS.map((item) => {
+                  const Icon = NAV_ICONS[item.path];
+                  const isActive = pathname === item.path;
+                  return (
+                    <SheetClose asChild key={item.path}>
+                      <Link
+                        to={item.path}
+                        className={cn(
+                          "flex items-center gap-2.5 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
+                          isActive
+                            ? "bg-accent text-foreground"
+                            : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+                        )}
+                      >
+                        {Icon && <Icon className="size-4" />}
+                        {item.label}
+                      </Link>
+                    </SheetClose>
+                  );
+                })}
+              </nav>
+            </SheetContent>
+          </Sheet>
+
           <Link to="/dashboard" className="flex items-center gap-2 font-semibold">
             <div className="flex size-7 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20">
               <Activity className="size-4 text-primary" />
             </div>
             <span>{APP_NAME}</span>
           </Link>
-          <nav className="flex items-center gap-0.5">
+          <nav className="hidden items-center gap-0.5 md:flex">
             {NAV_ITEMS.map((item) => {
               const Icon = NAV_ICONS[item.path];
               const isActive = pathname === item.path;
